@@ -1,0 +1,14 @@
+[
+    {
+        "name": "Occurrence Typing",
+        "path": "occtyp.stml"
+    },
+    {
+        "name": "Recursive Functions",
+        "path": "rec.stml"
+    },
+    {
+        "name": "Abstract Types",
+        "path": "abstract.stml"
+    }
+]

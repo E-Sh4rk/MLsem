@@ -1,0 +1,25 @@
+
+abstract type ref('a)
+let ref = <'a -> ref('a)>
+let set = <ref('a) -> 'a -> ref('a)> (* We dont have value restriction yet, so functions should not have effects *)
+let get = <ref('a) -> 'a>
+
+let test_ref x =
+  let y = ref x in
+  let y = set y 42 in
+  get y
+
+let is_ref x = if x is ref then true else false
+let is_not_ref x = if x is ~ref then true else false
+(* let incalid_typecase x = if x is ref(int) then true else false *)
+
+abstract type map(-'k, +'v)
+let mk_map = <() -> map('a, 'b)>
+let add_map = <map('a, 'b) -> 'a -> 'b -> map('a, 'b)>
+let get_map = <map('a, 'b) -> 'a -> 'b>
+
+let test_map x =
+  let map = mk_map () in
+  let map = add_map map x 42 in
+  let map = add_map map "key" 0 in
+  (map, get_map map false)

@@ -1,0 +1,58 @@
+
+let succ = <int->int>
+
+let fixpoint = fun f ->
+  let delta = fun x ->
+     f ( fun  v -> ( x x v ))
+   in delta delta
+
+let fact fact n =
+  if n is 0 then 1 else (fact (n-1))*n
+
+let fact = fixpoint fact
+
+let length length lst =
+  if lst is [] then 0 else succ (length (tl lst))
+
+let length = fixpoint length
+
+let map map f lst =
+  if lst is [] then []
+  else (f (hd lst))::(map f (tl lst))
+
+let map = fixpoint map
+
+(* === Filter map === *)
+
+let rec filtermap ((f, l) : (any, [])) =
+  match l with
+  | [] -> []
+  | (x::xs) ->
+      match f x with
+      | :false -> filtermap (f, xs)
+      | :true -> x::(filtermap (f, xs))
+      | (:true, y) -> y::(filtermap (f, xs))
+    end
+  end
+
+let rec filtermap ((f, l) : ('a -> false | (true, 'b), ['a*])) =
+  match l with
+  | [] -> []
+  | (x::xs) ->
+      match f x with
+      | :false -> filtermap (f, xs)
+      | :true -> x::(filtermap (f, xs))
+      | (:true, y) -> y::(filtermap (f, xs))
+    end
+  end
+
+let rec filtermap ((f, l) : ('a -> bool | (true, 'b), ['a*])) =
+  match l with
+  | [] -> []
+  | (x::xs) ->
+      match f x with
+      | :false -> filtermap (f, xs)
+      | :true -> x::(filtermap (f, xs))
+      | (:true, y) -> y::(filtermap (f, xs))
+    end
+  end
