@@ -1,6 +1,5 @@
 %{ (* Emacs, use -*- tuareg -*- to open this file. *)
 
-  (* TODO: partition annotation for let bindings *)
   open Ast
   open Types.Additions
   open Types.Base
@@ -179,6 +178,8 @@ variance:
 term:
   t=simple_term { t }
 | FUN ais=parameter+ ARROW t = term { multi_param_abstraction $startpos $endpos ais t }
+| LET id=generalized_identifier COLON tys=separated_nonempty_list(SEMICOLON, typ) EQUAL td=term IN t=term
+  { annot $startpos $endpos (Let (id, PAnnot tys, td, t)) }
 | LET id=generalized_identifier ais=parameter* EQUAL td=term IN t=term
   {
     let td = multi_param_abstraction $startpos $endpos ais td in
