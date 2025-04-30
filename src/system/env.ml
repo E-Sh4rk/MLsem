@@ -18,6 +18,14 @@ module TyScheme = struct
   let pp fmt (tvs, ty) =
     Format.fprintf fmt "∀%a.%a"
       (Utils.pp_list TVar.pp) (TVarSet.destruct tvs) pp_typ ty
+  let pp_short fmt (tvs, ty) =
+    let s = shorten_names tvs in
+    let ty = Subst.apply s ty in
+    let tvs = TVarSet.destruct tvs
+      |> List.map TVar.typ
+      |> List.map (Subst.apply s) in
+    Format.fprintf fmt "∀%a.%a"
+      (Utils.pp_list pp_typ) tvs pp_typ ty
 end
 
 module Env = struct

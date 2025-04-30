@@ -16,7 +16,7 @@ let () =
                 match type_check_def tenv env (v,e,ta) with
                 | TSuccess (t, env, time) ->
                     Format.printf "%a @{<italic;yellow>(checked in %.00fms)@}\n%!"
-                        System.Env.TyScheme.pp t time ; (* TODO: print_short *)
+                        System.Env.TyScheme.pp_short t time ;
                     env
                 | TFailure (_, msg, time) ->
                     Format.printf "@{<red>%s@} @{<italic;purple>(failed in %.00fms)@}\n%!" msg time ;

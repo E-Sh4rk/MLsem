@@ -75,6 +75,7 @@ val vars_with_polarity : Base.typ -> (TVar.t * [ `Both | `Neg | `Pos ]) list
 val check_var : Base.typ -> [ `Not_var | `Pos of TVar.t | `Neg of TVar.t ]
 val is_ground_typ : Base.typ -> bool
 val refresh : TVarSet.t -> Subst.t
+val shorten_names : TVarSet.t -> Subst.t
 val pp_typ_short : Format.formatter -> Base.typ -> unit
 val string_of_type_short : Base.typ -> string
 

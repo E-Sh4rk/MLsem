@@ -179,24 +179,24 @@ let refresh vars =
   let f v = (v, TVar.mk_fresh v |> TVar.typ) in
   vars |> TVarSet.destruct |> List.map f |> Subst.construct
 
-let pp_typ_short fmt t =
-  let short_names vs =
-    let char i = Char.chr ((i mod 26)+97) in
-    let nb i = i / 26 in
-    let names =
-      let c = ref 0 in
-      fun _ ->
-        let letter, n = char !c, nb !c in
-        c := !c + 1 ;
-        if n = 0 then
-          Format.asprintf "'%c" letter
-        else
-          Format.asprintf "'%c%i" letter n
-    in
-    let (s,_) = Sstt.Subst.refresh ~names vs in
-    s
+let shorten_names vs =
+  let char i = Char.chr ((i mod 26)+97) in
+  let nb i = i / 26 in
+  let names =
+    let c = ref 0 in
+    fun _ ->
+      let letter, n = char !c, nb !c in
+      c := !c + 1 ;
+      if n = 0 then
+        Format.asprintf "'%c" letter
+      else
+        Format.asprintf "'%c%i" letter n
   in
-  let t = Subst.apply (short_names (vars t)) t in
+  let (s,_) = Sstt.Subst.refresh ~names vs in
+  s
+
+let pp_typ_short fmt t =
+  let t = Subst.apply (vars t |> shorten_names) t in
   Base.pp_typ fmt t
 let string_of_type_short t =
   Format.asprintf "%a" pp_typ_short t

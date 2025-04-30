@@ -12,6 +12,7 @@ module TyScheme : sig
     val leq : t -> t -> bool
     val equiv : t -> t -> bool
     val pp : Format.formatter -> t -> unit
+    val pp_short : Format.formatter -> t -> unit
 end
 
 module Env : sig
