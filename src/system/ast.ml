@@ -3,7 +3,6 @@ open Variable
 open Types.Base
 open Types.Tvar
 
-(* TODO: add location info to AST *)
 (* TODO: no more mono/poly var? *)
 
 type e =
@@ -11,17 +10,19 @@ type e =
 | Const of Ast.const
 | Var of Variable.t
 | Atom of atom
-| Tag of tag * e
-| Lambda of (typ list) * Variable.t * e
-| Ite of e * typ * e * e
-| App of e * e
-| Tuple of e list
-| Cons of e * e
-| Projection of Ast.projection * e
-| RecordUpdate of e * string * e option
-| Let of (typ list) * Variable.t * e * e
-| TypeConstr of e * typ
-| TypeCoerce of e * typ list
+| Tag of tag * t
+| Lambda of (typ list) * Variable.t * t
+| Ite of t * typ * t * t
+| App of t * t
+| Tuple of t list
+| Cons of t * t
+| Projection of Ast.projection * t
+| RecordUpdate of t * string * t option
+| Let of (typ list) * Variable.t * t * t
+| TypeConstr of t * typ
+| TypeCoerce of t * typ list
+[@@deriving show]
+and t = Ast.exprid * e
 [@@deriving show]
 
 let fixpoint_var = Variable.create_gen (Some "__builtin_fixpoint")
@@ -37,30 +38,31 @@ let initial_env =
   Env.construct [(fixpoint_var, fixpoint_typ)]
 
 let map f =
-  let rec aux e =
-    begin match e with
-    | Abstract t -> Abstract t
-    | Const c -> Const c
-    | Var v -> Var v
-    | Atom a -> Atom a
-    | Tag (t,e) -> Tag (t, aux e)
-    | Lambda (ta, v, e) -> Lambda (ta, v, aux e)
-    | Ite (e, t, e1, e2) -> Ite (aux e, t, aux e1, aux e2)
-    | App (e1, e2) -> App (aux e1, aux e2)
-    | Tuple es -> Tuple (List.map aux es)
-    | Cons (e1, e2) -> Cons (aux e1, aux e2)
-    | Projection (p, e) -> Projection (p, aux e)
-    | RecordUpdate (e, str, eo) -> RecordUpdate (aux e, str, Option.map aux eo)
-    | Let (ta, v, e1, e2) -> Let (ta, v, aux e1, aux e2)
-    | TypeConstr (e, t) -> TypeConstr (aux e, t)
-    | TypeCoerce (e, ts) -> TypeCoerce (e, ts)
-    end
-    |> f
+  let rec aux (id,e) =
+    let e =
+      match e with
+      | Abstract t -> Abstract t
+      | Const c -> Const c
+      | Var v -> Var v
+      | Atom a -> Atom a
+      | Tag (t,e) -> Tag (t, aux e)
+      | Lambda (ta, v, e) -> Lambda (ta, v, aux e)
+      | Ite (e, t, e1, e2) -> Ite (aux e, t, aux e1, aux e2)
+      | App (e1, e2) -> App (aux e1, aux e2)
+      | Tuple es -> Tuple (List.map aux es)
+      | Cons (e1, e2) -> Cons (aux e1, aux e2)
+      | Projection (p, e) -> Projection (p, aux e)
+      | RecordUpdate (e, str, eo) -> RecordUpdate (aux e, str, Option.map aux eo)
+      | Let (ta, v, e1, e2) -> Let (ta, v, aux e1, aux e2)
+      | TypeConstr (e, t) -> TypeConstr (aux e, t)
+      | TypeCoerce (e, ts) -> TypeCoerce (e, ts)
+    in
+    f (id,e)
   in
   aux
 
 let fold f =
-  let rec aux e =
+  let rec aux (id,e) =
     begin match e with
     | Abstract _ | Const _ | Var _ | Atom _ -> []
     | Tag (_, e) | Lambda (_,_, e) | Projection (_, e)
@@ -71,11 +73,11 @@ let fold f =
     | Tuple es -> es
     end
     |> List.map aux
-    |> f e
+    |> f (id,e)
   in
   aux
 
-let fv' e accs =
+let fv' (_,e) accs =
   let acc = List.fold_left VarSet.union VarSet.empty accs in
   match e with
   | Abstract _ | Const _ | Atom _ | Tag _ | Ite _
@@ -84,7 +86,7 @@ let fv' e accs =
   | Var v -> VarSet.add v acc
   | Let (_, v, _, _) | Lambda (_, v, _) -> VarSet.remove v acc
 
-let fv e = fold fv' e
+let fv t = fold fv' t
 
 (* Conversion *)
 
@@ -126,12 +128,11 @@ let rec vars_of_pat pat =
 let rec def_of_var_pat pat v e =
   assert (Variable.equals v Ast.dummy_pat_var |> not) ;
   let open Ast in
-  let (annot, _) = e in
   match pat with
   | PatVar v' when Variable.equals v v' -> e
   | PatVar _ -> assert false
   | PatTag (tag, p) ->
-    def_of_var_pat p v (annot, Projection (PiTag tag, e))
+    def_of_var_pat p v (Ast.unique_exprid (), Projection (PiTag tag, e))
   | PatAnd (p1, p2) ->
     if vars_of_pat p1 |> VarSet.mem v
     then def_of_var_pat p1 v e
@@ -140,40 +141,38 @@ let rec def_of_var_pat pat v e =
     let i = List.find_index (fun p -> vars_of_pat p |> VarSet.mem v) ps |> Option.get in
     let n = List.length ps in
     let p = List.nth ps i in
-    def_of_var_pat p v (annot, Projection (Pi (n,i), e))
+    def_of_var_pat p v (Ast.unique_exprid (), Projection (Pi (n,i), e))
   | PatCons (p1, p2) ->
     if vars_of_pat p1 |> VarSet.mem v
-    then def_of_var_pat p1 v (annot, Projection (Hd, e))
-    else def_of_var_pat p2 v (annot, Projection (Tl, e))
+    then def_of_var_pat p1 v (Ast.unique_exprid (), Projection (Hd, e))
+    else def_of_var_pat p2 v (Ast.unique_exprid (), Projection (Tl, e))
   | PatRecord (fields, _) ->
     let (str, p) =
       fields |> List.find (fun (_, p) -> vars_of_pat p |> VarSet.mem v)
     in
-    def_of_var_pat p v (annot, Projection (Field str, e))
+    def_of_var_pat p v (Ast.unique_exprid (), Projection (Field str, e))
   | PatOr (p1, p2) ->
     let case = Ite (e, type_of_pat p1,
       def_of_var_pat p1 v e, def_of_var_pat p2 v e) in
-    (annot, case)
-  | PatAssign (v', c) when Variable.equals v v' -> (annot, Const c)
+    (Ast.unique_exprid (), case)
+  | PatAssign (v', c) when Variable.equals v v' -> (Ast.unique_exprid (), Const c)
   | PatAssign _ -> assert false
   | PatType _ -> assert false
 
-let encode_pattern_matching annot e pats =
+let encode_pattern_matching id e pats =
   let x = Variable.create_let None in
-  Variable.attach_location x (Position.position annot) ;
-  let (eannot,_) = e in
-  let ex : Ast.annot_expr = (eannot, Var x) in
+  let ex : Ast.expr = (Ast.unique_exprid (), Var x) in
   let t = pats |> List.map fst |> List.map type_of_pat |> disj in
   let body_of_pat pat e' =
     let vars = vars_of_pat pat in
     let add_def acc v =
       let d = def_of_var_pat pat v ex in
-      (annot, Ast.Let (v, Ast.PNoAnnot, d, acc))
+      (Ast.unique_exprid (), Ast.Let (v, Ast.PNoAnnot, d, acc))
     in
     List.fold_left add_def e' (VarSet.elements vars)
   in
   let add_branch acc (t, e') =
-    (annot, Ast.Ite (ex, t, e', acc))
+    (Ast.unique_exprid (), Ast.Ite (ex, t, e', acc))
   in
   let pats = pats |> List.map (fun (pat, e') ->
     (type_of_pat pat, body_of_pat pat e')) |> List.rev in
@@ -181,19 +180,18 @@ let encode_pattern_matching annot e pats =
   | [] -> assert false 
   | (_, e')::pats -> List.fold_left add_branch e' pats
   in
-  (annot, Ast.Let (x, Ast.PNoAnnot, (annot, Ast.TypeConstr (e, t)), body))
+  let def = (Ast.unique_exprid (), Ast.TypeConstr (e, t)) in
+  (id, Ast.Let (x, Ast.PNoAnnot, def, body))
 
-let encode_fixpoint annot e =
+let encode_fixpoint id e =
   let x = Variable.create_let None in
-  Variable.attach_location x (Position.position annot) ;
-  let (eannot,_) = e in
-  let ex : Ast.annot_expr = (eannot, Var x) in
-  let fix : Ast.annot_expr = (annot, Ast.Var fixpoint_var) in
-  let app = (annot, Ast.App (fix, ex)) in
-  (annot, Ast.Let (x, Ast.PNoAnnot, e, app))
+  let ex : Ast.expr = (Ast.unique_exprid (), Var x) in
+  let fix : Ast.expr = (Ast.unique_exprid (), Ast.Var fixpoint_var) in
+  let app = (Ast.unique_exprid (), Ast.App (fix, ex)) in
+  (id, Ast.Let (x, Ast.PNoAnnot, e, app))
 
-let from_parser_ast e =
-  let rec aux (annot,e) =
+let from_parser_ast t =
+  let rec aux_e (id,e) =
     match e with
     | Ast.Abstract t -> Abstract t
     | Ast.Const c -> Const c
@@ -204,7 +202,7 @@ let from_parser_ast e =
       let tv = TVar.mk_mono ~infer:true (Variable.get_name x) |> TVar.typ in
       Lambda ([tv], x, aux e)
     | Ast.Lambda (x, DAnnot lst, e) -> Lambda (lst, x, aux e)
-    | Ast.Fixpoint e -> encode_fixpoint annot e |> aux
+    | Ast.Fixpoint e -> encode_fixpoint id e |> aux_e
     | Ast.Ite (e,t,e1,e2) -> Ite (aux e, t, aux e1, aux e2)
     | Ast.App (e1,e2) -> App (aux e1, aux e2)
     | Ast.Let (x, PNoAnnot, e1, e2) -> Let ([], x, aux e1, aux e2)
@@ -215,5 +213,10 @@ let from_parser_ast e =
     | Ast.RecordUpdate (e, lbl, eo) -> RecordUpdate (aux e, lbl, Option.map aux eo)
     | Ast.TypeConstr (e, t) -> TypeConstr (aux e, t)
     | Ast.TypeCoerce (e, ts) -> TypeCoerce (aux e, ts)
-    | Ast.PatMatch (e, pats) -> encode_pattern_matching annot e pats |> aux
-  in aux e
+    | Ast.PatMatch (e, pats) -> encode_pattern_matching id e pats |> aux_e
+  and aux t =
+    let e = aux_e t in
+    let (id, _) = t in
+    (id,e)
+  in
+  aux t

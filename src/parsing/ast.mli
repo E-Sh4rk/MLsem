@@ -1,7 +1,6 @@
 open Types.Base
 open Types.Additions
 open Variable
-open Pomap
 
 exception SymbolError of string
 exception LexicalError of Position.t * string
@@ -58,26 +57,19 @@ and ('a, 'typ, 'ato, 'tag, 'v) ast =
 
 and ('a, 'typ, 'ato, 'tag, 'v) t = 'a * ('a, 'typ, 'ato, 'tag, 'v) ast
 
-type annot_expr = (annotation, typ, atom, tag, Variable.t) t
-type expr = (unit, typ, atom, tag, Variable.t) t
+type expr = (exprid, typ, atom, tag, Variable.t) t
 type parser_expr = (annotation, type_expr, string, string, varname) t
-
-module Expr : Pomap_intf.PARTIAL_ORDER with type el = expr
-module ExprMap : Pomap_intf.POMAP with type key = expr
 
 type name_var_map = Variable.t StrMap.t
 val empty_name_var_map : name_var_map
 
 val unique_exprid : unit -> exprid
-val identifier_of_expr : (annotation, 'a, 'b, 'c, 'd) t -> exprid
-val position_of_expr : (annotation, 'a, 'b, 'c, 'd) t -> Position.t
-
 val new_annot : Position.t -> annotation
 val copy_annot : annotation -> annotation
 
 val dummy_pat_var : Variable.t
 
-val parser_expr_to_annot_expr : type_env -> var_type_env -> name_var_map -> parser_expr -> annot_expr
+val parser_expr_to_expr : type_env -> var_type_env -> name_var_map -> parser_expr -> expr
 
 val const_to_typ : const -> typ
 
@@ -90,6 +82,7 @@ type parser_program = (annotation * parser_element) list
 
 (* Pretty printers *)
 
+val pp_exprid : Format.formatter -> exprid -> unit
 val pp_const : Format.formatter -> const -> unit
 val pp_projection : Format.formatter -> projection -> unit
 val pp_dom_annot : (Format.formatter -> 'a -> unit) ->

@@ -12,7 +12,6 @@ depends: [
   "sstt" {>= "0.1.0"}
   "ppx_deriving"
   "zarith"
-  "pomap"
   "yojson"
   "js_of_ocaml-ppx"
   "zarith_stubs_js"

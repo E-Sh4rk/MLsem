@@ -6,7 +6,7 @@ open Parsing
 open Parsing.Variable
 open Types.Tvar
 
-type def = Variable.t * Ast.annot_expr * typ option
+type def = Variable.t * Ast.expr * typ option
 
 type typecheck_result =
 | TSuccess of typ * Env.t * float
@@ -87,7 +87,7 @@ let parse_and_resolve f varm =
         | None -> None
         | Some expr -> let (t, _) = type_expr_to_typ tenv empty_vtenv expr in Some t
         in
-        let expr = Ast.parser_expr_to_annot_expr tenv empty_vtenv varm expr in
+        let expr = Ast.parser_expr_to_expr tenv empty_vtenv varm expr in
         let var = Variable.create_let (Some name) in
         Variable.attach_location var (Position.position annot) ;
         let varm = StrMap.add name var varm in

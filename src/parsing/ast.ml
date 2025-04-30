@@ -1,7 +1,6 @@
 open Types.Base
 open Types.Additions
 open Variable
-open Pomap
 
 exception SymbolError of string
 exception LexicalError of Position.t * string
@@ -9,6 +8,7 @@ exception SyntaxError of Position.t * string
 
 type varname = string
 type exprid = int
+[@@deriving show]
 
 type annotation = exprid Position.located
 
@@ -69,42 +69,10 @@ and ('a, 'typ, 'ato, 'tag, 'v) ast =
 
 and ('a, 'typ, 'ato, 'tag, 'v) t = 'a * ('a, 'typ, 'ato, 'tag, 'v) ast
 
-type annot_expr = (annotation, typ, atom, tag, Variable.t) t
-type expr = (unit, typ, atom, tag, Variable.t) t
+type expr = (exprid, typ, atom, tag, Variable.t) t
 type parser_expr = (annotation, type_expr, string, string, varname) t
-module Expr = struct
-    type el = expr
-    type ord = Unknown | Lower | Equal | Greater
-    let compare t1 t2 =
-        let cstruct = compare
-            (fun () () -> 0)
-            (fun _ _ -> 0)
-            compare_atom
-            compare_tag
-            Variable.compare t1 t2
-        in match cstruct with
-        | -1 -> Lower
-        | 1 -> Greater
-        | 0 ->
-            begin try
-                let cexact = compare
-                    (fun () () -> 0)
-                    Types.Compare.compare_typ
-                    compare_atom
-                    compare_tag
-                    Variable.compare t1 t2 in
-                match cexact with
-                | -1 -> Lower
-                | 1 -> Greater
-                | 0 -> Equal
-                | _ -> assert false
-            with Types.Compare.Uncomparable -> Unknown end
-        | _ -> assert false
-end
-module ExprMap = Pomap_impl.Make(Expr)
 
 type name_var_map = Variable.t StrMap.t
-
 let empty_name_var_map = StrMap.empty
 
 let unique_exprid =
@@ -113,12 +81,8 @@ let unique_exprid =
         last_id := !last_id + 1 ;
         !last_id
     )
-let identifier_of_expr (a,_) = Position.value a
-let position_of_expr (a,_) = Position.position a
-
 let new_annot p =
     Position.with_pos p (unique_exprid ())
-
 let copy_annot a =
     new_annot (Position.position a)
 
@@ -130,7 +94,8 @@ let no_infer_var t =
     let open Types.Tvar in
     vars t |> TVarSet.filter TVar.can_infer |> TVarSet.is_empty
 
-let parser_expr_to_annot_expr tenv vtenv name_var_map e =
+(* TODO: associate a location to each exprid using a hashtbl *)
+let parser_expr_to_expr tenv vtenv name_var_map e =
     let rec aux vtenv env ((exprid,pos),e) =
         let e = match e with
         | Abstract t ->
@@ -192,7 +157,7 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
         | PatMatch (e, pats) ->
             PatMatch (aux vtenv env e, List.map (aux_pat pos vtenv env) pats)
         in
-        ((exprid,pos),e)
+        (exprid,e)
     and aux_pat pos vtenv env (pat, e) =
         let merge_disj =
             StrMap.union (fun str v1 v2 ->

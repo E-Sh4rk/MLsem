@@ -18,5 +18,5 @@
 (package
  (name mlsem)
  (synopsis "A prototype type-checker for dynamic languages")
- (depends (ocaml (>= 5.3.0)) dune (sstt (>= 0.1.0)) ppx_deriving zarith pomap yojson js_of_ocaml-ppx zarith_stubs_js)
+ (depends (ocaml (>= 5.3.0)) dune (sstt (>= 0.1.0)) ppx_deriving zarith yojson js_of_ocaml-ppx zarith_stubs_js)
 )
