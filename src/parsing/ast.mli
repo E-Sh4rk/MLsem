@@ -53,7 +53,7 @@ and ('a, 'typ, 'ato, 'tag, 'v) ast =
 | Projection of projection * ('a, 'typ, 'ato, 'tag, 'v) t
 | RecordUpdate of ('a, 'typ, 'ato, 'tag, 'v) t * string * ('a, 'typ, 'ato, 'tag, 'v) t option
 | TypeConstr of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ
-| TypeCoercion of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ list
+| TypeCoerce of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ list
 | PatMatch of ('a, 'typ, 'ato, 'tag, 'v) t * (('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'ato, 'tag, 'v) t) list
 
 and ('a, 'typ, 'ato, 'tag, 'v) t = 'a * ('a, 'typ, 'ato, 'tag, 'v) ast
@@ -78,8 +78,6 @@ val copy_annot : annotation -> annotation
 val dummy_pat_var : Variable.t
 
 val parser_expr_to_annot_expr : type_env -> var_type_env -> name_var_map -> parser_expr -> annot_expr
-
-val map_ast : (annot_expr -> annot_expr) -> annot_expr -> annot_expr 
 
 val const_to_typ : const -> typ
 

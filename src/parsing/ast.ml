@@ -63,7 +63,7 @@ and ('a, 'typ, 'ato, 'tag, 'v) ast =
 | Projection of projection * ('a, 'typ, 'ato, 'tag, 'v) t
 | RecordUpdate of ('a, 'typ, 'ato, 'tag, 'v) t * string * ('a, 'typ, 'ato, 'tag, 'v) t option
 | TypeConstr of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ
-| TypeCoercion of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ list
+| TypeCoerce of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ list
 | PatMatch of ('a, 'typ, 'ato, 'tag, 'v) t * (('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'ato, 'tag, 'v) t) list
 [@@deriving ord]
 
@@ -184,10 +184,10 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
             if is_test_type t
             then TypeConstr (aux vtenv env e, t)
             else raise (SymbolError ("type constraints should be a test type"))
-        | TypeCoercion (e, ts) ->
+        | TypeCoerce (e, ts) ->
             let (ts, vtenv) = type_exprs_to_typs tenv vtenv ts in
             if List.for_all no_infer_var ts
-            then TypeCoercion (aux vtenv env e, ts)
+            then TypeCoerce (aux vtenv env e, ts)
             else raise (SymbolError ("type in coercion should not have inferable type variable"))
         | PatMatch (e, pats) ->
             PatMatch (aux vtenv env e, List.map (aux_pat pos vtenv env) pats)
@@ -264,59 +264,6 @@ let parser_expr_to_annot_expr tenv vtenv name_var_map e =
         (pat, aux vtenv env e)
     in
     aux vtenv name_var_map e
-
-let map_p f p =
-    let rec aux p =
-        let p =
-            match p with
-            | PatAssign (v, e) -> PatAssign (v, e)
-            | PatType t -> PatType t
-            | PatVar v -> PatVar v
-            | PatTag (tag, p) -> PatTag (tag, aux p)
-            | PatAnd (p1, p2) -> PatAnd (aux p1, aux p2)
-            | PatOr (p1, p2) -> PatOr (aux p1, aux p2)
-            | PatTuple ps -> PatTuple (List.map aux ps)
-            | PatCons (p1, p2) -> PatCons (aux p1, aux p2)
-            | PatRecord (fields, o) ->
-                PatRecord (List.map (fun (str, p) -> (str, aux p)) fields, o)
-        in
-        f p
-    in
-    aux p
-
-let map_ast f e =
-    let rec aux (annot, e) =
-        let e = match e with
-        | Abstract t -> Abstract t
-        | Const c -> Const c
-        | Var v -> Var v
-        | Atom a -> Atom a
-        | Tag (t, e) -> Tag (t, aux e)
-        | Lambda (v, a, e) -> Lambda (v, a, aux e)
-        | Fixpoint e -> Fixpoint (aux e)
-        | Ite (e, t, e1, e2) -> Ite (aux e, t, aux e1, aux e2)
-        | App (e1, e2) -> App (aux e1, aux e2)
-        | Let (v, a, e1, e2) -> Let (v, a, aux e1, aux e2)
-        | Tuple es -> Tuple (List.map aux es)
-        | Cons (e1, e2) -> Cons (aux e1, aux e2)
-        | Projection (p, e) -> Projection (p, aux e)
-        | RecordUpdate (e, str, eo) -> RecordUpdate (aux e, str, Option.map aux eo)
-        | TypeConstr (e, t) -> TypeConstr (aux e, t)
-        | TypeCoercion (e, t) -> TypeCoercion (aux e, t)
-        | PatMatch (e, pats) ->
-            let pats = pats |> List.map (fun (p,e) -> (aux_p p, aux e)) in
-            PatMatch (aux e, pats)
-        in
-        f (annot, e)
-    and aux_p p =
-        let pa p =
-            match p with
-            | PatAssign (v, c) -> PatAssign (v, c)
-            | p -> p
-        in
-        map_p pa p
-    in
-    aux e
 
 let const_to_typ c =
     match c with

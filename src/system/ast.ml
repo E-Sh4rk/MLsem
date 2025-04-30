@@ -3,6 +3,9 @@ open Variable
 open Types.Base
 open Types.Tvar
 
+(* TODO: add location info to AST *)
+(* TODO: no more mono/poly var? *)
+
 type e =
 | Abstract of typ
 | Const of Ast.const
@@ -155,44 +158,62 @@ let rec def_of_var_pat pat v e =
   | PatAssign _ -> assert false
   | PatType _ -> assert false
 
-let remove_patterns_and_fixpoints e =
-  let aux (annot,e) =
-    let e =
-      match e with
-      | Ast.PatMatch (e, pats) ->
-        let x = Variable.create_let None in
-        Variable.attach_location x (Position.position annot) ;
-        let (eannot,_) = e in
-        let ex : Ast.annot_expr = (eannot, Var x) in
-        let t = pats |> List.map fst |> List.map type_of_pat |> disj in
-        let body_of_pat pat e' =
-          let vars = vars_of_pat pat in
-          let add_def acc v =
-            let d = def_of_var_pat pat v ex in
-            (annot, Ast.Let (v, Ast.PNoAnnot, d, acc))
-          in
-          List.fold_left add_def e' (VarSet.elements vars)
-        in
-        let add_branch acc (t, e') =
-          (annot, Ast.Ite (ex, t, e', acc))
-        in
-        let pats = pats |> List.map (fun (pat, e') ->
-          (type_of_pat pat, body_of_pat pat e')) |> List.rev in
-        let body = match pats with
-        | [] -> assert false 
-        | (_, e')::pats -> List.fold_left add_branch e' pats
-        in
-        Ast.Let (x, Ast.PNoAnnot, (annot, Ast.TypeConstr (e, t)), body)
-      | Ast.Fixpoint e ->
-        let x = Variable.create_let None in
-        Variable.attach_location x (Position.position annot) ;
-        let (eannot,_) = e in
-        let ex : Ast.annot_expr = (eannot, Var x) in
-        let fix : Ast.annot_expr = (annot, Ast.Var fixpoint_var) in
-        let app = (annot, Ast.App (fix, ex)) in
-        Ast.Let (x, Ast.PNoAnnot, e, app)
-      | e -> e
+let encode_pattern_matching annot e pats =
+  let x = Variable.create_let None in
+  Variable.attach_location x (Position.position annot) ;
+  let (eannot,_) = e in
+  let ex : Ast.annot_expr = (eannot, Var x) in
+  let t = pats |> List.map fst |> List.map type_of_pat |> disj in
+  let body_of_pat pat e' =
+    let vars = vars_of_pat pat in
+    let add_def acc v =
+      let d = def_of_var_pat pat v ex in
+      (annot, Ast.Let (v, Ast.PNoAnnot, d, acc))
     in
-    (annot, e)
+    List.fold_left add_def e' (VarSet.elements vars)
   in
-  Ast.map_ast aux e
+  let add_branch acc (t, e') =
+    (annot, Ast.Ite (ex, t, e', acc))
+  in
+  let pats = pats |> List.map (fun (pat, e') ->
+    (type_of_pat pat, body_of_pat pat e')) |> List.rev in
+  let body = match pats with
+  | [] -> assert false 
+  | (_, e')::pats -> List.fold_left add_branch e' pats
+  in
+  (annot, Ast.Let (x, Ast.PNoAnnot, (annot, Ast.TypeConstr (e, t)), body))
+
+let encode_fixpoint annot e =
+  let x = Variable.create_let None in
+  Variable.attach_location x (Position.position annot) ;
+  let (eannot,_) = e in
+  let ex : Ast.annot_expr = (eannot, Var x) in
+  let fix : Ast.annot_expr = (annot, Ast.Var fixpoint_var) in
+  let app = (annot, Ast.App (fix, ex)) in
+  (annot, Ast.Let (x, Ast.PNoAnnot, e, app))
+
+let from_parser_ast e =
+  let rec aux (annot,e) =
+    match e with
+    | Ast.Abstract t -> Abstract t
+    | Ast.Const c -> Const c
+    | Ast.Var v -> Var v
+    | Ast.Atom a -> Atom a
+    | Ast.Tag (t, e) -> Tag (t, aux e)
+    | Ast.Lambda (x, DNoAnnot, e) ->
+      let tv = TVar.mk_mono ~infer:true (Variable.get_name x) |> TVar.typ in
+      Lambda ([tv], x, aux e)
+    | Ast.Lambda (x, DAnnot lst, e) -> Lambda (lst, x, aux e)
+    | Ast.Fixpoint e -> encode_fixpoint annot e |> aux
+    | Ast.Ite (e,t,e1,e2) -> Ite (aux e, t, aux e1, aux e2)
+    | Ast.App (e1,e2) -> App (aux e1, aux e2)
+    | Ast.Let (x, PNoAnnot, e1, e2) -> Let ([], x, aux e1, aux e2)
+    | Ast.Let (x, PAnnot ts, e1, e2) -> Let (ts, x, aux e1, aux e2)
+    | Ast.Tuple es -> Tuple (List.map aux es)
+    | Ast.Cons (e1, e2) -> Cons (aux e1, aux e2)
+    | Ast.Projection (p, e) -> Projection (p, aux e)
+    | Ast.RecordUpdate (e, lbl, eo) -> RecordUpdate (aux e, lbl, Option.map aux eo)
+    | Ast.TypeConstr (e, t) -> TypeConstr (aux e, t)
+    | Ast.TypeCoerce (e, ts) -> TypeCoerce (aux e, ts)
+    | Ast.PatMatch (e, pats) -> encode_pattern_matching annot e pats |> aux
+  in aux e
