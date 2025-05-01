@@ -11,6 +11,7 @@ module Annot = struct
   | ALet of t * part
   | AApp of t * t | ACons of t * t
   | AProj of t | ATag of t
+  | AUpdate of t * t option
   | ATuple of t list
   | AIte of t * branch * branch
   | ALambda of typ * t
@@ -25,6 +26,7 @@ module Annot = struct
     | AApp (t1, t2) -> AApp (aux t1, aux t2)
     | ACons (t1, t2) -> ACons (aux t1, aux t2)
     | AProj t -> AProj (aux t) | ATag t -> ATag (aux t)
+    | AUpdate (t, ot) -> AUpdate (aux t, Option.map aux ot)
     | ATuple ts -> ATuple (List.map aux ts)
     | AIte (t,b1,b2) -> AIte (aux t, aux_branch b1, aux_branch b2)
     | ALambda (ty, t) -> ALambda (Subst.apply s ty, aux t)
@@ -49,6 +51,7 @@ module IAnnot = struct
   | ALet of t * part
   | AApp of t * t | ACons of t * t
   | AProj of t | ATag of t
+  | AUpdate of t * t option
   | ATuple of t list
   | AIte of t * branch * branch
   | ALambda of typ * t
@@ -66,6 +69,7 @@ module IAnnot = struct
     | AApp (t1, t2) -> AApp (aux t1, aux t2)
     | ACons (t1, t2) -> ACons (aux t1, aux t2)
     | AProj t -> AProj (aux t) | ATag t -> ATag (aux t)
+    | AUpdate (t, ot) -> AUpdate (aux t, Option.map aux ot)
     | ATuple ts -> ATuple (List.map aux ts)
     | AIte (t,b1,b2) -> AIte (aux t, aux_branch b1, aux_branch b2)
     | ALambda (ty, t) -> ALambda (Subst.apply s ty, aux t)

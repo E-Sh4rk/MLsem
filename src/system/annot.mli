@@ -11,6 +11,7 @@ module Annot : sig
   | ALet of t * part
   | AApp of t * t | ACons of t * t
   | AProj of t | ATag of t
+  | AUpdate of t * t option
   | ATuple of t list
   | AIte of t * branch * branch
   | ALambda of typ * t
@@ -32,6 +33,7 @@ module IAnnot : sig
   | ALet of t * part
   | AApp of t * t | ACons of t * t
   | AProj of t | ATag of t
+  | AUpdate of t * t option
   | ATuple of t list
   | AIte of t * branch * branch
   | ALambda of typ * t

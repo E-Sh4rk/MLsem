@@ -87,8 +87,8 @@ let rec typeof tenv env annot (id,e) =
     if subtype t1 arrow_any then
       if subtype t2 (domain t1)
       then apply t1 t2
-      else untypeable id "The argument must be in the domain of the function."
-    else untypeable id "Only functions can be applied."
+      else untypeable id "Invalid application: argument not in the domain."
+    else untypeable id "Invalid application: not a function."
   | Tuple es, ATuple annots when List.length es = List.length annots ->
     List.combine es annots |> List.map (fun (e, annot) ->
       typeof tenv env annot e
@@ -98,12 +98,25 @@ let rec typeof tenv env annot (id,e) =
     let t2 = typeof tenv env annot2 e2 in
     if subtype t2 list_typ
     then mk_cons t1 t2
-    else untypeable id "Second argument of cons must be a list."
+    else untypeable id "Invalid cons: not a list."
   | Projection (p, e), AProj annot ->
     let t = typeof tenv env annot e in
     if subtype t (domain_of_proj p any)
     then proj p t
     else untypeable id "Invalid projection."
+  | RecordUpdate (e, label, None), AUpdate (annot, None) ->
+    let t = typeof tenv env annot e in
+    if subtype t record_any
+    then remove_field t label
+    else untypeable id "Invalid field deletion: not a record."
+  | RecordUpdate (e, label, Some e'), AUpdate (annot, Some annot') ->
+    let t = typeof tenv env annot e in
+    if subtype t record_any
+    then
+      let t' = typeof tenv env annot' e' in
+      let right_record = mk_record false [label, (false, t')] in
+      merge_records t right_record  
+    else untypeable id "Invalid field update: not a record."
   (* TODO *)
   | _, _ -> assert false (* Expr/annot mismatch *)
 and typeof_branch tenv env bannot e =
