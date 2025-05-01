@@ -50,6 +50,8 @@ let proj p ty =
 
 exception Untypeable of Parsing.Ast.exprid * string
 
+let untypeable id msg = raise (Untypeable (id, msg))
+
 let rec typeof tenv env annot (id,e) =
   let open Annot in
   match e, annot with
@@ -61,9 +63,9 @@ let rec typeof tenv env annot (id,e) =
       if TVarSet.subset (Subst.dom s) tvs then
         Subst.apply s ty
       else
-        raise (Untypeable (id, "Invalid substitution for "^(Variable.show v)^"."))
+        untypeable id ("Invalid substitution for "^(Variable.show v)^".")
     end else
-      raise (Untypeable (id, "Undefined variable "^(Variable.show v)^"."))
+      untypeable id ("Undefined variable "^(Variable.show v)^".")
   | Atom a, AAtom -> mk_atom a
   | Tag (tag, e), ATag annot -> mk_tag tag (typeof tenv env annot e)
   | Lambda (_, v, e), ALambda (s, annot) ->
@@ -73,12 +75,35 @@ let rec typeof tenv env annot (id,e) =
   | Ite (e, tau, e1, e2), AIte (annot, b1, b2) ->
     let s = typeof tenv env annot e in
     if b1 = BSkip && not (subtype s (neg tau))
-    then raise (Untypeable (id, "First branch is reachable and must be typed.")) ;
+    then untypeable id "First branch is reachable and must be typed." ;
     if b2 = BSkip && not (subtype s tau)
-    then raise (Untypeable (id, "Second branch is reachable and must be typed.")) ;
+    then untypeable id "Second branch is reachable and must be typed." ;
     let t1 = typeof_branch tenv env b1 e1 in
     let t2 = typeof_branch tenv env b2 e2 in
     cup t1 t2
+  | App (e1, e2), AApp (annot1, annot2) ->
+    let t1 = typeof tenv env annot1 e1 in
+    let t2 = typeof tenv env annot2 e2 in
+    if subtype t1 arrow_any then
+      if subtype t2 (domain t1)
+      then apply t1 t2
+      else untypeable id "The argument must be in the domain of the function."
+    else untypeable id "Only functions can be applied."
+  | Tuple es, ATuple annots when List.length es = List.length annots ->
+    List.combine es annots |> List.map (fun (e, annot) ->
+      typeof tenv env annot e
+    ) |> mk_tuple
+  | Cons (e1, e2), ACons (annot1, annot2) ->
+    let t1 = typeof tenv env annot1 e1 in
+    let t2 = typeof tenv env annot2 e2 in
+    if subtype t2 list_typ
+    then mk_cons t1 t2
+    else untypeable id "Second argument of cons must be a list."
+  | Projection (p, e), AProj annot ->
+    let t = typeof tenv env annot e in
+    if subtype t (domain_of_proj p any)
+    then proj p t
+    else untypeable id "Invalid projection."
   (* TODO *)
   | _, _ -> assert false (* Expr/annot mismatch *)
 and typeof_branch tenv env bannot e =

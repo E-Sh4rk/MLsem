@@ -9,7 +9,7 @@ module Annot = struct
   | AConst | AAbstract | AAtom
   | AAx of Subst.t
   | ALet of t * part
-  | AApp of t * t
+  | AApp of t * t | ACons of t * t
   | AProj of t | ATag of t
   | ATuple of t list
   | AIte of t * branch * branch
@@ -23,6 +23,7 @@ module Annot = struct
     | AAx s' -> AAx (Subst.compose_restr s s')
     | ALet (t, ps) -> ALet (aux t, List.map aux_part ps)
     | AApp (t1, t2) -> AApp (aux t1, aux t2)
+    | ACons (t1, t2) -> ACons (aux t1, aux t2)
     | AProj t -> AProj (aux t) | ATag t -> ATag (aux t)
     | ATuple ts -> ATuple (List.map aux ts)
     | AIte (t,b1,b2) -> AIte (aux t, aux_branch b1, aux_branch b2)
@@ -46,7 +47,7 @@ module IAnnot = struct
   | AConst | AAbstract | AAtom
   | AAx of Subst.t
   | ALet of t * part
-  | AApp of t * t
+  | AApp of t * t | ACons of t * t
   | AProj of t | ATag of t
   | ATuple of t list
   | AIte of t * branch * branch
@@ -63,6 +64,7 @@ module IAnnot = struct
     | AAx s' -> AAx (Subst.compose_restr s s')
     | ALet (t, ps) -> ALet (aux t, List.map aux_part ps)
     | AApp (t1, t2) -> AApp (aux t1, aux t2)
+    | ACons (t1, t2) -> ACons (aux t1, aux t2)
     | AProj t -> AProj (aux t) | ATag t -> ATag (aux t)
     | ATuple ts -> ATuple (List.map aux ts)
     | AIte (t,b1,b2) -> AIte (aux t, aux_branch b1, aux_branch b2)

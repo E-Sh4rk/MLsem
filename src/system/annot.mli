@@ -9,7 +9,7 @@ module Annot : sig
   | AConst | AAbstract | AAtom
   | AAx of Subst.t
   | ALet of t * part
-  | AApp of t * t
+  | AApp of t * t | ACons of t * t
   | AProj of t | ATag of t
   | ATuple of t list
   | AIte of t * branch * branch
@@ -30,7 +30,7 @@ module IAnnot : sig
   | AConst | AAbstract | AAtom
   | AAx of Subst.t
   | ALet of t * part
-  | AApp of t * t
+  | AApp of t * t | ACons of t * t
   | AProj of t | ATag of t
   | ATuple of t list
   | AIte of t * branch * branch
