@@ -11,6 +11,8 @@ module TyScheme : sig
     val fv : t -> TVarSet.t
     val leq : t -> t -> bool
     val equiv : t -> t -> bool
+    val leq_inst : t -> t -> bool
+    val equiv_inst : t -> t -> bool
     val pp : Format.formatter -> t -> unit
     val pp_short : Format.formatter -> t -> unit
 end

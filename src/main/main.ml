@@ -24,7 +24,11 @@ let type_check_def _ env (var,_,typ_annot) =
     let typ =
       match typ_annot with
       | None -> typ
-      | Some _ -> (* TODO *) raise (IncompatibleType typ)
+      | Some tya ->
+        let tya = TyScheme.mk_poly tya in
+        if TyScheme.leq_inst typ tya
+        then tya
+        else raise (IncompatibleType typ)
     in
     let env = Env.add var typ env in
     TSuccess (typ, env, retrieve_time ())
