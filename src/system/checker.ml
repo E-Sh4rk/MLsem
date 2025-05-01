@@ -52,7 +52,7 @@ exception Untypeable of Parsing.Ast.exprid * string
 
 let untypeable id msg = raise (Untypeable (id, msg))
 
-let rec typeof tenv env annot (id,e) =
+let rec typeof env annot (id,e) =
   let open Annot in
   match e, annot with
   | Abstract ty, AAbstract -> ty
@@ -67,23 +67,23 @@ let rec typeof tenv env annot (id,e) =
     end else
       untypeable id ("Undefined variable "^(Variable.show v)^".")
   | Atom a, AAtom -> mk_atom a
-  | Tag (tag, e), ATag annot -> mk_tag tag (typeof tenv env annot e)
+  | Tag (tag, e), ATag annot -> mk_tag tag (typeof env annot e)
   | Lambda (_, v, e), ALambda (s, annot) ->
     let env = Env.add v (TyScheme.mk_mono s) env in
-    let t = typeof tenv env annot e in
+    let t = typeof env annot e in
     mk_arrow s t
   | Ite (e, tau, e1, e2), AIte (annot, b1, b2) ->
-    let s = typeof tenv env annot e in
+    let s = typeof env annot e in
     if b1 = BSkip && not (subtype s (neg tau))
     then untypeable id "First branch is reachable and must be typed." ;
     if b2 = BSkip && not (subtype s tau)
     then untypeable id "Second branch is reachable and must be typed." ;
-    let t1 = typeof_branch tenv env b1 e1 in
-    let t2 = typeof_branch tenv env b2 e2 in
+    let t1 = typeof_branch env b1 e1 in
+    let t2 = typeof_branch env b2 e2 in
     cup t1 t2
   | App (e1, e2), AApp (annot1, annot2) ->
-    let t1 = typeof tenv env annot1 e1 in
-    let t2 = typeof tenv env annot2 e2 in
+    let t1 = typeof env annot1 e1 in
+    let t2 = typeof env annot2 e2 in
     if subtype t1 arrow_any then
       if subtype t2 (domain t1)
       then apply t1 t2
@@ -91,47 +91,55 @@ let rec typeof tenv env annot (id,e) =
     else untypeable id "Invalid application: not a function."
   | Tuple es, ATuple annots when List.length es = List.length annots ->
     List.combine es annots |> List.map (fun (e, annot) ->
-      typeof tenv env annot e
+      typeof env annot e
     ) |> mk_tuple
   | Cons (e1, e2), ACons (annot1, annot2) ->
-    let t1 = typeof tenv env annot1 e1 in
-    let t2 = typeof tenv env annot2 e2 in
+    let t1 = typeof env annot1 e1 in
+    let t2 = typeof env annot2 e2 in
     if subtype t2 list_typ
     then mk_cons t1 t2
     else untypeable id "Invalid cons: not a list."
   | Projection (p, e), AProj annot ->
-    let t = typeof tenv env annot e in
+    let t = typeof env annot e in
     if subtype t (domain_of_proj p any)
     then proj p t
     else untypeable id "Invalid projection."
   | RecordUpdate (e, label, None), AUpdate (annot, None) ->
-    let t = typeof tenv env annot e in
+    let t = typeof env annot e in
     if subtype t record_any
     then remove_field t label
     else untypeable id "Invalid field deletion: not a record."
   | RecordUpdate (e, label, Some e'), AUpdate (annot, Some annot') ->
-    let t = typeof tenv env annot e in
+    let t = typeof env annot e in
     if subtype t record_any
     then
-      let t' = typeof tenv env annot' e' in
+      let t' = typeof env annot' e' in
       let right_record = mk_record false [label, (false, t')] in
       merge_records t right_record  
     else untypeable id "Invalid field update: not a record."
   | Let (_, v, e1, e2), ALet (annot1, annots2) ->
-    let s = typeof tenv env annot1 e1 in
+    let s = typeof env annot1 e1 in
     if subtype s (annots2 |> List.map fst |> disj) then
       let aux (si,annot2) =
         let tvs = TVarSet.diff (vars s) (TVarSet.union (Env.tvars env) (vars si)) in
         let t = TyScheme.mk tvs (cap s si) in
         let env = Env.add v t env in
-        typeof tenv env annot2 e2
+        typeof env annot2 e2
       in
       List.map aux annots2 |> disj
     else
       untypeable id ("Partition does not cover the type of "^(Variable.show v)^".")
-  (* TODO *)
+  | TypeConstr (e, ty), AConstr annot ->
+    let t = typeof env annot e in
+    if subtype t ty then t
+    else untypeable id "Type constraint not satisfied."
+  | TypeCoerce (e, tys), ACoerce annot -> 
+    let t = typeof env annot e in
+    let ty = conj tys in
+    if subtype t ty then ty
+    else untypeable id "Impossible type coercion."
   | _, _ -> assert false (* Expr/annot mismatch *)
-and typeof_branch tenv env bannot e =
+and typeof_branch env bannot e =
   match bannot with
-  | BType annot -> typeof tenv env annot e
+  | BType annot -> typeof env annot e
   | BSkip -> empty

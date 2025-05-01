@@ -10,7 +10,7 @@ module Annot = struct
   | AAx of Subst.t
   | ALet of t * part
   | AApp of t * t | ACons of t * t
-  | AProj of t | ATag of t
+  | AProj of t | ATag of t | AConstr of t | ACoerce of t
   | AUpdate of t * t option
   | ATuple of t list
   | AIte of t * branch * branch
@@ -26,6 +26,7 @@ module Annot = struct
     | AApp (t1, t2) -> AApp (aux t1, aux t2)
     | ACons (t1, t2) -> ACons (aux t1, aux t2)
     | AProj t -> AProj (aux t) | ATag t -> ATag (aux t)
+    | AConstr t -> AConstr (aux t) | ACoerce t -> ACoerce (aux t)
     | AUpdate (t, ot) -> AUpdate (aux t, Option.map aux ot)
     | ATuple ts -> ATuple (List.map aux ts)
     | AIte (t,b1,b2) -> AIte (aux t, aux_branch b1, aux_branch b2)
@@ -50,7 +51,7 @@ module IAnnot = struct
   | AAx of Subst.t
   | ALet of t * part
   | AApp of t * t | ACons of t * t
-  | AProj of t | ATag of t
+  | AProj of t | ATag of t | AConstr of t | ACoerce of t
   | AUpdate of t * t option
   | ATuple of t list
   | AIte of t * branch * branch
@@ -69,6 +70,7 @@ module IAnnot = struct
     | AApp (t1, t2) -> AApp (aux t1, aux t2)
     | ACons (t1, t2) -> ACons (aux t1, aux t2)
     | AProj t -> AProj (aux t) | ATag t -> ATag (aux t)
+    | AConstr t -> AConstr (aux t) | ACoerce t -> ACoerce (aux t)
     | AUpdate (t, ot) -> AUpdate (aux t, Option.map aux ot)
     | ATuple ts -> ATuple (List.map aux ts)
     | AIte (t,b1,b2) -> AIte (aux t, aux_branch b1, aux_branch b2)
