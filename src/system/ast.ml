@@ -19,7 +19,7 @@ type e =
 | Projection of Ast.projection * t
 | RecordUpdate of t * string * t option
 | Let of (typ list) * Variable.t * t * t
-| TypeConstr of t * typ
+| TypeConstr of t * typ list
 | TypeCoerce of t * typ list
 [@@deriving show]
 and t = Ast.exprid * e
@@ -55,8 +55,8 @@ let map f =
       | Projection (p, e) -> Projection (p, aux e)
       | RecordUpdate (e, str, eo) -> RecordUpdate (aux e, str, Option.map aux eo)
       | Let (ta, v, e1, e2) -> Let (ta, v, aux e1, aux e2)
-      | TypeConstr (e, t) -> TypeConstr (aux e, t)
-      | TypeCoerce (e, ts) -> TypeCoerce (e, ts)
+      | TypeConstr (e, ts) -> TypeConstr (aux e, ts)
+      | TypeCoerce (e, ts) -> TypeCoerce (aux e, ts)
     in
     f (id,e)
   in
@@ -181,7 +181,7 @@ let encode_pattern_matching id e pats =
   | [] -> assert false 
   | (_, e')::pats -> List.fold_left add_branch e' pats
   in
-  let def = (Ast.unique_exprid (), Ast.TypeConstr (e, t)) in
+  let def = (Ast.unique_exprid (), Ast.TypeConstr (e, [t])) in
   (id, Ast.Let (x, Ast.PNoAnnot, def, body))
 
 let encode_fixpoint id e =
@@ -212,7 +212,7 @@ let from_parser_ast t =
     | Ast.Cons (e1, e2) -> Cons (aux e1, aux e2)
     | Ast.Projection (p, e) -> Projection (p, aux e)
     | Ast.RecordUpdate (e, lbl, eo) -> RecordUpdate (aux e, lbl, Option.map aux eo)
-    | Ast.TypeConstr (e, t) -> TypeConstr (aux e, t)
+    | Ast.TypeConstr (e, ts) -> TypeConstr (aux e, ts)
     | Ast.TypeCoerce (e, ts) -> TypeCoerce (aux e, ts)
     | Ast.PatMatch (e, pats) -> encode_pattern_matching id e pats |> aux_e
   and aux t =

@@ -17,7 +17,7 @@ type e =
 | Projection of Ast.projection * t
 | RecordUpdate of t * string * t option
 | Let of (typ list) * Variable.t * t * t
-| TypeConstr of t * typ
+| TypeConstr of t * typ list
 | TypeCoerce of t * typ list
 and t = Ast.exprid * e
 
