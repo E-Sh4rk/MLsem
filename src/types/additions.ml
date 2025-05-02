@@ -310,7 +310,7 @@ let instantiate ss t =
     |> conj
 
 let bot_instance mono =
-    clean_type ~pos:empty ~neg:any mono
+    clean ~pos:empty ~neg:any mono
 
 let top_instance mono =
-    clean_type ~pos:any ~neg:empty mono
+    clean ~pos:any ~neg:empty mono

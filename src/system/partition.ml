@@ -50,3 +50,20 @@ let rec constr env renv (_,e) =
   | Let _ -> [], any
   | TypeConstr (e, _) -> constr env renv e
   | TypeCoerce (_, tys) -> [], conj tys
+
+let refine env renv e t =
+  let cs, s = constr env renv e in
+  let cs = (s, t)::cs in
+  let mono = TVarSet.union (Env.tvars env) (TVar.user_vars ()) in
+  tallying mono cs |> List.filter_map (fun s ->
+    let bindings = REnv.bindings renv
+      |> List.map (fun (v,t) -> (v,Subst.apply s t)) in
+    let clean = clean_subst' ~pos:any ~neg:empty mono (List.map snd bindings) in
+    let bindings = bindings |> List.map (fun (v,t) -> (v,Subst.apply clean t)) in
+    let renv' = REnv.construct bindings in
+    if TVarSet.subset (REnv.tvars renv') mono
+      && not (REnv.leq renv renv')
+      && not (REnv.bindings renv' |> List.exists (fun (_,t) -> is_empty t))
+    then Some renv'
+    else None
+  )

@@ -66,11 +66,14 @@ module Subst : sig
 end
 
 val vars : Base.typ -> TVarSet.t
+val vars' : Base.typ list -> TVarSet.t
 val vars_user : Base.typ -> TVarSet.t
 val vars_internal : Base.typ -> TVarSet.t
 val top_vars : Base.typ -> TVarSet.t
 val polarity : TVar.t -> Base.typ -> [ `Both | `Neg | `Pos | `None ]
+val polarity' : TVar.t -> Base.typ list -> [ `Both | `Neg | `Pos | `None ]
 val vars_with_polarity : Base.typ -> (TVar.t * [ `Both | `Neg | `Pos ]) list
+val vars_with_polarity' : Base.typ list -> (TVar.t * [ `Both | `Neg | `Pos ]) list
 val check_var : Base.typ -> [ `Not_var | `Pos of TVar.t | `Neg of TVar.t ]
 val is_ground_typ : Base.typ -> bool
 val refresh : TVarSet.t -> Subst.t
@@ -79,11 +82,13 @@ val pp_typ_short : Format.formatter -> Base.typ -> unit
 
 (* Operations on types *)
 
-(** [clean_type p n mono t] substitutes in [t]
+(** [clean p n mono t] substitutes in [t]
     all type variables not in [mono] and only occurring positively by [p], and
     all type variables not in [mono] and only occurring negatively by [n] *)
-val clean_type : pos:Base.typ -> neg:Base.typ -> TVarSet.t -> Base.typ -> Base.typ
-val clean_type_subst : pos:Base.typ -> neg:Base.typ -> TVarSet.t -> Base.typ -> Subst.t
+val clean : pos:Base.typ -> neg:Base.typ -> TVarSet.t -> Base.typ -> Base.typ
+val clean_subst : pos:Base.typ -> neg:Base.typ -> TVarSet.t -> Base.typ -> Subst.t
+val clean' : pos:Base.typ -> neg:Base.typ -> TVarSet.t -> Base.typ list -> Base.typ list
+val clean_subst' : pos:Base.typ -> neg:Base.typ -> TVarSet.t -> Base.typ list -> Subst.t
 
 val test_tallying : TVarSet.t -> (Base.typ * Base.typ) list -> bool
 val tallying : TVarSet.t -> (Base.typ * Base.typ) list -> Subst.t list

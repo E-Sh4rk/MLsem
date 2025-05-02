@@ -99,6 +99,7 @@ module TVarSet = struct
 end
 
 let vars = Sstt.Ty.vars
+let vars' ts = List.map vars ts |> TVarSet.union_many
 let top_vars = Sstt.Ty.vars_toplevel
 let check_var t =
   match top_vars t |> Sstt.VarSet.elements with
@@ -164,12 +165,23 @@ let polarity v t =
   else if cov then `Pos
   else if contrav then `Neg
   else `Both
-let vars_with_polarity t =
-  Sstt.Ty.vars t |> Sstt.VarSet.elements |> List.filter_map (fun v ->
-    match polarity v t with
+let polarity' v ts =
+  let aux acc n =
+    match acc, n with
+    | `Both, _ | _, `Both -> `Both
+    | `None, p | p, `None -> p
+    | `Neg, `Neg -> `Neg
+    | `Pos, `Pos -> `Pos
+    | `Neg, `Pos | `Pos, `Neg -> `Both
+  in
+  List.fold_left aux `None (List.map (polarity v) ts)
+let vars_with_polarity' ts =
+  vars' ts |> Sstt.VarSet.elements |> List.filter_map (fun v ->
+    match polarity' v ts with
     | `None -> None
     | `Pos -> Some (v, `Pos) | `Neg -> Some (v, `Neg) | `Both -> Some (v, `Both)
   )
+let vars_with_polarity t = vars_with_polarity' [t]
 let is_ground_typ t = vars t |> TVarSet.is_empty
 
 let refresh vars =
@@ -198,8 +210,8 @@ let pp_typ_short fmt t =
 
 (* Operations on types *)
 
-let clean_type_subst ~pos ~neg mono t =
-  vars_with_polarity t |>
+let clean_subst' ~pos ~neg mono ts =
+  vars_with_polarity' ts |>
   List.filter_map (fun (v,p) ->
       if TVarSet.mem mono v then None
       else match p with
@@ -207,10 +219,12 @@ let clean_type_subst ~pos ~neg mono t =
       | `Neg -> Some (v, neg)
       | `Both -> None
   ) |> Subst.construct
+let clean_subst ~pos ~neg mono t = clean_subst' ~pos ~neg mono [t]
 
-let clean_type ~pos ~neg mono t =
-  let s = clean_type_subst ~pos ~neg mono t in
-  Subst.apply s t
+let clean' ~pos ~neg mono ts =
+  let s = clean_subst' ~pos ~neg mono ts in
+  List.map (Subst.apply s) ts
+let clean ~pos ~neg mono t = clean' ~pos ~neg mono [t] |> List.hd
 
 let tallying mono cs =
   Sstt.Tallying.tally mono cs
