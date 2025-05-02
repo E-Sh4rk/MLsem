@@ -80,3 +80,21 @@ let partition ts =
       s::(aux (diff t s))
   in
   aux any
+
+let rec infer env renv (id,e) =
+  let e, renvs = match e with
+  | Abstract t -> Abstract t, []
+  | Const c -> Const c, []
+  | Var v -> Var v, []
+  | Atom a -> Atom a, []
+  | Tag (tag, e) ->
+    let e, renvs = infer env renv e in
+    Tag (tag, e), renvs
+  | Lambda (ts, v, e) ->
+    let t = disj ts |> TyScheme.mk_mono in
+    let env = Env.add v t env in
+    let e, renvs = infer env renv e in
+    Lambda (ts, v, e), renvs
+  | _ -> failwith "TODO"
+  in
+  (id,e), renvs
