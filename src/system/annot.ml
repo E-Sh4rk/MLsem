@@ -37,6 +37,24 @@ module Annot = struct
     and aux_inter ts = List.map aux ts
     in
     aux t
+
+  let tvars t =
+    let rec aux t =
+      let vs = match t with
+      | AConst | AAbstract | AAtom -> []
+      | AAx s -> [Subst.vars s]
+      | ALet (t, ps) -> (aux t)::(List.map aux_part ps)
+      | AApp (t1, t2) | ACons (t1, t2) | AUpdate (t1, Some t2) -> [aux t1 ; aux t2]
+      | AProj t | ATag t | AConstr t | ACoerce t | AUpdate (t, None) -> [aux t]
+      | ATuple ts | AInter ts -> List.map aux ts
+      | AIte (t,b1,b2) -> [ aux t ; aux_branch b1 ; aux_branch b2 ]
+      | ALambda (ty, t) -> [ vars ty ; aux t ]
+      in
+      TVarSet.union_many vs
+    and aux_part (s, t) = TVarSet.union (vars s) (aux t)
+    and aux_branch b = match b with BSkip -> TVarSet.empty | BType t -> aux t
+    in
+    aux t
 end
 
 module IAnnot = struct
@@ -82,6 +100,25 @@ module IAnnot = struct
     | BType t -> BType (aux t)
     | BInfer -> BInfer
     and aux_inter ts = List.map aux ts
+    in
+    aux t
+
+  let tvars t =
+    let rec aux t =
+      let vs = match t with
+      | A t -> [Annot.tvars t]
+      | Infer | Untyp | AConst | AAbstract | AAtom -> []
+      | AAx s -> [Subst.vars s]
+      | ALet (t, ps) -> (aux t)::(List.map aux_part ps)
+      | AApp (t1, t2) | ACons (t1, t2) | AUpdate (t1, Some t2) -> [aux t1 ; aux t2]
+      | AProj t | ATag t | AConstr t | ACoerce t | AUpdate (t, None) -> [aux t]
+      | ATuple ts | AInter ts -> List.map aux ts
+      | AIte (t,b1,b2) -> [ aux t ; aux_branch b1 ; aux_branch b2 ]
+      | ALambda (ty, t) -> [ vars ty ; aux t ]
+      in
+      TVarSet.union_many vs
+    and aux_part (s, t) = TVarSet.union (vars s) (aux t)
+    and aux_branch b = match b with BSkip | BInfer -> TVarSet.empty | BType t -> aux t
     in
     aux t
 end

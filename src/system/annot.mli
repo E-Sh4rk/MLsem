@@ -18,6 +18,7 @@ module Annot : sig
   | AInter of inter
 
   val substitute : Subst.t -> t -> t
+  val tvars : t -> TVarSet.t
 end
 
 module IAnnot : sig
@@ -40,4 +41,5 @@ module IAnnot : sig
   | AInter of inter
 
   val substitute : Subst.t -> t -> t
+  val tvars : t -> TVarSet.t
 end
