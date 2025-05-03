@@ -26,7 +26,7 @@ let rec infer env annot (id, e) =
   | Tag (_, e'), ATag annot' ->
     begin match infer' env annot' e' with
     | Ok (annot', _) -> infer env (A (Annot.ATag annot')) (id, e)
-    | Subst (s,a1,a2) -> Subst (s,ATag a1,ATag a2)
+    | Subst (ss,a1,a2) -> Subst (ss,ATag a1,ATag a2)
     | Fail -> Fail
     end
   | Lambda (tys,_,_), Infer ->
@@ -41,12 +41,28 @@ let rec infer env annot (id, e) =
     let env' = Env.add v (TyScheme.mk_mono ty) env in
     begin match infer' env' annot' e' with
     | Ok (annot', _) -> infer env (A (Annot.ATag annot')) (id, e)
-    | Subst (s,a1,a2) -> Subst (s,ALambda (ty, a1),ALambda (ty, a2))
+    | Subst (ss,a1,a2) -> Subst (ss,ALambda (ty, a1),ALambda (ty, a2))
     | Fail -> Fail
+    end
+  | Ite _, Infer -> infer env (AIte (Infer, BInfer, BInfer)) (id, e)
+  | Ite (e0,tau,e1,e2), AIte (a0,a1,a2) ->
+    begin match infer' env a0 e0 with
+    | Fail -> Fail
+    | Subst (ss,a,a') -> Subst (ss,AIte (a,a1,a2),AIte (a',a1,a2))
+    | Ok (a0, s) ->
+      begin match a1, a2 with
+      | BInfer, a2 ->
+        let ss = tallying (TVar.user_vars ()) [(s,neg tau)] in
+        Subst (ss, AIte(A a0,BSkip,a2), AIte(A a0,BType Infer,a2))
+      | a1, BInfer ->
+        let ss = tallying (TVar.user_vars ()) [(s,tau)] in
+        Subst (ss, AIte(A a0,a1,BSkip), AIte(A a0,a1,BType Infer))
+      | a1, a2 -> failwith "TODO"
+      end
     end
   | _, _ -> failwith "TODO"
 and infer' env annot e =
-  let mono = Env.tvars env in
+  let mono = TVarSet.union (Env.tvars env) (TVar.user_vars ()) in
   let subst_disjoint s =
     TVarSet.inter (Subst.dom s) mono |> TVarSet.is_empty
   in
@@ -57,7 +73,6 @@ and infer' env annot e =
     let branches = ss |> List.map (fun s ->
       let annot = IAnnot.substitute s a1 in
       let tvs = TVarSet.diff (IAnnot.tvars annot) mono in
-      let tvs = TVarSet.filter (fun tv -> TVar.from_user tv |> not) tvs in
       IAnnot.substitute (refresh tvs) annot
       ) in
     let annot = IAnnot.AInter (branches@[a2]) in
