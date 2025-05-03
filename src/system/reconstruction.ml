@@ -8,7 +8,7 @@ open Ast
 type result =
 | Ok of Annot.t * typ
 | Fail
-| Subst of Subst.t * IAnnot.t * IAnnot.t
+| Subst of Subst.t list * IAnnot.t * IAnnot.t
 
 let rec infer env annot (id, e) =
   let open IAnnot in
@@ -45,7 +45,24 @@ let rec infer env annot (id, e) =
     | Fail -> Fail
     end
   | _, _ -> failwith "TODO"
-and infer' _ _ _ = failwith "TODO"
+and infer' env annot e =
+  let mono = Env.tvars env in
+  let subst_disjoint s =
+    TVarSet.inter (Subst.dom s) mono |> TVarSet.is_empty
+  in
+  match infer env annot e with
+  | Ok (a, ty) -> Ok (a, ty)
+  | Fail -> Fail
+  | Subst (ss, a1, a2) when List.for_all subst_disjoint ss ->
+    let branches = ss |> List.map (fun s ->
+      let annot = IAnnot.substitute s a1 in
+      let tvs = TVarSet.diff (IAnnot.tvars annot) mono in
+      let tvs = TVarSet.filter (fun tv -> TVar.from_user tv |> not) tvs in
+      IAnnot.substitute (refresh tvs) annot
+      ) in
+    let annot = IAnnot.AInter (branches@[a2]) in
+    infer' env annot e
+  | Subst (ss, a1, a2) -> Subst (ss, a1, a2)
 
 let infer env e =
   match infer env IAnnot.Infer e with
