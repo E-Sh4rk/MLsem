@@ -147,7 +147,22 @@ let rec infer env annot (id, e) =
       Subst (ss, A (Annot.AUpdate(a1,Some a2)), Untyp)
     | _ -> assert false
     end
-  | _, _ -> failwith "TODO"
+  | Let _, _ -> failwith "TODO"
+  | TypeConstr _, Infer -> retry_with (AConstr Infer)
+  | TypeCoerce _, Infer -> retry_with (ACoerce Infer)
+  | TypeConstr (e', ts), AConstr annot' ->
+    begin match infer' env annot' e' with
+    | Ok (annot', s) -> failwith "TODO"
+    | Subst (ss,a,a') -> Subst (ss,AConstr a,AConstr a')
+    | Fail -> Fail
+    end
+  | TypeCoerce (e', ts), ACoerce annot' ->
+    begin match infer' env annot' e' with
+    | Ok (annot', s) -> failwith "TODO"
+    | Subst (ss,a,a') -> Subst (ss,ACoerce a,ACoerce a')
+    | Fail -> Fail
+    end
+  | _, _ -> assert false
 and infer' env annot e =
   let mono = TVarSet.union (Env.tvars env) (TVar.user_vars ()) in
   let subst_disjoint s =
