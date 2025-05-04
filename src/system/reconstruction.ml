@@ -201,7 +201,7 @@ and infer_b_seq' env lst s tau =
   seq (fun b e -> infer_b' env b e s tau) (fun b -> B b) lst
 
 let infer env e =
-  match infer env IAnnot.Infer e with
+  match infer' env IAnnot.Infer e with
   | Fail -> None
   | Subst _ -> assert false
   | Ok (a,_) -> Some a
