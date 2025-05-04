@@ -96,6 +96,24 @@ let rec infer env annot (id, e) =
       Subst (ss, A (Annot.AApp(a1,a2)), Untyp)
     | _ -> assert false
     end
+  | Tuple es, Infer -> retry_with (ATuple (List.map (fun _ -> Infer) es))
+  | Tuple es, ATuple annots ->
+    begin match infer_seq' env (List.combine annots es) with
+    | OneFail -> Fail
+    | OneSubst (ss, a, a') -> Subst (ss,ATuple a,ATuple a')
+    | AllOk (annots,_) -> retry_with (A (Annot.ATuple annots))
+    end
+  | Cons _, Infer -> retry_with (ACons (Infer, Infer))
+  | Cons (e1,e2), ACons (a1,a2) ->
+    begin match infer_seq' env [(a1,e1);(a2,e2)] with
+    | OneFail -> Fail
+    | OneSubst (ss, [a1;a2], [a1';a2']) ->
+      Subst (ss,ACons(a1,a2),ACons(a1',a2'))
+    | AllOk ([a1;a2],[_;t2]) ->
+      let ss = tallying (TVar.user_vars ()) [(t2,list_typ)] in
+      Subst (ss, A (Annot.ACons(a1,a2)), Untyp)
+    | _ -> assert false
+    end
   | _, _ -> failwith "TODO"
 and infer' env annot e =
   let mono = TVarSet.union (Env.tvars env) (TVar.user_vars ()) in
