@@ -155,7 +155,11 @@ let rec infer env annot (id, e) =
     | Subst (ss,a,a') -> Subst (ss,ALet (a,parts),ALet (a',parts))
     | Ok (annot1, s) ->
       let parts = parts |> List.filter (fun (t,_) -> disjoint s t |> not) in
-      failwith "TODO"
+      begin match infer_part_seq' env e2 v s parts with
+      | OneFail -> Fail
+      | OneSubst (ss,p,p') -> Subst (ss,ALet(A annot1,p),ALet(A annot1,p'))
+      | AllOk (p,_) -> retry_with (A (Annot.ALet (annot1, p)))
+      end
     end
   | TypeConstr _, Infer -> retry_with (AConstr Infer)
   | TypeCoerce _, Infer -> retry_with (ACoerce Infer)
