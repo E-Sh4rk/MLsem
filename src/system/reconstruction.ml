@@ -147,7 +147,16 @@ let rec infer env annot (id, e) =
       Subst (ss, A (Annot.AUpdate(a1,Some a2)), Untyp)
     | _ -> assert false
     end
-  | Let _, _ -> failwith "TODO"
+  | Let (tys,_,_,_), Infer ->
+    retry_with (ALet (Infer, List.map (fun ty -> (ty, Infer)) tys))
+  | Let (_,v,e1,e2), ALet(annot1,parts) ->
+    begin match infer' env annot1 e1 with
+    | Fail -> Fail
+    | Subst (ss,a,a') -> Subst (ss,ALet (a,parts),ALet (a',parts))
+    | Ok (annot1, s) ->
+      let parts = parts |> List.filter (fun (t,_) -> disjoint s t |> not) in
+      failwith "TODO"
+    end
   | TypeConstr _, Infer -> retry_with (AConstr Infer)
   | TypeCoerce _, Infer -> retry_with (ACoerce Infer)
   | TypeConstr (e', t), AConstr annot' ->
@@ -196,9 +205,20 @@ and infer_b' env bannot e s tau =
     | Subst (ss,a1,a2) -> Subst (ss,IAnnot.BType a1,IAnnot.BType a2)
     | Fail -> Fail
     end
+and infer_part' env e v s (si,annot) =
+  let tvs = TVarSet.diff (vars s) (TVarSet.union (Env.tvars env) (vars si)) in
+  let t = TyScheme.mk tvs (cap s si) in
+  let env = Env.add v t env in
+  match infer' env annot e with
+  | Fail -> Fail
+  | Subst (ss,a,a') -> Subst (ss,(si,a),(si,a'))
+  | Ok (a,ty) -> Ok ((si,a),ty)
 and infer_seq' env lst = seq (infer' env) (fun a -> A a) lst
 and infer_b_seq' env lst s tau =
   seq (fun b e -> infer_b' env b e s tau) (fun b -> B b) lst
+and infer_part_seq' env e v s lst =
+  seq (fun a e -> infer_part' env e v s a) (fun (si,annot) -> (si, A annot))
+    (lst |> List.map (fun a -> (a,e)))
 
 let infer env e =
   match infer' env IAnnot.Infer e with

@@ -127,13 +127,7 @@ let rec typeof env annot (id,e) =
   | Let (_, v, e1, e2), ALet (annot1, annots2) ->
     let s = typeof env annot1 e1 in
     if subtype s (annots2 |> List.map fst |> disj) then
-      let aux (si,annot2) =
-        let tvs = TVarSet.diff (vars s) (TVarSet.union (Env.tvars env) (vars si)) in
-        let t = TyScheme.mk tvs (cap s si) in
-        let env = Env.add v t env in
-        typeof env annot2 e2
-      in
-      List.map aux annots2 |> disj
+      List.map (typeof_part env e2 v s) annots2 |> disj
     else
       untypeable id ("Partition does not cover the type of "^(Variable.show v)^".")
   | TypeConstr (e, ty), AConstr annot ->
@@ -149,3 +143,8 @@ and typeof_b env bannot e =
   match bannot with
   | BType annot -> typeof env annot e
   | BSkip -> empty
+and typeof_part env e v s (si,annot) =
+  let tvs = TVarSet.diff (vars s) (TVarSet.union (Env.tvars env) (vars si)) in
+  let t = TyScheme.mk tvs (cap s si) in
+  let env = Env.add v t env in
+  typeof env annot e
