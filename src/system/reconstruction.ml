@@ -195,10 +195,10 @@ and infer' env annot e =
   | Subst (ss, a1, a2) -> Subst (ss, a1, a2)
 and infer_b' env bannot e s tau =
   match bannot with
-  | IAnnot.B b -> Ok (b, Checker.typeof_b env b e)
   | IAnnot.BInfer ->
     let ss = tallying (TVar.user_vars ()) [(s,neg tau)] in
-    Subst (ss, IAnnot.B Annot.BSkip, IAnnot.BType Infer)
+    Subst (ss, IAnnot.BSkip, IAnnot.BType Infer)
+  | IAnnot.BSkip -> Ok (Annot.BSkip, empty)
   | IAnnot.BType annot ->
     begin match infer' env annot e with
     | Ok (a, ty) -> Ok (Annot.BType a, ty)
@@ -215,9 +215,12 @@ and infer_part' env e v s (si,annot) =
   | Ok (a,ty) -> Ok ((si,a),ty)
 and infer_seq' env lst = seq (infer' env) (fun a -> A a) lst
 and infer_b_seq' env lst s tau =
-  seq (fun b e -> infer_b' env b e s tau) (fun b -> B b) lst
+  seq (fun b e -> infer_b' env b e s tau)
+  (function Annot.BSkip -> IAnnot.BSkip | Annot.BType a -> IAnnot.BType (A a))
+  lst
 and infer_part_seq' env e v s lst =
-  seq (fun a e -> infer_part' env e v s a) (fun (si,annot) -> (si, A annot))
+  seq (fun a e -> infer_part' env e v s a)
+    (fun (si,annot) -> (si, A annot))
     (lst |> List.map (fun a -> (a,e)))
 
 let infer env e =

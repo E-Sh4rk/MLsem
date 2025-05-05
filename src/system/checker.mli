@@ -11,4 +11,3 @@ val typeof_proj : Parsing.Ast.projection -> TyScheme.t
 exception Untypeable of Parsing.Ast.exprid * string
 
 val typeof : Env.t -> Annot.t -> Ast.t -> typ
-val typeof_b : Env.t -> Annot.branch -> Ast.t -> typ

@@ -23,7 +23,7 @@ module Annot : sig
 end
 
 module IAnnot : sig
-  type branch = B of Annot.branch | BType of t | BInfer
+  type branch = BType of t | BSkip | BInfer
   and inter = t list
   and part = (typ * t) list
   and t =
