@@ -12,7 +12,7 @@ let rec constr env renv (_,e) =
   | Var v when Env.mem v env ->
     let (_,t) = Env.find v env |> TyScheme.get_fresh in
     [], t
-  | Var _ -> assert false
+  | Var _ -> [], any
   | Atom a -> [], mk_atom a
   | Tag (tag, e) ->
     let cs, t = constr env renv e in

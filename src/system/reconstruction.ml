@@ -63,7 +63,7 @@ let rec infer env annot (id, e) =
   | Lambda (_,v,e'), ALambda (ty, annot') ->
     let env' = Env.add v (TyScheme.mk_mono ty) env in
     begin match infer' env' annot' e' with
-    | Ok (annot', _) -> retry_with (A (Annot.ATag annot'))
+    | Ok (annot', _) -> retry_with (A (Annot.ALambda (ty, annot')))
     | Subst (ss,a,a') -> Subst (ss,ALambda (ty, a),ALambda (ty, a'))
     | Fail -> Fail
     end
