@@ -29,7 +29,7 @@ let type_check_def env (var,e,typ_annot) =
       | Some annot-> annot
     in
     let typ = Checker.typeof env annot e |> simplify_typ in
-    let typ = TyScheme.mk_poly typ in
+    let typ = TyScheme.mk_poly typ |> TyScheme.clean in
     let typ =
       match typ_annot with
       | None -> typ

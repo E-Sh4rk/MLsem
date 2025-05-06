@@ -22,6 +22,10 @@ let leq_inst t1 (_,ty2) =
   let mono = TVarSet.union mono1 (vars ty2) in
   test_tallying mono [ty1,ty2]
 let equiv_inst t1 t2 = leq_inst t1 t2 && leq_inst t2 t1
+let clean (tvs,t) =
+  let mono = TVarSet.diff (vars t) tvs in
+  let t = Additions.bot_instance mono t in
+  mk tvs t
 let pp fmt (tvs, ty) =
   Format.fprintf fmt "∀%a.%a"
     (Utils.pp_list TVar.pp) (TVarSet.destruct tvs) pp_typ ty
