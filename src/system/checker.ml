@@ -81,12 +81,8 @@ let rec typeof env annot (id,e) =
     mk_arrow s t
   | Ite (e, tau, e1, e2), AIte (annot, b1, b2) ->
     let s = typeof env annot e in
-    if b1 = BSkip && not (subtype s (neg tau))
-    then untypeable id "First branch is reachable and must be typed." ;
-    if b2 = BSkip && not (subtype s tau)
-    then untypeable id "Second branch is reachable and must be typed." ;
-    let t1 = typeof_b env b1 e1 in
-    let t2 = typeof_b env b2 e2 in
+    let t1 = typeof_b env b1 e1 s tau in
+    let t2 = typeof_b env b2 e2 s (neg tau) in
     cup t1 t2
   | App (e1, e2), AApp (annot1, annot2) ->
     let t1 = typeof env annot1 e1 in
@@ -143,10 +139,13 @@ let rec typeof env annot (id,e) =
   | e, a ->
     Format.printf "e:@.%a@.@.a:@.%a@.@." Ast.pp_e e Annot.pp a ;
     assert false
-and typeof_b env bannot e =
+and typeof_b env bannot (id,e) s tau =
   match bannot with
-  | BType annot -> typeof env annot e
-  | BSkip -> empty
+  | BType annot -> typeof env annot (id,e)
+  | BSkip ->
+    if disjoint s tau |> not
+    then untypeable id "Branch is reachable and must be typed." ;
+    empty
 and typeof_part env e v s (si,annot) =
   let tvs = TVarSet.diff (vars s) (TVarSet.union (Env.tvars env) (vars si)) in
   let t = TyScheme.mk tvs (cap s si) in

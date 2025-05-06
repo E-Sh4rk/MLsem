@@ -70,16 +70,23 @@ let rec infer env annot (id, e) =
     end
   | Ite _, Infer -> retry_with (AIte (Infer, BInfer, BInfer))
   | Ite (e0,tau,e1,e2), AIte (a0,a1,a2) ->
+    let to_i =
+      (function Annot.BSkip -> IAnnot.BSkip | Annot.BType a -> IAnnot.BType (A a)) in
     begin match infer' env a0 e0 with
     | Fail -> Fail
     | Subst (ss,a,a') -> Subst (ss,AIte (a,a1,a2),AIte (a',a1,a2))
     | Ok (a0, s) ->
-      begin match infer_b_seq' env [(a1,e1);(a2,e2)] s tau with
-      | OneFail _ -> Fail
-      | OneSubst (ss, [a1;a2], [a1';a2']) ->
-        Subst (ss, AIte(A a0,a1,a2), AIte(A a0,a1',a2'))
-      | AllOk ([a1;a2],_) -> retry_with (A (Annot.AIte(a0,a1,a2)))
-      | _ -> assert false
+      begin match infer_b' env a1 e1 s tau with
+      | Fail -> Fail
+      | Subst (ss, a1, a1') ->
+        Subst (ss, AIte(A a0,a1,a2), AIte(A a0,a1',a2))
+      | Ok (a1,_) ->
+        begin match infer_b' env a2 e2 s (neg tau) with
+        | Fail -> Fail
+        | Subst (ss, a2, a2') ->
+          Subst (ss, AIte(A a0,to_i a1,a2), AIte(A a0,to_i a1,a2'))
+        | Ok (a2,_) -> retry_with (A (Annot.AIte(a0,a1,a2)))
+        end  
       end
     end
   | App _, Infer -> retry_with (AApp (Infer, Infer))
@@ -232,10 +239,6 @@ and infer_part' env e v s (si,annot) =
   | Subst (ss,a,a') -> Subst (ss,(si,a),(si,a'))
   | Ok (a,ty) -> Ok ((si,a),ty)
 and infer_seq' env lst = seq (infer' env) (fun a -> A a) lst
-and infer_b_seq' env lst s tau =
-  seq (fun b e -> infer_b' env b e s tau)
-  (function Annot.BSkip -> IAnnot.BSkip | Annot.BType a -> IAnnot.BType (A a))
-  lst
 and infer_part_seq' env e v s lst =
   seq (fun a e -> infer_part' env e v s a)
     (fun (si,annot) -> (si, A annot))
