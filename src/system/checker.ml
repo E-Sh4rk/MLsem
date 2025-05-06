@@ -138,7 +138,11 @@ let rec typeof env annot (id,e) =
     let t = typeof env annot e in
     if subtype t ty then ty
     else untypeable id "Impossible type coercion."
-  | _, _ -> assert false (* Expr/annot mismatch *)
+  | e, AInter lst ->
+    lst |> List.map (fun a -> typeof env a (id,e)) |> conj
+  | e, a ->
+    Format.printf "e:@.%a@.@.a:@.%a@.@." Ast.pp_e e Annot.pp a ;
+    assert false
 and typeof_b env bannot e =
   match bannot with
   | BType annot -> typeof env annot e
