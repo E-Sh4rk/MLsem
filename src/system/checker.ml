@@ -65,7 +65,7 @@ let generalize ~e env s =
   let tvs = TVarSet.diff (vars s) (Env.tvars env) in
   TyScheme.mk tvs s |> TyScheme.clean
 
-let rec typeof env annot (id,e) =
+let rec typeof' env annot (id,e) =
   let open Annot in
   match e, annot with
   | Abstract ty, AAbstract -> ty
@@ -150,8 +150,15 @@ let rec typeof env annot (id,e) =
   | e, AInter lst ->
     lst |> List.map (fun a -> typeof env a (id,e)) |> conj
   | e, a ->
-    Format.printf "e:@.%a@.@.a:@.%a@.@." Ast.pp_e e Annot.pp a ;
+    Format.printf "e:@.%a@.@.a:@.%a@.@." Ast.pp_e e Annot.pp_a a ;
     assert false
+and typeof env annot e =
+  match annot.cache with
+  | Some ty -> ty
+  | None ->
+    let ty = typeof' env annot.ann e in
+    annot.cache <- Some ty ;
+    ty
 and typeof_b env bannot (id,e) s tau =
   match bannot with
   | BType annot -> typeof env annot (id,e)

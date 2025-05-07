@@ -88,24 +88,26 @@ let rec seq (f : 'b -> Ast.t -> ('a,'b) result) (c : 'a->
       end
     end
 
+let nc a = IAnnot.A (Annot.nc a)
+
 let rec infer env annot (id, e) =
   let open IAnnot in
   let retry_with a = infer env a (id, e) in
   match e, annot with
   | _, A a -> Ok (a, Checker.typeof env a (id, e))
   | _, Untyp -> Fail
-  | Abstract _, Infer -> retry_with (A Annot.AAbstract)
-  | Const _, Infer -> retry_with (A Annot.AConst)
+  | Abstract _, Infer -> retry_with (nc Annot.AAbstract)
+  | Const _, Infer -> retry_with (nc Annot.AConst)
   | Var v, Infer when Env.mem v env ->
     let (tvs,_) = Env.find v env |> TyScheme.get in
     let s = refresh tvs in
-    retry_with (A (Annot.AAx s))
+    retry_with (nc (Annot.AAx s))
   | Var _, Infer -> Fail
-  | Atom _, Infer -> retry_with (A Annot.AAtom)
+  | Atom _, Infer -> retry_with (nc Annot.AAtom)
   | Tag _, Infer -> retry_with (ATag Infer)
   | Tag (_, e'), ATag annot' ->
     begin match infer' env annot' e' with
-    | Ok (annot', _) -> retry_with (A (Annot.ATag annot'))
+    | Ok (annot', _) -> retry_with (nc (Annot.ATag annot'))
     | Subst (ss,a,a') -> Subst (ss,ATag a,ATag a')
     | Fail -> Fail
     end
@@ -120,7 +122,7 @@ let rec infer env annot (id, e) =
   | Lambda (_,v,e'), ALambda (ty, annot') ->
     let env' = Env.add v (TyScheme.mk_mono ty) env in
     begin match infer' env' annot' e' with
-    | Ok (annot', _) -> retry_with (A (Annot.ALambda (ty, annot')))
+    | Ok (annot', _) -> retry_with (nc (Annot.ALambda (ty, annot')))
     | Subst (ss,a,a') -> Subst (ss,ALambda (ty, a),ALambda (ty, a'))
     | Fail -> Fail
     end
@@ -141,7 +143,7 @@ let rec infer env annot (id, e) =
         | Fail -> Fail
         | Subst (ss, a2, a2') ->
           Subst (ss, AIte(A a0,to_i a1,a2), AIte(A a0,to_i a1,a2'))
-        | Ok (a2,_) -> retry_with (A (Annot.AIte(a0,a1,a2)))
+        | Ok (a2,_) -> retry_with (nc (Annot.AIte(a0,a1,a2)))
         end  
       end
     end
@@ -155,7 +157,7 @@ let rec infer env annot (id, e) =
       let tv = TVar.mk None in
       let arrow = mk_arrow t2 (TVar.typ tv) in
       let ss = tallying_with_result tv [(t1, arrow)] in
-      Subst (ss, A (Annot.AApp(a1,a2)), Untyp)
+      Subst (ss, nc (Annot.AApp(a1,a2)), Untyp)
     | _ -> assert false
     end
   | Tuple es, Infer -> retry_with (ATuple (List.map (fun _ -> Infer) es))
@@ -163,7 +165,7 @@ let rec infer env annot (id, e) =
     begin match infer_seq' env (List.combine annots es) with
     | OneFail _ -> Fail
     | OneSubst (ss, a, a') -> Subst (ss,ATuple a,ATuple a')
-    | AllOk (annots,_) -> retry_with (A (Annot.ATuple annots))
+    | AllOk (annots,_) -> retry_with (nc (Annot.ATuple annots))
     end
   | Cons _, Infer -> retry_with (ACons (Infer, Infer))
   | Cons (e1,e2), ACons (a1,a2) ->
@@ -173,7 +175,7 @@ let rec infer env annot (id, e) =
       Subst (ss,ACons(a1,a2),ACons(a1',a2'))
     | AllOk ([a1;a2],[_;t2]) ->
       let ss = tallying [(t2,list_typ)] in
-      Subst (ss, A (Annot.ACons(a1,a2)), Untyp)
+      Subst (ss, nc (Annot.ACons(a1,a2)), Untyp)
     | _ -> assert false
     end
   | Projection _, Infer -> retry_with (AProj Infer)
@@ -183,7 +185,7 @@ let rec infer env annot (id, e) =
       let tv = TVar.mk None in
       let ty = Checker.domain_of_proj p (TVar.typ tv) in
       let ss = tallying_with_result tv [(s, ty)] in
-      Subst (ss, A (Annot.AProj annot'), Untyp)
+      Subst (ss, nc (Annot.AProj annot'), Untyp)
     | Subst (ss,a,a') -> Subst (ss,AProj a,AProj a')
     | Fail -> Fail
     end
@@ -193,7 +195,7 @@ let rec infer env annot (id, e) =
     begin match infer' env annot' e' with
     | Ok (annot', s) ->
       let ss = tallying [(s,record_any)] in
-      Subst (ss, A (Annot.AUpdate(annot',None)), Untyp)
+      Subst (ss, nc (Annot.AUpdate(annot',None)), Untyp)
     | Subst (ss,a,a') -> Subst (ss,AUpdate (a,None),AUpdate (a',None))
     | Fail -> Fail
     end
@@ -204,7 +206,7 @@ let rec infer env annot (id, e) =
       Subst (ss,AUpdate(a1,Some a2),AUpdate(a1',Some a2'))
     | AllOk ([a1;a2],[s;_]) ->
       let ss = tallying [(s,record_any)] in
-      Subst (ss, A (Annot.AUpdate(a1,Some a2)), Untyp)
+      Subst (ss, nc (Annot.AUpdate(a1,Some a2)), Untyp)
     | _ -> assert false
     end
   | Let (tys,_,_,_), Infer ->
@@ -219,7 +221,7 @@ let rec infer env annot (id, e) =
       begin match infer_part_seq' env e2 v (tvs,s) parts with
       | OneFail _ -> Fail
       | OneSubst (ss,p,p') -> Subst (ss,ALet(A annot1,p),ALet(A annot1,p'))
-      | AllOk (p,_) -> retry_with (A (Annot.ALet (annot1, p)))
+      | AllOk (p,_) -> retry_with (nc (Annot.ALet (annot1, p)))
       end
     end
   | TypeConstr _, Infer -> retry_with (AConstr Infer)
@@ -228,7 +230,7 @@ let rec infer env annot (id, e) =
     begin match infer' env annot' e' with
     | Ok (annot', s) ->
       let ss = tallying [(s,t)] in
-      Subst (ss, A (Annot.AConstr(annot')), Untyp)
+      Subst (ss, nc (Annot.AConstr(annot')), Untyp)
     | Subst (ss,a,a') -> Subst (ss,AConstr a,AConstr a')
     | Fail -> Fail
     end
@@ -236,7 +238,7 @@ let rec infer env annot (id, e) =
     begin match infer' env annot' e' with
     | Ok (annot', s) ->
       let ss = tallying [(s,t)] in
-      Subst (ss, A (Annot.ACoerce(annot')), Untyp)
+      Subst (ss, nc (Annot.ACoerce(annot')), Untyp)
     | Subst (ss,a,a') -> Subst (ss,ACoerce a,ACoerce a')
     | Fail -> Fail
     end
@@ -248,7 +250,7 @@ let rec infer env annot (id, e) =
       begin match infer_seq' env (List.map (fun a -> (a,(id, e))) lst) with
       | OneFail (ls,rs) -> retry_with (AInter (ls@rs))
       | OneSubst (ss,a,a') -> Subst(ss,AInter(a),AInter(a'))
-      | AllOk (a,_) -> retry_with (A (Annot.AInter a))
+      | AllOk (a,_) -> retry_with (nc (Annot.AInter a))
       end
     end
   | e, a ->

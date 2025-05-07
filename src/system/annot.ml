@@ -8,7 +8,7 @@ module Annot = struct
   [@@deriving show]
   and part = (typ * t) list
   [@@deriving show]
-  and t =
+  and a =
   | AConst | AAbstract | AAtom
   | AAx of Subst.t
   | ALet of t * part
@@ -20,22 +20,25 @@ module Annot = struct
   | ALambda of typ * t
   | AInter of inter
   [@@deriving show]
+  and t = { mutable cache: typ option ; ann: a }
+  [@@deriving show]
 
   let substitute s t =
     let rec aux t =
-    match t with
-    | AConst -> AConst | AAbstract -> AAbstract | AAtom -> AAtom
-    | AAx s' -> AAx (Subst.compose_restr s s')
-    | ALet (t, ps) -> ALet (aux t, List.map (fun (ty, t) -> Subst.apply s ty, aux t) ps)
-    | AApp (t1, t2) -> AApp (aux t1, aux t2)
-    | ACons (t1, t2) -> ACons (aux t1, aux t2)
-    | AProj t -> AProj (aux t) | ATag t -> ATag (aux t)
-    | AConstr t -> AConstr (aux t) | ACoerce t -> ACoerce (aux t)
-    | AUpdate (t, ot) -> AUpdate (aux t, Option.map aux ot)
-    | ATuple ts -> ATuple (List.map aux ts)
-    | AIte (t,b1,b2) -> AIte (aux t, aux_b b1, aux_b b2)
-    | ALambda (ty, t) -> ALambda (Subst.apply s ty, aux t)
-    | AInter ts -> AInter (List.map aux ts)
+      let ann = match t.ann with
+      | AConst -> AConst | AAbstract -> AAbstract | AAtom -> AAtom
+      | AAx s' -> AAx (Subst.compose_restr s s')
+      | ALet (t, ps) -> ALet (aux t, List.map (fun (ty, t) -> Subst.apply s ty, aux t) ps)
+      | AApp (t1, t2) -> AApp (aux t1, aux t2)
+      | ACons (t1, t2) -> ACons (aux t1, aux t2)
+      | AProj t -> AProj (aux t) | ATag t -> ATag (aux t)
+      | AConstr t -> AConstr (aux t) | ACoerce t -> ACoerce (aux t)
+      | AUpdate (t, ot) -> AUpdate (aux t, Option.map aux ot)
+      | ATuple ts -> ATuple (List.map aux ts)
+      | AIte (t,b1,b2) -> AIte (aux t, aux_b b1, aux_b b2)
+      | ALambda (ty, t) -> ALambda (Subst.apply s ty, aux t)
+      | AInter ts -> AInter (List.map aux ts)
+    in { cache=Option.map (Subst.apply s) t.cache ; ann }
     and aux_b b =
       match b with BSkip -> BSkip | BType t -> BType (aux t)  
     in
@@ -43,7 +46,7 @@ module Annot = struct
 
   let tvars t =
     let rec aux t =
-      let vs = match t with
+      let vs = match t.ann with
         | AConst | AAbstract | AAtom -> []
         | AAx s -> [Subst.vars s]
         | ALet (t, ps) ->
@@ -59,6 +62,8 @@ module Annot = struct
       match b with BSkip -> TVarSet.empty | BType t -> aux t
     in
     aux t
+
+  let nc a = { cache=None ; ann=a }
 end
 
 module IAnnot = struct

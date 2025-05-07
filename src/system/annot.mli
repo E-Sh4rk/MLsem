@@ -2,11 +2,10 @@ open Types.Base
 open Types.Tvar
 
 module Annot : sig
-  (* TODO: cache *)
   type branch = BType of t | BSkip
   and inter = t list
   and part = (typ * t) list
-  and t =
+  and a =
   | AConst | AAbstract | AAtom
   | AAx of Subst.t
   | ALet of t * part
@@ -17,10 +16,13 @@ module Annot : sig
   | AIte of t * branch * branch
   | ALambda of typ * t
   | AInter of inter
+  and t = { mutable cache: typ option ; ann: a }
 
+  val nc : a -> t
   val substitute : Subst.t -> t -> t
   val tvars : t -> TVarSet.t
   val pp : Format.formatter -> t -> unit
+  val pp_a : Format.formatter -> a -> unit
 end
 
 module IAnnot : sig
