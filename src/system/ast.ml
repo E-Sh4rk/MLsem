@@ -89,6 +89,14 @@ let fv' (_,e) accs =
 
 let fv t = fold fv' t
 
+let substitute' v v' (id,e) =
+  let e = match e with
+  | Var v'' when Variable.equals v v'' -> Var v'
+  | e -> e
+  in
+  (id,e)
+let substitute v v' e = map (substitute' v v') e
+
 (* Conversion *)
 
 let rec type_of_pat pat =
@@ -191,7 +199,6 @@ let encode_fixpoint id e =
   let app = (Ast.unique_exprid (), Ast.App (fix, ex)) in
   (id, Ast.Let (x, Ast.PNoAnnot, e, app))
 
-(* TODO: Add a let binding for each lambda var. Update Partition.infer accordingly. *)
 let from_parser_ast t =
   let rec aux_e (id,e) =
     match e with
@@ -203,7 +210,12 @@ let from_parser_ast t =
     | Ast.Lambda (x, DNoAnnot, e) ->
       let tv = TVar.mk ~user:false (Variable.get_name x) |> TVar.typ in
       Lambda ([tv], x, aux e)
-    | Ast.Lambda (x, DAnnot lst, e) -> Lambda (lst, x, aux e)
+    | Ast.Lambda (x, DAnnot lst, e) ->
+      let e = aux e in
+      let x' = Variable.create_let (Variable.get_name x) in
+      Variable.get_locations x |> List.iter (Variable.attach_location x') ;
+      Lambda (lst, x, (Ast.unique_exprid (), Let ([], x',
+        (Ast.unique_exprid (), Var x), substitute x x' e)))
     | Ast.Fixpoint e -> encode_fixpoint id e |> aux_e
     | Ast.Ite (e,t,e1,e2) -> Ite (aux e, t, aux e1, aux e2)
     | Ast.App (e1,e2) -> App (aux e1, aux e2)

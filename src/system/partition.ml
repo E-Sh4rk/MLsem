@@ -81,6 +81,11 @@ let partition ts =
   in
   aux any
 
+let typeof env (_,e) =
+  match e with
+  | Var v when Env.mem v env -> Env.find v env
+  | _ -> TyScheme.mk_mono any
+
 let rec infer env renv (id,e) =
   let e, renvs = match e with
   | Abstract t -> Abstract t, []
@@ -125,7 +130,7 @@ let rec infer env renv (id,e) =
     RecordUpdate (e, lbl, Some e'), renvs@renvs'
   | Let (tys, v, e1, e2) ->
     let e1, renvs1 = infer env renv e1 in
-    let env' = Env.add v (TyScheme.mk_mono any) env in
+    let env' = Env.add v (typeof env e1) env in
     let renv' = REnv.add v (TVar.mk None |> TVar.typ) renv in
     let e2, renvs2 = infer env' renv' e2 in
     let part = renvs2 |> List.map (REnv.find v) in
