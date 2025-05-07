@@ -19,7 +19,7 @@ let tsort leq lst =
   List.fold_left add_elt [] (List.rev lst)
 
 let simplify_tallying env sols =
-  let tvars = Env.tvars env in
+  let tvars = TVarSet.union (Env.tvars env) (TVar.user_vars ()) in
   let vars_involved' dom sol =
     let sol = Subst.restrict sol dom in
     TVarSet.union (Subst.vars sol) dom
@@ -31,33 +31,19 @@ let simplify_tallying env sols =
     TyScheme.leq_inst r1 r2
   in
   sols
-  (* TODO *)
-  (* (* Generalize vars in the result when possible *)
-  |> List.map (fun (sol, res) ->
-    let mono = vars_involved tvars sol in
-    let gen = generalize_inferable (TVarSet.diff (vars res) mono) in
-    let sol, res = Subst.compose_restr gen sol, Subst.apply gen res in
-    let clean = clean_type_subst ~pos:empty ~neg:any res in
-    (Subst.compose_restr clean sol, Subst.apply clean res)
-  )
-  (* Try remove var substitutions *)
+  (* Try remove unnecessary var substitutions *)
   |> List.map (fun (sol, res) ->
     List.fold_left (fun (sol, res) v ->
       let t = Subst.find sol v in
-      let mono = vars_involved' (TVarSet.rm v tvars) sol in
-      let pvs = TVarSet.diff (vars t) mono in
-      let g = generalize_inferable pvs in
-      let t = Subst.apply g t in
-      let tallying_res = tallying [(TVar.typ v, t) ; (t, TVar.typ v)]
-      |> List.map (fun s ->
-        let s = Subst.compose_restr s g in
-        Subst.compose_restr (Subst.vars s |> monomorphize) s
-      )
-      |> List.filter (fun s ->
-        let res' = Subst.apply s res in
-        let res' = Subst.apply (vars res' |> generalize) res' in
-        subtype_poly res' res
-      )
+      let mono = TVarSet.add v (vars_involved' (TVarSet.rm v tvars) sol) in
+      let tallying_res =
+        tallying mono [(TVar.typ v, t) ; (t, TVar.typ v)]
+        |> List.filter (fun s ->
+          let res' = Subst.apply s res in
+          let res = TyScheme.mk_poly res in
+          let res' = TyScheme.mk_poly res' in
+          TyScheme.leq_inst res' res
+        )
       in
       match tallying_res with
       | [] -> (sol, res)
@@ -70,10 +56,16 @@ let simplify_tallying env sols =
     let sol = List.hd to_merge |> fst in
     let res = List.map snd to_merge |> conj in
     (sol, res)
-  ) *)
+  )
   (* Order solutions (more precise results first) *)
   |> tsort leq_sol
   |> List.map fst
+
+let tallying env cs =
+  tallying (TVar.user_vars ()) cs |> List.map (fun ty -> ty, empty) |> simplify_tallying env
+
+let tallying_with_result env tv cs =
+  tallying_with_result (TVar.user_vars ()) tv cs |> simplify_tallying env
 
 (* Reconstruction algorithm *)
 
@@ -170,9 +162,7 @@ let rec infer env annot (id, e) =
     | AllOk ([a1;a2],[t1;t2]) ->
       let tv = TVar.mk None in
       let arrow = mk_arrow t2 (TVar.typ tv) in
-      let ss =
-        tallying_with_result (TVar.user_vars ()) tv [(t1, arrow)]
-        |> List.map fst in
+      let ss = tallying_with_result env tv [(t1, arrow)] in
       Subst (ss, A (Annot.AApp(a1,a2)), Untyp)
     | _ -> assert false
     end
@@ -190,7 +180,7 @@ let rec infer env annot (id, e) =
     | OneSubst (ss, [a1;a2], [a1';a2']) ->
       Subst (ss,ACons(a1,a2),ACons(a1',a2'))
     | AllOk ([a1;a2],[_;t2]) ->
-      let ss = tallying (TVar.user_vars ()) [(t2,list_typ)] in
+      let ss = tallying env [(t2,list_typ)] in
       Subst (ss, A (Annot.ACons(a1,a2)), Untyp)
     | _ -> assert false
     end
@@ -200,9 +190,7 @@ let rec infer env annot (id, e) =
     | Ok (annot', s) ->
       let tv = TVar.mk None in
       let ty = Checker.domain_of_proj p (TVar.typ tv) in
-      let ss =
-        tallying_with_result (TVar.user_vars ()) tv [(s, ty)]
-        |> List.map fst in
+      let ss = tallying_with_result env tv [(s, ty)] in
       Subst (ss, A (Annot.AProj annot'), Untyp)
     | Subst (ss,a,a') -> Subst (ss,AProj a,AProj a')
     | Fail -> Fail
@@ -212,7 +200,7 @@ let rec infer env annot (id, e) =
   | RecordUpdate (e', _, None), AUpdate (annot', None) ->
     begin match infer' env annot' e' with
     | Ok (annot', s) ->
-      let ss = tallying (TVar.user_vars ()) [(s,record_any)] in
+      let ss = tallying env [(s,record_any)] in
       Subst (ss, A (Annot.AUpdate(annot',None)), Untyp)
     | Subst (ss,a,a') -> Subst (ss,AUpdate (a,None),AUpdate (a',None))
     | Fail -> Fail
@@ -223,7 +211,7 @@ let rec infer env annot (id, e) =
     | OneSubst (ss, [a1;a2], [a1';a2']) ->
       Subst (ss,AUpdate(a1,Some a2),AUpdate(a1',Some a2'))
     | AllOk ([a1;a2],[s;_]) ->
-      let ss = tallying (TVar.user_vars ()) [(s,record_any)] in
+      let ss = tallying env [(s,record_any)] in
       Subst (ss, A (Annot.AUpdate(a1,Some a2)), Untyp)
     | _ -> assert false
     end
@@ -246,7 +234,7 @@ let rec infer env annot (id, e) =
   | TypeConstr (e', t), AConstr annot' ->
     begin match infer' env annot' e' with
     | Ok (annot', s) ->
-      let ss = tallying (TVar.user_vars ()) [(s,t)] in
+      let ss = tallying env [(s,t)] in
       Subst (ss, A (Annot.AConstr(annot')), Untyp)
     | Subst (ss,a,a') -> Subst (ss,AConstr a,AConstr a')
     | Fail -> Fail
@@ -254,7 +242,7 @@ let rec infer env annot (id, e) =
   | TypeCoerce (e', t), ACoerce annot' ->
     begin match infer' env annot' e' with
     | Ok (annot', s) ->
-      let ss = tallying (TVar.user_vars ()) [(s,t)] in
+      let ss = tallying env [(s,t)] in
       Subst (ss, A (Annot.ACoerce(annot')), Untyp)
     | Subst (ss,a,a') -> Subst (ss,ACoerce a,ACoerce a')
     | Fail -> Fail
@@ -293,7 +281,7 @@ and infer' env annot e =
 and infer_b' env bannot e s tau =
   match bannot with
   | IAnnot.BInfer ->
-    let ss = tallying (TVar.user_vars ()) [(s,neg tau)] in
+    let ss = tallying env [(s,neg tau)] in
     Subst (ss, IAnnot.BSkip, IAnnot.BType Infer)
   | IAnnot.BSkip -> Ok (Annot.BSkip, empty)
   | IAnnot.BType annot ->

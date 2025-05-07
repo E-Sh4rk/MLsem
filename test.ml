@@ -74,6 +74,8 @@ let rec map_clist f (lst:clist('a)) =
   end
 
 (* ================================= *)
+
+let test a = (fst a, fst a)
 let succ = <int->int>
 
 let aliasing (x : any -> any) = 
