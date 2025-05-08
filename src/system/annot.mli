@@ -27,7 +27,7 @@ module Annot : sig
 end
 
 module IAnnot : sig
-  type coverage = Parsing.Ast.exprid * typ * REnv.t
+  type coverage = (Parsing.Ast.exprid * typ) option * REnv.t
   type branch = BType of t | BSkip | BInfer
   and inter_branch = { coverage: coverage option ; ann: t }
   and inter = inter_branch list
@@ -52,4 +52,5 @@ module IAnnot : sig
   val tvars_ib : inter_branch -> TVarSet.t
   val tvars : t -> TVarSet.t
   val pp : Format.formatter -> t -> unit
+  val pp_coverage : Format.formatter -> coverage -> unit
 end
