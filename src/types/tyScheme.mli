@@ -13,7 +13,8 @@ val leq : t -> t -> bool
 val equiv : t -> t -> bool
 val leq_inst : t -> typ -> bool
 val geq_inst : t -> typ -> bool
-val clean : t -> t
+val bot_instance : t -> t
+val top_instance : t -> t
 val simplify : t -> t
 val pp : Format.formatter -> t -> unit
 val pp_short : Format.formatter -> t -> unit

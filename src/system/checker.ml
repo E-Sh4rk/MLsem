@@ -62,7 +62,7 @@ let untypeable id msg = raise (Untypeable (id, msg))
 let generalize ~e env s =
   ignore e ; (* TODO: value restriction *)
   let tvs = TVarSet.diff (vars s) (Env.tvars env) in
-  TyScheme.mk tvs s |> TyScheme.clean
+  TyScheme.mk tvs s |> TyScheme.bot_instance
 
 let rec typeof' env annot (id,e) =
   let open Annot in

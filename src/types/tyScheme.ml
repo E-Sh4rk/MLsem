@@ -20,18 +20,24 @@ let leq (tvs1,ty1) (tvs2,ty2) =
   TVarSet.subset tvs2 tvs1 &&
   subtype ty1 ty2
 let equiv t1 t2 = leq t1 t2 && leq t2 t1
+let bot_instance (tvs,t) =
+  let mono = TVarSet.diff (vars t) tvs in
+  let t = Additions.bot_instance mono t in
+  mk tvs t
+let top_instance (tvs,t) =
+  let mono = TVarSet.diff (vars t) tvs in
+  let t = Additions.top_instance mono t in
+  mk tvs t
 let leq_inst t1 ty2 =
+  let t1 = bot_instance t1 in
   let mono1, ty1 = get_fresh t1 in
   let mono = TVarSet.union mono1 (vars ty2) in
   test_tallying mono [ty1,ty2]
 let geq_inst t1 ty2 =
+  let t1 = top_instance t1 in
   let mono1, ty1 = get_fresh t1 in
   let mono = TVarSet.union mono1 (vars ty2) in
   test_tallying mono [ty2,ty1]
-let clean (tvs,t) =
-  let mono = TVarSet.diff (vars t) tvs in
-  let t = Additions.bot_instance mono t in
-  mk tvs t
 let simplify (tvs,ty) = (tvs, Additions.simplify_typ ty)
 let pp fmt (tvs, ty) =
   Format.fprintf fmt "∀%a.%a"
