@@ -49,7 +49,6 @@ let simplify_tallying poly sols =
   )
   (* Order solutions (more precise results first) *)
   |> tsort leq_sol
-  |> List.map fst
 
 let tallying cs =
   tallying (TVar.user_vars ()) cs |> List.map (fun ty -> ty, empty)
@@ -64,12 +63,12 @@ let tallying_with_result tv cs =
 type ('a,'b) result =
 | Ok of 'a * typ
 | Fail
-| Subst of Subst.t list * 'b * 'b * REnv.t
+| Subst of (Subst.t * typ) list * 'b * 'b * (Parsing.Ast.exprid * REnv.t)
 
 type ('a,'b) result_seq =
 | AllOk of 'a list * typ list
 | OneFail
-| OneSubst of Subst.t list * 'b list * 'b list * REnv.t
+| OneSubst of (Subst.t * typ) list * 'b list * 'b list * (Parsing.Ast.exprid * REnv.t)
 
 let rec seq (f : 'b -> 'c -> ('a,'b) result) (c : 'a->'b) (lst:('b*'c) list)
   : ('a,'b) result_seq =
@@ -93,6 +92,7 @@ let nc a = IAnnot.A (Annot.nc a)
 let rec infer dom env annot (id, e) =
   let open IAnnot in
   let retry_with a = infer dom env a (id, e) in
+  let empty_cov = (id, REnv.empty) in
   match e, annot with
   | _, A a -> Ok (a, Checker.typeof env a (id, e))
   | _, Untyp -> Fail
@@ -123,7 +123,8 @@ let rec infer dom env annot (id, e) =
     let env' = Env.add v (TyScheme.mk_mono ty) env in
     begin match infer' Domain.empty env' annot' e' with
     | Ok (annot', _) -> retry_with (nc (Annot.ALambda (ty, annot')))
-    | Subst (ss,a,a',r) -> Subst (ss,ALambda (ty, a),ALambda (ty, a'),REnv.add v ty r)
+    | Subst (ss,a,a',(eid,r)) ->
+      Subst (ss,ALambda (ty, a),ALambda (ty, a'),(eid,REnv.add v ty r))
     | Fail -> Fail
     end
   | Ite _, Infer -> retry_with (AIte (Infer, BInfer, BInfer))
@@ -157,7 +158,7 @@ let rec infer dom env annot (id, e) =
       let tv = TVar.mk None in
       let arrow = mk_arrow t2 (TVar.typ tv) in
       let ss = tallying_with_result tv [(t1, arrow)] in
-      Subst (ss, nc (Annot.AApp(a1,a2)), Untyp, REnv.empty)
+      Subst (ss, nc (Annot.AApp(a1,a2)), Untyp, empty_cov)
     | _ -> assert false
     end
   | Tuple es, Infer -> retry_with (ATuple (List.map (fun _ -> Infer) es))
@@ -175,7 +176,7 @@ let rec infer dom env annot (id, e) =
       Subst (ss,ACons(a1,a2),ACons(a1',a2'),r)
     | AllOk ([a1;a2],[_;t2]) ->
       let ss = tallying [(t2,list_typ)] in
-      Subst (ss, nc (Annot.ACons(a1,a2)), Untyp, REnv.empty)
+      Subst (ss, nc (Annot.ACons(a1,a2)), Untyp, empty_cov)
     | _ -> assert false
     end
   | Projection _, Infer -> retry_with (AProj Infer)
@@ -185,7 +186,7 @@ let rec infer dom env annot (id, e) =
       let tv = TVar.mk None in
       let ty = Checker.domain_of_proj p (TVar.typ tv) in
       let ss = tallying_with_result tv [(s, ty)] in
-      Subst (ss, nc (Annot.AProj annot'), Untyp, REnv.empty)
+      Subst (ss, nc (Annot.AProj annot'), Untyp, empty_cov)
     | Subst (ss,a,a',r) -> Subst (ss,AProj a,AProj a',r)
     | Fail -> Fail
     end
@@ -195,7 +196,7 @@ let rec infer dom env annot (id, e) =
     begin match infer' dom env annot' e' with
     | Ok (annot', s) ->
       let ss = tallying [(s,record_any)] in
-      Subst (ss, nc (Annot.AUpdate(annot',None)), Untyp, REnv.empty)
+      Subst (ss, nc (Annot.AUpdate(annot',None)), Untyp, empty_cov)
     | Subst (ss,a,a',r) -> Subst (ss,AUpdate (a,None),AUpdate (a',None),r)
     | Fail -> Fail
     end
@@ -206,7 +207,7 @@ let rec infer dom env annot (id, e) =
       Subst (ss,AUpdate(a1,Some a2),AUpdate(a1',Some a2'),r)
     | AllOk ([a1;a2],[s;_]) ->
       let ss = tallying [(s,record_any)] in
-      Subst (ss, nc (Annot.AUpdate(a1,Some a2)), Untyp, REnv.empty)
+      Subst (ss, nc (Annot.AUpdate(a1,Some a2)), Untyp, empty_cov)
     | _ -> assert false
     end
   | Let (tys,_,_,_), Infer ->
@@ -230,7 +231,7 @@ let rec infer dom env annot (id, e) =
     begin match infer' dom env annot' e' with
     | Ok (annot', s) ->
       let ss = tallying [(s,t)] in
-      Subst (ss, nc (Annot.AConstr(annot')), Untyp, REnv.empty)
+      Subst (ss, nc (Annot.AConstr(annot')), Untyp, empty_cov)
     | Subst (ss,a,a',r) -> Subst (ss,AConstr a,AConstr a',r)
     | Fail -> Fail
     end
@@ -238,7 +239,7 @@ let rec infer dom env annot (id, e) =
     begin match infer' dom env annot' e' with
     | Ok (annot', s) ->
       let ss = tallying [(s,t)] in
-      Subst (ss, nc (Annot.ACoerce(annot')), Untyp, REnv.empty)
+      Subst (ss, nc (Annot.ACoerce(annot')), Untyp, empty_cov)
     | Subst (ss,a,a',r) -> Subst (ss,ACoerce a,ACoerce a',r)
     | Fail -> Fail
     end
@@ -251,7 +252,7 @@ let rec infer dom env annot (id, e) =
         let dom', useless =
           match coverage with
           | None -> dom, false
-          | Some renv -> Domain.add renv dom, Domain.covers mono dom renv
+          | Some cov -> Domain.add cov dom, Domain.covers mono dom cov
         in
         if useless then aux dom lst
         else
@@ -286,22 +287,25 @@ and infer' dom env annot e =
   match infer dom env annot e with
   | Ok (a, ty) -> Ok (a, ty)
   | Fail -> Fail
-  | Subst (ss, a1, a2, r) when List.for_all subst_disjoint ss ->
-    let branches = ss |> List.map (fun s ->
-      let ib = { IAnnot.coverage=Some r ; ann=a1 } in
+  | Subst (ss, a1, a2, (eid,r)) when ss |> List.map fst |> List.for_all subst_disjoint ->
+    let branches = ss |> List.map (fun (s,ty) ->
+      let coverage = Some (eid, ty, r) in
+      let ib = { IAnnot.coverage ; ann=a1 } in
       let ib = IAnnot.substitute_ib s ib in
       let tvs = TVarSet.diff (IAnnot.tvars_ib ib) mono in
       let ib = IAnnot.substitute_ib (refresh tvs) ib in
       ib
       ) in
-    let annot = IAnnot.AInter (branches@[{ coverage=Some r ; ann=a2 }]) in
+    let coverage = Some (eid, any, r) in
+    let annot = IAnnot.AInter (branches@[{ coverage ; ann=a2 }]) in
     infer' dom env annot e
   | Subst (ss, a1, a2, r) -> Subst (ss, a1, a2, r)
 and infer_b' dom env bannot e s tau =
+  let empty_cov = (fst e, REnv.empty) in
   match bannot with
   | IAnnot.BInfer ->
     let ss = tallying [(s,neg tau)] in
-    Subst (ss, IAnnot.BSkip, IAnnot.BType Infer, REnv.empty)
+    Subst (ss, IAnnot.BSkip, IAnnot.BType Infer, empty_cov)
   | IAnnot.BSkip -> Ok (Annot.BSkip, empty)
   | IAnnot.BType annot ->
     begin match infer' dom env annot e with

@@ -68,9 +68,11 @@ module Annot = struct
 end
 
 module IAnnot = struct
+  type coverage = Parsing.Ast.exprid * typ * REnv.t
+  [@@deriving show]
   type branch = BType of t | BSkip | BInfer
   [@@deriving show]
-  and inter_branch = { coverage: REnv.t option ; ann: t }
+  and inter_branch = { coverage: coverage option ; ann: t }
   [@@deriving show]
   and inter = inter_branch list
   [@@deriving show]
@@ -115,10 +117,12 @@ module IAnnot = struct
       | BType t -> BType (aux t)
       | BInfer -> BInfer | BSkip -> BSkip
     and aux_ib { coverage ; ann } =
-      let aux_coverage coverage =
-        REnv.bindings coverage
+      let aux_coverage (eid,ty,renv) =
+        let renv = REnv.bindings renv
         |> List.map (fun (x,t) -> (x,Subst.apply s t))
         |> REnv.construct
+        in
+        (eid, Subst.apply s ty, renv)
       in
       let coverage = Option.map aux_coverage coverage in
       { coverage ; ann=aux ann }

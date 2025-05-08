@@ -1,8 +1,8 @@
 open Types.Tvar
-open Env
+open Annot
 
 type t
 val empty : t
-val add : REnv.t -> t -> t
-val covers : TVarSet.t -> t -> REnv.t -> bool
+val add : IAnnot.coverage -> t -> t
+val covers : TVarSet.t -> t -> IAnnot.coverage -> bool
 val pp : Format.formatter -> t -> unit
