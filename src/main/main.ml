@@ -33,9 +33,8 @@ let type_check_def env (var,e,typ_annot) =
       match typ_annot with
       | None -> typ
       | Some tya ->
-        let tya = TyScheme.mk_poly_except (Env.tvars env) tya in
         if TyScheme.leq_inst typ tya
-        then tya
+        then TyScheme.mk_poly_except (Env.tvars env) tya
         else raise (IncompatibleType typ)
     in
     let env = Env.add var typ env in

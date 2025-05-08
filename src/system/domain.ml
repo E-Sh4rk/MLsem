@@ -23,8 +23,7 @@ let more_specific mono res1 res2 =
   | None, _ -> false
   | Some (eid1,ty1), Some (eid2,ty2) when eid1=eid2 ->
     let t1 = TyScheme.mk_poly_except mono ty1 in
-    let t2 = TyScheme.mk_poly_except mono ty2 in
-    TyScheme.leq_inst t1 t2
+    TyScheme.leq_inst t1 ty2
   | Some _, Some _ -> false
 
 let covers mono t (res,renv) =
@@ -35,5 +34,4 @@ let covers mono t (res,renv) =
   let a = renvs |> List.map env_to_typ |> disj in
   let a = TyScheme.mk_poly_except mono a in
   let b = env_to_typ renv in
-  let b = TyScheme.mk_poly_except mono b in
   TyScheme.geq_inst a b

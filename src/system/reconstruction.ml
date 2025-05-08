@@ -30,7 +30,6 @@ let simplify_tallying poly sols =
         tallying mono [(TVar.typ v, t) ; (t, TVar.typ v)]
         |> List.filter (fun s ->
           let res' = Subst.apply s res in
-          let res = TyScheme.mk_poly res in
           let res' = TyScheme.mk_poly res' in
           TyScheme.leq_inst res' res
         )
