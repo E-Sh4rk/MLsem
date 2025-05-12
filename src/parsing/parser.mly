@@ -96,7 +96,7 @@
 %}
 
 %token EOF
-%token FUN LET REC IN FST SND HD TL DEBUG
+%token FUN LET REC IN FST SND HD TL HASHTAG
 %token IF IS THEN ELSE
 %token LPAREN RPAREN EQUAL COMMA CONS COLON COLON_OPT COERCE INTERROGATION_MARK EXCLAMATION_MARK
 %token ARROW AND OR NEG DIFF
@@ -132,22 +132,23 @@ program: e=element* EOF { e }
 unique_term: t=term EOF { t }
 
 element:
-  i=optional_debug LET id=generalized_identifier COLON ty=typ EQUAL t=term
-  { annot $symbolstartpos $endpos (Definition (i, (id, t, Some ty))) }
-| i=optional_debug LET gioa=gen_id_opt_annot ais=parameter* EQUAL t=term
+  LET id=generalized_identifier COLON ty=typ EQUAL t=term
+  { annot $symbolstartpos $endpos (Definition (id, t, Some ty)) }
+| LET gioa=gen_id_opt_annot ais=parameter* EQUAL t=term
   { 
     let (id, ty) = gioa in
     let t = multi_param_abstraction $startpos $endpos ais t in
-    annot $symbolstartpos $endpos (Definition (i, (id, t, ty)))
+    annot $symbolstartpos $endpos (Definition (id, t, ty))
   }
-| i=optional_debug LET REC gioa=gen_id_opt_annot ais=parameter* oty=optional_typ EQUAL t=term
+| LET REC gioa=gen_id_opt_annot ais=parameter* oty=optional_typ EQUAL t=term
   { 
     let (id, ty) = gioa in
     let t = multi_param_rec_abstraction $startpos $endpos id ais oty t in
-    annot $symbolstartpos $endpos (Definition (i, (id, t, ty)))
+    annot $symbolstartpos $endpos (Definition (id, t, ty))
   }
 | TYPE ts=separated_nonempty_list(TYPE_AND, param_type_def) { annot $symbolstartpos $endpos (Types ts) }
 | ABSTRACT TYPE name=ID params=abs_params { annot $symbolstartpos $endpos (AbsType (name, params)) }
+| HASHTAG cmd=ID EQUAL v=literal { annot $symbolstartpos $endpos (Command (cmd, v)) }
 
 %inline abs_params:
   { [] }
@@ -165,11 +166,6 @@ variance:
 %inline optional_typ:
 | { None }
 | COLON ty=typ { Some ty }
-
-%inline optional_debug:
-  { Utils.log_disabled }
-| DEBUG { Utils.log_full }
-| DEBUG i=lint { Z.to_int i }
 
 (* ===== TERMS ===== *)
 

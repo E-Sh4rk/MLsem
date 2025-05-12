@@ -31,15 +31,17 @@ let cov = <cov(A|B) & cov(B|C) & ~cov(empty)>
 
 let inv = <inv(A) & inv(B) & inv(A|B)>
 
+#value_restriction = true
+
 abstract type ref('a)
 let ref = <'a -> ref('a)>
-let set = <ref('a) -> 'a -> ref('a)> (* We dont have value restriction yet, so functions should not have effects *)
+let set = <ref('a) -> 'a -> ()>
 let get = <ref('a) -> 'a>
 
-let test_ref = ref 42 (* No value restriction yet :( *)
+let test_ref = ref 42
 let test_ref x =
   let y = ref x in
-  let y = set y 42 in
+  let () = set y 42 in
   get y
 
 let is_ref x = if x is ref then true else false
@@ -56,6 +58,8 @@ let test_map x =
   let map = add_map map x 42 in
   let map = add_map map "key" 0 in
   (map, get_map map false)
+
+#value_restriction = false
 
 (* ========= TAGGED VALUES ======== *)
 
@@ -139,6 +143,7 @@ let map map f lst =
 
 let map = fixpoint map
 
+(*
 (*************************************************
 *          Tobin-Hochstadt & Felleisen           *
 *     exampleX = EXPLICITLY ANNOTATED VERSIONS   *

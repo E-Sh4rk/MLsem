@@ -49,7 +49,7 @@ let type_check_def env (var,e,typ_annot) =
       retrieve_time ())
 
 type parsing_result =
-| PSuccess of type_env * ((int * def) list)
+| PSuccess of type_env * (def list)
 | PFailure of Position.t * string
 
 let builtin_functions =
@@ -87,7 +87,7 @@ let parse_and_resolve f varm =
     let treat_elem (tenv,varm,defs) (annot, elem) =
       last_pos := Position.position annot ;
       match elem with
-      | Ast.Definition (log, (name, expr, tyo)) ->
+      | Ast.Definition (name, expr, tyo) ->
         let tyo = match tyo with
         | None -> None
         | Some expr -> let (t, _) = type_expr_to_typ tenv empty_vtenv expr in Some t
@@ -96,7 +96,15 @@ let parse_and_resolve f varm =
         let var = Variable.create_let (Some name) in
         Variable.attach_location var (Position.position annot) ;
         let varm = StrMap.add name var varm in
-        (tenv,varm,(log,(var,expr,tyo))::defs)
+        (tenv,varm,(var,expr,tyo)::defs)
+      | Ast.Command (str, c) ->
+        (* TODO: dont execute all commands before typing *)
+        begin match str, c with
+        | "log", Int i -> Config.log_level := Z.to_int i
+        | "value_restriction", Bool b -> Config.value_restriction := b
+        | _ -> failwith ("Invalid command "^str)
+        end ;
+        (tenv,varm,defs)
       | Ast.Types lst ->
         let tenv = define_types tenv empty_vtenv lst in
         (tenv,varm,defs)

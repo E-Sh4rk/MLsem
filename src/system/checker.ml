@@ -59,10 +59,20 @@ exception Untypeable of Parsing.Ast.exprid * string
 
 let untypeable id msg = raise (Untypeable (id, msg))
 
+let rec is_value (_,e) =
+  match e with
+  | Const _ | Atom _ | Lambda _ | Abstract _ -> true
+  | Tag (_, e) -> is_value e
+  | Tuple es -> List.for_all is_value es
+  | Cons (e1, e2) -> is_value e1 && is_value e2
+  | _ -> false
+
 let generalize ~e env s =
-  ignore e ; (* TODO: value restriction *)
-  let tvs = TVarSet.diff (vars s) (Env.tvars env) in
-  TyScheme.mk tvs s |> TyScheme.bot_instance
+  if not (!Config.value_restriction) || is_value e then
+    let tvs = TVarSet.diff (vars s) (Env.tvars env) in
+    TyScheme.mk tvs s |> TyScheme.bot_instance
+  else
+    TyScheme.mk_mono s
 
 let rec typeof' env annot (id,e) =
   let open Annot in

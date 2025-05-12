@@ -24,7 +24,7 @@ let typecheck code callback =
           `Assoc [("exit_code", `Int 0); ("results", `List (List.rev res))]
         in
         let (_, res) =
-          List.fold_left (fun (env, res) (_, (v, e, ta)) ->
+          List.fold_left (fun (env, res) (v, e, ta) ->
             let name = Parsing.Variable.Variable.get_name v |> Option.get in
             let def_pos = Parsing.Variable.Variable.get_locations v |> List.hd in
             let (env, res) =

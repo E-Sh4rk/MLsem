@@ -9,8 +9,7 @@ let () =
         match parse_and_resolve (`File !fn) initial_varm with
         | PSuccess (_, lst) ->
             let time0 = Unix.gettimeofday () in
-            List.fold_left (fun env (ll, (v, e, ta)) ->
-                Utils.log_level := ll ;
+            List.fold_left (fun env (v, e, ta) ->
                 Format.printf "@{<blue;bold>%s@}: %!"
                     (Parsing.Variable.Variable.get_name v |> Option.get) ;
                 match type_check_def env (v,e,ta) with

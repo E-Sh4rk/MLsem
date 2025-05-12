@@ -51,6 +51,7 @@ rule token = parse
 | "where" { WHERE }
 | "and"   { TYPE_AND }
 | "abstract"  { ABSTRACT }
+| "#"     { HASHTAG }
 | "(*"    { comment 0 lexbuf }
 | "->"    { ARROW }
 | "&"     { AND }
@@ -81,7 +82,6 @@ rule token = parse
 | "snd"   { SND }
 | "hd"    { HD }
 | "tl"    { TL }
-| "debug" { DEBUG }
 | "("     { LPAREN }
 | ")"     { RPAREN }
 | "{"     { LBRACE }

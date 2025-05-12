@@ -20,11 +20,8 @@ let error fmt (pos, msg) =
 let success fmt msg =
   Format.fprintf fmt "Success: %s@." msg
 
-let log_disabled = -1
-let log_full = 10
-let log_level = ref log_disabled
 let log ?(level=0) a =
-  if level <= !log_level then Format.fprintf Format.std_formatter a
+  if level <= !Config.log_level then Format.fprintf Format.std_formatter a
   else Format.ifprintf Format.std_formatter a
   
 let identity x = x
