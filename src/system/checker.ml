@@ -59,8 +59,9 @@ exception Untypeable of Parsing.Ast.exprid * string
 
 let untypeable id msg = raise (Untypeable (id, msg))
 
-let rec is_value (_,e) =
+let rec is_value (id,e) =
   match e with
+  | _ when is_fixpoint (id,e) -> true
   | Const _ | Atom _ | Lambda _ | Abstract _ -> true
   | Tag (_, e) -> is_value e
   | Tuple es -> List.for_all is_value es

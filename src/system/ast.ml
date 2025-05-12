@@ -38,6 +38,12 @@ let fixpoint_scheme =
 let initial_env =
   Env.construct [(fixpoint_var, fixpoint_scheme)]
 
+let rec is_fixpoint (_,e) =
+  match e with
+  | App ((_, Var v), _) when Variable.equals v fixpoint_var -> true
+  | Let (_,_,_,e) -> is_fixpoint e
+  | _ -> false
+
 let map f =
   let rec aux (id,e) =
     let e =
