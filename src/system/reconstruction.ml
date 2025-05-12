@@ -5,6 +5,26 @@ open Types
 open Env
 open Ast
 
+(* Type variable caching *)
+let res_tvars = Hashtbl.create 100
+
+let tvar_for_res eid =
+  match Hashtbl.find_opt res_tvars eid with
+  | Some tv -> tv
+  | None ->
+    let tv = TVar.mk None in
+    Hashtbl.replace res_tvars eid tv ; tv
+
+let ax_tvars = Hashtbl.create 100
+
+let tvar_for_ax eid tvar =
+    match Hashtbl.find_opt ax_tvars (eid, tvar) with
+  | Some tv -> tv
+  | None ->
+    let tv = TVar.mk None in
+    Hashtbl.replace ax_tvars (eid, tvar) tv ; tv
+
+
 (* Auxiliary *)
 
 let tsort leq lst =
@@ -108,9 +128,10 @@ let rec infer dom env annot (id, e) =
   | Abstract _, Infer -> retry_with (nc Annot.AAbstract)
   | Const _, Infer -> retry_with (nc Annot.AConst)
   | Var v, Infer when Env.mem v env ->
-    (* TODO: reuse type variables when possible *)
     let (tvs,_) = Env.find v env |> TyScheme.get in
-    let s = refresh tvs in
+    let s = tvs |> TVarSet.destruct
+      |> List.map (fun v -> (v, tvar_for_ax id v |> TVar.typ))
+      |> Subst.construct in
     retry_with (nc (Annot.AAx s))
   | Var _, Infer -> Fail
   | Atom _, Infer -> retry_with (nc Annot.AAtom)
@@ -165,8 +186,7 @@ let rec infer dom env annot (id, e) =
     | OneSubst (ss, [a1;a2], [a1';a2'],r) ->
       Subst (ss,AApp(a1,a2),AApp(a1',a2'),r)
     | AllOk ([a1;a2],[t1;t2]) ->
-      (* TODO: reuse type variables when possible *)
-      let tv = TVar.mk None in
+      let tv = tvar_for_res id in
       let arrow = mk_arrow t2 (TVar.typ tv) in
       let ss = tallying_with_result env tv [(t1, arrow)] in
       Subst (ss, nc (Annot.AApp(a1,a2)), Untyp, empty_cov)
@@ -194,8 +214,7 @@ let rec infer dom env annot (id, e) =
   | Projection (p,e'), AProj annot' ->
     begin match infer' dom env annot' e' with
     | Ok (annot', s) ->
-      (* TODO: reuse type variables when possible *)
-      let tv = TVar.mk None in
+      let tv = tvar_for_res id in
       let ty = Checker.domain_of_proj p (TVar.typ tv) in
       let ss = tallying_with_result env tv [(s, ty)] in
       Subst (ss, nc (Annot.AProj annot'), Untyp, empty_cov)
