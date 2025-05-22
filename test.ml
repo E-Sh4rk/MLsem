@@ -169,7 +169,7 @@ let invalid_arg = <string -> empty>
 type t('a) =
   Nil | (t('a), Key, 'a, t('a), int)
 
-let height x =
+let height (x: t('a)) =
   match x with
   | :Nil -> 0
   | (_,_,_,_,h) -> h

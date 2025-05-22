@@ -40,9 +40,17 @@ let tallying_no_result env cs =
   |> List.map (fun s -> s, empty)
 
 let tallying_with_result env tv cs =
+  let tvars = Env.tvars env in
   let leq_sol (_,r1) (_,r2) = subtype r1 r2 in
-  tallying_with_prio (TVar.user_vars ()) (Env.tvars env |> TVarSet.destruct) cs
-  |> List.map (fun s -> s, Subst.find s tv)
+  tallying_with_prio (TVar.user_vars ()) (tvars |> TVarSet.destruct) cs
+  |> List.map (fun s -> Subst.rm tv s, Subst.find s tv)
+  (* Simplify result if it does not impact the domains *)
+  |> List.map (fun (s,r) ->
+    let mono = Subst.restrict s tvars |> Subst.vars in
+    let mono = TVarSet.union mono tvars in
+    let clean = clean_subst ~pos:empty ~neg:any mono r in
+    (Subst.compose_restr clean s, Subst.apply clean r)
+  )
   |> tsort leq_sol
 
 (* Reconstruction algorithm *)
