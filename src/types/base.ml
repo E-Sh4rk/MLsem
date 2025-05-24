@@ -28,6 +28,7 @@ let pp_subst fmt t =
 
 let any = Sstt.Ty.any
 let empty = Sstt.Ty.empty
+let normalize = Sstt.Ty.factorize
 
 (* ----- *)
 

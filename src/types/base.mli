@@ -7,6 +7,7 @@ val pp_subst : Format.formatter -> Sstt.Subst.t -> unit
 
 val any : typ
 val empty : typ
+val normalize : typ -> typ
 
 val true_typ : typ
 val false_typ : typ
