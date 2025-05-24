@@ -72,6 +72,11 @@ let pp_list pp_elt fmt lst =
   List.iter (fun elt -> Format.fprintf fmt "%a ; " pp_elt elt) lst ;
   Format.fprintf fmt "]"
 
+let pp_seq f sep fmt l =
+  let fst = ref true in
+  l |> List.iter
+    (fun e -> Format.fprintf fmt "%s%a" (if !fst then "" else sep) f e ; fst := false)
+
 let fst3 (a,_,_) = a
 let snd3 (_,b,_) = b
 let trd3 (_,_,c) = c

@@ -45,13 +45,16 @@ let geq_inst t1 ty2 =
   test_tallying mono [ty2,ty1]
 let simplify (tvs,ty) = (tvs, Additions.simplify_typ ty)
 let pp fmt (tvs, ty) =
-  Format.fprintf fmt "∀%a.%a"
-    (Utils.pp_list TVar.pp) (TVarSet.destruct tvs) pp_typ ty
+  if TVarSet.is_empty tvs
+  then Format.fprintf fmt "%a" pp_typ ty
+  else
+    Format.fprintf fmt "∀%a. %a"
+      (Utils.pp_seq TVar.pp ",") (TVarSet.destruct tvs) pp_typ ty
 let pp_short fmt (tvs, ty) =
   let s = shorten_names tvs in
   let ty = Subst.apply s ty in
   let tvs = TVarSet.destruct tvs
-    |> List.map TVar.typ
-    |> List.map (Subst.apply s) in
-  Format.fprintf fmt "∀%a.%a"
-    (Utils.pp_list pp_typ) tvs pp_typ ty
+    |> List.map (fun v -> Subst.find s v |> vars |> TVarSet.destruct |> List.hd)
+    |> TVarSet.construct
+  in
+  pp fmt (tvs,ty)
