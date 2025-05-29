@@ -66,6 +66,8 @@ type ('a,'b) result_seq =
 | OneFail
 | OneSubst of (Subst.t * typ) list * 'b list * 'b list * (Parsing.Ast.exprid * REnv.t)
 
+type cache = { dom : Domain.t ; cache : ((Annot.t, IAnnot.t) result) Cache.t }
+
 let rec seq (f : 'b -> 'c -> ('a,'b) result) (c : 'a->'b) (lst:('b*'c) list)
   : ('a,'b) result_seq =
   match lst with
@@ -85,9 +87,9 @@ let rec seq (f : 'b -> 'c -> ('a,'b) result) (c : 'a->'b) (lst:('b*'c) list)
 
 let nc a = IAnnot.A (Annot.nc a)
 
-let rec infer dom env annot (id, e) =
+let rec infer cache env annot (id, e) =
   let open IAnnot in
-  let retry_with a = infer dom env a (id, e) in
+  let retry_with a = infer cache env a (id, e) in
   let empty_cov = (id, REnv.empty) in
   match e, annot with
   | _, A a -> Ok (a, Checker.typeof env a (id, e))
@@ -104,7 +106,7 @@ let rec infer dom env annot (id, e) =
   | Atom _, Infer -> retry_with (nc Annot.AAtom)
   | Tag _, Infer -> retry_with (ATag Infer)
   | Tag (_, e'), ATag annot' ->
-    begin match infer' dom env annot' e' with
+    begin match infer' cache env annot' e' with
     | Ok (annot', _) -> retry_with (nc (Annot.ATag annot'))
     | Subst (ss,a,a',r) -> Subst (ss,ATag a,ATag a',r)
     | Fail -> Fail
@@ -119,7 +121,7 @@ let rec infer dom env annot (id, e) =
     retry_with (AInter branches)
   | Lambda (_,v,e'), ALambda (ty, annot') ->
     let env' = Env.add v (TyScheme.mk_mono ty) env in
-    begin match infer' Domain.empty env' annot' e' with
+    begin match infer' { cache with dom=Domain.empty } env' annot' e' with
     | Ok (annot', _) -> retry_with (nc (Annot.ALambda (ty, annot')))
     | Subst (ss,a,a',(eid,r)) ->
       Subst (ss,ALambda (ty, a),ALambda (ty, a'),(eid,REnv.add v ty r))
@@ -129,16 +131,16 @@ let rec infer dom env annot (id, e) =
   | Ite (e0,tau,e1,e2), AIte (a0,a1,a2) ->
     let to_i =
       (function Annot.BSkip -> IAnnot.BSkip | Annot.BType a -> IAnnot.BType (A a)) in
-    begin match infer' dom env a0 e0 with
+    begin match infer' cache env a0 e0 with
     | Fail -> Fail
     | Subst (ss,a,a',r) -> Subst (ss,AIte (a,a1,a2),AIte (a',a1,a2),r)
     | Ok (a0, s) ->
-      begin match infer_b' dom env a1 e1 s tau with
+      begin match infer_b' cache env a1 e1 s tau with
       | Fail -> Fail
       | Subst (ss, a1, a1',r) ->
         Subst (ss, AIte(A a0,a1,a2), AIte(A a0,a1',a2),r)
       | Ok (a1,_) ->
-        begin match infer_b' dom env a2 e2 s (neg tau) with
+        begin match infer_b' cache env a2 e2 s (neg tau) with
         | Fail -> Fail
         | Subst (ss, a2, a2',r) ->
           Subst (ss, AIte(A a0,to_i a1,a2), AIte(A a0,to_i a1,a2'),r)
@@ -148,7 +150,7 @@ let rec infer dom env annot (id, e) =
     end
   | App _, Infer -> retry_with (AApp (Infer, Infer))
   | App (e1, e2), AApp (a1,a2) ->
-    begin match infer_seq' dom env [(a1,e1);(a2,e2)] with
+    begin match infer_seq' cache env [(a1,e1);(a2,e2)] with
     | OneFail -> Fail
     | OneSubst (ss, [a1;a2], [a1';a2'],r) ->
       Subst (ss,AApp(a1,a2),AApp(a1',a2'),r)
@@ -161,14 +163,14 @@ let rec infer dom env annot (id, e) =
     end
   | Tuple es, Infer -> retry_with (ATuple (List.map (fun _ -> Infer) es))
   | Tuple es, ATuple annots ->
-    begin match infer_seq' dom env (List.combine annots es) with
+    begin match infer_seq' cache env (List.combine annots es) with
     | OneFail -> Fail
     | OneSubst (ss, a, a',r) -> Subst (ss,ATuple a,ATuple a',r)
     | AllOk (annots,_) -> retry_with (nc (Annot.ATuple annots))
     end
   | Cons _, Infer -> retry_with (ACons (Infer, Infer))
   | Cons (e1,e2), ACons (a1,a2) ->
-    begin match infer_seq' dom env [(a1,e1);(a2,e2)] with
+    begin match infer_seq' cache env [(a1,e1);(a2,e2)] with
     | OneFail -> Fail
     | OneSubst (ss, [a1;a2], [a1';a2'],r) ->
       Subst (ss,ACons(a1,a2),ACons(a1',a2'),r)
@@ -179,7 +181,7 @@ let rec infer dom env annot (id, e) =
     end
   | Projection _, Infer -> retry_with (AProj Infer)
   | Projection (p,e'), AProj annot' ->
-    begin match infer' dom env annot' e' with
+    begin match infer' cache env annot' e' with
     | Ok (annot', s) ->
       let tv = tvar_for_res id in
       let ty = Checker.domain_of_proj p (TVar.typ tv) in
@@ -191,7 +193,7 @@ let rec infer dom env annot (id, e) =
   | RecordUpdate (_,_,None), Infer -> retry_with (AUpdate (Infer, None))
   | RecordUpdate (_,_,Some _), Infer -> retry_with (AUpdate (Infer, Some Infer))
   | RecordUpdate (e', _, None), AUpdate (annot', None) ->
-    begin match infer' dom env annot' e' with
+    begin match infer' cache env annot' e' with
     | Ok (annot', s) ->
       let ss = tallying_no_result env [(s,record_any)] in
       Subst (ss, nc (Annot.AUpdate(annot',None)), Untyp, empty_cov)
@@ -199,7 +201,7 @@ let rec infer dom env annot (id, e) =
     | Fail -> Fail
     end
   | RecordUpdate (e1, _, Some e2), AUpdate (a1, Some a2) ->
-    begin match infer_seq' dom env [(a1,e1);(a2,e2)] with
+    begin match infer_seq' cache env [(a1,e1);(a2,e2)] with
     | OneFail -> Fail
     | OneSubst (ss, [a1;a2], [a1';a2'],r) ->
       Subst (ss,AUpdate(a1,Some a2),AUpdate(a1',Some a2'),r)
@@ -211,13 +213,13 @@ let rec infer dom env annot (id, e) =
   | Let (tys,_,_,_), Infer ->
     retry_with (ALet (Infer, List.map (fun ty -> (ty, Infer)) tys))
   | Let (_,v,e1,e2), ALet(annot1,parts) ->
-    begin match infer' dom env annot1 e1 with
+    begin match infer' cache env annot1 e1 with
     | Fail -> Fail
     | Subst (ss,a,a',r) -> Subst (ss,ALet (a,parts),ALet (a',parts),r)
     | Ok (annot1, s) ->
       let tvs, s = Checker.generalize ~e:e1 env s |> TyScheme.get in
       let parts = parts |> List.filter (fun (t,_) -> disjoint s t |> not) in
-      begin match infer_part_seq' dom env e2 v (tvs,s) parts with
+      begin match infer_part_seq' cache env e2 v (tvs,s) parts with
       | OneFail -> Fail
       | OneSubst (ss,p,p',r) -> Subst (ss,ALet(A annot1,p),ALet(A annot1,p'),r)
       | AllOk (p,_) -> retry_with (nc (Annot.ALet (annot1, p)))
@@ -226,7 +228,7 @@ let rec infer dom env annot (id, e) =
   | TypeConstr _, Infer -> retry_with (AConstr Infer)
   | TypeCoerce _, Infer -> retry_with (ACoerce Infer)
   | TypeConstr (e', t), AConstr annot' ->
-    begin match infer' dom env annot' e' with
+    begin match infer' cache env annot' e' with
     | Ok (annot', s) ->
       let ss = tallying_no_result env [(s,t)] in
       Subst (ss, nc (Annot.AConstr(annot')), Untyp, empty_cov)
@@ -234,7 +236,7 @@ let rec infer dom env annot (id, e) =
     | Fail -> Fail
     end
   | TypeCoerce (e', t), ACoerce annot' ->
-    begin match infer' dom env annot' e' with
+    begin match infer' cache env annot' e' with
     | Ok (annot', s) ->
       let ss = tallying_no_result env [(s,t)] in
       Subst (ss, nc (Annot.ACoerce(annot')), Untyp, empty_cov)
@@ -253,7 +255,7 @@ let rec infer dom env annot (id, e) =
         in
         if useless then aux dom lst
         else
-          begin match infer' dom env ann (id,e) with
+          begin match infer' {cache with dom} env ann (id,e) with
           | Fail -> aux dom lst
           | Subst (ss,a,a',r) ->
             let a, a' = { coverage ; ann=a }, { coverage ; ann=a' } in
@@ -267,7 +269,7 @@ let rec infer dom env annot (id, e) =
             end
           end
     in
-    begin match aux dom lst with
+    begin match aux cache.dom lst with
     | Either.Left [] -> Fail
     | Either.Left [a] -> retry_with (A a)
     | Either.Left lst -> retry_with (nc (Annot.AInter lst))
@@ -276,12 +278,12 @@ let rec infer dom env annot (id, e) =
   | e, a ->
     Format.printf "e:@.%a@.@.a:@.%a@.@." Ast.pp_e e IAnnot.pp a ;
     assert false
-and infer' dom env annot e =
+and infer' cache env annot e =
   let mono = TVarSet.union (Env.tvars env) (TVar.user_vars ()) in
   let subst_disjoint s =
     TVarSet.inter (Subst.dom s) mono |> TVarSet.is_empty
   in
-  match infer dom env annot e with
+  match infer cache env annot e with
   | Ok (a, ty) -> Ok (a, ty)
   | Fail -> Fail
   | Subst (ss, a1, a2, (eid,r)) when ss |> List.map fst |> List.for_all subst_disjoint ->
@@ -296,9 +298,9 @@ and infer' dom env annot e =
       ) in
     let coverage = Some (None, r) in
     let annot = IAnnot.AInter (branches@[{ coverage ; ann=a2 }]) in
-    infer' dom env annot e
+    infer' cache env annot e
   | Subst (ss, a1, a2, r) -> Subst (ss, a1, a2, r)
-and infer_b' dom env bannot e s tau =
+and infer_b' cache env bannot e s tau =
   let empty_cov = (fst e, REnv.empty) in
   match bannot with
   | IAnnot.BInfer ->
@@ -306,26 +308,27 @@ and infer_b' dom env bannot e s tau =
     Subst (ss, IAnnot.BSkip, IAnnot.BType Infer, empty_cov)
   | IAnnot.BSkip -> Ok (Annot.BSkip, empty)
   | IAnnot.BType annot ->
-    begin match infer' dom env annot e with
+    begin match infer' cache env annot e with
     | Ok (a, ty) -> Ok (Annot.BType a, ty)
     | Subst (ss,a1,a2,r) -> Subst (ss,IAnnot.BType a1,IAnnot.BType a2,r)
     | Fail -> Fail
     end
-and infer_part' dom env e v (tvs, s) (si,annot) =
+and infer_part' cache env e v (tvs, s) (si,annot) =
   let t = TyScheme.mk tvs (cap s si) in
   let env = Env.add v t env in
-  match infer' dom env annot e with
+  match infer' cache env annot e with
   | Fail -> Fail
   | Subst (ss,a,a',r) -> Subst (ss,(si,a),(si,a'),r)
   | Ok (a,ty) -> Ok ((si,a),ty)
-and infer_seq' dom env lst = seq (infer' dom env) (fun a -> A a) lst
-and infer_part_seq' dom env e v s lst =
-  seq (fun a () -> infer_part' dom env e v s a)
+and infer_seq' cache env lst = seq (infer' cache env) (fun a -> A a) lst
+and infer_part_seq' cache env e v s lst =
+  seq (fun a () -> infer_part' cache env e v s a)
     (fun (si,annot) -> (si, A annot))
     (lst |> List.map (fun a -> (a,())))
 
 let infer env e =
-  match infer' Domain.empty env IAnnot.Infer e with
+  let cache = { dom = Domain.empty ; cache = Cache.empty () } in
+  match infer' cache env IAnnot.Infer e with
   | Fail -> None
   | Subst _ -> assert false
   | Ok (a,_) -> Some a

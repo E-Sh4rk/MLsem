@@ -38,6 +38,8 @@ end
 module Cache = struct
   type 'a t = (Parsing.Ast.exprid * IAnnot.t, (Env.t * 'a) list) Hashtbl.t
 
+  let empty () = Hashtbl.create 100
+
   let add (id,e) env a res t =
     let env = Env.restrict (Ast.fv (id,e) |> VarSet.elements) env in
     let lst = match Hashtbl.find_opt t (id,a) with Some lst -> lst | None -> [] in

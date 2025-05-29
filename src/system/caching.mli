@@ -11,6 +11,7 @@ end
 
 module Cache : sig
     type 'a t
+    val empty : unit -> 'a t
     val add : Ast.t -> Env.t -> IAnnot.t -> 'a -> 'a t -> unit
     val get : Ast.t -> Env.t -> IAnnot.t -> 'a t -> 'a option
 end
