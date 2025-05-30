@@ -1,4 +1,5 @@
 open Types.Base
+open Types.Tvar
 open Parsing.Variable
 open Env
 open Annot
@@ -52,4 +53,22 @@ module Cache = struct
     | Some lst ->
       let env = Env.restrict (Ast.fv (id,e) |> VarSet.elements) env in
       List.find_opt (fun (env',_) -> Env.equiv env env') lst |> Option.map snd
+end
+
+module TVCache = struct
+  type t = (Parsing.Ast.exprid * TVar.t, TVar.t) Hashtbl.t
+
+  let empty () = Hashtbl.create 100
+
+  let get h eid tv =
+    match Hashtbl.find_opt h (eid, tv) with
+    | Some tv -> tv
+    | None ->
+      let tv' = TVar.mk None in
+      Hashtbl.replace h (eid, tv) tv' ; tv'
+
+  let get' t eid tvs =
+    TVarSet.destruct tvs
+    |> List.map (fun tv -> tv, get t eid tv |> TVar.typ)
+    |> Subst.construct
 end

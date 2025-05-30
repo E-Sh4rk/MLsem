@@ -1,5 +1,6 @@
 open Annot
 open Env
+open Types.Tvar
 
 module Domain : sig
     type t
@@ -14,4 +15,11 @@ module Cache : sig
     val empty : unit -> 'a t
     val add : Ast.t -> Env.t -> IAnnot.t -> 'a -> 'a t -> unit
     val get : Ast.t -> Env.t -> IAnnot.t -> 'a t -> 'a option
+end
+
+module TVCache : sig
+    type t
+    val empty : unit -> t
+    val get : t -> Parsing.Ast.exprid -> TVar.t -> TVar.t
+    val get' : t -> Parsing.Ast.exprid -> TVarSet.t -> Subst.t
 end
