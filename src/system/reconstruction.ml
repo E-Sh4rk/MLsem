@@ -112,11 +112,6 @@ let rec infer cache env annot (id, e) =
     | Fail -> Fail
     end
   | Lambda (tys,_,_), Infer ->
-    (* let refresh_internal ty =
-      let s = refresh (vars_internal ty) in
-      Subst.apply s ty
-    in
-    let tys = List.map refresh_internal tys in *)
     let branches = List.map (fun ty -> { coverage=None ; ann=ALambda (ty, Infer) }) tys in
     retry_with (AInter branches)
   | Lambda (_,v,e'), ALambda (ty, annot') ->
@@ -289,10 +284,6 @@ and infer_nc' cache env annot e =
   | Subst (ss, a1, a2, (eid,r)) when ss |> List.map fst |> List.for_all subst_disjoint ->
     let branches = ss |> List.map (fun (s,ty) ->
       let ann = IAnnot.substitute s a1 in
-      (* let refresh = TVarSet.diff (IAnnot.tvars ann) mono |> refresh in
-      let ann = IAnnot.substitute refresh ann in
-      let coverage = (Some (eid, Subst.apply refresh ty),
-        REnv.substitute s r |> REnv.substitute refresh) in *)
       let coverage = (Some (eid, ty), REnv.substitute s r) in
       { IAnnot.coverage=(Some coverage) ; ann }
       ) in

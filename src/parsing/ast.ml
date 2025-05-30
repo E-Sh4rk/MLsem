@@ -90,10 +90,6 @@ let dummy_pat_var_str = "_"
 let dummy_pat_var =
     Variable.create_gen (Some dummy_pat_var_str)
 
-let only_user_vars t =
-    let open Types.Tvar in
-    vars_internal t |> TVarSet.is_empty
-
 (* TODO: associate a location to each exprid using a hashtbl *)
 let parser_expr_to_expr tenv vtenv name_var_map e =
     let rec aux vtenv env ((exprid,pos),e) =
@@ -124,7 +120,7 @@ let parser_expr_to_expr tenv vtenv name_var_map e =
             let (t, vtenv) = type_expr_to_typ tenv vtenv t in
             if is_test_type t
             then Ite (aux vtenv env e, t, aux vtenv env e1, aux vtenv env e2)
-            else raise (SymbolError ("typecases must use a valid test type"))
+            else raise (SymbolError ("typecases should use test types"))
         | App (e1, e2) -> App (aux vtenv env e1, aux vtenv env e2)
         | Let (str, a, e1, e2) ->
             let a, vtenv = match a with
@@ -151,9 +147,7 @@ let parser_expr_to_expr tenv vtenv name_var_map e =
             else raise (SymbolError ("type constraint should be a test type"))
         | TypeCoerce (e, ty) ->
             let (ty, vtenv) = type_expr_to_typ tenv vtenv ty in
-            if only_user_vars ty
-            then TypeCoerce (aux vtenv env e, ty)
-            else raise (SymbolError ("type coercion should not have non-user type variables"))
+            TypeCoerce (aux vtenv env e, ty)
         | PatMatch (e, pats) ->
             PatMatch (aux vtenv env e, List.map (aux_pat pos vtenv env) pats)
         in
@@ -178,7 +172,7 @@ let parser_expr_to_expr tenv vtenv name_var_map e =
                 let (t, vtenv) = type_expr_to_typ tenv vtenv t in
                 if is_test_type t
                 then (PatType t, vtenv, StrMap.empty)
-                else raise (SymbolError ("typecases must use a valid test type"))
+                else raise (SymbolError ("typecases should use test types"))
             | PatVar str ->
                 if String.equal str dummy_pat_var_str
                 then (PatVar dummy_pat_var, vtenv, StrMap.empty)
