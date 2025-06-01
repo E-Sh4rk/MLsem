@@ -92,9 +92,7 @@ let rec infer cache env annot (id, e) =
     | Subst (ss,a,a',r) -> Subst (ss,ATag a,ATag a',r)
     | Fail -> Fail
     end
-  | Lambda (tys,_,_), Infer ->
-    let branches = List.map (fun ty -> { coverage=None ; ann=ALambda (ty, Infer) }) tys in
-    retry_with (AInter branches)
+  | Lambda (d,_,_), Infer -> retry_with (ALambda (d, Infer))
   | Lambda (_,v,e'), ALambda (ty, annot') ->
     let env' = Env.add v (TyScheme.mk_mono ty) env in
     begin match infer' { cache with dom=Domain.empty } env' annot' e' with

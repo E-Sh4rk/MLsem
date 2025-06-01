@@ -95,11 +95,11 @@ let rec infer env renv (id,e) =
   | Tag (tag, e) ->
     let e, renvs = infer env renv e in
     Tag (tag, e), renvs
-  | Lambda (ts, v, e) ->
-    let t = disj ts |> TyScheme.mk_mono in
+  | Lambda (d, v, e) ->
+    let t = TyScheme.mk_mono d in
     let env = Env.add v t env in
     let e, renvs = infer env renv e in
-    Lambda (ts, v, e), renvs
+    Lambda (d, v, e), renvs
   | Ite (e, tau, e1, e2) ->
     let renvs1' = refine env renv e (neg tau) in
     let renvs2' = refine env renv e tau in

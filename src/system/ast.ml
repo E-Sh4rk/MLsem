@@ -11,7 +11,7 @@ type e =
 | Var of Variable.t
 | Atom of atom
 | Tag of tag * t
-| Lambda of (typ list) * Variable.t * t
+| Lambda of typ * Variable.t * t
 | Ite of t * typ * t * t
 | App of t * t
 | Tuple of t list
@@ -53,7 +53,7 @@ let map f =
       | Var v -> Var v
       | Atom a -> Atom a
       | Tag (t,e) -> Tag (t, aux e)
-      | Lambda (ta, v, e) -> Lambda (ta, v, aux e)
+      | Lambda (d, v, e) -> Lambda (d, v, aux e)
       | Ite (e, t, e1, e2) -> Ite (aux e, t, aux e1, aux e2)
       | App (e1, e2) -> App (aux e1, aux e2)
       | Tuple es -> Tuple (List.map aux es)
@@ -215,12 +215,12 @@ let from_parser_ast t =
     | Ast.Tag (t, e) -> Tag (t, aux e)
     | Ast.Lambda (x, DNoAnnot, e) ->
       let tv = TVar.mk ~user:false (Variable.get_name x) |> TVar.typ in
-      Lambda ([tv], x, aux e)
-    | Ast.Lambda (x, DAnnot lst, e) ->
+      Lambda (tv, x, aux e)
+    | Ast.Lambda (x, DAnnot d, e) ->
       let e = aux e in
       let x' = Variable.create_let (Variable.get_name x) in
       Variable.get_locations x |> List.iter (Variable.attach_location x') ;
-      Lambda (lst, x, (Ast.unique_exprid (), Let ([], x',
+      Lambda (d, x, (Ast.unique_exprid (), Let ([], x',
         (Ast.unique_exprid (), Var x), substitute x x' e)))
     | Ast.Fixpoint e -> encode_fixpoint id e |> aux_e
     | Ast.Ite (e,t,e1,e2) -> Ite (aux e, t, aux e1, aux e2)

@@ -9,7 +9,7 @@ type e =
 | Var of Variable.t
 | Atom of atom
 | Tag of tag * t
-| Lambda of (typ list) * Variable.t * t
+| Lambda of typ * Variable.t * t
 | Ite of t * typ * t * t
 | App of t * t
 | Tuple of t list

@@ -36,11 +36,10 @@
         | Some ty -> ty
         end
       | (DNoAnnot, _)::lst -> TArrow (TVarWeak (fresh_tvar_id ()), aux lst)
-      | (DAnnot [ty], _)::lst -> TArrow (ty, aux lst)
-      | (DAnnot _, _)::_ -> failwith "Parameters of recursive functions cannot have multiple type annotations."
+      | (DAnnot ty, _)::lst -> TArrow (ty, aux lst)
     in
     let self_annot = aux lst in
-    let lst = (DAnnot [self_annot], PatVar name)::lst in
+    let lst = (DAnnot self_annot, PatVar name)::lst in
     let t = multi_param_abstraction startpos endpos lst t in
     annot startpos endpos (Fixpoint t)
 
@@ -266,7 +265,7 @@ parameter:
 
 %inline optional_param_type_annot:
     { DNoAnnot }
-  | COLON tys = separated_nonempty_list(SEMICOLON, typ) { DAnnot tys }
+  | COLON d = typ { DAnnot d }
 
 generalized_identifier:
   | x=ID | LPAREN x=prefix RPAREN | LPAREN x=infix RPAREN { x }

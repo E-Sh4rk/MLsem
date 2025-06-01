@@ -30,7 +30,7 @@ type const =
 type projection = Pi of int * int | Field of string | Hd | Tl | PiTag of tag
 [@@deriving show, ord]
 
-type 'typ dom_annot = DNoAnnot | DAnnot of 'typ list
+type 'typ dom_annot = DNoAnnot | DAnnot of 'typ
 [@@deriving show, ord]
 type 'typ part_annot = PNoAnnot | PAnnot of 'typ list
 [@@deriving show, ord]
@@ -107,9 +107,9 @@ let parser_expr_to_expr tenv vtenv name_var_map e =
         | Lambda (str,a,e) ->
             let a, vtenv = match a with
             | DNoAnnot -> DNoAnnot, vtenv
-            | DAnnot ts ->
-                let (ts, vtenv) = type_exprs_to_typs tenv vtenv ts in
-                DAnnot (ts), vtenv
+            | DAnnot d ->
+                let (d, vtenv) = type_expr_to_typ tenv vtenv d in
+                DAnnot d, vtenv
             in
             let var = Variable.create_lambda (Some str) in
             Variable.attach_location var pos ;

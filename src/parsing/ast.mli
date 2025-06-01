@@ -22,7 +22,7 @@ type const =
 
 type projection = Pi of int * int | Field of string | Hd | Tl | PiTag of tag
 
-type 'typ dom_annot = DNoAnnot | DAnnot of 'typ list
+type 'typ dom_annot = DNoAnnot | DAnnot of 'typ
 type 'typ part_annot = PNoAnnot | PAnnot of 'typ list
 
 type ('a, 'typ, 'tag, 'v) pattern =
