@@ -11,7 +11,7 @@ module Annot : sig
   | AAx of Subst.t
   | ALet of t * part
   | AApp of t * t | ACons of t * t
-  | AProj of t | ATag of t | AConstr of t | ACoerce of t
+  | AProj of t | ATag of t | AConstr of t | ACoerce of typ * t
   | AUpdate of t * t option
   | ATuple of t list
   | AIte of t * branch * branch
@@ -21,7 +21,6 @@ module Annot : sig
 
   val nc : a -> t
   val substitute : Subst.t -> t -> t
-  val tvars : t -> TVarSet.t
   val pp : Format.formatter -> t -> unit
   val pp_a : Format.formatter -> a -> unit
 end
@@ -40,7 +39,7 @@ module IAnnot : sig
   | AAx of Subst.t
   | ALet of t * part
   | AApp of t * t | ACons of t * t
-  | AProj of t | ATag of t | AConstr of t | ACoerce of t
+  | AProj of t | ATag of t | AConstr of t | ACoerce of typ * t
   | AUpdate of t * t option
   | ATuple of t list
   | AIte of t * branch * branch
@@ -48,7 +47,6 @@ module IAnnot : sig
   | AInter of inter
 
   val substitute : Subst.t -> t -> t
-  val tvars : t -> TVarSet.t
   val pp : Format.formatter -> t -> unit
   val pp_coverage : Format.formatter -> coverage -> unit
 end

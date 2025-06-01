@@ -153,7 +153,7 @@ let rec typeof' env annot (id,e) =
     let t = typeof env annot e in
     if subtype t ty then t
     else untypeable id "Type constraint not satisfied."
-  | TypeCoerce (e, ty), ACoerce annot -> 
+  | TypeCoerce (e, _), ACoerce (ty, annot) ->
     let t = typeof env annot e in
     if subtype t ty then ty
     else untypeable id "Impossible type coercion."

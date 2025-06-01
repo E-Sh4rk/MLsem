@@ -200,7 +200,7 @@ let rec infer cache env annot (id, e) =
       end
     end
   | TypeConstr _, Infer -> retry_with (AConstr Infer)
-  | TypeCoerce _, Infer -> retry_with (ACoerce Infer)
+  | TypeCoerce (_,t), Infer -> retry_with (ACoerce (t,Infer))
   | TypeConstr (e', t), AConstr annot' ->
     begin match infer' cache env annot' e' with
     | Ok (annot', s) ->
@@ -209,12 +209,12 @@ let rec infer cache env annot (id, e) =
     | Subst (ss,a,a',r) -> Subst (ss,AConstr a,AConstr a',r)
     | Fail -> Fail
     end
-  | TypeCoerce (e', t), ACoerce annot' ->
+  | TypeCoerce (e', _), ACoerce (t,annot') ->
     begin match infer' cache env annot' e' with
     | Ok (annot', s) ->
       let ss = tallying_no_result env [(s,t)] in
-      Subst (ss, nc (Annot.ACoerce(annot')), Untyp, empty_cov)
-    | Subst (ss,a,a',r) -> Subst (ss,ACoerce a,ACoerce a',r)
+      Subst (ss, nc (Annot.ACoerce(t,annot')), Untyp, empty_cov)
+    | Subst (ss,a,a',r) -> Subst (ss,ACoerce (t,a),ACoerce (t,a'),r)
     | Fail -> Fail
     end
   | e, AInter lst ->
