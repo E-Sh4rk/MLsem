@@ -30,7 +30,7 @@ type const =
 type projection = Pi of int * int | Field of string | Hd | Tl | PiTag of tag
 [@@deriving show, ord]
 
-type 'typ dom_annot = DNoAnnot | DAnnot of 'typ
+type 'typ lambda_annot = 'typ option * 'typ option
 [@@deriving show, ord]
 type 'typ part_annot = PNoAnnot | PAnnot of 'typ list
 [@@deriving show, ord]
@@ -53,7 +53,7 @@ and ('a, 'typ, 'ato, 'tag, 'v) ast =
 | Var of 'v
 | Atom of 'ato
 | Tag of 'tag * ('a, 'typ, 'ato, 'tag, 'v) t
-| Lambda of 'v * 'typ dom_annot * ('a, 'typ, 'ato, 'tag, 'v) t
+| Lambda of 'v * 'typ lambda_annot * ('a, 'typ, 'ato, 'tag, 'v) t
 | Fixpoint of ('a, 'typ, 'ato, 'tag, 'v) t
 | Ite of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ * ('a, 'typ, 'ato, 'tag, 'v) t * ('a, 'typ, 'ato, 'tag, 'v) t
 | App of ('a, 'typ, 'ato, 'tag, 'v) t * ('a, 'typ, 'ato, 'tag, 'v) t
@@ -104,17 +104,20 @@ let parser_expr_to_expr tenv vtenv name_var_map e =
             else raise (SymbolError ("undefined symbol "^str))
         | Atom str -> Atom (get_atom tenv str)
         | Tag (str, e) -> Tag (get_tag tenv str, aux vtenv env e)
-        | Lambda (str,a,e) ->
-            let a, vtenv = match a with
-            | DNoAnnot -> DNoAnnot, vtenv
-            | DAnnot d ->
-                let (d, vtenv) = type_expr_to_typ tenv vtenv d in
-                DAnnot d, vtenv
+        | Lambda (str,(da,ra),e) ->
+            let aux_a tyo vtenv =
+                match tyo with
+                | None -> None, vtenv
+                | Some ty ->
+                    let (ty, vtenv) = type_expr_to_typ tenv vtenv ty in
+                    Some ty, vtenv
             in
+            let da, vtenv = aux_a da vtenv in
+            let ra, vtenv = aux_a ra vtenv in
             let var = Variable.create_lambda (Some str) in
             Variable.attach_location var pos ;
             let env = StrMap.add str var env in
-            Lambda (var, a, aux vtenv env e)
+            Lambda (var, (da,ra), aux vtenv env e)
         | Fixpoint e -> Fixpoint (aux vtenv env e)
         | Ite (e, t, e1, e2) ->
             let (t, vtenv) = type_expr_to_typ tenv vtenv t in

@@ -11,14 +11,17 @@
     (Ast.new_annot (Position.lex_join sp ep), e)
 
   let tmp_var = "__encoding"
-  let multi_param_abstraction startpos endpos lst t =
-    let step acc (annotation, pat) =
+  let multi_param_abstraction startpos endpos lst t_res t =
+    let first = ref true in
+    let step acc (da, pat) =
+      let t_res = if !first then t_res else None in
+      first := false ;
       match pat with
-      | PatVar v -> annot startpos endpos (Lambda (v, annotation, acc))
+      | PatVar v -> annot startpos endpos (Lambda (v, (da,t_res), acc))
       | pat ->
         let test = annot startpos endpos (Var tmp_var) in
         let body = annot startpos endpos (PatMatch (test, [(pat, acc)])) in
-        annot startpos endpos (Lambda (tmp_var, annotation, body))
+        annot startpos endpos (Lambda (tmp_var, (da,t_res), body))
     in
     List.rev lst |> List.fold_left step t
 
@@ -27,20 +30,19 @@
     (fun () ->
       last := (!last) + 1 ;
       Format.sprintf "__self_%i" (!last))
-  let multi_param_rec_abstraction startpos endpos name lst oty t =
+  let multi_param_rec_abstraction startpos endpos name lst t_res t =
     let rec aux lst =
       match lst with
       | [] ->
-        begin match oty with
+        begin match t_res with
         | None -> TVarWeak (fresh_tvar_id ())
         | Some ty -> ty
         end
-      | (DNoAnnot, _)::lst -> TArrow (TVarWeak (fresh_tvar_id ()), aux lst)
-      | (DAnnot ty, _)::lst -> TArrow (ty, aux lst)
+      | (None, _)::lst -> TArrow (TVarWeak (fresh_tvar_id ()), aux lst)
+      | (Some ty, _)::lst -> TArrow (ty, aux lst)
     in
-    let self_annot = aux lst in
-    let lst = (DAnnot self_annot, PatVar name)::lst in
-    let t = multi_param_abstraction startpos endpos lst t in
+    let lst = (Some (aux lst), PatVar name)::lst in
+    let t = multi_param_abstraction startpos endpos lst t_res t in
     annot startpos endpos (Fixpoint t)
 
   let let_pattern startpos endpos pat d t =
@@ -133,17 +135,15 @@ unique_term: t=term EOF { t }
 element:
   LET id=generalized_identifier COLON ty=typ EQUAL t=term
   { annot $symbolstartpos $endpos (Definition (id, t, Some ty)) }
-| LET gioa=gen_id_opt_annot ais=parameter* EQUAL t=term
-  { 
-    let (id, ty) = gioa in
-    let t = multi_param_abstraction $startpos $endpos ais t in
-    annot $symbolstartpos $endpos (Definition (id, t, ty))
-  }
-| LET REC gioa=gen_id_opt_annot ais=parameter* oty=optional_typ EQUAL t=term
-  { 
-    let (id, ty) = gioa in
-    let t = multi_param_rec_abstraction $startpos $endpos id ais oty t in
-    annot $symbolstartpos $endpos (Definition (id, t, ty))
+| LET id=generalized_identifier EQUAL t=term
+  { annot $symbolstartpos $endpos (Definition (id, t, None)) }
+| LET r=isrec id=generalized_identifier ais=parameter+ oty=optional_typ EQUAL t=term
+  {
+    let t = if r
+      then multi_param_rec_abstraction $startpos $endpos id ais oty t
+      else multi_param_abstraction $startpos $endpos ais oty t
+    in
+    annot $symbolstartpos $endpos (Definition (id, t, None))
   }
 | TYPE ts=separated_nonempty_list(TYPE_AND, param_type_def) { annot $symbolstartpos $endpos (Types ts) }
 | ABSTRACT TYPE name=ID params=abs_params { annot $symbolstartpos $endpos (AbsType (name, params)) }
@@ -158,10 +158,6 @@ variance:
 | PLUS TVAR { Cov }
 | MINUS TVAR { Cav }
 
-%inline gen_id_opt_annot:
-  id=generalized_identifier { (id, None) }
-| LPAREN id=generalized_identifier oty=optional_typ RPAREN { (id, oty) }
-
 %inline optional_typ:
 | { None }
 | COLON ty=typ { Some ty }
@@ -172,20 +168,26 @@ variance:
   { TBase TTrue }
 | IS t=typ { t }
 
+%inline isrec:
+  { false }
+| REC { true }
+
+%inline optional_pannot:
+  { PNoAnnot }
+| COLON tys=separated_nonempty_list(SEMICOLON, typ) { PAnnot tys }
+
 term:
   t=simple_term { t }
-| FUN ais=parameter+ ARROW t = term { multi_param_abstraction $startpos $endpos ais t }
-| LET id=generalized_identifier COLON tys=separated_nonempty_list(SEMICOLON, typ) EQUAL td=term IN t=term
-  { annot $startpos $endpos (Let (id, PAnnot tys, td, t)) }
-| LET id=generalized_identifier ais=parameter* EQUAL td=term IN t=term
+| FUN ais=parameter+ ARROW t = term { multi_param_abstraction $startpos $endpos ais None t }
+| LET id=generalized_identifier a=optional_pannot EQUAL td=term IN t=term
+  { annot $startpos $endpos (Let (id, a, td, t)) }
+| LET r=isrec id=generalized_identifier ais=parameter+ oty=optional_typ EQUAL td=term IN t=term
   {
-    let td = multi_param_abstraction $startpos $endpos ais td in
+    let td = if r
+      then multi_param_rec_abstraction $startpos $endpos id ais oty td
+      else multi_param_abstraction $startpos $endpos ais oty td
+    in
     annot $startpos $endpos (Let (id, PNoAnnot, td, t))
-  }
-| LET REC id=generalized_identifier ais=parameter* oty=optional_typ EQUAL td=term IN t=term
-  { 
-    let td = multi_param_rec_abstraction $startpos $endpos id ais oty td in
-    annot $symbolstartpos $endpos (Let (id, PNoAnnot, td, t))
   }
 | LET p=ppattern EQUAL td=term IN t=term { let_pattern $startpos $endpos p td t }
 | IF t=term ott=optional_test_type THEN t1=term ELSE t2=term { annot $startpos $endpos (Ite (t,ott,t1,t2)) }
@@ -259,13 +261,9 @@ lint:
 | LPAREN MINUS i=LINT RPAREN { Z.neg i }
 
 parameter:
-  arg = ID { (DNoAnnot, PatVar arg) }
-| LPAREN arg = pattern opta = optional_param_type_annot RPAREN
+  arg = ID { (None, PatVar arg) }
+| LPAREN arg = pattern opta = optional_typ RPAREN
 { (opta, arg) }
-
-%inline optional_param_type_annot:
-    { DNoAnnot }
-  | COLON d = typ { DAnnot d }
 
 generalized_identifier:
   | x=ID | LPAREN x=prefix RPAREN | LPAREN x=infix RPAREN { x }

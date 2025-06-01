@@ -213,11 +213,11 @@ let from_parser_ast t =
     | Ast.Var v -> Var v
     | Ast.Atom a -> Atom a
     | Ast.Tag (t, e) -> Tag (t, aux e)
-    | Ast.Lambda (x, DNoAnnot, e) ->
+    | Ast.Lambda (x, (None, t_res), e) ->
       let tv = TVar.mk ~user:false (Variable.get_name x) |> TVar.typ in
-      Lambda (tv, x, aux e)
-    | Ast.Lambda (x, DAnnot d, e) ->
-      let e = aux e in
+      Lambda (tv, x, aux' e t_res)
+    | Ast.Lambda (x, (Some d, t_res), e) ->
+      let e = aux' e t_res in
       let x' = Variable.create_let (Variable.get_name x) in
       Variable.get_locations x |> List.iter (Variable.attach_location x') ;
       Lambda (d, x, (Ast.unique_exprid (), Let ([], x',
@@ -234,6 +234,11 @@ let from_parser_ast t =
     | Ast.TypeConstr (e, ty) -> TypeConstr (aux e, ty)
     | Ast.TypeCoerce (e, ty) -> TypeCoerce (aux e, ty)
     | Ast.PatMatch (e, pats) -> encode_pattern_matching id e pats |> aux_e
+  and aux' t tyo =
+    let t = aux t in
+    match tyo with
+    | None -> t
+    | Some ty -> (Ast.unique_exprid (), TypeCoerce (t, ty))
   and aux t =
     let e = aux_e t in
     let (id, _) = t in
