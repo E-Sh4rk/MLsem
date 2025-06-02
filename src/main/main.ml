@@ -16,7 +16,14 @@ type typecheck_result =
 
 exception IncompatibleType of TyScheme.t
 exception UnresolvedType of TyScheme.t
-let type_check_def env (var,e,typ_annot) =
+let is_inst_of_annot mono typ tya =
+  let (tvs, mty) = TyScheme.get typ in
+  let tvs = TVarSet.union tvs (TVarSet.diff (vars mty) mono) in
+  let gty = TyScheme.mk tvs mty in
+  TyScheme.leq_inst gty tya
+let sig_to_tyscheme mono sigs =
+  sigs |> conj |> TyScheme.mk_poly_except mono
+let type_check_def env sigs (var,e,typ_annot) =
   let time0 = Unix.gettimeofday () in
   let retrieve_time () =
     let time1 = Unix.gettimeofday () in
@@ -36,11 +43,16 @@ let type_check_def env (var,e,typ_annot) =
       match typ_annot with
       | None -> typ
       | Some tya ->
-        let (tvs, mty) = TyScheme.get typ in
-        let tvs = TVarSet.union tvs (TVarSet.diff (vars mty) mono) in
-        let gty = TyScheme.mk tvs mty in
-        if TyScheme.leq_inst gty tya
+        if is_inst_of_annot mono typ tya
         then Checker.generalize ~e env tya
+        else raise (IncompatibleType typ)
+    in
+    let typ =
+      match sigs with
+      | None -> typ
+      | Some (sigs, typ') ->
+        if sigs |> List.for_all (TyScheme.leq_inst typ)
+        then typ'
         else raise (IncompatibleType typ)
     in
     if TVarSet.diff (TyScheme.fv typ) mono |> TVarSet.is_empty |> not
@@ -64,11 +76,21 @@ type 'a treat_result =
 | TDone
 | TFailure of Variable.t option * (Position.t list) * string * float
 
-let treat (tenv,varm,env) (annot, elem) =
+let sigs_of_def varm senv env str =
+  match StrMap.find_opt str varm with
+  | None -> None
+  | Some v ->
+    begin match VarMap.find_opt v senv with
+    | None -> None
+    | Some sigs -> Some (sigs, Env.find v env)
+    end
+
+let treat (tenv,varm,senv,env) (annot, elem) =
   let pos = [Position.position annot] in
   try  
     match elem with
     | Ast.Definition (name, expr, tyo) ->
+      let sigs = sigs_of_def varm senv env name in
       let var = Variable.create_let (Some name) in
       Variable.attach_location var (Position.position annot) ;
       begin try
@@ -77,30 +99,44 @@ let treat (tenv,varm,env) (annot, elem) =
         | Some expr -> let (t, _) = type_expr_to_typ tenv empty_vtenv expr in Some t
         in
         let expr = Ast.parser_expr_to_expr tenv empty_vtenv varm expr in
-        match type_check_def env (var,expr,tyo) with
+        match type_check_def env sigs (var,expr,tyo) with
         | TCSuccess (ty,f) ->
           let varm = StrMap.add name var varm in
           let env = Env.add var ty env in
-          (tenv,varm,env), TSuccess (var,ty,f)
-        | TCFailure (pos,msg,f) -> (tenv,varm,env), TFailure (Some var,pos,msg,f)
+          (tenv,varm,senv,env), TSuccess (var,ty,f)
+        | TCFailure (pos,msg,f) -> (tenv,varm,senv,env), TFailure (Some var,pos,msg,f)
       with
-      | Ast.SymbolError msg -> (tenv,varm,env), TFailure (Some var, pos, msg, 0.0)
+      | Ast.SymbolError msg -> (tenv,varm,senv,env), TFailure (Some var, pos, msg, 0.0)
       end
+    | Ast.SigDef (name, ty) ->
+      let sigs = match sigs_of_def varm senv env name with
+      | None -> []
+      | Some (sigs,_) -> sigs
+      in
+      let v = Variable.create_let (Some name) in
+      Variable.attach_location v (Position.position annot) ;
+      let varm = StrMap.add name v varm in
+      let (ty, _) = type_expr_to_typ tenv empty_vtenv ty in
+      let sigs = ty::sigs in
+      let ty = sig_to_tyscheme (Env.tvars env) sigs in
+      let senv = VarMap.add v sigs senv in
+      let env = Env.add v ty env in
+      (tenv,varm,senv,env), TDone
     | Ast.Command (str, c) ->
       begin match str, c with
       | "log", Int i -> Config.log_level := Z.to_int i
       | "value_restriction", Bool b -> Config.value_restriction := b
       | _ -> failwith ("Invalid command "^str)
       end ;
-      (tenv,varm,env), TDone
+      (tenv,varm,senv,env), TDone
     | Ast.Types lst ->
       let tenv = define_types tenv empty_vtenv lst in
-      (tenv,varm,env), TDone
+      (tenv,varm,senv,env), TDone
     | Ast.AbsType (name, vs) ->
       let tenv = define_abstract tenv name vs in
-      (tenv,varm,env), TDone
+      (tenv,varm,senv,env), TDone
   with
-  | TypeDefinitionError msg -> (tenv,varm,env), TFailure (None, pos, msg, 0.0)
+  | TypeDefinitionError msg -> (tenv,varm,senv,env), TFailure (None, pos, msg, 0.0)
 
 let builtin_functions =
   let arith_operators_typ =
@@ -125,6 +161,8 @@ let initial_env =
     let var = StrMap.find name initial_varm in
     Env.add var t env
   ) System.Ast.initial_env
+
+let initial_senv = VarMap.empty
 
 let initial_tenv = empty_tenv
 

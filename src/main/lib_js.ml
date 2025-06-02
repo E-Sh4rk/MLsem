@@ -57,7 +57,7 @@ let typecheck code callback =
               Js.Unsafe.fun_call callback [| intermediate_answer |> Js.Unsafe.inject |] |> ignore
             ) ;
             (env,res)
-          ) ((initial_tenv, initial_varm, initial_env), []) program
+          ) ((initial_tenv, initial_varm, initial_senv, initial_env), []) program
         in
         ok_answer res
       | PFailure (pos, msg) ->

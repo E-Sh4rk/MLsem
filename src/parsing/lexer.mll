@@ -94,7 +94,6 @@ rule token = parse
 | "-"     { MINUS }
 | "+"     { PLUS  }
 | "/"     { DIV   }
-| "magic" { MAGIC }
 | "<"     { LT }
 | ">"     { GT }
 | int as i { LINT (Z.of_string i) }

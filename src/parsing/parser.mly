@@ -112,7 +112,6 @@
 %token<bool> LBOOL
 %token<char> LCHAR
 %token<string> LSTRING
-%token MAGIC
 %token<string> INFIX PREFIX
 
 %type<Ast.parser_expr> term
@@ -226,7 +225,6 @@ atomic_term:
 | t=PCID a=term RPAREN { annot $startpos $endpos (Tag (t,a)) }
 | t=PCID RPAREN { annot $startpos $endpos (Tag (t,annot $startpos $endpos (Const Unit))) }
 | l=literal { annot $startpos $endpos (Const l) }
-| MAGIC { annot $startpos $endpos (Abstract (TBase TEmpty)) }
 | LPAREN RPAREN { annot $startpos $endpos (Const Unit) }
 | LPAREN t=term RPAREN { t }
 | LPAREN t=term COLON ty=typ RPAREN { annot $startpos $endpos (TypeConstr (t,ty)) }

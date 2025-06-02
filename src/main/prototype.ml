@@ -27,7 +27,7 @@ let () =
                     Format.printf "@{<red>%s@}\n%!" msg ;
                     acc
                 | TDone -> acc
-            ) (initial_tenv, initial_varm, initial_env) program |> ignore ;
+            ) (initial_tenv, initial_varm, initial_senv, initial_env) program |> ignore ;
             let time1 = Unix.gettimeofday () in
             Format.printf "@.@{<bold;green>Total time: %.02fs@}@." (time1 -. time0)
         | PFailure (pos, msg) ->
