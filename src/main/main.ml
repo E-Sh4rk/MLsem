@@ -28,24 +28,28 @@ let type_check_def env sigs (var,e) =
   in
   try
     let e = System.Ast.from_parser_ast e in
-    let e = Partition.infer env e in
-    let annot =
-      match Reconstruction.infer env e with
-      | None -> raise (Checker.Untypeable (fst e, "Annotation reconstruction failed."))
-      | Some annot-> annot
+    let infer e =
+      let e = Partition.infer env e in
+      let annot =
+        match Reconstruction.infer env e with
+        | None -> raise (Checker.Untypeable (fst e, "Annotation reconstruction failed."))
+        | Some annot-> annot
+      in
+      Checker.typeof_def env annot e |> TyScheme.simplify
     in
-    let typ = Checker.typeof_def env annot e |> TyScheme.simplify in
-    let mono = Env.tvars env in
-    (* TODO *)
-    let typ =
-      match sigs with
-      | None -> typ
-      | Some (sigs, typ') ->
-        if sigs |> List.for_all (TyScheme.leq_inst typ)
-        then typ'
-        else raise (IncompatibleType typ)
+    let es, aty = match sigs with
+    | None -> [e], TyScheme.mk_mono any
+    | Some (sigs, ty) ->
+      List.map (System.Ast.add_coercion e) sigs, ty
     in
-    if TVarSet.diff (TyScheme.fv typ) mono |> TVarSet.is_empty |> not
+    let typs = List.map infer es in
+    let tscap t1 t2 =
+      let (tvs1, t1), (tvs2, t2) = TyScheme.get t1, TyScheme.get t2 in
+      TyScheme.mk (TVarSet.union tvs1 tvs2) (cap t1 t2)
+    in
+    let typ = List.fold_left tscap (TyScheme.mk_mono any) typs in
+    if TyScheme.leq typ aty |> not then raise (IncompatibleType typ) ;
+    if TVarSet.diff (TyScheme.fv typ) (Env.tvars env) |> TVarSet.is_empty |> not
     then raise (UnresolvedType typ) ;
     TCSuccess (typ, retrieve_time ())
   with

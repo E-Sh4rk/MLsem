@@ -246,6 +246,9 @@ let from_parser_ast t =
   in
   aux t
 
+let add_coercion t ty =
+  (Ast.unique_exprid (), TypeCoerce (t, ty))
+
 let rec push_coercions t =
   match t with
   | _ -> ignore push ; failwith "TODO"
