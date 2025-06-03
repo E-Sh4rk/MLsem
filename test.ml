@@ -200,7 +200,7 @@ let create l x d r =
   let hr = height r in
   (l, x, d, r, (if hl >= hr then hl + 1 else hr + 1))
 
-let bal (l:t('a)) (x: Key) (d:'a) (r:t('a)) =
+let bal (l:t('a)) (x: Key) (d:'a) (r:t('a)) : t('a) =
   let hl = match l with :Nil -> 0 | (_,_,_,_,h) -> h end in
   let hr = match r with :Nil -> 0 | (_,_,_,_,h) -> h end in
   if hl > (hr + 2) then
@@ -230,8 +230,6 @@ let bal (l:t('a)) (x: Key) (d:'a) (r:t('a)) =
         end
     end
   else (l, x, d, r, (if hl >= hr then hl + 1 else hr + 1))
-
-let bal : t('a) -> Key -> 'a -> t('a) -> t('a) = bal
 
 (*
 (*************************************************
