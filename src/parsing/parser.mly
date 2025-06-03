@@ -97,7 +97,7 @@
 %}
 
 %token EOF
-%token FUN LET REC IN FST SND HD TL HASHTAG
+%token FUN VAL LET REC IN FST SND HD TL HASHTAG
 %token IF IS THEN ELSE
 %token LPAREN RPAREN EQUAL COMMA CONS COLON COLON_OPT COERCE INTERROGATION_MARK EXCLAMATION_MARK
 %token ARROW AND OR NEG DIFF
@@ -147,6 +147,8 @@ element:
     in
     annot $symbolstartpos $endpos (Definition (id, t))
   }
+| VAL id=generalized_identifier COLON tys=separated_nonempty_list(SEMICOLON, typ)
+{ annot $symbolstartpos $endpos (SigDef (id, tys)) }
 | TYPE ts=separated_nonempty_list(TYPE_AND, param_type_def) { annot $symbolstartpos $endpos (Types ts) }
 | ABSTRACT TYPE name=ID params=abs_params { annot $symbolstartpos $endpos (AbsType (name, params)) }
 | HASHTAG cmd=ID EQUAL v=literal { annot $symbolstartpos $endpos (Command (cmd, v)) }

@@ -75,6 +75,7 @@ rule token = parse
 | "with"  { WITH }
 | "end"   { END }
 | "fun"   { FUN }
+| "val"   { VAL }
 | "let"   { LET }
 | "rec"   { REC }
 | "in"    { IN }

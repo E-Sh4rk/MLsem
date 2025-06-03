@@ -255,10 +255,10 @@ let rec push id' ty (id,t) =
   | Let (tys, v, e1, e2) ->
     id', Let (tys, v, e1, push (Ast.unique_exprid ()) ty e2)
   | Lambda (_,v,e) ->
-    let d' = domain ty in
-    let cd' = apply ty d' in
-    if equiv ty (mk_arrow d' cd')
-    then id', Lambda (d', v, push (Ast.unique_exprid ()) cd' e)
+    let d = domain ty in
+    let cd = apply ty d in
+    if equiv ty (mk_arrow d cd)
+    then id', Lambda (d, v, push (Ast.unique_exprid ()) cd e)
     else id', TypeCoerce ((id,t), ty)
   (* TODO: fixpoints ? *)
   | t -> id', TypeCoerce ((id,t), ty)

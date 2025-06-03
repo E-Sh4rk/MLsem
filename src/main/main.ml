@@ -29,10 +29,13 @@ let type_check_def env sigs (var,e) =
   try
     let e = System.Ast.from_parser_ast e in
     let infer e =
+      let e = System.Ast.push_coercions e in
       let e = Partition.infer env e in
       let annot =
         match Reconstruction.infer env e with
-        | None -> raise (Checker.Untypeable (fst e, "Annotation reconstruction failed."))
+        | None ->
+          (* Format.printf "@.@.%a@.@." System.Ast.pp e ; *)
+          raise (Checker.Untypeable (fst e, "Annotation reconstruction failed."))
         | Some annot-> annot
       in
       Checker.typeof_def env annot e |> TyScheme.simplify

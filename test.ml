@@ -1,3 +1,22 @@
+(* ========= SIGNATURES ======== *)
+
+val val42 : int
+let val42 = true
+let val42 = 42
+
+val test_sig : 'a -> 'b -> ('a|bool,'b|int)
+let test_sig x y = (x,y)
+
+val filter : ('a->any) & ('b -> ~true) -> [('a|'b)*] -> [('a\'b)*]
+let filter f l =
+  match l with
+  | [] -> []
+  | e::l ->
+    if f e is true
+    then e::(filter f l)
+    else filter f l
+  end
+
 (* ========= TESTS OBJECTS ======== *)
 
 type objF('a) = { f :? 'a ; proto :? objF('a) ..}
