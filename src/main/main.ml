@@ -20,7 +20,7 @@ let sigs_to_tyscheme mono sigs =
   if sigs |> List.for_all (fun ty -> vars_internal ty |> TVarSet.is_empty) then
     Some (sigs |> conj |> TyScheme.mk_poly_except mono)
   else None
-let type_check_def env sigs (var,e) =
+let type_check_def env (sigs,aty) (var,e) =
   let time0 = Unix.gettimeofday () in
   let retrieve_time () =
     let time1 = Unix.gettimeofday () in
@@ -40,10 +40,9 @@ let type_check_def env sigs (var,e) =
       in
       Checker.typeof_def env annot e |> TyScheme.simplify
     in
-    let es, aty = match sigs with
-    | None -> [e], TyScheme.mk_mono any
-    | Some (sigs, ty) ->
-      List.map (System.Ast.add_coercion e) sigs, ty
+    let es = match sigs with
+    | [] -> [e]
+    | sigs -> List.map (System.Ast.add_coercion e) sigs
     in
     let typs = List.map infer es in
     let tscap t1 t2 =
@@ -73,13 +72,21 @@ type 'a treat_result =
 | TDone
 | TFailure of Variable.t option * (Position.t list) * string * float
 
+exception AlreadyDefined of Variable.t
+
+let check_not_defined varm str =
+  if StrMap.mem str varm then
+    raise (AlreadyDefined (StrMap.find str varm))
+
 let sigs_of_def varm senv env str =
   match StrMap.find_opt str varm with
-  | None -> None
+  | None ->
+    let var = Variable.create_let (Some str) in
+    var, [], TyScheme.mk_mono any
   | Some v ->
     begin match VarMap.find_opt v senv with
-    | None -> None
-    | Some sigs -> Some (sigs, Env.find v env)
+    | None -> raise (AlreadyDefined v)
+    | Some sigs -> v, sigs, Env.find v env
     end
 
 let treat (tenv,varm,senv,env) (annot, elem) =
@@ -87,21 +94,22 @@ let treat (tenv,varm,senv,env) (annot, elem) =
   try  
     match elem with
     | Ast.Definition (name, expr) ->
-      let sigs = sigs_of_def varm senv env name in
-      let var = Variable.create_let (Some name) in
+      let var, sigs, aty = sigs_of_def varm senv env name in
       Variable.attach_location var (Position.position annot) ;
       begin try
         let expr = Ast.parser_expr_to_expr tenv empty_vtenv varm expr in
-        match type_check_def env sigs (var,expr) with
+        match type_check_def env (sigs,aty) (var,expr) with
         | TCSuccess (ty,f) ->
           let varm = StrMap.add name var varm in
-          let env = Env.add var ty env in
+          let senv = VarMap.remove var senv in
+          let env = if Env.mem var env then env else Env.add var ty env in
           (tenv,varm,senv,env), TSuccess (var,ty,f)
         | TCFailure (pos,msg,f) -> (tenv,varm,senv,env), TFailure (Some var,pos,msg,f)
       with
       | Ast.SymbolError msg -> (tenv,varm,senv,env), TFailure (Some var, pos, msg, 0.0)
       end
     | Ast.SigDef (name, tys) ->
+      check_not_defined varm name ;
       let v = Variable.create_let (Some name) in
       Variable.attach_location v (Position.position annot) ;
       let (sigs, _) = type_exprs_to_typs tenv empty_vtenv tys in
@@ -129,6 +137,8 @@ let treat (tenv,varm,senv,env) (annot, elem) =
       (tenv,varm,senv,env), TDone
   with
   | TypeDefinitionError msg -> (tenv,varm,senv,env), TFailure (None, pos, msg, 0.0)
+  | AlreadyDefined v ->
+    (tenv,varm,senv,env), TFailure (Some v, pos, "Symbol already defined.", 0.0)
 
 let builtin_functions =
   let arith_operators_typ =
