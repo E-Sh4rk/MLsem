@@ -249,10 +249,24 @@ let from_parser_ast t =
 let add_coercion t ty =
   (Ast.unique_exprid (), TypeCoerce (t, ty))
 
-let rec push_coercions t =
+let rec push id' ty (id,t) =
   match t with
-  | _ -> ignore push ; failwith "TODO"
+  | TypeCoerce (t, _) -> push id' ty t
+  | Let (tys, v, e1, e2) ->
+    id', Let (tys, v, e1, push (Ast.unique_exprid ()) ty e2)
+  | Lambda (_,v,e) ->
+    let d' = domain ty in
+    let cd' = apply ty d' in
+    if equiv ty (mk_arrow d' cd')
+    then id', Lambda (d', v, push (Ast.unique_exprid ()) cd' e)
+    else id', TypeCoerce ((id,t), ty)
+  (* TODO: fixpoints ? *)
+  | t -> id', TypeCoerce ((id,t), ty)
 
-and push _ t =
-  match t with
-  | _ -> failwith "TODO"
+let push_coercions t =
+  let aux (id,t) =
+    match t with
+    | TypeCoerce (t, ty) -> push id ty t
+    | t -> (id,t)
+  in
+  map aux t
