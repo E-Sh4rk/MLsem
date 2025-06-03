@@ -7,14 +7,14 @@ let val42 = 42
 val test_sig : 'a -> 'b -> ('a|bool,'b|int)
 let test_sig x y = (x,y)
 
-val filter : ('a->any) & ('b -> ~true) -> [('a|'b)*] -> [('a\'b)*]
-let filter f l =
+val filter_sig : ('a->any) & ('b -> ~true) -> [('a|'b)*] -> [('a\'b)*]
+let filter_sig f l =
   match l with
   | [] -> []
   | e::l ->
     if f e is true
-    then e::(filter f l)
-    else filter f l
+    then e::(filter_sig f l)
+    else filter_sig f l
   end
 
 (* ========= TESTS OBJECTS ======== *)
@@ -40,13 +40,13 @@ let test_neg4 = < ~cov(int)>
 let test_neg5 = <inv & ~inv(int)>
 let test_neg6 = < ~inv(int)>
 
-let cav = <cav(A) & cav(~A)>
-let cav = <cav(A|B) & cav(B|C)>
-let cav = <cav(A|B) & cav(B|C) & ~cav(any)>
+let cav1 = <cav(A) & cav(~A)>
+let cav2 = <cav(A|B) & cav(B|C)>
+let cav3 = <cav(A|B) & cav(B|C) & ~cav(any)>
 
-let cov = <cov(A) & cov(~A)>
-let cov = <cov(A|B) & cov(B|C)>
-let cov = <cov(A|B) & cov(B|C) & ~cov(empty)>
+let cov1 = <cov(A) & cov(~A)>
+let cov2 = <cov(A|B) & cov(B|C)>
+let cov3 = <cov(A|B) & cov(B|C) & ~cov(empty)>
 
 let inv = <inv(A) & inv(B) & inv(A|B)>
 
@@ -59,7 +59,7 @@ let get = <ref('a) -> 'a>
 
 let test_ref = ref 42
 let test_ref : ref(int) = ref 42
-let test_ref x =
+let mutate_ref x =
   let y = ref x in
   let () = set y 42 in
   get y
@@ -147,21 +147,21 @@ let fixpoint = fun f ->
      f ( fun  v -> ( x x v ))
    in delta delta
 
-let fact fact n =
+let fact_stub fact n =
   if n is 0 then 1 else (fact (n-1))*n
 
-let fact = fixpoint fact
+let fact = fixpoint fact_stub
 
-let length length lst =
+let length_stub length lst =
   if lst is [] then 0 else succ (length (tl lst))
 
-let length = fixpoint length
+let length = fixpoint length_stub
 
-let map map f lst =
+let map_stub map f lst =
   if lst is [] then []
   else (f (hd lst))::(map f (tl lst))
 
-let map = fixpoint map
+let map = fixpoint map_stub
 
 (* let rec filter_noannot f l =
   match l with
