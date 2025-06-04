@@ -31,6 +31,13 @@ let ccmp f e1 e2 r =
   | n -> n
 let filter_options x = List.filter_map identity x
 
+let rec map3 f l1 l2 l3 =
+  match l1, l2, l3 with
+  | [], [], [] -> []
+  | e1::l1, e2::l2, e3::l3 ->
+    let v = f e1 e2 e3 in
+    v::(map3 f l1 l2 l3)
+  | _ -> raise (Invalid_argument "Lists must have the same length.")
 let rec split3 lst =
   match lst with
   | [] -> ([],[],[])

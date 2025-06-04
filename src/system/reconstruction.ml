@@ -21,11 +21,11 @@ let tallying_no_result env cs =
   tallying_with_prio (TVar.user_vars ()) (Env.tvars env |> TVarSet.destruct) cs
   |> List.map (fun s -> s, empty)
 
-let tallying_with_result env tv cs =
+let tallying_with_result env res cs =
   let tvars = Env.tvars env in
   let leq_sol (_,r1) (_,r2) = subtype r1 r2 in
   tallying_with_prio (TVar.user_vars ()) (tvars |> TVarSet.destruct) cs
-  |> List.map (fun s -> Subst.rm tv s, Subst.find s tv)
+  |> List.map (fun s -> s, Subst.apply s res)
   (* Simplify result if it does not impact the domains *)
   |> List.map (fun (s,r) ->
     let mono = Subst.restrict s tvars |> Subst.vars in
@@ -34,8 +34,6 @@ let tallying_with_result env tv cs =
     (Subst.compose clean s, Subst.apply clean r)
   )
   |> tsort leq_sol
-
-let res_tvar = TVar.mk None
 
 (* Reconstruction algorithm *)
 
@@ -101,7 +99,23 @@ let rec infer cache env annot (id, e) =
       Subst (ss,ALambda (ty, a),ALambda (ty, a'),(eid,REnv.add v ty r))
     | Fail -> Fail
     end
-  | LambdaRec _, _ -> failwith "TODO"
+  | LambdaRec lst, Infer ->
+    retry_with (ALambdaRec (List.map (fun (ty,_,_) -> ty, Infer) lst))
+  | LambdaRec lst, ALambdaRec anns ->
+    let lst = List.combine lst anns in
+    let env' = lst |> List.fold_left
+      (fun env ((_,v,_),(ty,_)) -> Env.add v (TyScheme.mk_mono ty) env) env in
+    let tys = List.map fst anns in
+    begin match infer_seq' cache env' (List.map (fun ((_,_,e),(_,a)) -> a,e) lst) with
+    | OneFail -> Fail
+    | OneSubst (ss, a, a',r) ->
+      Subst (ss,ALambdaRec (List.combine tys a),ALambdaRec (List.combine tys a'),r)
+    | AllOk (annots,tys') ->
+      let cs = List.combine tys' tys in
+      let ss = tallying_with_result env (mk_tuple tys') cs in
+      let ok_ann = nc (Annot.ALambdaRec (List.combine tys annots)) in
+      Subst (ss, ok_ann, Untyp, empty_cov)
+    end
   | Ite _, Infer -> retry_with (AIte (Infer, BInfer, BInfer))
   | Ite (e0,tau,e1,e2), AIte (a0,a1,a2) ->
     let to_i =
@@ -130,9 +144,9 @@ let rec infer cache env annot (id, e) =
     | OneSubst (ss, [a1;a2], [a1';a2'],r) ->
       Subst (ss,AApp(a1,a2),AApp(a1',a2'),r)
     | AllOk ([a1;a2],[t1;t2]) ->
-      let tv = TVCache.get cache.tvcache id res_tvar in
+      let tv = TVCache.get cache.tvcache id TVCache.res_tvar in
       let arrow = mk_arrow t2 (TVar.typ tv) in
-      let ss = tallying_with_result env tv [(t1, arrow)] in
+      let ss = tallying_with_result env (TVar.typ tv) [(t1, arrow)] in
       Subst (ss, nc (Annot.AApp(a1,a2)), Untyp, empty_cov)
     | _ -> assert false
     end
@@ -158,9 +172,9 @@ let rec infer cache env annot (id, e) =
   | Projection (p,e'), AProj annot' ->
     begin match infer' cache env annot' e' with
     | Ok (annot', s) ->
-      let tv = TVCache.get cache.tvcache id res_tvar in
+      let tv = TVCache.get cache.tvcache id TVCache.res_tvar in
       let ty = Checker.domain_of_proj p (TVar.typ tv) in
-      let ss = tallying_with_result env tv [(s, ty)] in
+      let ss = tallying_with_result env (TVar.typ tv) [(s, ty)] in
       Subst (ss, nc (Annot.AProj annot'), Untyp, empty_cov)
     | Subst (ss,a,a',r) -> Subst (ss,AProj a,AProj a',r)
     | Fail -> Fail

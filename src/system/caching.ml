@@ -71,4 +71,13 @@ module TVCache = struct
     TVarSet.destruct tvs
     |> List.map (fun tv -> tv, get t eid tv |> TVar.typ)
     |> Subst.construct
+  
+  let res_tvar = TVar.mk None
+  let res_tvars = Hashtbl.create 5
+  let res_tvar' i =
+    match Hashtbl.find_opt res_tvars i with
+    | Some tv -> tv
+    | None ->
+      let tv = TVar.mk None in
+      Hashtbl.add res_tvars i tv ; tv
 end

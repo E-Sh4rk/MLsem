@@ -22,4 +22,6 @@ module TVCache : sig
     val empty : unit -> t
     val get : t -> Parsing.Ast.exprid -> TVar.t -> TVar.t
     val get' : t -> Parsing.Ast.exprid -> TVarSet.t -> Subst.t
+    val res_tvar : TVar.t
+    val res_tvar' : int -> TVar.t
 end
