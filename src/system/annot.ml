@@ -19,6 +19,7 @@ module Annot = struct
   | ATuple of t list
   | AIte of t * branch * branch
   | ALambda of typ * t
+  | ALambdaRec of (typ * t) list
   | AInter of inter
   [@@deriving show]
   and t = { mutable cache: typ option ; ann: a }
@@ -39,6 +40,7 @@ module Annot = struct
       | ATuple ts -> ATuple (List.map aux ts)
       | AIte (t,b1,b2) -> AIte (aux t, aux_b b1, aux_b b2)
       | ALambda (ty, t) -> ALambda (Subst.apply s ty, aux t)
+      | ALambdaRec lst -> ALambdaRec (List.map (fun (ty,t) -> (Subst.apply s ty, aux t)) lst)
       | AInter ts -> AInter (List.map aux ts)
     in { cache=Option.map (Subst.apply s) t.cache ; ann }
     and aux_b b =
@@ -73,6 +75,7 @@ module IAnnot = struct
   | ATuple of t list
   | AIte of t * branch * branch
   | ALambda of typ * t
+  | ALambdaRec of (typ * t) list
   | AInter of inter
   [@@deriving show]
 
@@ -94,6 +97,7 @@ module IAnnot = struct
       | ATuple ts -> ATuple (List.map aux ts)
       | AIte (t,b1,b2) -> AIte (aux t, aux_b b1, aux_b b2)
       | ALambda (ty, t) -> ALambda (Subst.apply s ty, aux t)
+      | ALambdaRec lst -> ALambdaRec (List.map (fun (ty,t) -> (Subst.apply s ty, aux t)) lst)
       | AInter bs -> AInter (List.map aux_ib bs)
     and aux_b b =
       match b with

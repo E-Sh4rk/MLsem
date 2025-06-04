@@ -16,6 +16,7 @@ module Annot : sig
   | ATuple of t list
   | AIte of t * branch * branch
   | ALambda of typ * t
+  | ALambdaRec of (typ * t) list
   | AInter of inter
   and t = { mutable cache: typ option ; ann: a }
 
@@ -44,6 +45,7 @@ module IAnnot : sig
   | ATuple of t list
   | AIte of t * branch * branch
   | ALambda of typ * t
+  | ALambdaRec of (typ * t) list
   | AInter of inter
 
   val substitute : Subst.t -> t -> t
