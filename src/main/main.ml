@@ -37,7 +37,7 @@ let type_check_def env (sigs,aty) (var,e) =
     in
     let es = match sigs with
     | [] -> [lambdarec None e]
-    | sigs -> List.map (fun s -> lambdarec (Some s) e |> coerce (mk_tuple [s])) sigs
+    | sigs -> List.map (fun s -> lambdarec (Some s) (coerce s e)) sigs
     in
     let infer e =
       let e = System.Ast.from_parser_ast e in
