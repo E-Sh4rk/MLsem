@@ -61,8 +61,9 @@ let untypeable id msg = raise (Untypeable (id, msg))
 
 let rec is_value (_,e) =
   match e with
-  | Const _ | Atom _ | Lambda _ | LambdaRec _ | Abstract _ -> true
+  | Const _ | Atom _ | Lambda _ | Abstract _ -> true
   | Tag (_, e) -> is_value e
+  | LambdaRec lst -> List.for_all (fun (_,_,e) -> is_value e) lst
   | Tuple es -> List.for_all is_value es
   | Cons (e1, e2) -> is_value e1 && is_value e2
   | _ -> false
