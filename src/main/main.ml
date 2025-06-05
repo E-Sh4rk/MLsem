@@ -81,7 +81,6 @@ type 'a treat_result =
 | TFailure of Variable.t option * (Position.t list) * string * float
 
 exception AlreadyDefined of Variable.t
-exception InconsistentSig of Variable.t
 
 let check_not_defined varm env str =
   match StrMap.find_opt str varm with
@@ -104,7 +103,7 @@ let sigs_of_def varm senv env str oty =
   let sigs = match sigs, oty with
   | sigs, None -> sigs
   | [], Some ty -> [ty]
-  | _::_, Some _ -> raise (InconsistentSig v)
+  | sigs, Some _ -> sigs
   in
   v, sigs, aty
 
@@ -165,8 +164,6 @@ let treat (tenv,varm,senv,env) (annot, elem) =
   | TypeDefinitionError msg -> (tenv,varm,senv,env), TFailure (None, pos, msg, 0.0)
   | AlreadyDefined v ->
     (tenv,varm,senv,env), TFailure (Some v, pos, "Symbol already defined.", 0.0)
-  | InconsistentSig v ->
-    (tenv,varm,senv,env), TFailure (Some v, pos, "Inconsistent type annotations.", 0.0)  
 
 let builtin_functions =
   let arith_operators_typ =

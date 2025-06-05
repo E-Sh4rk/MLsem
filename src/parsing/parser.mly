@@ -41,8 +41,7 @@
       | (None, _)::lst -> TArrow (TVarWeak (fresh_tvar_id ()), aux lst)
       | (Some ty, _)::lst -> TArrow (ty, aux lst)
     in
-    if t_res = None && List.for_all (fun (o,_) -> o = None) lst
-    then None else Some (aux lst)
+    Some (aux lst)
 
   let let_pattern startpos endpos pat d t =
     match pat with
