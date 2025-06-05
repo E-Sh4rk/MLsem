@@ -30,7 +30,7 @@
     (fun () ->
       last := (!last) + 1 ;
       Format.sprintf "__self_%i" (!last))
-  let multi_param_rec_abstraction startpos endpos name lst t_res t =
+  let self_type lst t_res =
     let rec aux lst =
       match lst with
       | [] ->
@@ -41,8 +41,7 @@
       | (None, _)::lst -> TArrow (TVarWeak (fresh_tvar_id ()), aux lst)
       | (Some ty, _)::lst -> TArrow (ty, aux lst)
     in
-    let t = multi_param_abstraction startpos endpos lst t_res t in
-    annot startpos endpos (LambdaRec [name, Some (aux lst), t])
+    aux lst
 
   let let_pattern startpos endpos pat d t =
     match pat with
@@ -138,14 +137,6 @@ element:
   }
 | LET id=generalized_identifier EQUAL t=term
   { annot $symbolstartpos $endpos (Definition (id, t)) }
-| LET r=isrec id=generalized_identifier ais=parameter+ oty=optional_typ EQUAL t=term
-  {
-    let t = if r
-      then multi_param_rec_abstraction $startpos $endpos id ais oty t
-      else multi_param_abstraction $startpos $endpos ais oty t
-    in
-    annot $symbolstartpos $endpos (Definition (id, t))
-  }
 | VAL id=generalized_identifier COLON tys=separated_nonempty_list(SEMICOLON, typ)
 { annot $symbolstartpos $endpos (SigDef (id, tys)) }
 | TYPE ts=separated_nonempty_list(TYPE_AND, param_type_def) { annot $symbolstartpos $endpos (Types ts) }
@@ -171,26 +162,32 @@ variance:
   { TBase TTrue }
 | IS t=typ { t }
 
-%inline isrec:
-  { false }
-| REC { true }
-
 %inline optional_pannot:
   { PNoAnnot }
 | COLON tys=separated_nonempty_list(SEMICOLON, typ) { PAnnot tys }
+
+%inline letfundef:
+| id=generalized_identifier ais=parameter+ oty=optional_typ EQUAL td=term
+{
+  (id, multi_param_abstraction $startpos $endpos ais oty td, self_type ais oty) 
+}
 
 term:
   t=simple_term { t }
 | FUN ais=parameter+ ARROW t = term { multi_param_abstraction $startpos $endpos ais None t }
 | LET id=generalized_identifier a=optional_pannot EQUAL td=term IN t=term
   { annot $startpos $endpos (Let (id, a, td, t)) }
-| LET r=isrec id=generalized_identifier ais=parameter+ oty=optional_typ EQUAL td=term IN t=term
+| LET d=letfundef IN t=term
   {
-    let td = if r
-      then multi_param_rec_abstraction $startpos $endpos id ais oty td
-      else multi_param_abstraction $startpos $endpos ais oty td
-    in
+    let (id,td,_) = d in
     annot $startpos $endpos (Let (id, PNoAnnot, td, t))
+  }
+| LET REC ds=separated_nonempty_list(AND, letfundef) IN t=term
+  {
+    let ds = List.map (fun (id,td,self) -> (id, Some self, td)) ds in
+    let lambda = annot $startpos $endpos (LambdaRec ds) in
+    let names = List.map (fun (id,_,_) -> PatVar id) ds in
+    let_pattern $startpos $endpos (PatTuple names) lambda t
   }
 | LET p=ppattern EQUAL td=term IN t=term { let_pattern $startpos $endpos p td t }
 | IF t=term ott=optional_test_type THEN t1=term ELSE t2=term { annot $startpos $endpos (Ite (t,ott,t1,t2)) }
