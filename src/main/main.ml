@@ -14,9 +14,21 @@ exception IncompatibleType of Variable.t * TyScheme.t
 exception UnresolvedType of Variable.t * TyScheme.t
 exception Untypeable of Variable.t
 
-let sigs_to_tyscheme mono sigs =
-  if sigs |> List.for_all (fun ty -> vars_internal ty |> TVarSet.is_empty) then
-    Some (sigs |> conj |> TyScheme.mk_poly_except mono)
+let sigs_of_ty mono ty =
+  let rec aux ty =
+    match dnf ty with
+    | [arrs] ->
+      let arrs = arrs |> List.map (fun (a,b) ->
+        aux b |> List.map (fun b -> mk_arrow a b)
+      ) |> List.flatten
+      in
+      if equiv ty (conj arrs)
+      then arrs else [ty]
+    | _ -> [ty]
+  in
+  if ty |> vars_internal |> TVarSet.is_empty then
+    let sigs = aux ty in
+    Some (sigs, TyScheme.mk_poly_except mono ty)
   else None
 let infer var env e =
   let e = Partition.infer env e in
@@ -111,15 +123,15 @@ let treat (tenv,varm,senv,env) (annot, elem) =
       let tys2 = List.map (type_check_with_sigs env) sigs in
       let senv = List.fold_left (fun senv (v,_) -> VarMap.remove v senv) senv tys2 in
       (tenv,varm,senv,env), TSuccess (tys1@tys2,retrieve_time time)
-    | Ast.SigDef (name, tys) ->
+    | Ast.SigDef (name, ty) ->
       check_not_defined varm name ;
       let v = Variable.create_let (Some name) in
       Variable.attach_location v (Position.position annot) ;
-      let (sigs, _) = type_exprs_to_typs tenv empty_vtenv tys in
-      begin match sigs_to_tyscheme (Env.tvars env) sigs with
+      let (ty, _) = type_expr_to_typ tenv empty_vtenv ty in
+      begin match sigs_of_ty (Env.tvars env) ty with
       | None -> (tenv,varm,senv,env),
-        TFailure (Some v, pos, "Signatures cannot contain weak variables.", 0.0)
-      | Some ty ->
+        TFailure (Some v, pos, "Invalid signature annotation.", 0.0)
+      | Some (sigs, ty) ->
         let varm = StrMap.add name v varm in
         let senv = VarMap.add v sigs senv in
         let env = Env.add v ty env in

@@ -73,7 +73,7 @@ val parser_expr_to_expr : type_env -> var_type_env -> name_var_map -> parser_exp
 
 type parser_element =
 | Definitions of (string * parser_expr) list
-| SigDef of string * type_expr list
+| SigDef of string * type_expr
 | Types of (string * string list * type_expr) list
 | AbsType of string * variance list
 | Command of string * const

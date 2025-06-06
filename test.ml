@@ -29,6 +29,20 @@ let filter_sig f l =
     else filter_sig f l
   end
 
+val filtermap :
+    (('t -> ((true, 'u) | false), ['t*]) -> ['u*])
+  & (('t -> ((true, 'u) | bool), ['t*]) -> [('t | 'u)*])
+let filtermap (f, l) =
+    match l with
+    | [] -> []
+    | x::xs ->
+      match f x with
+      | :false -> filtermap (f, xs)
+      | :true -> x::(filtermap (f, xs))
+      | (:true, y) -> y::(filtermap (f, xs))
+    end
+  end
+
 (* ========= TESTS OBJECTS ======== *)
 
 type objF('a) = { f :? 'a ; proto :? objF('a) ..}
