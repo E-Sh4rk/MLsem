@@ -25,7 +25,7 @@ val map : (t -> t) -> t -> t
 val fold : (t -> 'a list -> 'a) -> t -> 'a
 val fv : t -> VarSet.t
 val from_parser_ast : Ast.expr -> t
-(* val push_coercions : t -> t *)
+val coerce : typ -> t -> t
 
 val pp : Format.formatter -> t -> unit
 val pp_e : Format.formatter -> e -> unit

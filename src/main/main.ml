@@ -19,7 +19,6 @@ let sigs_to_tyscheme mono sigs =
     Some (sigs |> conj |> TyScheme.mk_poly_except mono)
   else None
 let infer var env e =
-  let e = System.Ast.from_parser_ast e in
   let e = Partition.infer env e in
   let annot =
     match Reconstruction.infer env e with
@@ -29,8 +28,6 @@ let infer var env e =
     | Some annot-> annot
   in
   Checker.typeof_def env annot e |> TyScheme.simplify
-let coerce ty e =
-  Parsing.Ast.unique_exprid (), Parsing.Ast.TypeCoerce (e,ty)
 let retrieve_time time =
   let time' = Unix.gettimeofday () in
   (time' -. time) *. 1000.
@@ -39,7 +36,8 @@ let check_resolved var env typ =
   then raise (UnresolvedType (var,typ))
 
 let type_check_with_sigs env (var,e,sigs,aty) =
-  let es = List.map (fun s -> coerce s e) sigs in
+  let e = System.Ast.from_parser_ast e in
+  let es = List.map (fun s -> System.Ast.coerce s e) sigs in
   let typs = List.map (infer var env) es in
   let tscap t1 t2 =
     let (tvs1, t1), (tvs2, t2) = TyScheme.get t1, TyScheme.get t2 in
@@ -50,10 +48,11 @@ let type_check_with_sigs env (var,e,sigs,aty) =
   check_resolved var env typ ;
   var,typ
 
-let type_check_recs env lst (* var, psig, e *) =
+let type_check_recs env lst =
   if lst = [] then []
   else
     let e = Parsing.Ast.unique_exprid (), Parsing.Ast.LambdaRec lst in
+    let e = System.Ast.from_parser_ast e in
     let (var,_,_) = List.hd lst in
     let typ = infer var env e in
     check_resolved var env typ ;

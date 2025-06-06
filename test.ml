@@ -143,8 +143,9 @@ let lor = fun a -> fun b ->
 let land = fun a -> fun b ->
   if a is true then if b is false then false else true else false
 
-let tautology = fun x -> fun y ->
-  if land (lor x (lnot x)) (lor (lnot y) y) then true else false
+(* TODO: fix partition perf *)
+(* let tautology = fun x -> fun y ->
+  if land (lor x (lnot x)) (lor (lnot y) y) then true else false *)
 
 (* ============== RECURSIVE ============= *)
 
@@ -209,7 +210,9 @@ let create l x d r =
   let hr = height r in
   (l, x, d, r, (if hl >= hr then hl + 1 else hr + 1))
 
-let bal (l:t('a)) (x: Key) (d:'a) (r:t('a)) : t('a) =
+val bal : t('a) -> Key -> 'a -> t('a) -> t('a)
+let bal l x d r =
+(* let bal (l:t('a)) (x: Key) (d:'a) (r:t('a)) : t('a) = *)
   let hl = match l with :Nil -> 0 | (_,_,_,_,h) -> h end in
   let hr = match r with :Nil -> 0 | (_,_,_,_,h) -> h end in
   if hl > (hr + 2) then

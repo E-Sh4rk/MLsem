@@ -182,43 +182,17 @@ let encode_pattern_matching id e pats =
   let def = (Ast.unique_exprid (), Ast.TypeConstr (e, t)) in
   (id, Ast.Let (x, Ast.PNoAnnot, def, body))
 
-let rec push id' ty (id,t) =
-  match t with
-  | TypeCoerce (t, _) -> push id' ty t
-  | Let (tys, v, e1, e2) ->
-    id', Let (tys, v, e1, push (Ast.unique_exprid ()) ty e2)
-  | Lambda (_,v,e) ->
-    let d = domain ty in
-    let cd = apply ty d in
-    if equiv ty (mk_arrow d cd)
-    then id', Lambda (d, v, push (Ast.unique_exprid ()) cd e)
-    else id', TypeCoerce ((id,t), ty)
-  | t -> id', TypeCoerce ((id,t), ty)
-
-let push_coercions t =
-  let aux (id,t) =
-    match t with
-    | TypeCoerce (t, ty) -> push id ty t
-    | t -> (id,t)
-  in
-  map aux t
-
 let from_parser_ast t =
-  let lambda_annot ~addlet x a e =
+  let add_let x e =
+    let x' = Variable.create_let (Variable.get_name x) in
+    Variable.get_locations x |> List.iter (Variable.attach_location x') ;
+    Ast.unique_exprid (),
+    Let ([], x', (Ast.unique_exprid (), Var x), substitute x x' e)
+  in
+  let lambda_annot x a =
     match a with
-    | None ->
-      let d = TVar.mk ~user:false (Variable.get_name x) |> TVar.typ in
-      d, e
-    | Some d ->
-      let x' = Variable.create_let (Variable.get_name x) in
-      Variable.get_locations x |> List.iter (Variable.attach_location x') ;
-      let e =
-        if addlet then
-          Ast.unique_exprid (),
-          Let ([], x', (Ast.unique_exprid (), Var x), substitute x x' e)
-        else e
-      in
-      d, e
+    | None -> TVar.mk ~user:false (Variable.get_name x) |> TVar.typ
+    | Some d -> d
   in
   let rec aux_e (id,e) =
     match e with
@@ -228,15 +202,10 @@ let from_parser_ast t =
     | Ast.Atom a -> Atom a
     | Ast.Tag (t, e) -> Tag (t, aux e)
     | Ast.Lambda (x, (a, t_res), e) ->
-      let e = aux' e t_res in
-      let d, e = lambda_annot ~addlet:true x a e in
-      Lambda (d, x, e)
+      let e = aux' e t_res |> add_let x in
+      Lambda (lambda_annot x a, x, e)
     | Ast.LambdaRec lst ->
-      let aux (x,a,e) =
-        let e = aux e in
-        let d,e = lambda_annot ~addlet:false x a e in
-        (d, x, e)
-      in
+      let aux (x,a,e) = (lambda_annot x a, x, aux e) in
       LambdaRec (List.map aux lst)
     | Ast.Ite (e,t,e1,e2) -> Ite (aux e, t, aux e1, aux e2)
     | Ast.App (e1,e2) -> App (aux e1, aux e2)
@@ -259,4 +228,17 @@ let from_parser_ast t =
     let (id, _) = t in
     (id,e)
   in
-  aux t |> push_coercions
+  aux t
+
+let rec coerce ty (id,t) =
+  match t with
+  | TypeCoerce (t, _) -> coerce ty t
+  | Let (tys, v, e1, e2) ->
+    id, Let (tys, v, e1, coerce ty e2)
+  | Lambda (_,v,e) ->
+    let d = domain ty in
+    let cd = apply ty d in
+    if equiv ty (mk_arrow d cd)
+    then id, Lambda (d, v, coerce cd e)
+    else Ast.unique_exprid (), TypeCoerce ((id,t), ty)
+  | t -> Ast.unique_exprid (), TypeCoerce ((id,t), ty)

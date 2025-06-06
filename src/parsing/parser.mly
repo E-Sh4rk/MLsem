@@ -25,23 +25,18 @@
     in
     List.rev lst |> List.fold_left step t
 
-  let fresh_tvar_id =
-    let last = ref 0 in
-    (fun () ->
-      last := (!last) + 1 ;
-      Format.sprintf "__self_%i" (!last))
   let self_type lst t_res =
     let rec aux lst =
       match lst with
-      | [] ->
-        begin match t_res with
-        | None -> TVarWeak (fresh_tvar_id ())
-        | Some ty -> ty
+      | [] -> t_res
+      | (None, _)::_ -> None
+      | (Some ty, _)::lst ->
+        begin match aux lst with
+        | None -> None
+        | Some ty' -> Some (TArrow (ty, ty'))
         end
-      | (None, _)::lst -> TArrow (TVarWeak (fresh_tvar_id ()), aux lst)
-      | (Some ty, _)::lst -> TArrow (ty, aux lst)
     in
-    Some (aux lst)
+    aux lst
 
   let let_pattern startpos endpos pat d t =
     match pat with
@@ -130,10 +125,10 @@ program: e=element* EOF { e }
 unique_term: t=term EOF { t }
 
 %inline tl_let:
-| id=generalized_identifier oty=optional_typ EQUAL t=term
-{ (id, oty, t) }
-| id=generalized_identifier ais=parameter+ oty=optional_typ EQUAL t=term
+| id=generalized_identifier ais=parameter* oty=optional_typ EQUAL t=term
 {
+  (* TODO: multi-def syntax *)
+  (* TODO: remove oty *)
   let t = multi_param_abstraction $startpos $endpos ais oty t in
   let st = self_type ais oty in
   (id, st, t)
