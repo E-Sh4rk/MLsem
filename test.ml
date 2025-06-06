@@ -9,6 +9,9 @@ let map_rec f (lst:['a*]) =
   | a::lst -> (f a)::(map_rec f lst)
   end
 
+let foo x = bar x
+and bar y = foo y
+
 val val42 : int
 let val42 = true
 let val42 = 42

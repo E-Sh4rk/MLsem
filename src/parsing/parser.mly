@@ -116,7 +116,7 @@ unique_term: t=term EOF { t }
 }
 
 element:
-| LET ds=separated_nonempty_list(AND, tl_let)
+| LET ds=separated_nonempty_list(TYPE_AND, tl_let)
 {
   annot $symbolstartpos $endpos (Definitions ds)
 }
