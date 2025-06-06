@@ -168,6 +168,27 @@ let treat (tenv,varm,senv,env) (annot, elem) =
       "the type inferred is not fully resolved",
       retrieve_time time)
 
+let treat_sig envs (annot,elem) =
+  match elem with
+  | Ast.Types _ | Ast.AbsType _ | Ast.SigDef _ -> treat envs (annot,elem)
+  | Ast.Command _ | Ast.Definitions _ -> envs, TDone
+let treat_def envs (annot,elem) =
+  match elem with
+  | Ast.Types _ | Ast.AbsType _ | Ast.SigDef _ -> envs, TDone
+  | Ast.Command _ | Ast.Definitions _ -> treat envs (annot,elem)
+let treat_all_sigs envs elts =
+  let rec aux envs elts =
+    match elts with
+    | [] -> envs, TDone
+    | e::elts ->
+      begin match treat_sig envs e with
+      | (envs, TDone) -> aux envs elts
+      | (envs, (TFailure _ as f)) -> envs, f
+      | (_, TSuccess _) -> assert false
+      end
+  in
+  aux envs elts
+
 let builtin_functions =
   let arith_operators_typ =
     mk_arrow int_typ (mk_arrow int_typ int_typ) |> TyScheme.mk_poly
