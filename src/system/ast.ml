@@ -244,12 +244,12 @@ let from_parser_ast t =
 
 let rec coerce ty (id,t) =
   match t with
-  | TypeCoerce (t, _) -> coerce ty t
   | Let (tys, v, e1, e2) ->
     id, Let (tys, v, e1, coerce ty e2)
   | Lambda (_,v,e) ->
     let d = domain ty in
     let cd = apply ty d in
+    (* TODO *)
     if equiv ty (mk_arrow d cd)
     then id, Lambda (d, v, coerce cd e)
     else Ast.unique_exprid (), TypeCoerce ((id,t), ty)

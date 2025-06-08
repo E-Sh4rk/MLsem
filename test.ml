@@ -20,12 +20,12 @@ val test_sig : 'a -> 'b -> ('a|bool,'b|int)
 let test_sig x y = (x,y)
 
 val filter_sig : ('a->any) & ('b -> ~true) -> [('a|'b)*] -> [('a\'b)*]
-let filter_sig f l =
+let filter_sig (f : ('a->any) & ('b -> ~true)) l =
   match l with
   | [] -> []
   | e::l ->
     if f e is true
-    then e::(filter_sig f l)
+    then (suggest e is ~'a in e::(filter_sig f l))
     else filter_sig f l
   end
 

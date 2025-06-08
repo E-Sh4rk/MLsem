@@ -74,13 +74,14 @@
 %}
 
 %token EOF
-%token FUN VAL LET IN FST SND HD TL HASHTAG
+%token FUN VAL LET IN FST SND HD TL HASHTAG SUGGEST
 %token IF IS THEN ELSE
 %token LPAREN RPAREN EQUAL COMMA CONS COLON COLON_OPT COERCE INTERROGATION_MARK EXCLAMATION_MARK
 %token ARROW AND OR NEG DIFF
 %token TIMES PLUS MINUS DIV
 %token LBRACE RBRACE DOUBLEPOINT MATCH WITH END POINT LT GT
-%token TYPE TYPE_AND WHERE ABSTRACT
+%token AND_KW OR_KW
+%token TYPE WHERE ABSTRACT
 %token LBRACKET RBRACKET SEMICOLON
 %token<string> ID CID PCID
 %token<string> TVAR TVAR_WEAK
@@ -116,9 +117,9 @@ unique_term: t=term EOF { t }
 }
 
 element:
-| LET ds=separated_nonempty_list(TYPE_AND, tl_let) { annot $symbolstartpos $endpos (Definitions ds) }
+| LET ds=separated_nonempty_list(AND_KW, tl_let) { annot $symbolstartpos $endpos (Definitions ds) }
 | VAL id=generalized_identifier COLON ty=typ { annot $symbolstartpos $endpos (SigDef (id, ty)) }
-| TYPE ts=separated_nonempty_list(TYPE_AND, param_type_def) { annot $symbolstartpos $endpos (Types ts) }
+| TYPE ts=separated_nonempty_list(AND_KW, param_type_def) { annot $symbolstartpos $endpos (Types ts) }
 | ABSTRACT TYPE name=ID params=abs_params { annot $symbolstartpos $endpos (AbsType (name, params)) }
 | HASHTAG cmd=ID EQUAL v=literal { annot $symbolstartpos $endpos (Command (cmd, v)) }
 
@@ -146,6 +147,8 @@ term:
     annot $startpos $endpos (Let (id, td, t))
   }
 | LET p=ppattern EQUAL td=term IN t=term { let_pattern $startpos $endpos p td t }
+| SUGGEST id=generalized_identifier IS tys=separated_nonempty_list(OR_KW, typ) IN t=term
+{ annot $startpos $endpos (Suggest (id, tys, t)) }
 | IF t=term ott=optional_test_type THEN t1=term ELSE t2=term { annot $startpos $endpos (Ite (t,ott,t1,t2)) }
 | MATCH t=term WITH pats=patterns END { annot $startpos $endpos (PatMatch (t,pats)) }
 | hd=simple_term COMMA tl=separated_nonempty_list(COMMA, simple_term) { annot $startpos $endpos (Tuple (hd::tl)) }
@@ -250,7 +253,7 @@ prefix:
 
 typ:
   t=typ_norec { t }
-| t=typ_norec WHERE ts=separated_nonempty_list(TYPE_AND, param_type_def)
+| t=typ_norec WHERE ts=separated_nonempty_list(AND_KW, param_type_def)
   { TWhere (t, ts) }
 
 typ_norec:

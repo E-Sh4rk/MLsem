@@ -49,7 +49,9 @@ rule token = parse
 | blank   { token lexbuf }
 | "type"  { TYPE }
 | "where" { WHERE }
-| "and"   { TYPE_AND }
+| "and"   { AND_KW }
+| "or"    { OR_KW }
+| "suggest"   { SUGGEST }
 | "abstract"  { ABSTRACT }
 | "#"     { HASHTAG }
 | "(*"    { comment 0 lexbuf }
