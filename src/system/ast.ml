@@ -166,7 +166,7 @@ let encode_pattern_matching id e pats =
     let vars = vars_of_pat pat in
     let add_def acc v =
       let d = def_of_var_pat pat v ex in
-      (Ast.unique_exprid (), Ast.Let (v, None, d, acc))
+      (Ast.unique_exprid (), Ast.Let (v, d, acc))
     in
     List.fold_left add_def e' (VarSet.elements vars)
   in
@@ -180,7 +180,7 @@ let encode_pattern_matching id e pats =
   | (_, e')::pats -> List.fold_left add_branch e' pats
   in
   let def = (Ast.unique_exprid (), Ast.TypeConstr (e, t)) in
-  (id, Ast.Let (x, None, def, body))
+  (id, Ast.Let (x, def, body))
 
 let from_parser_ast t =
   let add_let x e =
@@ -209,8 +209,7 @@ let from_parser_ast t =
       LambdaRec (List.map aux lst)
     | Ast.Ite (e,t,e1,e2) -> Ite (aux e, t, aux e1, aux e2)
     | Ast.App (e1,e2) -> App (aux e1, aux e2)
-    | Ast.Let (x, None, e1, e2) -> Let ([], x, aux e1, aux e2)
-    | Ast.Let (x, Some ts, e1, e2) -> Let (ts, x, aux e1, aux e2)
+    | Ast.Let (x, e1, e2) -> Let ([], x, aux e1, aux e2)
     | Ast.Tuple es -> Tuple (List.map aux es)
     | Ast.Cons (e1, e2) -> Cons (aux e1, aux e2)
     | Ast.Projection (p, e) -> Projection (p, aux e)

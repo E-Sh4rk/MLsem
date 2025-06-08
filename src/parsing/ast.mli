@@ -23,7 +23,6 @@ type const =
 type projection = Pi of int * int | Field of string | Hd | Tl | PiTag of tag
 
 type 'typ lambda_annot = 'typ option
-type 'typ part_annot = 'typ list option
 
 type ('a, 'typ, 'tag, 'v) pattern =
 | PatType of 'typ
@@ -46,7 +45,7 @@ and ('a, 'typ, 'ato, 'tag, 'v) ast =
 | LambdaRec of ('v * 'typ option * ('a, 'typ, 'ato, 'tag, 'v) t) list
 | Ite of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ * ('a, 'typ, 'ato, 'tag, 'v) t * ('a, 'typ, 'ato, 'tag, 'v) t
 | App of ('a, 'typ, 'ato, 'tag, 'v) t * ('a, 'typ, 'ato, 'tag, 'v) t
-| Let of 'v * 'typ part_annot * ('a, 'typ, 'ato, 'tag, 'v) t * ('a, 'typ, 'ato, 'tag, 'v) t
+| Let of 'v * ('a, 'typ, 'ato, 'tag, 'v) t * ('a, 'typ, 'ato, 'tag, 'v) t
 | Tuple of ('a, 'typ, 'ato, 'tag, 'v) t list
 | Cons of ('a, 'typ, 'ato, 'tag, 'v) t * ('a, 'typ, 'ato, 'tag, 'v) t
 | Projection of projection * ('a, 'typ, 'ato, 'tag, 'v) t
@@ -87,11 +86,7 @@ val pp_const : Format.formatter -> const -> unit
 val pp_projection : Format.formatter -> projection -> unit
 val pp_lambda_annot : (Format.formatter -> 'a -> unit) ->
                     Format.formatter -> 'a lambda_annot -> unit
-val pp_part_annot : (Format.formatter -> 'a -> unit) ->
-    Format.formatter -> 'a part_annot -> unit    
 val show_const : const -> string
 val show_projection : projection -> string
 val show_lambda_annot : (Format.formatter -> 'a -> unit) ->
                     'a lambda_annot -> string
-val show_part_annot : (Format.formatter -> 'a -> unit) ->
-    'a part_annot -> string

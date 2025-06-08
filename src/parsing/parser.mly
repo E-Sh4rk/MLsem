@@ -24,7 +24,7 @@
 
   let let_pattern startpos endpos pat d t =
     match pat with
-    | PatVar v -> annot startpos endpos (Let (v, None, d, t))
+    | PatVar v -> annot startpos endpos (Let (v, d, t))
     | pat -> annot startpos endpos (PatMatch (d, [(pat, t)]))
 
   let double_app startpos endpos f a b =
@@ -131,27 +131,19 @@ variance:
 | PLUS TVAR { Cov }
 | MINUS TVAR { Cav }
 
-%inline optional_typ:
-| { None }
-| COLON ty=typ { Some ty }
-
 (* ===== TERMS ===== *)
 
 %inline optional_test_type:
   { TBase TTrue }
 | IS t=typ { t }
 
-%inline optional_pannot:
-  { None }
-| COLON tys=separated_nonempty_list(SEMICOLON, typ) { Some tys }
-
 term:
   t=simple_term { t }
 | FUN ais=parameter+ ARROW t = term { abstraction $startpos $endpos ais t }
-| LET id=generalized_identifier ais=parameter* a=optional_pannot EQUAL td=term IN t=term
+| LET id=generalized_identifier ais=parameter* EQUAL td=term IN t=term
   {
     let td = abstraction $startpos $endpos ais td in
-    annot $startpos $endpos (Let (id, a, td, t))
+    annot $startpos $endpos (Let (id, td, t))
   }
 | LET p=ppattern EQUAL td=term IN t=term { let_pattern $startpos $endpos p td t }
 | IF t=term ott=optional_test_type THEN t1=term ELSE t2=term { annot $startpos $endpos (Ite (t,ott,t1,t2)) }
@@ -222,6 +214,10 @@ lint:
   i=LINT { i }
 | LPAREN PLUS i=LINT RPAREN { i }
 | LPAREN MINUS i=LINT RPAREN { Z.neg i }
+
+%inline optional_typ:
+| { None }
+| COLON ty=typ { Some ty }
 
 parameter:
   arg = ID { (None, PatVar arg) }

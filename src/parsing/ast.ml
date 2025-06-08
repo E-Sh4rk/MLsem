@@ -32,8 +32,6 @@ type projection = Pi of int * int | Field of string | Hd | Tl | PiTag of tag
 
 type 'typ lambda_annot = 'typ option
 [@@deriving show, ord]
-type 'typ part_annot = 'typ list option
-[@@deriving show, ord]
 
 type ('a, 'typ, 'tag, 'v) pattern =
 | PatType of 'typ
@@ -57,7 +55,7 @@ and ('a, 'typ, 'ato, 'tag, 'v) ast =
 | LambdaRec of ('v * 'typ option * ('a, 'typ, 'ato, 'tag, 'v) t) list
 | Ite of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ * ('a, 'typ, 'ato, 'tag, 'v) t * ('a, 'typ, 'ato, 'tag, 'v) t
 | App of ('a, 'typ, 'ato, 'tag, 'v) t * ('a, 'typ, 'ato, 'tag, 'v) t
-| Let of 'v * 'typ part_annot * ('a, 'typ, 'ato, 'tag, 'v) t * ('a, 'typ, 'ato, 'tag, 'v) t
+| Let of 'v * ('a, 'typ, 'ato, 'tag, 'v) t * ('a, 'typ, 'ato, 'tag, 'v) t
 | Tuple of ('a, 'typ, 'ato, 'tag, 'v) t list
 | Cons of ('a, 'typ, 'ato, 'tag, 'v) t * ('a, 'typ, 'ato, 'tag, 'v) t
 | Projection of projection * ('a, 'typ, 'ato, 'tag, 'v) t
@@ -132,17 +130,11 @@ let parser_expr_to_expr tenv vtenv name_var_map e =
             then Ite (aux vtenv env e, t, aux vtenv env e1, aux vtenv env e2)
             else raise (SymbolError ("typecases should use test types"))
         | App (e1, e2) -> App (aux vtenv env e1, aux vtenv env e2)
-        | Let (str, a, e1, e2) ->
-            let a, vtenv = match a with
-            | None -> None, vtenv
-            | Some ts ->
-                let (ts, vtenv) = type_exprs_to_typs tenv vtenv ts in
-                Some ts, vtenv
-            in
+        | Let (str, e1, e2) ->
             let var = Variable.create_let (Some str) in
             Variable.attach_location var pos ;
             let env' = StrMap.add str var env in
-            Let (var, a, aux vtenv env e1, aux vtenv env' e2)
+            Let (var, aux vtenv env e1, aux vtenv env' e2)
         | Tuple es ->
             Tuple (List.map (aux vtenv env) es)
         | Cons (e1, e2) ->
