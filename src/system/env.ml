@@ -112,10 +112,20 @@ module Env = Make(struct
   let pp = TyScheme.pp
 end)
 
-module REnv = Make(struct
-  type t = typ
-  let fv = vars
-  let leq = subtype
-  let substitute = Subst.apply
-  let pp = pp_typ
-end)
+module REnv = struct
+  include Make(struct
+    type t = typ
+    let fv = vars
+    let leq = subtype
+    let substitute = Subst.apply
+    let pp = pp_typ
+  end)
+
+  let cap (m1, s1) (m2, s2) =
+    (VarMap.union (fun _ t1 t2 ->
+      Some (cap t1 t2)
+      ) m1 m2,
+    TVarSet.union s1 s2)
+    
+  let conj lst = List.fold_left cap empty lst
+end

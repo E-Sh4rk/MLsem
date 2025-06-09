@@ -92,16 +92,6 @@ let fst3 (a,_,_) = a
 let snd3 (_,b,_) = b
 let trd3 (_,_,c) = c
 
-let pairs s1 s2 =
-  let rec aux s1 s2 =
-    match s1 with
-    | [] -> []
-    | a1::s1 ->
-      let pairs = aux s1 s2 in
-      (List.map (fun a2 -> (a1,a2)) s2) @ pairs
-  in
-  aux s1 s2
-
 let add_others lst =
   let rec aux treated lst =
     match lst with
@@ -170,12 +160,21 @@ let rec perm lst =
   | h::t ->
     List.flatten (List.map (insert h) (perm t))
 
-let carthesian_product l1 l2 =
+let carthesian_prod l1 l2 =
   l1 |> List.map (fun e1 ->
     l2 |> List.map (fun e2 ->
       (e1, e2)
     )
   ) |> List.flatten
+
+let rec carthesian_prod' lst =
+  match lst with
+  | [] -> [[]]
+  | es::lst ->
+    let tls = carthesian_prod' lst in
+    es |> List.map (fun e ->
+      tls |> List.map (fun tl -> e::tl)
+    ) |> List.flatten
 
 let (--) i j =
   let rec aux n acc =

@@ -3,6 +3,8 @@ open Env
 open Types
 open Types.Base
 open Types.Tvar
+open Types.Additions
+open Utils
 
 let rec constr env renv (_,e) =
   match e with
@@ -150,78 +152,84 @@ let rec infer env renv (id,e) =
 let infer env e =
   infer env REnv.empty e |> fst
 
-(* === TODO (wip) === *)
-(*
-let rec is_undesirable s =
-  subtype s arrow_any &&
-  dnf s |> List.for_all
-    (List.exists (fun (a, b) -> non_empty a && is_undesirable b))
+(* =============================================== *)
 
 let rec refine env (_,e) t =
+  let rec is_undesirable_arrow s =
+    subtype s arrow_any &&
+    dnf s |> List.for_all
+      (List.exists (fun (a, b) -> non_empty a && is_undesirable_arrow b))
+  in
+  let is_undesirable mono s =
+    TVarSet.subset (vars s) mono |> not ||
+    is_undesirable_arrow s
+  in
+  let combine rs1 rs2 =
+    carthesian_prod rs1 rs2
+    |> List.map (fun (r1, r2) -> REnv.cap r1 r2)
+  in
   match e with
   | Lambda _ -> []
   | LambdaRec _ -> []
   | Var v -> [REnv.singleton v t]
-  | Abstract s when subtype t s -> [REnv.empty]
+  | TypeCoerce (_, s) when subtype s t -> [REnv.empty]
+  | Abstract s when subtype s t -> [REnv.empty]
   | Const c when subtype (Checker.typeof_const c) t -> [REnv.empty]
   | Atom a when subtype (mk_atom a) t -> [REnv.empty]
-  | Abstract _ | Const _ | Atom _ -> []
+  | Abstract _ | Const _ | Atom _ | TypeCoerce _ -> []
   | Tag (tag, e) -> refine env e (destruct_tag tag t)
-  | Tuple vs ->
-    tuple_dnf (List.length vs) t
+  | Tuple es ->
+    tuple_dnf (List.length es) t
     |> List.filter (fun b -> subtype (tuple_branch_type b) t)
-    |> List.map (
-      fun ts -> Env.construct_dup (List.combine vs ts)
-    )
-  | Cons (v1, v2) ->
+    |> List.map (fun ts ->
+      List.map2 (fun t e -> refine env e t) ts es
+      |> carthesian_prod' |> List.map REnv.conj
+    ) |> List.flatten
+  | Cons (e1, e2) ->
     cons_dnf t
     |> List.filter (fun b -> subtype (cons_branch_type b) t)
-    |> List.map (
-      fun (t1,t2) -> Env.construct_dup [(v1, t1) ; (v2, t2)]
-    )
-  | Projection (p, v) -> [Env.singleton v (domain_of_proj p t)]
-  | RecordUpdate (v, label, None) ->
+    |> List.map (fun (t1,t2) ->
+      combine (refine env e1 t1) (refine env e2 t2)
+    ) |> List.flatten
+  | Projection (p, e) -> refine env e (Checker.domain_of_proj p t)
+  | RecordUpdate (e, label, None) ->
     let t = cap t (record_any_without label) in
     record_dnf t
     |> List.map (fun b -> record_branch_type b)
     |> List.filter (fun ti -> subtype ti t)
-    |> List.map (
-      fun ti -> Env.singleton v (remove_field_info ti label)
-    )
-  | RecordUpdate (v, label, Some x) ->
+    |> List.map (fun ti -> 
+      refine env e (remove_field_info ti label)
+    ) |> List.flatten
+  | RecordUpdate (e, label, Some e') ->
     let t = cap t (record_any_with label) in
     record_dnf t
     |> List.map (fun b -> record_branch_type b)
     |> List.filter (fun ti -> subtype ti t)
-    |> List.map (
-      fun ti ->
-        let field_type = get_field ti label in
-        let ti = remove_field_info ti label in
-        Env.construct_dup [(v, ti) ; (x, field_type)]
+    |> List.map (fun ti ->
+      let field_type = get_field ti label in
+      let ti = remove_field_info ti label in
+      combine (refine env e ti) (refine env e' field_type)
+    ) |> List.flatten
+  | TypeConstr (e, _) -> refine env e t
+  | App ((_, Var v), e) when Env.mem v env ->
+    let alpha = TVar.mk None in
+    let (mono, ty) = Env.find v env |> TyScheme.get_fresh in
+    let mono = TVarSet.union mono (vars t) in
+    begin match dnf ty with
+    | [] -> []
+    | [arrows] ->
+      let t1 = branch_type arrows in
+      let res = tallying mono [ (t1, mk_arrow (TVar.typ alpha) t) ] in
+      res |> List.map (fun sol ->
+        let targ = Subst.find sol alpha |> top_instance mono in
+        if is_undesirable mono targ then [] else refine env e targ
       )
-  | TypeConstr (v, _) -> [Env.singleton v t]
-  | App (v1, v2) ->
-    let alpha = TVar.mk_poly None in
-    Env.find v1 env |> dnf |> List.map (
-      fun arrows ->
-        let t1 = branch_type arrows in
-        let constr = [ (t1, mk_arrow (TVar.typ alpha) t) ] in
-        let res = tallying constr in
-        res |> List.map (fun sol ->
-          let t1 = Subst.apply sol t1 in
-          let t2 = Subst.find sol alpha in
-          let clean_subst = clean_type_subst ~pos:any ~neg:empty t2 in
-          let t1 = Subst.apply clean_subst t1 in
-          let t2 = Subst.apply clean_subst t2 in
-          let pvars = TVarSet.union (vars_poly t1) (vars_poly t2) in
-          let mono = monomorphize pvars in
-          Env.construct_dup [(v1, t1) ; (v2, t2)] |> Env.apply_subst mono
-        )
-    )
-    |> List.flatten
-    |> List.filter (fun env -> Env.bindings env |>
-        List.for_all (fun (_,t) -> not (is_undesirable t)))
-  | Ite (v, s, v1, v2) ->
-    [Env.construct_dup [(v,s);(v1,t)] ; Env.construct_dup [(v,neg s);(v2,t)]]
-  | Let (_, v2) -> [Env.singleton v2 t]
-*)
+      |> List.flatten
+    | _ -> []
+    end
+  | App _ -> []
+  | Ite (e, s, e1, e2) ->
+    let r1 = combine (refine env e s) (refine env e1 t) in
+    let r2 = combine (refine env e (neg s)) (refine env e2 t) in
+    r1@r2
+  | Let (_, _, _, _) -> []
