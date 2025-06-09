@@ -1,7 +1,5 @@
 %{ (* Emacs, use -*- tuareg -*- to open this file. *)
 
-(* TODO: sequence ';' *)
-
   open Ast
   open Types.Additions
   open Types.Base

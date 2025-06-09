@@ -6,20 +6,20 @@ open Types.Tvar
 open Types.Additions
 open Utils
 
+let rec is_undesirable_arrow s =
+  subtype s arrow_any &&
+  dnf s |> List.for_all
+    (List.exists (fun (a, b) -> non_empty a && is_undesirable_arrow b))
+
+let is_undesirable mono s =
+  TVarSet.subset (vars s) mono |> not ||
+  is_undesirable_arrow s
+
+let combine rs1 rs2 =
+  carthesian_prod rs1 rs2
+  |> List.map (fun (r1, r2) -> REnv.cap r1 r2)
+
 let rec refine env (_,e) t =
-  let rec is_undesirable_arrow s =
-    subtype s arrow_any &&
-    dnf s |> List.for_all
-      (List.exists (fun (a, b) -> non_empty a && is_undesirable_arrow b))
-  in
-  let is_undesirable mono s =
-    TVarSet.subset (vars s) mono |> not ||
-    is_undesirable_arrow s
-  in
-  let combine rs1 rs2 =
-    carthesian_prod rs1 rs2
-    |> List.map (fun (r1, r2) -> REnv.cap r1 r2)
-  in
   match e with
   | Lambda _ -> []
   | LambdaRec _ -> []
@@ -100,6 +100,11 @@ let refine_partitions env e =
     let lst = tys@(get_parts v) in
     Hashtbl.replace parts v lst
   in
+  let refine env e t =
+    refine env e (neg t) |> List.iter (fun renv ->
+        REnv.bindings renv |> List.iter (fun (v,ty) -> add_parts v [neg ty])
+      ) ;
+  in
   let rec aux_lambda env (d,v,e) =
     let t = TyScheme.mk_mono d in
     d,v,aux (Env.add v t env) e
@@ -116,11 +121,7 @@ let refine_partitions env e =
     | LambdaRec lst ->
       LambdaRec (lst |> List.map (aux_lambda env))
     | Ite (e, tau, e1, e2) ->
-      let renvs1 = refine env e (neg tau) in
-      let renvs2 = refine env e tau in
-      renvs1@renvs2 |> List.iter (fun renv ->
-        REnv.bindings renv |> List.iter (fun (v,ty) -> add_parts v [neg ty])
-      ) ;
+      refine env e tau ; refine env e (neg tau) ;
       Ite (aux env e, tau, aux env e1, aux env e2)
     | App (e1, e2) -> App (aux env e1, aux env e2)
     | Tuple es -> Tuple (List.map (aux env) es)
@@ -131,6 +132,7 @@ let refine_partitions env e =
     | Let (tys, v, e1, e2) ->
       let e1, e2 = aux env e1, aux (Env.add v (typeof env e1) env) e2 in
       let tys = (get_parts v)@tys |> partition in
+      tys |> List.iter (refine env e1) ;
       Let (tys, v, e1, e2)
     | TypeConstr (e, tys) -> TypeConstr (aux env e, tys)
     | TypeCoerce (e, tys) -> TypeCoerce (aux env e, tys)

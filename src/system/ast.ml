@@ -172,7 +172,6 @@ let rec def_of_var_pat pat v e =
   | PatAssign _ -> assert false
   | PatType _ -> assert false
 
-(* TODO : this encoding will not partition correctly... (cf. "match_pair" example) *)
 let encode_pattern_matching id e pats =
   let x = Variable.create_let None in
   let ex : Ast.expr = (Ast.unique_exprid (), Var x) in

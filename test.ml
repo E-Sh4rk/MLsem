@@ -20,12 +20,12 @@ val test_sig : 'a -> 'b -> ('a|bool,'b|int)
 let test_sig x y = (x,y)
 
 val filter_sig : ('a->any) & ('b -> ~true) -> [('a|'b)*] -> [('a\'b)*]
-let filter_sig (f : ('a->any) & ('b -> ~true)) l =
+let filter_sig f l =
   match l with
   | [] -> []
   | e::l ->
     if f e is true
-    then (suggest e is ~'b in e::(filter_sig f l))
+    then e::(filter_sig f l)
     else filter_sig f l
   end
 
@@ -182,10 +182,12 @@ let land = fun a -> fun b ->
   if a is true then if b is false then false else true else false
 
 let tautology = fun x -> fun y ->
-  if land (lor x (lnot x)) (lor (lnot y) y) then true else false
+  land (lor x (lnot x)) (lor (lnot y) y)
 
 let tautology_ann = fun (x:any) -> fun (y:any) ->
-  if land (lor x (lnot x)) (lor (lnot y) y) then true else false
+  suggest x is true or ~true in
+  suggest y is true or ~true in
+  land (lor x (lnot x)) (lor (lnot y) y)
 
 let test_many_params_ann1 (a:any) (b:any) (c:any) (d:any) (e:any) (f:any) =
   if (a,b,c,d,e,f) is (int,bool,int,bool,int,bool) then (a,b,c,d,e,f) else false
