@@ -2,6 +2,7 @@ open Parsing
 open Variable
 open Types.Base
 open Types.Tvar
+open Env
 
 type e =
 | Abstract of typ
@@ -199,21 +200,14 @@ let encode_pattern_matching id e pats =
   (id, Ast.Let (x, def, body))
 
 let from_parser_ast t =
-  let parts = Hashtbl.create 100 in
-  let get_parts v =
-    match Hashtbl.find_opt parts v with Some lst -> lst | None -> []
-  in
-  let add_parts v tys =
-    let lst = tys@(get_parts v) in
-    Hashtbl.replace parts v lst
-  in
+  let parts = PartitionTbl.create () in
   let let_binding x e1 e2 =
-    Let (get_parts x |> Types.Additions.partition, x, e1, e2)
+    Let (PartitionTbl.get_parts parts x, x, e1, e2)
   in
   let add_let x e =
     let x' = Variable.create_let (Variable.get_name x) in
     Variable.get_locations x |> List.iter (Variable.attach_location x') ;
-    add_parts x' (get_parts x) ;
+    PartitionTbl.add_parts parts x' (PartitionTbl.get_parts parts x) ;
     Ast.unique_exprid (),
     let_binding x' (Ast.unique_exprid (), Var x) (substitute x x' e)
   in
@@ -229,7 +223,8 @@ let from_parser_ast t =
     | Ast.Var v -> Var v
     | Ast.Atom a -> Atom a
     | Ast.Tag (t, e) -> Tag (t, aux e)
-    | Ast.Suggest (v, tys, e) -> add_parts v tys ; aux_e e
+    | Ast.Suggest (v, tys, e) ->
+      PartitionTbl.add_parts parts v tys ; aux_e e
     | Ast.Lambda (x, a, e) ->
       let e = aux e |> add_let x in
       Lambda (lambda_annot x a, x, e)

@@ -46,3 +46,10 @@ module REnv : sig
   val cap : t -> t -> t
   val conj : t list -> t
 end
+
+module PartitionTbl : sig
+  type t
+  val create : unit -> t
+  val add_parts : t -> Variable.t -> typ list -> unit
+  val get_parts : t -> Variable.t -> typ list
+end

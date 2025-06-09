@@ -262,6 +262,9 @@ let partition ts =
       s::(aux (diff t s))
   in
   aux any
+let refine_partition tys ty =
+    tys |> List.map (fun ty' -> [cap ty' ty ; diff ty' ty])
+    |> List.flatten |> List.filter non_empty
 
 let is_test_type t =
     let exception NotTestType in

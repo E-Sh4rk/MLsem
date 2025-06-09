@@ -92,17 +92,11 @@ let typeof env (_,e) =
   | _ -> TyScheme.mk_mono any
 
 let refine_partitions env e =
-  let parts = Hashtbl.create 100 in
-  let get_parts v =
-    match Hashtbl.find_opt parts v with Some lst -> lst | None -> []
-  in
-  let add_parts v tys =
-    let lst = tys@(get_parts v) in
-    Hashtbl.replace parts v lst
-  in
+  let parts = PartitionTbl.create () in
   let refine env e t =
     refine env e (neg t) |> List.iter (fun renv ->
-        REnv.bindings renv |> List.iter (fun (v,ty) -> add_parts v [neg ty])
+        REnv.bindings renv |>
+          List.iter (fun (v,ty) -> PartitionTbl.add_parts parts v [neg ty])
       ) ;
   in
   let rec aux_lambda env (d,v,e) =
@@ -130,8 +124,9 @@ let refine_partitions env e =
     | RecordUpdate (e, lbl, None) -> RecordUpdate (aux env e, lbl, None)
     | RecordUpdate (e, lbl, Some e') -> RecordUpdate (aux env e, lbl, Some (aux env e'))
     | Let (tys, v, e1, e2) ->
+      PartitionTbl.add_parts parts v tys ;
       let e1, e2 = aux env e1, aux (Env.add v (typeof env e1) env) e2 in
-      let tys = (get_parts v)@tys |> partition in
+      let tys = PartitionTbl.get_parts parts v in
       tys |> List.iter (refine env e1) ;
       Let (tys, v, e1, e2)
     | TypeConstr (e, tys) -> TypeConstr (aux env e, tys)

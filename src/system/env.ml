@@ -129,3 +129,17 @@ module REnv = struct
     
   let conj lst = List.fold_left cap empty lst
 end
+
+module PartitionTbl = struct
+  type t = (Variable.t, typ list) Hashtbl.t
+
+  let create () = Hashtbl.create 100
+
+  let get_parts t v =
+    match Hashtbl.find_opt t v with Some lst -> lst | None -> [any]
+  
+  let add_parts t v tys =
+    let parts = get_parts t v in
+    let parts = List.fold_left Types.Additions.refine_partition parts tys in
+    Hashtbl.replace t v parts
+end

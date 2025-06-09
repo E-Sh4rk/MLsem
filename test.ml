@@ -225,6 +225,8 @@ let length_stub length lst =
 
 let length = fixpoint length_stub
 
+(* TODO: inference time for map_stub and length_stub seems to depend on
+partitions order... investigate *)
 let map_stub map f lst =
   if lst is [] then []
   else (f (hd lst))::(map f (tl lst))
