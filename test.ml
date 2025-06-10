@@ -94,24 +94,23 @@ let test_ref = ref 42
 let test_ref2 = ref 42
 let mutate_ref x =
   let y = ref x in
-  let () = set y 42 in
+  set y 42 ;
   get y
 
 let is_ref x = if x is ref then true else false
 let is_not_ref x = if x is ~ref then true else false
-(* let incalid_typecase x = if x is ref(int) then true else false *)
+(* let invalid_typecase x = if x is ref(int) then true else false *)
 
-abstract type map(-'k, +'v)
-val mk_map : () -> map('a, 'b)
-val add_map : map('a, 'b) -> 'a -> 'b -> map('a, 'b)
-val get_map : map('a, 'b) -> 'a -> 'b
+abstract type dict('k, 'v)
+val mk_dict : () -> dict('a, 'b)
+val add_dict : dict('a, 'b) -> 'a -> 'b -> ()
+val get_dict : dict('a, 'b) -> 'a -> 'b
 
-let test_map x =
-  let map = mk_map () in
-  let map = add_map map x 42 in
-  let map = add_map map "key" 0 in
-  (map, get_map map false)
-
+let test_dict x =
+  let d = mk_dict () in
+  add_dict d x 42 ;
+  add_dict d "key" 0 ;
+  d, get_dict d false
 
 abstract type arr('a)
 val set_arr : arr('a) -> int -> 'a -> ()
