@@ -195,15 +195,14 @@ let test_many_params_ann1 (a:any) (b:any) (c:any) (d:any) (e:any) (f:any) =
 let test_many_params_ann2 (a:'a) (b:'b) (c:'c) (d:'d) (e:'e) (f:'f) =
   if (a,b,c,d,e,f) is (int,bool,int,bool,int,bool) then (a,b,c,d,e,f) else false
 
+let test_many_params a b c d e f =
+  if (a,b,c,d,e,f) is (int,bool,int,bool,int,bool) then (a,b,c,d,e,f) else false
+
 let match_pair (x:any) (y:any) =
   match (x,y) with
   | :(int, bool) -> (x + 1, lnot y)
   | _ -> false
   end
-
-(* TODO: investigate why it is long *)
-(* let test_many_params a b c d e f =
-  if (a,b,c,d,e,f) is (int,bool,int,bool,int,bool) then (a,b,c,d,e,f) else false *)
 
 (* ============== RECURSIVE ============= *)
 

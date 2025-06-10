@@ -57,6 +57,23 @@ let tallying_with_result env res cs =
   |> tsort leq_sol
   (* |> List.map (fun (s,r) -> Format.printf "%a@.%a@." Subst.pp s pp_typ r ; s,r) *)
 
+let reduce_parts tvs s parts =
+  let open IAnnot in
+  let parts = parts |> List.filter (fun (t,_) -> disjoint s t |> not) in
+  let mono, s = TyScheme.mk tvs s |> TyScheme.get_fresh in
+  let mono = TVarSet.filter TVar.from_user mono in
+  (* The first time, we merge parts that will already be discriminated by future tallying instances *)
+  let rec aux parts =
+    match parts with
+    | (a,Infer)::(b,Infer)::parts ->
+      let mono = TVarSet.union mono (vars a) in
+      if test_tallying mono [ (s,a) ; (a,s) ]
+      then aux ((cup a b, Infer)::parts)
+      else (a,Infer)::(aux ((b,Infer)::parts))
+    | parts -> parts
+  in
+  aux parts
+
 (* Reconstruction algorithm *)
 
 type ('a,'b) result =
@@ -229,7 +246,7 @@ let rec infer cache env annot (id, e) =
     | Subst (ss,a,a',r) -> Subst (ss,ALet (a,parts),ALet (a',parts),r)
     | Ok (annot1, s) ->
       let tvs, s = Checker.generalize ~e:e1 env s |> TyScheme.get in
-      let parts = parts |> List.filter (fun (t,_) -> disjoint s t |> not) in
+      let parts = reduce_parts tvs s parts in
       begin match infer_part_seq' cache env e2 v (tvs,s) parts with
       | OneFail -> Fail
       | OneSubst (ss,p,p',r) -> Subst (ss,ALet(A annot1,p),ALet(A annot1,p'),r)
