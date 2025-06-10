@@ -76,7 +76,7 @@ let cov3 = <cov(A|B) & cov(B|C) & ~cov(empty)>
 
 let inv = <inv(A) & inv(B) & inv(A|B)>
 
-#value_restriction = true
+(* #value_restriction = true *)
 
 abstract type ref('a)
 let ref = <'a -> ref('a)>
@@ -126,7 +126,7 @@ let test_arr x =
   let () = push_arr arr false in
   filter_arr (fun x -> if x is int then true else false) arr
 
-#value_restriction = false
+(* #value_restriction = false *)
 
 (* ========= TAGGED VALUES ======== *)
 
@@ -230,7 +230,7 @@ let map_stub map f lst =
   if lst is [] then []
   else (f (hd lst))::(map f (tl lst))
 
-let map = fixpoint map_stub
+let map x = fixpoint map_stub x
 
 (* let filter_noannot f l =
   match l with
