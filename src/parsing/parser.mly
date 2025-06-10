@@ -73,7 +73,7 @@
 
 %token EOF
 %token FUN VAL LET IN FST SND HD TL HASHTAG SUGGEST
-%token IF IS THEN ELSE WHILE DO
+%token IF IS THEN ELSE WHILE DO BEGIN
 %token LPAREN RPAREN EQUAL COMMA CONS COLON COLON_OPT COERCE INTERROGATION_MARK EXCLAMATION_MARK
 %token ARROW AND OR NEG DIFF
 %token TIMES PLUS MINUS DIV
@@ -137,39 +137,43 @@ variance:
 | IS t=typ { t }
 
 term:
-  t=simple_terms { t }
-| FUN ais=parameter+ ARROW t = term { abstraction $startpos $endpos ais t }
-| LET id=generalized_identifier ais=parameter* EQUAL td=term IN t=term
+  t=simple_term { t }
+| FUN ais=parameter+ ARROW t = terms { abstraction $startpos $endpos ais t }
+| LET id=generalized_identifier ais=parameter* EQUAL td=term IN t=terms
   {
     let td = abstraction $startpos $endpos ais td in
     annot $startpos $endpos (Let (id, td, t))
   }
-| LET p=ppattern EQUAL td=term IN t=term { let_pattern $startpos $endpos p td t }
-| SUGGEST id=generalized_identifier IS tys=separated_nonempty_list(OR_KW, typ) IN t=term
+| LET p=ppattern EQUAL td=term IN t=terms { let_pattern $startpos $endpos p td t }
+| SUGGEST id=generalized_identifier IS tys=separated_nonempty_list(OR_KW, typ) IN t=terms
 { annot $startpos $endpos (Suggest (id, tys, t)) }
 | IF t=term ott=optional_test_type THEN t1=term ELSE t2=term { annot $startpos $endpos (Ite (t,ott,t1,t2)) }
+
+terms:
+  a=term { a }
+| t1=simple_term SEMICOLON t2=terms { annot $startpos $endpos (Seq (t1,t2)) }
+
+simple_term: (* Cannot end with a semi-colon *)
+  a=simple_term2 { a }
 | IF t=term ott=optional_test_type DO t1=term END { annot $startpos $endpos (Cond (t,ott,t1,None)) }
 | IF t=term ott=optional_test_type DO t1=term ELSE t2=term END { annot $startpos $endpos (Cond (t,ott,t1,Some t2)) }
 | WHILE t=term ott=optional_test_type DO t1=term END { annot $startpos $endpos (While (t,ott,t1)) }
 | MATCH t=term WITH pats=patterns END { annot $startpos $endpos (PatMatch (t,pats)) }
-| hd=simple_terms COMMA tl=separated_nonempty_list(COMMA, simple_terms) { annot $startpos $endpos (Tuple (hd::tl)) }
+| hd=simple_term2 COMMA tl=separated_nonempty_list(COMMA, simple_term2) { annot $startpos $endpos (Tuple (hd::tl)) }
 
-simple_terms:
-| ts=separated_nonempty_list(SEMICOLON, simple_term) { annot $startpos $endpos (Seq ts) }
+simple_term2:
+  a=simple_term3 { a }
+| lhs=simple_term3 CONS rhs=simple_term2 { annot $startpos $endpos (Cons (lhs, rhs)) }
 
-simple_term:
-  a=simple_term_nocons { a }
-| lhs=simple_term_nocons CONS rhs=simple_term { annot $startpos $endpos (Cons (lhs, rhs)) }
-
-simple_term_nocons:
-  a=simple_term_nocons_noapp { a }
-| a=simple_term_nocons b=simple_term_nocons_noapp { annot $startpos $endpos (App (a, b)) }
-| p=proj a=simple_term_nocons_noapp { annot $startpos $endpos (Projection (p, a)) }
-| a=simple_term_nocons_noapp s=infix_term b=simple_term_nocons_noapp { double_app $startpos $endpos s a b }
-| p=prefix_term a=simple_term_nocons_noapp { annot $startpos $endpos (App (p, a)) }
+simple_term3:
+  a=simple_term4 { a }
+| a=simple_term3 b=simple_term4 { annot $startpos $endpos (App (a, b)) }
+| p=proj a=simple_term4 { annot $startpos $endpos (Projection (p, a)) }
+| a=simple_term4 s=infix_term b=simple_term4 { double_app $startpos $endpos s a b }
+| p=prefix_term a=simple_term4 { annot $startpos $endpos (App (p, a)) }
 | LT t=typ GT { annot $startpos $endpos (Abstract t) }
 
-simple_term_nocons_noapp:
+simple_term4:
   a=atomic_term { a }
 | a=atomic_term POINT id=ID { annot $startpos $endpos (Projection (Field id, a)) }
 | a=atomic_term DIFF id=ID { annot $startpos $endpos (RecordUpdate (a,id,None)) }
@@ -190,12 +194,13 @@ atomic_term:
 | t=PCID RPAREN { annot $startpos $endpos (Tag (t,annot $startpos $endpos (Const Unit))) }
 | l=literal { annot $startpos $endpos (Const l) }
 | LPAREN RPAREN { annot $startpos $endpos (Const Unit) }
-| LPAREN t=term RPAREN { t }
+| LPAREN t=terms RPAREN { t }
+| BEGIN t=terms END { t }
 | LPAREN t=term COLON ty=typ RPAREN { annot $startpos $endpos (TypeConstr (t,ty)) }
 | LPAREN t=term COERCE ty=typ RPAREN { annot $startpos $endpos (TypeCoerce (t,ty)) }
 | LBRACE obr=optional_base_record fs=separated_list(SEMICOLON, field_term) RBRACE
 { record_update $startpos $endpos obr fs }
-| LBRACKET lst=separated_list(SEMICOLON, simple_term) RBRACKET
+| LBRACKET lst=separated_list(SEMICOLON, simple_term2) RBRACKET
 { list_of_elts $startpos $endpos lst }
 
 %inline optional_base_record:
@@ -203,7 +208,7 @@ atomic_term:
 | a=atomic_term WITH { a }
 
 %inline field_term:
-  id=ID EQUAL t=simple_term { (id, t) }
+  id=ID EQUAL t=simple_term2 { (id, t) }
 
 literal:
   f=lfloat { Float f }

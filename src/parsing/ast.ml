@@ -66,7 +66,7 @@ and ('a, 'typ, 'ato, 'tag, 'v) ast =
 | PatMatch of ('a, 'typ, 'ato, 'tag, 'v) t * (('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'ato, 'tag, 'v) t) list
 | Cond of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ * ('a, 'typ, 'ato, 'tag, 'v) t * ('a, 'typ, 'ato, 'tag, 'v) t option
 | While of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ * ('a, 'typ, 'ato, 'tag, 'v) t
-| Seq of ('a, 'typ, 'ato, 'tag, 'v) t list
+| Seq of ('a, 'typ, 'ato, 'tag, 'v) t * ('a, 'typ, 'ato, 'tag, 'v) t
 [@@deriving ord]
 
 and ('a, 'typ, 'ato, 'tag, 'v) t = 'a * ('a, 'typ, 'ato, 'tag, 'v) ast
@@ -172,7 +172,7 @@ let parser_expr_to_expr tenv vtenv name_var_map e =
         | While (e, t, e') ->
             let (t, vtenv) = aux_cond tenv vtenv t in
             While (aux vtenv env e, t, aux vtenv env e')
-        | Seq  es -> Seq (List.map (aux vtenv env) es)
+        | Seq (e1, e2) -> Seq (aux vtenv env e1, aux vtenv env e2)
         in
         (exprid,e)
     and aux_pat pos vtenv env (pat, e) =

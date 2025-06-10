@@ -55,6 +55,12 @@ let call_f (o:objF('a)) =
 
 (* ========= ABSTRACT TYPES ======== *)
 
+val (<) : int -> int -> bool
+val (<=) : int -> int -> bool
+val (>) : int -> int -> bool
+val (>=) : int -> int -> bool
+
+
 abstract type cav(-'a)
 abstract type cov(+'a)
 abstract type inv('a)
@@ -79,9 +85,9 @@ let inv = <inv(A) & inv(B) & inv(A|B)>
 (* #value_restriction = true *)
 
 abstract type ref('a)
-let ref = <'a -> ref('a)>
-let set = <ref('a) -> 'a -> ()>
-let get = <ref('a) -> 'a>
+val ref : 'a -> ref('a)
+val set : ref('a) -> 'a -> ()
+val get : ref('a) -> 'a
 
 val test_ref : ref(int)
 let test_ref = ref 42
@@ -96,9 +102,9 @@ let is_not_ref x = if x is ~ref then true else false
 (* let incalid_typecase x = if x is ref(int) then true else false *)
 
 abstract type map(-'k, +'v)
-let mk_map = <() -> map('a, 'b)>
-let add_map = <map('a, 'b) -> 'a -> 'b -> map('a, 'b)>
-let get_map = <map('a, 'b) -> 'a -> 'b>
+val mk_map : () -> map('a, 'b)
+val add_map : map('a, 'b) -> 'a -> 'b -> map('a, 'b)
+val get_map : map('a, 'b) -> 'a -> 'b
 
 let test_map x =
   let map = mk_map () in
@@ -108,22 +114,28 @@ let test_map x =
 
 
 abstract type arr('a)
-let set_arr = <arr('a) -> int -> 'a -> ()>
-let get_arr = <arr('a) -> int -> 'a>
-let mk_arr = <() -> arr('a)>
-let push_arr = <arr('a) -> 'a -> ()>
+val set_arr : arr('a) -> int -> 'a -> ()
+val get_arr : arr('a) -> int -> 'a
+val mk_arr : () -> arr('a)
+val push_arr : arr('a) -> 'a -> ()
+val len_arr : arr('a) -> int
+
 let filter_arr (f:('a -> any) & ('b -> ~true)) (arr:arr('a|'b)) =
   let res = mk_arr () in
-  let e = get_arr arr 0 in
-  let () = if f e then push_arr res e else () in
+  let i = ref 0 in
+  while (get i) < (len_arr arr) do
+    let e = get_arr arr (get i) in
+    set i ((get i) + 1) ;
+    if f e do push_arr res e end
+  end ;
   res
 
 (* val test_arr : 'a -> arr('a | 'b) *)
 let test_arr x =
   let arr = mk_arr () in
-  let () = push_arr arr true in
-  let () = push_arr arr x in
-  let () = push_arr arr false in
+  push_arr arr true ;
+  push_arr arr x ;
+  push_arr arr false ;
   filter_arr (fun x -> if x is int then true else false) arr
 
 (* #value_restriction = false *)
@@ -147,7 +159,7 @@ let map_clist f (lst:clist('a)) =
 (* ================================= *)
 
 let test a = (fst a, fst a)
-let succ = <int->int>
+val succ : int -> int
 
 let aliasing (x : any -> any) = 
   let y = x in if x y is int then (y x) + 1 else 42
@@ -252,9 +264,7 @@ let filter (f: ('a->any) & ('b -> ~true)) (l:[('a|'b)*]) =
 
 (* ===== BAL ===== *)
 
-let (>=) = <int -> int -> bool>
-let (>) = <int -> int -> bool>
-let invalid_arg = <string -> empty>
+val invalid_arg : string -> empty
 
 type t('a) =
   Nil | (t('a), Key, 'a, t('a), int)
