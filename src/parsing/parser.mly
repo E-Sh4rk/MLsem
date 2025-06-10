@@ -200,7 +200,7 @@ atomic_term:
 | LPAREN t=term COERCE ty=typ RPAREN { annot $startpos $endpos (TypeCoerce (t,ty)) }
 | LBRACE obr=optional_base_record fs=separated_list(SEMICOLON, field_term) RBRACE
 { record_update $startpos $endpos obr fs }
-| LBRACKET lst=separated_list(SEMICOLON, simple_term2) RBRACKET
+| LBRACKET lst=separated_list(SEMICOLON, simple_term) RBRACKET
 { list_of_elts $startpos $endpos lst }
 
 %inline optional_base_record:
@@ -208,7 +208,7 @@ atomic_term:
 | a=atomic_term WITH { a }
 
 %inline field_term:
-  id=ID EQUAL t=simple_term2 { (id, t) }
+  id=ID EQUAL t=simple_term { (id, t) }
 
 literal:
   f=lfloat { Float f }
