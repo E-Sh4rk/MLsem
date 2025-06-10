@@ -372,8 +372,8 @@ and infer_cf_b' cache env bannot e s tau =
   | IAnnot.BSkip -> Ok (Annot.BSkip, empty)
   | IAnnot.BType annot ->
     begin match infer' cache env annot e with
-    | Ok (a, ty) when subtype ty unit_typ -> Ok (Annot.BType a, ty)
-    | Ok _ -> Fail
+    | Ok (a, ty) (* when subtype ty unit_typ *) -> Ok (Annot.BType a, ty)
+    (* | Ok _ -> Fail *)
     | Subst (ss,a1,a2,r) -> Subst (ss,IAnnot.BType a1,IAnnot.BType a2,r)
     | Fail -> Fail
     end

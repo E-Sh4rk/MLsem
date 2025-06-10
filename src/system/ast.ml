@@ -251,6 +251,7 @@ let from_parser_ast t =
     | Ast.Cond (e,t,e1,Some e2) -> ControlFlow (CfCond, aux e, t, aux e1, aux e2)
     | Ast.While (e,t,e1) ->
       ControlFlow (CfWhile, aux e, t, aux e1, (Ast.unique_exprid (), Const Unit))
+    | Ast.Seq (e1, e2) -> Let ([any], Variable.create_let None, aux e1, aux e2)
   and aux t =
     let e = aux_e t in
     let (id, _) = t in
