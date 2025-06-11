@@ -72,12 +72,15 @@ module Make(T:T) = struct
     let vs = VarSet.of_list vs in
     t |> filter (fun v _ -> VarSet.mem v vs)
 
-  let leq (m1,_) (m2,_) =
+  let leq (m1,_ as t1) (m2,_ as t2) =
+    VarSet.subset (domain t2 |> VarSet.of_list) (domain t1 |> VarSet.of_list) &&
     VarMap.for_all (fun v t ->
       VarMap.mem v m1 && T.leq (VarMap.find v m1) t
     ) m2
 
-  let equiv env1 env2 = leq env1 env2 && leq env2 env1
+  let equiv env1 env2 =
+    VarSet.equal (domain env1 |> VarSet.of_list) (domain env2 |> VarSet.of_list) &&
+    leq env1 env2 && leq env2 env1
 
   let substitute s t =
     bindings t
@@ -142,4 +145,18 @@ module PartitionTbl = struct
     let parts = get_parts t v in
     let parts = List.fold_left Types.Additions.refine_partition parts tys in
     Hashtbl.replace t v parts
+end
+
+module REnvSet = struct
+  type t = REnv.t list
+
+  let empty = []
+  let add t renv =
+    if List.exists (REnv.equiv renv) t then t else renv::t
+  let filter t v ty =
+    t |> List.filter (fun renv ->
+      (REnv.mem v renv |> not) ||
+      (disjoint (REnv.find v renv) ty |> not)
+    )
+  let elements t = t
 end

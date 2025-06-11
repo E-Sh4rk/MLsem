@@ -53,3 +53,11 @@ module PartitionTbl : sig
   val add_parts : t -> Variable.t -> typ list -> unit
   val get_parts : t -> Variable.t -> typ list
 end
+
+module REnvSet : sig
+  type t
+  val empty : t
+  val add : t -> REnv.t -> t
+  val filter : t -> Variable.t -> typ -> t
+  val elements : t -> REnv.t list
+end
