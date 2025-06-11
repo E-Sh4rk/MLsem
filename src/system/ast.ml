@@ -2,7 +2,6 @@ open Parsing
 open Variable
 open Types.Base
 open Types.Tvar
-open Env
 
 type cf = CfWhile | CfCond
 [@@deriving show]
@@ -205,14 +204,20 @@ let encode_pattern_matching id e pats =
   (id, Ast.Let (x, def, body))
 
 let from_parser_ast t =
-  let parts = PartitionTbl.create () in
+  let sugg = Hashtbl.create 100 in
+  let get_sugg v =
+    match Hashtbl.find_opt sugg v with Some lst -> lst | None -> []
+  in
+  let add_suggs v tys =
+    Hashtbl.replace sugg v (tys@(get_sugg v))
+  in
   let let_binding x e1 e2 =
-    Let (PartitionTbl.get_parts parts x, x, e1, e2)
+    Let (get_sugg x, x, e1, e2)
   in
   let add_let x e =
     let x' = Variable.create_let (Variable.get_name x) in
     Variable.get_locations x |> List.iter (Variable.attach_location x') ;
-    PartitionTbl.add_parts parts x' (PartitionTbl.get_parts parts x) ;
+    add_suggs x' (get_sugg x) ;
     Ast.unique_exprid (),
     let_binding x' (Ast.unique_exprid (), Var x) (substitute x x' e)
   in
@@ -229,7 +234,7 @@ let from_parser_ast t =
     | Ast.Atom a -> Atom a
     | Ast.Tag (t, e) -> Tag (t, aux e)
     | Ast.Suggest (v, tys, e) ->
-      PartitionTbl.add_parts parts v tys ; aux_e e
+      add_suggs v tys ; aux_e e
     | Ast.Lambda (x, a, e) ->
       let e = aux e |> add_let x in
       Lambda (lambda_annot x a, x, e)
@@ -251,7 +256,7 @@ let from_parser_ast t =
     | Ast.Cond (e,t,e1,Some e2) -> ControlFlow (CfCond, aux e, t, aux e1, aux e2)
     | Ast.While (e,t,e1) ->
       ControlFlow (CfWhile, aux e, t, aux e1, (Ast.unique_exprid (), Const Unit))
-    | Ast.Seq (e1, e2) -> Let ([any], Variable.create_let None, aux e1, aux e2)
+    | Ast.Seq (e1, e2) -> Let ([], Variable.create_let None, aux e1, aux e2)
   and aux t =
     let e = aux_e t in
     (fst t,e)

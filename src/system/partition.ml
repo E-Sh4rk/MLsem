@@ -87,55 +87,48 @@ let rec refine env (_,e) t =
     r1@r2
   | Let (_, _, _, _) -> []
 
+let refine env e t =
+  refine env e (neg t) |> List.filter_map REnv.neg_approx
+  |> REnv.conj
+
 let typeof env (_,e) =
   match e with
   | Var v when Env.mem v env -> Env.find v env
   | _ -> TyScheme.mk_mono any
 
-let refine_partitions env e =
-  let parts = PartitionTbl.create () in
-  let refine env e t =
-    refine env e (neg t) |> List.iter (fun renv ->
-        REnv.bindings renv |>
-          List.iter (fun (v,ty) -> PartitionTbl.add_parts parts v [neg ty])
-      ) ;
+let refinement_envs env e =
+  let res = ref REnvSet.empty in
+  let add_refinement env e t =
+    res := REnvSet.add !res (refine env e t)
   in
   let rec aux_lambda env (d,v,e) =
     let t = TyScheme.mk_mono d in
-    d,v,aux (Env.add v t env) e
-  and aux env (id,e) =
-    let e = match e with
-    | Abstract t -> Abstract t
-    | Const c -> Const c
-    | Var v -> Var v
-    | Atom a -> Atom a
-    | Tag (tag, e) -> Tag (tag, aux env e)
-    | Lambda (d, v, e) ->
-      let d,v,e = aux_lambda env (d,v,e) in
-      Lambda (d,v,e)
-    | LambdaRec lst ->
-      LambdaRec (lst |> List.map (aux_lambda env))
-    | Ite (e, tau, e1, e2) ->
-      refine env e tau ; refine env e (neg tau) ;
-      Ite (aux env e, tau, aux env e1, aux env e2)
-    | ControlFlow (cf, e, tau, e1, e2) ->
-      refine env e tau ; refine env e (neg tau) ;
-      ControlFlow (cf, aux env e, tau, aux env e1, aux env e2)
-    | App (e1, e2) -> App (aux env e1, aux env e2)
-    | Tuple es -> Tuple (List.map (aux env) es)
-    | Cons (e1, e2) -> Cons (aux env e1, aux env e2)
-    | Projection (p, e) -> Projection (p, aux env e)
-    | RecordUpdate (e, lbl, None) -> RecordUpdate (aux env e, lbl, None)
-    | RecordUpdate (e, lbl, Some e') -> RecordUpdate (aux env e, lbl, Some (aux env e'))
-    | Let (tys, v, e1, e2) ->
-      PartitionTbl.add_parts parts v tys ;
-      let e1, e2 = aux env e1, aux (Env.add v (typeof env e1) env) e2 in
-      let tys = PartitionTbl.get_parts parts v in
-      tys |> List.iter (refine env e1) ;
-      Let (tys, v, e1, e2)
-    | TypeConstr (e, tys) -> TypeConstr (aux env e, tys)
-    | TypeCoerce (e, tys) -> TypeCoerce (aux env e, tys)
-    in
-    (id, e)
+    aux (Env.add v t env) e
+  and aux env (_,e) : unit =
+    match e with
+    | Abstract _ | Const _ | Var _ | Atom _ -> ()
+    | Tag (_, e) | Projection (_, e) | RecordUpdate (e, _, None)
+    | TypeConstr (e, _) | TypeCoerce (e, _) ->
+      aux env e
+    | Lambda (d, v, e) -> aux_lambda env (d,v,e)
+    | LambdaRec lst -> lst |> List.iter (aux_lambda env)
+    | Ite (e, tau, e1, e2) | ControlFlow (_, e, tau, e1, e2) ->
+      add_refinement env e tau ; add_refinement env e (neg tau) ;
+      aux env e1 ; aux env e2
+    | App (e1, e2) | Cons (e1, e2) | RecordUpdate (e1, _, Some e2) ->
+      aux env e1 ; aux env e2
+    | Tuple es -> es |> List.iter (aux env)
+    | Let (_, v, e1, e2) ->
+      aux env e1 ; aux (Env.add v (typeof env e1) env) e2 ;
+      let res' =
+        REnvSet.elements !res |> List.map (fun renv ->
+          if REnv.mem v renv
+          then
+            let renv' = refine env e1 (REnv.find v renv) in
+            REnv.cap renv renv'
+          else renv
+        ) |> REnvSet.of_list
+      in
+      res := res'
   in
-  aux env e
+  aux env e ; !res

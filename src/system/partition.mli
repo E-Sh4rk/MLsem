@@ -1,3 +1,3 @@
 open Env
 
-val refine_partitions : Env.t -> Ast.t -> Ast.t
+val refinement_envs : Env.t -> Ast.t -> REnvSet.t

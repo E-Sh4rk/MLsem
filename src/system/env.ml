@@ -131,20 +131,27 @@ module REnv = struct
     TVarSet.union s1 s2)
     
   let conj lst = List.fold_left cap empty lst
-end
 
-module PartitionTbl = struct
-  type t = (Variable.t, typ list) Hashtbl.t
+  let neg t =
+    bindings t |> List.filter_map (fun (v,ty) ->
+      let nty = neg ty in
+      if Base.is_empty nty then None else Some (singleton v nty)
+    )
 
-  let create () = Hashtbl.create 100
+  let cup_approx (m1, s1) (m2, s2) =
+    (VarMap.merge (fun _ t1 t2 -> match t1, t2 with
+      | None, None -> None
+      | Some _, None | None, Some _ -> None
+      | Some t1, Some t2 -> Some (cup t1 t2)
+    ) m1 m2,
+    TVarSet.union s1 s2)
 
-  let get_parts t v =
-    match Hashtbl.find_opt t v with Some lst -> lst | None -> [any]
-  
-  let add_parts t v tys =
-    let parts = get_parts t v in
-    let parts = List.fold_left Types.Additions.refine_partition parts tys in
-    Hashtbl.replace t v parts
+  let disj_approx lst =
+    match lst with
+    | [] -> raise (Invalid_argument "Argument cannot be the empty list.")
+    | hd::tl -> List.fold_left cup_approx hd tl
+
+  let neg_approx t = try Some (neg t |> disj_approx) with Invalid_argument _ -> None
 end
 
 module REnvSet = struct
@@ -153,10 +160,15 @@ module REnvSet = struct
   let empty = []
   let add t renv =
     if List.exists (REnv.equiv renv) t then t else renv::t
-  let filter t v ty =
+  let union t1 t2 =
+    if List.length t1 <= List.length t2
+    then List.fold_left add t2 t1
+    else List.fold_left add t1 t2
+  let of_list ts = List.fold_left add empty ts
+  let filter_compatible t v ty =
     t |> List.filter (fun renv ->
       (REnv.mem v renv |> not) ||
-      (disjoint (REnv.find v renv) ty |> not)
+      (disjoint ty (REnv.find v renv) |> not)
     )
   let elements t = t
 end

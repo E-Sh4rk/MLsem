@@ -45,19 +45,18 @@ module REnv : sig
   include Env with type ty:=typ
   val cap : t -> t -> t
   val conj : t list -> t
-end
-
-module PartitionTbl : sig
-  type t
-  val create : unit -> t
-  val add_parts : t -> Variable.t -> typ list -> unit
-  val get_parts : t -> Variable.t -> typ list
+  val neg : t -> t list
+  val cup_approx : t -> t -> t
+  val disj_approx : t list -> t
+  val neg_approx : t -> t option
 end
 
 module REnvSet : sig
   type t
   val empty : t
+  val of_list : REnv.t list -> t
   val add : t -> REnv.t -> t
-  val filter : t -> Variable.t -> typ -> t
+  val union : t -> t -> t
+  val filter_compatible : t -> Variable.t -> typ -> t
   val elements : t -> REnv.t list
 end
