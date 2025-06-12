@@ -1,4 +1,6 @@
 
+# value_restriction = true
+
 val (<) : int -> int -> bool
 val (<=) : int -> int -> bool
 val (>) : int -> int -> bool
