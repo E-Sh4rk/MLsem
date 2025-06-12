@@ -39,8 +39,8 @@ let filter_arr (f:('a -> any) & ('b -> ~true)) (arr:arr('a|'b)) =
   let i = ref 0 in
   while (get i) < (len_arr arr) do
     let e = get_arr arr (get i) in
-    set i ((get i) + 1) ;
-    if f e do push_arr res e end
+    if f e do push_arr res e end ;
+    set i ((get i) + 1)
   end ;
   res
 
@@ -50,4 +50,4 @@ let test_arr x =
   push_arr arr true ;
   push_arr arr x ;
   push_arr arr false ;
-  filter_arr (fun x -> if x is int then true else false) arr
+  filter_arr (fun x -> (x is int)) arr
