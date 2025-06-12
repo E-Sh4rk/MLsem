@@ -37,6 +37,7 @@ requirejs(['vs/editor/editor.main','cookie'], function () {
 			// { token: 'identifier.term', foreground: 'DCDCAA' },
 			{ token: 'identifier.type', foreground: 'DD5555' },
 			{ token: 'identifier.vartype', foreground: 'DD7777' },
+			{ token: 'command', foreground: '#FFA229' },
 		],
 		colors: {
 			"editorCodeLens.foreground": "#AAAAAA",
@@ -49,6 +50,7 @@ requirejs(['vs/editor/editor.main','cookie'], function () {
 			// { token: 'identifier.term', foreground: 'DCDCAA' },
 			{ token: 'identifier.type', foreground: '991111' },
 			{ token: 'identifier.vartype', foreground: '993333' },
+			{ token: 'command', foreground: '#FFA229' },
 		],
 		colors: {
 			"editorCodeLens.foreground": "#333333",

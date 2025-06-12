@@ -4,10 +4,10 @@ function getTokenizer() {
         tokenPostfix: '.stml',
     
         keywords: [
-            'type', 'where', 'and', 'if', 'is', 'then',
-            'else', 'match', 'with', 'end', 'fun', 'let', 'in',
+            'type', 'where', 'and', 'or', 'if', 'is', 'do', 'then',
+            'else', 'match', 'with', 'end', 'begin', 'fun', 'let', 'in',
             'fst', 'snd', 'hd', 'tl', 'magic', 'true', 'false',
-            'rec', 'gen', 'debug', 'abstract'
+            'abstract', 'suggest', 'while', 'val'
         ],
 
         typeids: [
@@ -88,6 +88,8 @@ function getTokenizer() {
             whitespace: [
                 [/[ \t\r\n]+/, ''],
                 [/\(\*/, 'comment', '@comment'],
+                [/\/\*/, 'comment', '@comment'],
+			    [/#.*$/, 'command'],
             ],
     
             comment: [
