@@ -28,7 +28,7 @@ let add_res res res' =
     untyp::res
   | TFailure (None, pos, msg, time) ->
     let untyp =
-      `Assoc [("time", `Float time) ;
+      `Assoc [("time", `Float time) ; ("def_pos", json_of_pos (List.hd pos)) ;
       ("typeable", `Bool false) ; ("message", `String msg) ; ("pos", json_of_pos_list pos)]
     in
     untyp::res
