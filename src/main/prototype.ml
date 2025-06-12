@@ -9,16 +9,16 @@ let treat_res (acc, res) =
             Format.printf "%a @{<italic;yellow>(checked in %.00fms)@}\n%!"
                 Types.TyScheme.pp_short t time ;
         ) ;
-        acc
+        acc, true
     | TFailure (Some v, _, msg, time) ->
         Format.printf "@{<blue;bold>%s@}: %!"
             (Parsing.Variable.Variable.get_name v |> Option.get) ;
         Format.printf "@{<red>%s@} @{<italic;purple>(failed in %.00fms)@}\n%!" msg time ;
-        acc
+        acc, false
     | TFailure (None, _, msg, _) ->
         Format.printf "@{<red>%s@}\n%!" msg ;
-        acc
-    | TDone -> acc
+        acc, false
+    | TDone -> acc, true
 
 let () =
     (* Printexc.record_backtrace true; *)
@@ -30,10 +30,11 @@ let () =
         | PSuccess program ->
             let time0 = Unix.gettimeofday () in
             let envs = (initial_tenv, initial_varm, initial_senv, initial_env) in
-            let envs = treat_all_sigs envs program |> treat_res in
-            List.fold_left (fun acc e ->
-                treat_def acc e |> treat_res
-            ) envs program |> ignore ;
+            let envs, ok = treat_all_sigs envs program |> treat_res in
+            if ok then
+                List.fold_left (fun acc e ->
+                    treat_def acc e |> treat_res |> fst
+                ) envs program |> ignore ;
             let time1 = Unix.gettimeofday () in
             Format.printf "@.@{<bold;green>Total time: %.02fs@}@." (time1 -. time0)
         | PFailure (pos, msg) ->

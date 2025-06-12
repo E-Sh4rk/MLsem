@@ -61,15 +61,18 @@ let typecheck code callback =
       | PSuccess program ->
         let envs = (initial_tenv, initial_varm, initial_senv, initial_env) in
         let envs,res = treat_all_sigs envs program in
+        let ok = match res with | TFailure _ -> false | _ -> true in
         let res = add_res [] res in
         notify_res callback res ;
         let (_, res) =
-          List.fold_left (fun (env, res) e ->
-            let env, res' = treat_def env e in
-            let res = add_res res res' in
-            notify_res callback res ;
-            (env,res)
-          ) (envs, res) program
+          if ok then
+            List.fold_left (fun (env, res) e ->
+              let env, res' = treat_def env e in
+              let res = add_res res res' in
+              notify_res callback res ;
+              (env,res)
+            ) (envs, res) program
+          else (envs, res)
         in
         ok_answer res
       | PFailure (pos, msg) ->
