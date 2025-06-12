@@ -90,9 +90,9 @@ val ref : 'a -> ref('a)
 val set : ref('a) -> 'a -> ()
 val get : ref('a) -> 'a
 
-val test_ref : ref(int)
-let test_ref = ref 42
-let test_ref2 = ref 42
+val ref_42 : ref(int)
+let ref_42 = ref 42
+let ref_42_unresolved = ref 42
 let mutate_ref x =
   let y = ref x in
   set y 42 ;

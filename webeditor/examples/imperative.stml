@@ -1,1 +1,53 @@
 
+val (<) : int -> int -> bool
+val (<=) : int -> int -> bool
+val (>) : int -> int -> bool
+val (>=) : int -> int -> bool
+
+abstract type ref('a)
+val ref : 'a -> ref('a)
+val set : ref('a) -> 'a -> ()
+val get : ref('a) -> 'a
+
+val ref_42 : ref(int)
+let ref_42 = ref 42
+let mutate_ref x =
+  let y = ref x in
+  set y 42 ;
+  get y
+
+abstract type dict('k, 'v)
+val mk_dict : () -> dict('a, 'b)
+val add_dict : dict('a, 'b) -> 'a -> 'b -> ()
+val get_dict : dict('a, 'b) -> 'a -> 'b
+
+let test_dict x =
+  let d = mk_dict () in
+  add_dict d x 42 ;
+  add_dict d "key" 0 ;
+  d, get_dict d false
+
+abstract type arr('a)
+val set_arr : arr('a) -> int -> 'a -> ()
+val get_arr : arr('a) -> int -> 'a
+val mk_arr : () -> arr('a)
+val push_arr : arr('a) -> 'a -> ()
+val len_arr : arr('a) -> int
+
+let filter_arr (f:('a -> any) & ('b -> ~true)) (arr:arr('a|'b)) =
+  let res = mk_arr () in
+  let i = ref 0 in
+  while (get i) < (len_arr arr) do
+    let e = get_arr arr (get i) in
+    set i ((get i) + 1) ;
+    if f e do push_arr res e end
+  end ;
+  res
+
+val test_arr : 'a -> arr('a | 'b)
+let test_arr x =
+  let arr = mk_arr () in
+  push_arr arr true ;
+  push_arr arr x ;
+  push_arr arr false ;
+  filter_arr (fun x -> if x is int then true else false) arr
