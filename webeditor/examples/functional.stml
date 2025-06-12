@@ -26,7 +26,9 @@ let map_stub map f lst =
 
 let map = fixpoint map_stub
 
-(* === Occurrence Typing === *)
+(* === Pattern Matching and Type Narrowing === *)
+
+val not : bool -> bool
 
 let match_pair (x:any) (y:any) =
   match (x,y) with
@@ -42,8 +44,8 @@ let filter f l =
   | [] -> []
   | e::l ->
     if f e is true
-    then e::(filter_sig f l)
-    else filter_sig f l
+    then e::(filter f l)
+    else filter f l
   end
 
 let test_filter = filter (fun x -> (x is int)) [42 ; Null ; true ; 33]
