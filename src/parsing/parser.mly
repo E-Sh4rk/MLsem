@@ -170,13 +170,13 @@ simple_term3:
 | a=simple_term3 b=simple_term4 { annot $startpos $endpos (App (a, b)) }
 | p=proj a=simple_term4 { annot $startpos $endpos (Projection (p, a)) }
 | a=simple_term4 s=infix_term b=simple_term4 { double_app $startpos $endpos s a b }
-| p=prefix_term a=simple_term4 { annot $startpos $endpos (App (p, a)) }
 | LT t=typ GT { annot $startpos $endpos (Abstract t) }
 
 simple_term4:
   a=atomic_term { a }
 | a=atomic_term POINT id=ID { annot $startpos $endpos (Projection (Field id, a)) }
 | a=atomic_term DIFF id=ID { annot $startpos $endpos (RecordUpdate (a,id,None)) }
+| p=prefix_term a=simple_term4 { annot $startpos $endpos (App (p, a)) }
 
 proj:
 | FST { Pi(2,0) } | SND { Pi(2,1) } | HD { Hd } | TL { Tl }

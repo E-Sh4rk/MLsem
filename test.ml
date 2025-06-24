@@ -88,15 +88,16 @@ let inv = <inv(A) & inv(B) & inv(A|B)>
 abstract type ref('a)
 val ref : 'a -> ref('a)
 val set : ref('a) -> 'a -> ()
+val (:=) : ref('a) -> 'a -> ()
 val get : ref('a) -> 'a
+val (!) : ref('a) -> 'a
 
 val ref_42 : ref(int)
 let ref_42 = ref 42
 let ref_42_unresolved = ref 42
 let mutate_ref x =
   let y = ref x in
-  set y 42 ;
-  get y
+  y := 42 ; !y
 
 let is_ref x = if x is ref then true else false
 let is_not_ref x = if x is ~ref then true else false
@@ -123,9 +124,9 @@ val len_arr : arr('a) -> int
 let filter_arr (f:('a -> any) & ('b -> ~true)) (arr:arr('a|'b)) =
   let res = mk_arr () in
   let i = ref 0 in
-  while (get i) < (len_arr arr) do
-    let e = get_arr arr (get i) in
-    set i ((get i) + 1) ;
+  while !i < (len_arr arr) do
+    let e = get_arr arr !i in
+    i := (!i + 1) ;
     if f e do push_arr res e end
   end ;
   res
