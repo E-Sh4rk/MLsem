@@ -267,6 +267,7 @@ infix:
   | EQUAL {"="}
   | LT    {"<"}
   | GT    {">"}
+  | DOUBLEPOINT {".."}
 
 prefix:
   | x=PREFIX {x}

@@ -44,7 +44,7 @@ let op_char =  '!' | '$' | '%' | '&' | '*' | '+' | '-' |
 let prefix_op = ('!' | '?' | '~') op_char*
 let infix_op = ('=' | '<' | '>' | '@' | '$'
               | '+' | '-' | '*' | '/' | '^' | '%'
-              | '&' op_char | '|' op_char ) op_char*
+              | '&' op_char | '|' op_char | '.' op_char ) op_char*
 let indexed_op = ']' ('=' | '<' | '>' | '@' | '$') op_char*
 let op_id = '(' ('[' (indexed_op | ']') | prefix_op | infix_op) ')'
 
