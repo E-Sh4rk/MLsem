@@ -43,7 +43,7 @@ let filter_arr (f:('a -> any) & ('b -> ~true)) (arr:array('a|'b)) =
   end ;
   res
 
-val test_arr : 'a -> arr('a | 'b)
+val test_arr : 'a -> array('a | 'b)
 let test_arr x =
   let arr = array () in
   push arr true ;
