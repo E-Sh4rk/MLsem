@@ -45,8 +45,8 @@ let prefix_op = ('!' | '?' | '~') op_char*
 let infix_op = ('=' | '<' | '>' | '@' | '$'
               | '+' | '-' | '*' | '/' | '^' | '%'
               | '&' op_char | '|' op_char ) op_char*
-let closing_op = ']' ('=' | '<' | '>' | '@' | '$') op_char*
-let indexed_op = '(' '[' (closing_op | ']') ')'
+let indexed_op = ']' ('=' | '<' | '>' | '@' | '$') op_char*
+let op_id = '(' ('[' (indexed_op | ']') | prefix_op | infix_op) ')'
 
 rule token = parse
 | newline { enter_newline lexbuf |> token }
@@ -111,8 +111,8 @@ rule token = parse
 | "false" { LBOOL false }
 | infix_op as s  { INFIX s }
 | prefix_op as s { PREFIX s }
-| closing_op as s { CLOSING s }
-| indexed_op as s { INDEXED (String.sub s 1 ((String.length s) - 2)) }
+| indexed_op as s { INDEXED s }
+| op_id as s { OPID (String.sub s 1 ((String.length s) - 2)) }
 | '"' { read_string (Buffer.create 17) lexbuf }
 | '\'' ([^ '\'' '\\' '\010' '\013'] as c) '\'' { LCHAR c }
 | '\'' '\\' (backslash_escapes as c) '\'' { LCHAR (char_for_backslash c) }

@@ -92,7 +92,7 @@
 %token<bool> LBOOL
 %token<char> LCHAR
 %token<string> LSTRING
-%token<string> INFIX PREFIX CLOSING INDEXED
+%token<string> INFIX PREFIX INDEXED OPID
 
 %type<Ast.parser_expr> term
 %start<Ast.parser_expr> unique_term
@@ -175,7 +175,7 @@ simple_term3:
 | p=proj a=simple_term4 { annot $startpos $endpos (Projection (p, a)) }
 | a=simple_term4 s=infix_term b=simple_term4 { double_app $startpos $endpos s a b }
 | LT t=typ GT { annot $startpos $endpos (Abstract t) }
-| x=IID t=term i=CLOSING t2=simple_term4
+| x=IID t=term i=INDEXED t2=simple_term4
 {
   let arg = indexed_arg $startpos $endpos x t in
   let f = annot $startpos $endpos (Var ("["^i)) in
@@ -258,11 +258,7 @@ parameter:
 { (opta, arg) }
 
 generalized_identifier:
-  | x=ID
-  | LPAREN x=prefix RPAREN
-  | LPAREN x=infix RPAREN
-  | x=INDEXED
-  { x }
+  | x=ID | x=OPID { x }
 
 infix:
   | x=INFIX {x}
