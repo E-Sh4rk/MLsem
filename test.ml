@@ -314,7 +314,7 @@ let bal l x d r =
     end
   else (l, x, d, r, (if hl >= hr then hl + 1 else hr + 1))
 
-(* Type narrowing *)
+(* ===== Type narrowing ===== *)
 
 let type_narrowing_fail (f:any -> any) x =
   if f x is int then (f x) + 1 else 0
@@ -322,6 +322,12 @@ let type_narrowing_fail (f:any -> any) x =
 let type_narrowing_ok (f:any -> any) x =
   let y = f x in
   if y is int then y + 1 else 0
+
+let type_narrowing2_ok (f:(any -> any) & ('a -> false)) (x:any) =
+  if f x then x else 42
+
+let type_narrowing2_ok' ((f,x): ((any -> any) & ('a -> false), any)) =
+  if f x then x else 42
 
 (*************************************************
 *          Tobin-Hochstadt & Felleisen           *

@@ -94,10 +94,15 @@ let refine env e t =
   sufficient_refinements env e (neg t) |> List.filter_map REnv.neg_approx
   |> REnv.conj
 
-let typeof env (_,e) =
-  (* TODO: add other cases like projection (useful because of the pattern encoding) *)
+let rec typeof env (_,e) =
   match e with
   | Var v when Env.mem v env -> Env.find v env
+  (* These cases are necessary because of pattern matching encoding *)
+  | Projection (p, t) ->
+    let _, ty = typeof env t |> TyScheme.get in
+    TyScheme.mk_mono (Checker.proj p ty)
+  | TypeConstr (t, _) -> typeof env t
+  | TypeCoerce (_, ty) -> TyScheme.mk_mono ty
   | _ -> TyScheme.mk_mono any
 
 let refinement_envs env e =
