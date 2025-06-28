@@ -118,6 +118,20 @@ let tuple_dnf n t =
   t |> Sstt.Ty.get_descr |> Sstt.Descr.get_tuples
   |> Sstt.Tuples.get n |> Sstt.Op.TupleComp.as_union
 
+let tuple_of_dnf n lst =
+  let tc = Sstt.Op.TupleComp.of_union n lst in
+  Sstt.Tuples.mk_comp tc |> Sstt.Descr.mk_tuples |> Sstt.Ty.mk_descr
+
+let tuple_decompose t =
+  let (tcs, others) = t |> Sstt.Ty.get_descr |> Sstt.Descr.get_tuples
+  |> Sstt.Tuples.components in
+  let tcs = tcs |> List.map (fun tc -> Sstt.TupleComp.len tc, Sstt.Op.TupleComp.as_union tc) in
+  tcs, others
+
+let tuple_recompose (tcs, others) =
+  let tcs = tcs |> List.map (fun (n, dnf) -> Sstt.Op.TupleComp.of_union n dnf) in
+  Sstt.Tuples.of_components (tcs, others) |> Sstt.Descr.mk_tuples |> Sstt.Ty.mk_descr
+
 let nil_typ = Sstt.Extensions.Lists.nil
 let list_typ = Sstt.Extensions.Lists.any
 let non_empty_list_typ = Sstt.Extensions.Lists.any_non_empty
@@ -140,6 +154,16 @@ let record_dnf t =
       List.map (fun (lbl, (ty,opt)) -> (from_label lbl, (opt,ty))) in
     bindings, opened
   )
+let record_of_dnf lst =
+  let lst = lst |> List.map (fun (bs, opened) ->
+    let bindings = bs |>
+      List.map (fun (str, (opt,ty)) -> (to_label str, (ty, opt))) |> Sstt.LabelMap.of_list
+    in
+    { Sstt.Records.Atom.opened ; bindings }
+    )
+  in
+  Sstt.Op.Records.of_union lst |> Sstt.Descr.mk_records |> Sstt.Ty.mk_descr
+
 let record_any =
   Sstt.Records.any |> Sstt.Descr.mk_records |> Sstt.Ty.mk_descr
 

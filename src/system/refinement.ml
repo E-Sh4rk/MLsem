@@ -142,8 +142,25 @@ let refinement_envs env e =
   in
   aux env e ; !res
 
-module FilteredREnvSet = struct
+module Partitioner = struct
   type t = REnv.t list
+
+  let isolate_tuple_comp (n,lst) =
+    lst |>
+    List.filter (function [] -> false | _ -> true) |>
+    List.map (fun atom -> n, [atom])
+  let isolate_tuple_conjuncts t =
+    let (comps, _) = tuple_decompose t in
+    let comps = comps |> List.map (fun cp -> isolate_tuple_comp cp) |> List.flatten in
+    let comps = comps |> List.map (fun cp -> tuple_recompose ([cp], false)) in
+    comps
+  let isolate_record_conjuncts t =
+    record_dnf t |>
+    List.filter (function [], _ -> false | _, _ -> true) |>
+    List.map (fun atom -> record_of_dnf [atom])
+  let isolate_conjuncts t =
+    (* Necessary because of pattern matching encoding for uncurrified functions *)
+    t::(isolate_tuple_conjuncts t)@(isolate_record_conjuncts t)
 
   let from_renvset rs = REnvSet.elements rs
   let filter_compatible lst v ty =
@@ -151,5 +168,9 @@ module FilteredREnvSet = struct
       (REnv.mem v renv |> not) ||
       (disjoint ty (REnv.find v renv) |> not)
     )
-  let elements t = t
+  let partition_for t v extra =
+    let tys = t |> List.filter_map (fun renv ->
+      if REnv.mem v renv then Some (REnv.find v renv) else None
+    ) |> List.map isolate_conjuncts |> List.flatten in
+    extra@tys |> Types.Additions.partition
 end

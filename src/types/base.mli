@@ -54,6 +54,9 @@ val tuple_any : typ
 val tuple_n : int -> typ
 val pi : int -> int -> typ -> typ
 val tuple_dnf : int -> typ -> typ list list
+val tuple_of_dnf : int -> typ list list -> typ
+val tuple_decompose : typ -> (int * typ list list) list * bool
+val tuple_recompose : (int * typ list list) list * bool -> typ
 
 val nil_typ : typ
 val list_typ : typ
@@ -66,6 +69,7 @@ val to_label : string -> Sstt.Label.t
 val from_label : Sstt.Label.t -> string
 val mk_record : bool (* is_open *) -> (string * (bool * typ)) list -> typ
 val record_dnf : typ -> ((string * (bool * typ)) list * bool) list
+val record_of_dnf : ((string * (bool * typ)) list * bool) list -> typ
 val record_any : typ
 val empty_closed_record : typ
 val get_field : typ -> string -> typ
