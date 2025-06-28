@@ -91,8 +91,20 @@ let sufficient_refinements env e t =
   aux e t
 
 let refine env e t =
-  sufficient_refinements env e (neg t) |> List.filter_map REnv.neg_approx
-  |> REnv.conj
+  let renvs = sufficient_refinements env e (neg t) in
+  let rec aux renv renvs =
+    let renvs = renvs |> List.map (fun renv' ->
+      renv' |> REnv.filter (fun v ty ->
+        let _, ty' = Env.find v env |> TyScheme.get in
+        let ty'' = REnv.find' v renv in
+        subtype (cap ty' ty'') ty |> not
+      )
+    )
+    in
+    let renv' = REnv.cap renv (List.filter_map REnv.neg_approx renvs |> REnv.conj) in
+    if REnv.leq renv renv' then renv else aux renv' renvs
+  in
+  aux REnv.empty renvs
 
 let rec typeof env (_,e) =
   match e with

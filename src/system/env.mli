@@ -43,6 +43,7 @@ module Make(T:T) : Env with type ty:=T.t
 module Env : Env with type ty:=TyScheme.t
 module REnv : sig
   include Env with type ty:=typ
+  val find' : Variable.t -> t -> typ
   val cap : t -> t -> t
   val conj : t list -> t
   val neg : t -> t list

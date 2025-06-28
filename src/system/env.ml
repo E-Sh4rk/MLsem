@@ -124,6 +124,9 @@ module REnv = struct
     let pp = pp_typ
   end)
 
+  let find' v t =
+    try find v t with Not_found -> any
+
   let cap (m1, s1) (m2, s2) =
     (VarMap.union (fun _ t1 t2 ->
       Some (cap t1 t2)

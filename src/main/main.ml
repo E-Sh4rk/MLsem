@@ -33,6 +33,7 @@ let sigs_of_ty mono ty =
 let infer var env e =
   let annot =
     let r = if !Config.type_narrowing then Refinement.refinement_envs env e else REnvSet.empty in
+    (* REnvSet.elements r |> List.iter (fun renv -> Format.printf "Renv: %a@." REnv.pp renv) ; *)
     match Reconstruction.infer env r e with
     | None ->
       (* Format.printf "@.@.%a@.@." System.Ast.pp e ; *)
