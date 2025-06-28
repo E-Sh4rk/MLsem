@@ -165,10 +165,5 @@ module REnvSet = struct
     then List.fold_left add t2 t1
     else List.fold_left add t1 t2
   let of_list ts = List.fold_left add empty ts
-  let filter_compatible t v ty =
-    t |> List.filter (fun renv ->
-      (REnv.mem v renv |> not) ||
-      (disjoint ty (REnv.find v renv) |> not)
-    )
   let elements t = t
 end

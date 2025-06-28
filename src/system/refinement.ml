@@ -95,6 +95,7 @@ let refine env e t =
   |> REnv.conj
 
 let typeof env (_,e) =
+  (* TODO: add other cases like projection (useful because of the pattern encoding) *)
   match e with
   | Var v when Env.mem v env -> Env.find v env
   | _ -> TyScheme.mk_mono any
@@ -135,3 +136,15 @@ let refinement_envs env e =
       res := res'
   in
   aux env e ; !res
+
+module FilteredREnvSet = struct
+  type t = REnv.t list
+
+  let from_renvset rs = REnvSet.elements rs
+  let filter_compatible lst v ty =
+    lst |> List.filter (fun renv ->
+      (REnv.mem v renv |> not) ||
+      (disjoint ty (REnv.find v renv) |> not)
+    )
+  let elements t = t
+end

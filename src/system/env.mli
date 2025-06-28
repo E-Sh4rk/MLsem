@@ -57,6 +57,5 @@ module REnvSet : sig
   val of_list : REnv.t list -> t
   val add : t -> REnv.t -> t
   val union : t -> t -> t
-  val filter_compatible : t -> Variable.t -> typ -> t
   val elements : t -> REnv.t list
 end

@@ -241,7 +241,7 @@ let rec infer cache env renvs annot (id, e) =
     | _ -> assert false
     end
   | Let (suggs,v,_,_), Infer ->
-    let tys = REnvSet.elements renvs |> List.filter_map (fun renv ->
+    let tys = Refinement.FilteredREnvSet.elements renvs |> List.filter_map (fun renv ->
       if REnv.mem v renv then Some (REnv.find v renv) else None
     ) in
     let tys = suggs@tys |> Types.Additions.partition in
@@ -367,7 +367,7 @@ and infer_cf_b' cache env renvs bannot e s tau =
 and infer_part' cache env renvs e v (tvs, s) (si,annot) =
   let t = TyScheme.mk tvs (cap s si) in
   let env = Env.add v t env in
-  let renvs = REnvSet.filter_compatible renvs v si in
+  let renvs = Refinement.FilteredREnvSet.filter_compatible renvs v si in
   match infer' cache env renvs annot e with
   | Fail -> Fail
   | Subst (ss,a,a',r) -> Subst (ss,(si,a),(si,a'),r)
@@ -379,6 +379,7 @@ and infer_part_seq' cache env renvs e v s lst =
     (lst |> List.map (fun a -> (a,())))
 
 let infer env renvs e =
+  let renvs = Refinement.FilteredREnvSet.from_renvset renvs in
   let cache = { dom = Domain.empty ; cache = Cache.empty () ; tvcache = TVCache.empty () } in
   match infer' cache env renvs IAnnot.Infer e with
   | Fail -> None
