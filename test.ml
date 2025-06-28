@@ -164,9 +164,6 @@ let map_clist f (lst:clist('a)) =
 let test a = (fst a, fst a)
 val succ : int -> int
 
-let aliasing (x : any -> any) = 
-  let y = x in if x y is int then (y x) + 1 else 42
-
 let impossible_branch = fun x ->
   if x is int then x + 1 else (42 3)
 
@@ -317,7 +314,15 @@ let bal l x d r =
     end
   else (l, x, d, r, (if hl >= hr then hl + 1 else hr + 1))
 
-(*
+(* Type narrowing *)
+
+let type_narrowing_fail (f:any -> any) x =
+  if f x is int then (f x) + 1 else 0
+
+let type_narrowing_ok (f:any -> any) x =
+  let y = f x in
+  if y is int then y + 1 else 0
+
 (*************************************************
 *          Tobin-Hochstadt & Felleisen           *
 *     exampleX = EXPLICITLY ANNOTATED VERSIONS   *
@@ -342,97 +347,85 @@ let bal l x d r =
 
 (* prelude *)
 
-let and_ = fun x -> fun y ->
-     if x is true then if y is true then y else false else false
-let fst2 = <('a, any) -> 'a>
-let snd2 = <(any, 'a) -> 'a>
-let and2_ = fun x ->
-  if fst2 x is true then if snd2 x is true then fst2 x else false else false
-let and2_ = fun x ->
-     if fst x is true then if snd x is true then fst x else false else false
-
+let and_ = fun (x, y) ->
+     if x is true then if y is true then x else false else false
 let not_ = fun x -> if x is true then false else true
-
-let or_ =  fun x -> fun y -> not_ (and_ (not_ x) (not_ y))
+let or_ =  fun (x,y) ->
+  not_ (and_ (not_ x, not_ y))
 
 let is_string = fun x ->
      if x is string then true else false
-
 let is_int = fun x ->
      if x is int then true else false
 
-let strlen = <(string) -> int>
-
-let add = <int -> int -> int>
-
-let add1 = <int -> int>
-
-let f = <(int | string) -> int>
-
-let g = <(int, int) -> int>
+val strlen : string -> int
+val add : int -> int -> int
+val add1 : int -> int
+val f : (int | string) -> int
+val g : (int, int) -> int
 
 (* Examples Tobin-Hochstadt & Felleisen *)
 
 let example1 = fun (x:any) ->
   if x is int then add1 x else 0
 
-let implict1 = fun x ->
+let implicit1 = fun x ->
   if x is int then add1 x else 0
 
 
 let example2 = fun (x:string|int) ->
   if x is int then add1 x else strlen x
 
-let implict2 = fun x ->
+let implicit2 = fun x ->
   if x is int then add1 x else strlen x
 
 
 let example3 = fun (x: any) ->
   if x is (any \ false) then (x,x) else false
 
-let implict3 = fun x ->
+let implicit3 = fun x ->
   if x is (any \ false) then (x,x) else false
 
 
 let example4 = fun (x : any) ->
-  if or_ (is_int x) (is_string x) is true then x else 'A'
+  if or_ (is_int x, is_string x) is true then x else 'A'
 
-let implict4 = fun x ->
-  if or_ (is_int x) (is_string x) is true then x else 'A'
+let implicit4 = fun x ->
+  if or_ (is_int x, is_string x) is true then x else 'A'
 
 
 let example5 = fun (x : any) -> fun (y : any) ->
-  if and_ (is_int x) (is_string y) is true then
+  if and_ (is_int x, is_string y) is true then
    add x (strlen y) else 0
 
-let implict5 = fun x -> fun y ->
-  if and_ (is_int x) (is_string y) is true then
+let implicit5 = fun x -> fun y ->
+  if and_ (is_int x, is_string y) is true then
    add x (strlen y) else 0
 
 
 let example6 = fun (x : int|string) -> fun (y : any) ->
-  if and_ (is_int x) (is_string y) is true then
+  if and_ (is_int x, is_string y) is true then
    add  x (strlen y) else strlen x
 
-let implict6 = fun x -> fun y ->
-  if and_ (is_int x) (is_string y) is true then
+let implicit6 = fun x -> fun y ->
+  if and_ (is_int x, is_string y) is true then
    add  x (strlen y) else strlen x
 
 
 let example7 = fun (x : any) -> fun (y : any) ->
-  if  (if (is_int x) is true then (is_string y) else false) is true then
+  if (if is_int x is true then is_string y else false) is true then
    add x (strlen y) else 0
 
-let implict7 = fun x -> fun y ->
-  if  (if (is_int x) is true then (is_string y) else false) is true then
+let implicit7 = fun x -> fun y ->
+  if (if is_int x is true then is_string y else false) is true then
    add x (strlen y) else 0
 
 
 let example8 = fun (x : any) ->
-  if or_ (is_int x) (is_string x) is true then true else false
+  if or_ (is_int x, is_string x) is true then true else false
 
-let implict8 = fun x ->
-  if or_ (is_int x) (is_string x) is true then true else false
+let implicit8 = fun x ->
+  if or_ (is_int x, is_string x) is true then true else false
 
 
 let example9 = fun (x : any) ->
@@ -440,7 +433,7 @@ let example9 = fun (x : any) ->
    (if is_int x is true then is_int x else is_string x)
    is true then  f x else 0
 
-let implict9 = fun x  ->
+let implicit9 = fun x  ->
   if
    (if is_int x is true then is_int x else is_string x)
    is true then  f x else 0
@@ -449,88 +442,62 @@ let implict9 = fun x  ->
 let example10 = fun (p : (any,any)) ->
   if is_int (fst p) is true then add1 (fst p) else 7
 
-let implict10 = fun p ->
+let implicit10 = fun p ->
   if is_int (fst p) is true then add1 (fst p) else 7
 
 
 let example11 = fun (p : (any, any)) ->
-  if and_ (is_int (fst p)) (is_int (snd p)) is true then g p else No
+  if and_ (is_int (fst p), is_int (snd p)) is true then g p else No
 
-let implict11 = fun p ->
-  if and_ (is_int (fst p)) (is_int (snd p)) is true then g p else No
+let implicit11 = fun p ->
+  if and_ (is_int (fst p), is_int (snd p)) is true then g p else No
 
 let example12 = fun (p : (any, any)) ->
   if is_int (fst p) is true then true else false
 
-let implict12 = fun p ->
+let implicit12 = fun p ->
   if is_int (fst p) is true then true else false
 
 
 let example13 =
  fun (x : any) ->
    fun (y : any) ->
-    if and_ (is_int x) (is_string y) is true then 1
+    if and_ (is_int x, is_string y) is true then 1
     else if is_int x is true then 2
     else 3
 
-let implict13 =
+let implicit13 =
  fun x ->
    fun y ->
-    if and_ (is_int x) (is_string y) is true then 1
+    if and_ (is_int x, is_string y) is true then 1
     else if is_int x is true then 2
     else 3
 
-
-(* uncurried "and" *)
 let example14 = fun (input : int|string) ->
 fun (extra : (any, any)) ->
- if and2_(is_int input , is_int(fst extra)) is true then
+ if and_(is_int input , is_int(fst extra)) is true then
      add input (fst extra)
  else if is_int(fst extra) is true then
      add (strlen input) (fst extra)
  else 0
 
-let implct14a = fun (input : int|string) ->
+let implicit14a = fun (input : int|string) ->
 fun extra ->
- if and2_(is_int input , is_int(fst extra)) is true then
+ if and_(is_int input , is_int(fst extra)) is true then
      add input (fst extra)
  else if is_int(fst extra) is true then
      add (strlen input) (fst extra)
  else 0
 
-let implct14b = fun input ->
+let implicit14b = fun input ->
 fun extra ->
- if and2_(is_int input , is_int(fst extra)) is true then
+ if and_(is_int input , is_int(fst extra)) is true then
      add input (fst extra)
  else if is_int(fst extra) is true then
      add (strlen input) (fst extra)
  else 0
 
-(* curried "and" *)
-let curried14 = fun (input : int|string) ->
-fun (extra : (any, any)) ->
- if and_ (is_int input) (is_int(fst extra)) is true then
-     add input (fst extra)
- else if is_int (fst extra) is true then
-     add (strlen input) (fst extra)
- else 0
-
-let currid14a = fun (input : int|string) ->
-fun extra ->
- if and_ (is_int input) (is_int(fst extra)) is true then
-     add input (fst extra)
- else if is_int (fst extra) is true then
-     add (strlen input) (fst extra)
- else 0
-
-let currid14b = fun input ->
-fun extra ->
- if and_ (is_int input) (is_int(fst extra)) is true then
-     add input (fst extra)
- else if is_int (fst extra) is true then
-     add (strlen input) (fst extra)
-else 0
-
+(*
 (* === Filter map === *)
 
 let rec filtermap ((f, l) : (any, [])) =
