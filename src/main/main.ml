@@ -28,7 +28,7 @@ let sigs_of_ty mono ty =
   in
   if ty |> vars_internal |> TVarSet.is_empty then
     let sigs = aux ty in
-    Some (sigs, TyScheme.mk_poly_except mono ty)
+    Some (sigs, TyScheme.mk_poly_except mono ty |> TyScheme.simplify)
   else None
 let infer var env e =
   let annot =
