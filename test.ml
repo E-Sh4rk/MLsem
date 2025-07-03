@@ -106,8 +106,8 @@ abstract type array('a)
 
 val dict : () -> dict('a, 'b)
 val array : () -> array('a)
-val ([]<-) : ((dict('a, 'b), 'a) -> 'b -> ()) & ((array('a), int) -> 'a -> ())
-val ([]) : ((dict('a, 'b), 'a) -> 'b) & ((array('a), int) -> 'a)
+val ([]<-) : ((dict('a, 'b), 'a) -> 'b -> ()) & ((array('b), int) -> 'b -> ())
+val ([]) : ((dict('a, 'b), 'a) -> 'b) & ((array('b), int) -> 'b)
 val push : array('a) -> 'a -> ()
 val len : array('a) -> int
 
@@ -140,6 +140,8 @@ let test_double_array =
   arr[0]<- (array ()) ;
   (arr[0])[0]<- 42 ;
   (arr[0])[0]
+
+let overload2 x = x[0]<- x[1]
 
 (* #value_restriction = false *)
 
