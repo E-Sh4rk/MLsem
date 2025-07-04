@@ -149,10 +149,13 @@ let rec infer cache env renvs annot (id, e) =
     let env' = lst |> List.fold_left
       (fun env ((_,v,_),(ty,_)) -> Env.add v (TyScheme.mk_mono ty) env) env in
     let tys = List.map fst anns in
-    begin match infer_seq' cache env' renvs (List.map (fun ((_,_,e),(_,a)) -> a,e) lst) with
+    let aes = List.map (fun ((_,_,e),(_,a)) -> a,e) lst in
+    begin match infer_seq' { cache with dom=Domain.empty } env' renvs aes with
     | OneFail -> Fail
-    | OneSubst (ss, a, a',r) ->
-      Subst (ss,ALambdaRec (List.combine tys a),ALambdaRec (List.combine tys a'),r)
+    | OneSubst (ss, a, a',(eid,r)) ->
+      let r = lst |> List.fold_left
+        (fun r ((_,v,_),(ty,_)) -> REnv.add v ty r) r in
+      Subst (ss,ALambdaRec (List.combine tys a),ALambdaRec (List.combine tys a'),(eid,r))
     | AllOk (annots,tys') ->
       let cs = List.combine tys' tys in
       let ss = tallying_with_result env (mk_tuple tys') cs in

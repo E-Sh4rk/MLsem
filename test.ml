@@ -578,7 +578,6 @@ let concat (x:['a*]) (y:['b*]) =
 let flatten_ocaml (x:[['a*]*])  =
   if x is [] then [] else concat (hd x) (flatten_ocaml (tl x))
 
-(* TODO: inference does not work well...  *)
 let reverse (l:[['a*]*]) =
   if l is [] then [] else concat (reverse (tl l)) [hd l]
 
@@ -598,7 +597,7 @@ let eval_ann (e:expr) =
   | (:"const", x) -> x
   end
 
-let mapi_aux i f l =
+let mapi_aux (i:int) f (l:['a*]) =
   match l with
   | [] -> []
   | x::ll -> let r = f i x in r::(mapi_aux (i+1) f ll)
