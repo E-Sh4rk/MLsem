@@ -85,12 +85,13 @@
             <code>
     <var>prog</var> ::= <var>stmt</var>*
 
-    <var>stmt</var> ::=  <kbd>type</kbd> <var>id</var> <var>tvar</var>* <kbd>=</kbd> <var>t</var> [<kbd>and</kbd> ...]
-           | <kbd>let</kbd> <var>gid</var> <kbd>:</kbd> <var>t</var> <kbd>=</kbd> <var>e</var>
-           | <kbd>let</kbd> [<kbd>rec</kbd>] <var>gid</var> <var>param</var>* <kbd>=</kbd> <var>e</var>
-           | <kbd>let</kbd> [<kbd>rec</kbd>] <kbd>(</kbd><var>gid</var> <kbd>:</kbd> <var>t</var></var><kbd>)</kbd> <var>param</var>* <kbd>=</kbd> <var>e</var>
+    <var>stmt</var> ::=  <kbd>type</kbd> <var>id</var> [<kbd>(</kbd><var>tvar</var>, ..., <var>tvar</var><kbd>)</kbd>] <kbd>=</kbd> <var>t</var> [<kbd>and</kbd> ...]
+           | <kbd>abstract</kbd> <kbd>type</kbd> <var>id</var> [<kbd>(</kbd>[<kbd>+</kbd>|<kbd>-</kbd>]<var>tvar</var>, ..., [<kbd>+</kbd>|<kbd>-</kbd>]<var>tvar</var><kbd>)</kbd>]
+           | <kbd>let</kbd> <var>gid</var> <var>param</var>* <kbd>=</kbd> <var>e</var> [<kbd>and</kbd> ...]
+           | <kbd>val</kbd> <var>gid</var> <kbd>:</kbd> <var>t</var>
 
-    <var>param</var> ::= <var>pat</var> [<kbd>:</kbd> <var>t</var><kbd>,</kbd> ...<kbd>,</kbd><var>t</var>]
+    <var>param</var> ::= <var>pat</var>
+           | <kbd>(</kbd> <var>pat</var> <kbd>:</kbd> <var>t</var> <kbd>)</kbd>
         </code>
         </p>
         <p>
@@ -98,32 +99,43 @@
         </p>
         <ul>
             <li>
-                a type definition, composed of a type name, a (possibly empty) list of type variables, and a type
+                a type definition, composed of a type name, an optional list of type variables (parameters), and a type
                 expression.
                 Several mutually recursive type definitions can be defined together using the <kbd>and</kbd> keyword.
+            </li>
+            <li>
+                a abstract type definition, composed of a type name, and an optional list of type variables (parameters)
+                that can be associated with a variance.
             </li>
             <li>a toplevel value definition which follows, roughly, OCaml's
                 syntactic convention. Function parameters can be either simple
                 identifiers or <a href="#patterns">patterns</a> and optionally
                 feature a <a href="#type">type</a> constraint.
             </li>
+            <li>a type signature, composed of a simple identifier and the associated type.</li>
         </ul>
+
+        Note that top-level definitions are considered recursive. A definition may refer to an identifier
+        whose type signature is declared later. However, as top-level value definitions are typed sequentially,
+        mutually-recursive definitions that have no explicit type signatures must be
+        defined together using the <kbd>and</kbd> keyword.
         <h2>Identifiers</h2>
         <p>Identifiers come in several flavours :</p>
         <code>
     <var>gid</var> ::= <var>id</var> | <kbd>(</kbd> <var>op</var> <kbd>)</kbd>
 
-    <var>id</var> ::= <s>[a-zA-Z_][a-zA-Z0-9_']*</s>
+    <var>id</var> ::= <s>[a-z_][a-zA-Z0-9_']*</s>
 
-    <var>tvar</var> ::= <s>'[a-zA-Z_][a-zA-Z0-9_]*</s>
+    <var>cid</var> ::= <s>[A-Z][a-zA-Z0-9_']*</s>
+
+    <var>tvar</var> ::= <s>'[a-zA-Z][a-zA-Z0-9_]*</s>
                 </code>
         <ul>
-            <li>value identifiers can be either variable names or prefix or infix
-                operator symbols in parenthesis.</li>
+            <li>value identifiers can be either variable names (starting with a lowercase)
+                or prefix or infix operator symbols in parenthesis.</li>
+            <li>constructor identifiers start with an uppercase.</li>
             <li>variable and type identifiers are variable names</li>
-            <li>type variables start with a single quote <tt><kbd>'</kbd></tt> character. If the second character is
-                <tt>_</tt> then the variable
-                is monomorphic and is considered a hint for the type reconstruction.
+            <li>type variables start with a single quote <tt><kbd>'</kbd></tt> character
             </li>
         </ul>
         <h2 id="type">Type expressions</h2>
@@ -136,12 +148,13 @@
         | <kbd>{</kbd> <var>id</var> <kbd>:</kbd>[<kbd>?</kbd>] <var>t</var><kbd>;</kbd>...<kbd>;</kbd> <var>id</var> <kbd>:</kbd>[<kbd>?</kbd>] <var>t</var> [<kbd>..</kbd>]<kbd>}</kbd>
         | <var>t</var> <kbd>|</kbd> <var>t</var>
         | <var>t</var> <kbd>&</kbd> <var>t</var>
-        | <var>t</var> <kbd>\\</kbd> <var>t</var>
+        | <var>t</var> <kbd>\</kbd> <var>t</var>
         | <kbd>~</kbd> <var>t</var>
         | <var>t</var> <kbd>where</kbd> <var>id</var> <var>tvar</var>* <kbd>=</kbd> <var>t</var> [<kbd>and</kbd> ...]
 
     <var>simple_type</var> ::= <var>b</var>
-                | <var>id</var> [<var>t</var> ... <var>t</var>]
+                | <var>id</var> [<kbd>(</kbd><var>t</var>, ..., <var>t</var><kbd>)</kbd>]
+                | <var>cid</var> [<kbd>(</kbd><var>t</var><kbd>)</kbd>]
                 | <var>tvar</var>
                 | <kbd>(</kbd><var>t</var><kbd>)</kbd>
     <var>b</var> ::= <kbd>()</kbd>
@@ -171,7 +184,7 @@
     <code>
         <var>e</var> ::= <var>lit</var>
             | <var>gid</var>
-            | <kbd>magic</kbd>
+            | <var>cid</var> [<kbd>(</kbd><var>e</var><kbd>)</kbd>]
             | <kbd>(</kbd><var>e</var> <kbd>:</kbd> <var>t</var> <kbd>;</kbd> ... <kbd>;</kbd> <var>t</var> <kbd>)</kbd>
             | <kbd>(</kbd><var>e</var> <kbd>:&gt;</kbd> <var>t</var> <kbd>;</kbd> ... <kbd>;</kbd> <var>t</var> <kbd>)</kbd>
             | <kbd>{</kbd> [<var>e</var> <kbd>with</kbd>] <var>id</var><kbd>=</kbd><var>e</var><kbd>;</kbd>...<kbd>;</kbd><var>id</var><kbd>=</kbd><var>e</var> <kbd>}</kbd>
@@ -197,9 +210,8 @@
             <li>predefined atoms such as <tt><kbd>false</kbd></tt>,
             <tt><kbd>true</kbd></tt>, …</li>
             <li>identifiers</li>
-            <li>a <tt><kbd>magic</kbd></tt> constant with type <tt>'a</tt>,
-            which can be used to define a variable of any type (without having
-            to give a proper definition)</li>
+            <li>constructors (note that constructors are created on-the-fly,
+                they do not need to be declared)</li>
             <li>type annotated expressions, e.g. <kbd> (x : bool ; int)</kbd> which
             can be used locally to suggest a type constraint and/or
             a decomposition to the type reconstruction algorithm</li>
@@ -219,6 +231,7 @@
         <code>
         <var>pat</var> ::= <kbd>:</kbd><var>simple_type</var>
             | <var>id</var>
+            | <var>cid</var> [<kbd>(</kbd><var>pat</var><kbd>)</kbd>]
             | <var>pat</var><kbd>,</kbd>...<kbd>,</kbd><var>pat</var> | <var>pat</var><kbd>|</kbd><var>pat</var> | <var>pat</var><kbd>&</kbd><var>pat</var>
             | <kbd>(</kbd><var>pat</var><kbd>)</kbd>
             | <kbd>[</kbd> <var>pat</var><kbd>;</kbd> ... <kbd>;</kbd><var>pat</var> <kbd>]</kbd>
