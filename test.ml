@@ -141,6 +141,14 @@ let test_double_array =
   (arr[0])[0]<- 42 ;
   (arr[0])[0]
 
+let overload1 x y =
+  let d = dict () in
+  d[x]<- (array ()) ;
+  (d[x])[0]<- y ;
+  (d[x])[0]
+
+(* val overload2: (array('a)->())
+          & (dict(int,'a)->()) *)
 let overload2 x = x[0]<- x[1]
 
 (* #value_restriction = false *)
@@ -523,49 +531,21 @@ let and_pair = fun x -> fun y ->
 let test_pair = fun x ->
   if fst x is falsy then (fst x) + (snd x) else succ (fst x)
 
-val concat : ['a*] -> ['b*] -> ['a* 'b*]
-let concat (x:['a*]) (y:['b*]) =
-   if x is [] then y else (hd x)::(concat (tl x) y)
+type tt('a, 'b)  =  'a -> 'b -> 'a
+type ff('a, 'b)  =  'a -> 'b -> 'b
 
-let flatten_ocaml (x:[['a*]*])  =
-  if x is [] then [] else concat (hd x) (flatten_ocaml (tl x))
-
-(* TODO: inference does not work well...  *)
-let reverse (l:[['a*]*]) =
-  if l is [] then [] else concat (reverse (tl l)) [hd l]
-
-(*
-(* MISCELLANEOUS *)
-
-type tt 'a 'b  =  'a -> 'b -> 'a
-type ff 'a 'b  =  'a -> 'b -> 'b
-
-let ifthenelse (b : tt 'a 'b; ff 'a 'b )  x y = b x y
-
-let check :    (tt 'c 'd -> 'c -> 'd -> 'c) & (ff 'c 'd -> 'c -> 'd -> 'd) = ifthenelse
-
-(* Parametric types examples *)
-
-type Tree' 'a = ('a, [(Tree' 'a)*])
-let a = <Tree' int>
-
-type Rec 'a = Rec 'a -> 'a
-let b = <Rec 'b>
+val ifthenelse : (tt('c, 'd) -> 'c -> 'd -> 'c) & (ff('c, 'd) -> 'c -> 'd -> 'd)
+let ifthenelse b x y = b x y
 
 (* Pattern matching *)
 
-let test_patterns (a,_) = a
+let test1_patterns (a,_) = a
 
 let test2_patterns x =
   match x with (a,_)&(_,b) -> (a,b) end
 
 let test3_patterns x y =
   let pack x y = (x,y) in
-  let (y,x) = pack x y in
-  pack x y
-
-let test3_patterns_ann x y =
-  let pack (x:'a;'b) (y:'a;'b) = (x,y) in
   let (y,x) = pack x y in
   pack x y
 
@@ -585,198 +565,43 @@ let land_patterns a b =
   | :any -> false
   end
 
-let fact_pat_stub fact n =
-  match n with
-  | :0 -> 1
-  | n -> (fact (n-1))*n
-  end
+(*******************************
+ *                             *
+ * Complex recursive functions *
+ *                             *
+ *******************************)
 
-let fact_pat = fixpoint fact_pat_stub
+val concat : ['a*] -> ['b*] -> ['a* 'b*]
+let concat (x:['a*]) (y:['b*]) =
+   if x is [] then y else (hd x)::(concat (tl x) y)
 
-let length_pat_stub length lst =
-  match lst with
-  | [] -> 0
-  | (_, tl & :list) -> succ (length tl)
-  end
+let flatten_ocaml (x:[['a*]*])  =
+  if x is [] then [] else concat (hd x) (flatten_ocaml (tl x))
 
-let length_pat = fixpoint length_pat_stub
+(* TODO: inference does not work well...  *)
+let reverse (l:[['a*]*]) =
+  if l is [] then [] else concat (reverse (tl l)) [hd l]
 
-let map_pat_stub map f lst =
-  match lst with
-  | [] -> []
-  | (hd, tl) & :list -> (f hd, map f tl)
-  end
-
-let map_pat = fixpoint map_pat_stub
-
-(* Recursive functions and partial user type annotations *)
-
-let rec map_noannot f lst =
-  match lst with
-  | [] -> []
-  | (e,lst) & :list -> ((f e), map_noannot f lst)
-  end
-
-let rec map f (lst:['a*]) =
-  match lst with
-  | [] -> []
-  | (e,lst) & :list -> ((f e), map f lst)
-  end
-
-(* let rec filter_noannot f l =
-  if l is [] then []
-  else
-    if f(fst(l)) is true
-    then (fst(l),filter f (snd(l)))
-    else filter f (snd(l)) *)
-
-let rec filter (f: ('a->any) & ('b -> ~true)) (l:[('a|'b)*]) =
-  match l with
-  | :[] -> []
-  | (e,l) ->
-    if f e is true
-    then (e, filter f l)
-    else filter f l
-  end
-    
-(* let rec flatten_noannot x =
-  if x is [] then [] else
-  if x is [any*] then concat (flatten (fst x)) (flatten (snd x))
-  else (x,[]) *)
-
-let rec flatten (x : Tree('a)) =    
-  if x is [] then [] else
-  if x is [any*] then concat (flatten (fst x)) (flatten (snd x))
-  else (x,[])
-
-let rec mapi_aux i f l =
-  match l with
-  :[] -> []
-  | (x, ll) -> let r = f i x in (r, mapi_aux (i+1) f ll)
-end
-
-let mapi f l = mapi_aux 0 f l
-  
-let rec eval e =
+(* let eval eval e =
   match e with
   | (:"add", (e1, e2)) -> (eval e1) + (eval e2)
   | (:"uminus", e) -> 0 - (eval e)
   | (:"const", x) -> x
-  end
+  end *)
 
-type Expr = ("const", (0--)) | ("add", (Expr, Expr)) | ("uminus", Expr)
+type expr = ("const", (0..)) | ("add", (expr, expr)) | ("uminus", expr)
 
-let rec eval_ann (e:Expr) =
+let eval_ann (e:expr) =
   match e with
   | (:"add", (e1, e2)) -> (eval_ann e1) + (eval_ann e2)
   | (:"uminus", e) -> 0 - (eval_ann e)
   | (:"const", x) -> x
   end
 
-(* ===== EXAMPLES FROM THE PAPER ===== *)
-
-let toBoolean x =
-    if x is truthy then true else false
-
-let lOr (x,y) =
-    if toBoolean x then x else y
-
-let id x =
-    lOr (x,x)
-
-let fixpoint = fun f ->
-  let delta = fun x ->
-      f ( fun  v -> ( x x v ))
-  in delta delta
-
-let map_stub map f lst =
-  if lst is [] then []
-  else (f (fst lst), map f (snd lst))
-
-let map = fixpoint map_stub
-
-let filter_stub filter (f: ('a->any) & ('b -> ~true)) (l:[('a|'b)*]) =
-  if l is [] then []
-  else if f(fst(l)) is true
-  then (fst(l), filter f (snd(l)))
-  else filter f (snd(l))
-
-let filter = fixpoint filter_stub
-
-let rec (concat : ['a*] -> ['b*] -> ['a* ; 'b*]) x y =
-  match x with
-  | [] -> y
-  | (h, t) -> (h, concat t y)
-  end
-
-let rec flatten x = match x with
- | [] -> []
- | (h, t) & :list -> concat (flatten h) (flatten t)
- | _ -> [x]
-end
-
-let rec filter f (l:['a*]) =
+let mapi_aux i f l =
   match l with
   | [] -> []
-  | (h,t) & :list -> if f h
-             then (h, filter f t)
-             else filter f t
+  | x::ll -> let r = f i x in r::(mapi_aux (i+1) f ll)
   end
 
-let rec fold_right f acc l =
-  match l with
-  :[] -> acc
-  | (x, ll) -> f x (fold_right f acc ll)
-end
-
-(* UNCOMPLETENESS & ANNOTATIONS *)
-
-let id x = x
-
-let test_expansion_noannot =
-    let f = (fun x -> (x 123, x true)) in
-    f id
-
-let test_expansion =
-  let f = (fun x -> (x 123, x true)) in
-  f (id :> (123 -> 123) ; (true -> true))
-
-let f = < ('a -> 'a) -> ('a -> 'a) >
-let x = < (int -> int) | (bool -> bool) >
-
-let test_expansion2_noannot = f x
-
-let test_expansion2 =
-  (f :> ((int -> int) -> (int -> int)) ;
-        ((bool -> bool) -> (bool -> bool))) x
-
-let bool = <() -> bool>
-let neg = <(true -> false) & (false -> true)>
-let lor = <(true -> bool -> true)
-  & (bool -> true -> true) & (false -> false -> false)>
-
-let test_split_noannot =
-  let b = bool () in
-  lor (neg b) b
-
-let test_split =
-  let b = (bool () : true ; false) in
-  lor (neg b) b
-
-(* Cons syntax *)
-
-let hd2 x =
-  match x with
-  | _::b::_ -> b
-  end
-
-let cons2 x y z = x::y::z
-
-let test_cons = hd2 (cons2 'a' 'b' ['c';'d'])
-
-let rec first_leaf (x : T | () where T = [T+] | int) =
-  match x with
-  | () -> []
-  | b::_ -> first_leaf b
-  | i -> i
-  end
+let mapi f l = mapi_aux 0 f l

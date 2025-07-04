@@ -50,3 +50,13 @@ let test_arr x =
   push arr x ;
   push arr false ;
   filter_arr (fun x -> if x is int then true else false) arr
+
+let overload1 x y =
+  let d = dict () in
+  d[x]<- (array ()) ;
+  (d[x])[0]<- y ;
+  (d[x])[0]
+
+val overload2: (array('a)->())
+          & (dict(int,'a)->())
+let overload2 x = x[0]<- x[1]
