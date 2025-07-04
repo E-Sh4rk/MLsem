@@ -73,22 +73,26 @@ module Domain = struct
 end
 
 module Cache = struct
-  type 'a t = (Parsing.Ast.exprid * IAnnot.t, (Env.t * 'a) list) Hashtbl.t
+  type 'a t = (Parsing.Ast.exprid * IAnnot.t, (Env.t * TVarSet.t * 'a) list) Hashtbl.t
 
   let empty () = Hashtbl.create 100
 
   let add (id,e) env a res t =
+    let tvars = Env.tvars env in (* Required due to tvar caching *)
     let env = Env.restrict (Ast.fv (id,e) |> VarSet.elements) env in
     let lst = match Hashtbl.find_opt t (id,a) with Some lst -> lst | None -> [] in
-    let lst = (env,res)::lst in
+    let lst = (env,tvars,res)::lst in
     Hashtbl.replace t (id,a) lst
 
   let get (id,e) env a t =
     match Hashtbl.find_opt t (id,a) with
     | None -> None
     | Some lst ->
+      let tvars = Env.tvars env in
       let env = Env.restrict (Ast.fv (id,e) |> VarSet.elements) env in
-      List.find_opt (fun (env',_) -> Env.equiv env env') lst |> Option.map snd
+      lst |> List.find_opt
+        (fun (env',tvars',_) -> TVarSet.equal tvars tvars' && Env.equiv env env')
+      |> Option.map (fun (_,_,r) -> r)
 end
 
 module TVCache = struct

@@ -47,6 +47,10 @@ let minimize_new_tvars tvars sol =
 
 let tallying_no_result env cs =
   let tvars = Env.tvars env in
+  (* Format.printf "Tallying:@." ;
+  cs |> List.iter (fun (a,b) -> Format.printf "%a <= %a@." pp_typ a pp_typ b) ; *)
+  (* Format.printf "with tvars=%a@." (Utils.pp_list TVar.pp)
+    (TVarSet.destruct tvars) ; *)
   tallying_with_prio (TVar.user_vars ()) (tvars |> TVarSet.destruct) cs
   |> List.map (minimize_new_tvars tvars)
   |> List.map (fun s -> s, empty)
@@ -55,10 +59,10 @@ let tallying_with_result env res cs =
   let tvars = Env.tvars env in
   let leq_sol (_,r1) (_,r2) = subtype r1 r2 in
   (* Format.printf "Tallying:@." ;
-  cs |> List.iter (fun (a,b) -> Format.printf "%a <= %a@." pp_typ a pp_typ b) ;
-  Format.printf "with tvars=%a@." (Utils.pp_list TVar.pp)
-    (TVarSet.destruct tvars) ;
-  Format.printf "with env=%a@." Env.pp env ; *)
+  cs |> List.iter (fun (a,b) -> Format.printf "%a <= %a@." pp_typ a pp_typ b) ; *)
+  (* Format.printf "with tvars=%a@." (Utils.pp_list TVar.pp)
+    (TVarSet.destruct tvars) ; *)
+  (* Format.printf "with env=%a@." Env.pp env ; *)
   tallying_with_prio (TVar.user_vars ()) (tvars |> TVarSet.destruct) cs
   |> List.map (minimize_new_tvars tvars)
   |> List.map (fun s -> s, Subst.apply s res)

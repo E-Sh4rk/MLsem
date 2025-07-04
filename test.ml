@@ -519,9 +519,7 @@ let identity_js = fun x -> or_js x x
 let and_pair = fun x -> fun y ->
   if x is falsy then x else (y, succ x)
 
-(* TODO: inference does not work well... see if it is because of the combination
-  of type narrowing and tvar caching *)
-val test_pair : ((int \ 0, any) | (int, int) -> int)
+(* val test_pair : ((int \ 0, any) | (int, int) -> int) *)
 let test_pair = fun x ->
   if fst x is falsy then (fst x) + (snd x) else succ (fst x)
 
@@ -532,9 +530,8 @@ let concat (x:['a*]) (y:['b*]) =
 let flatten_ocaml (x:[['a*]*])  =
   if x is [] then [] else concat (hd x) (flatten_ocaml (tl x))
 
-(* TODO: inference does not work well... see if it is because of the combination
-  of type narrowing and tvar caching *)
-let reverse (l:['a*]) =
+(* TODO: inference does not work well...  *)
+let reverse (l:[['a*]*]) =
   if l is [] then [] else concat (reverse (tl l)) [hd l]
 
 (*
