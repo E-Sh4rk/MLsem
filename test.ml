@@ -141,14 +141,19 @@ let test_double_array =
   (arr[0])[0]<- 42 ;
   (arr[0])[0]
 
-let overload1 x y =
+(* val arr_dict_assign: (array('a)|dict(int,'a) -> ()) *)
+let arr_dict_assign x = x[0]<- x[1]
+
+let nested x y =
   let d = dict () in
   d[x]<- (array ()) ;
-  (d[x])[0]<- y ;
-  (d[x])[0]
+  (d[x])[0]<- y ; (d[x])[0]
 
-(* val overload2: (array('a)|dict(int,'a) -> ()) *)
-let overload2 x = x[0]<- x[1]
+val swap : ('a -> 'a -> dict('a,'b) -> ())
+         & (int -> int -> array('b) -> ())
+let swap i j x =
+    let tmp = x[i] in
+    x[i]<- x[j] ; x[j]<- tmp
 
 (* #value_restriction = false *)
 

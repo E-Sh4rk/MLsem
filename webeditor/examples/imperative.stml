@@ -51,11 +51,13 @@ let test_arr x =
   push arr false ;
   filter_arr (fun x -> if x is int then true else false) arr
 
-let overload1 x y =
+let nested x y =
   let d = dict () in
   d[x]<- (array ()) ;
-  (d[x])[0]<- y ;
-  (d[x])[0]
+  (d[x])[0]<- y ; (d[x])[0]
 
-let overload2 (x:array('a)|dict(int,'a)) =
-  x[0]<- x[1]
+val swap : ('a -> 'a -> dict('a,'b) -> ())
+         & (int -> int -> array('b) -> ())
+let swap i j x =
+    let tmp = x[i] in
+    x[i]<- x[j] ; x[j]<- tmp
