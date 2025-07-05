@@ -24,15 +24,32 @@ let tsort leq lst =
   in
   List.fold_left add_elt [] (List.rev lst)
 
+let substitute_by_similar_var v t =
+  let vs = TVarSet.rm v (top_vars t) in
+  let nt = vars_with_polarity t |> List.find_map (fun (v', k) ->
+    if TVarSet.mem vs v' then
+    match k with
+    | `Pos -> Some (TVar.typ v')
+    | `Neg -> Some (TVar.typ v' |> neg)
+    | `Both -> (* Cases like Bool & 'a \ 'b  |  Int & 'a & 'b *) None
+    else None
+    )
+  in
+  match nt with
+  | None -> Subst.identity
+  | Some nt -> Subst.construct [(v,nt)]
 let abstract_factors cache v ty =
   let (factor, _) = factorize (TVarSet.construct [v], TVarSet.empty) ty in
   let res = ref [] in
   let aux (abs, dnf) =
     let vs = params_of_abstract abs in
     let mk_arg i (ty,variance) =
-      let tv = TVCache.get_abs_param cache.tvcache abs i v |> TVar.typ in
-      match variance with
-      | Inv -> ty | Cov -> cap ty tv | Cav -> cup ty tv
+      let tv = TVCache.get_abs_param cache.tvcache abs i v in
+      let arg = match variance with
+      | Inv -> ty | Cov -> cap ty (TVar.typ tv) | Cav -> cup ty (TVar.typ tv)
+      in
+      let s = substitute_by_similar_var tv arg in
+      Subst.apply s arg
     in
     let mk_abstract' tys =
       let args = List.combine tys vs |> List.mapi mk_arg in
@@ -58,20 +75,6 @@ let abstract_factors cache sol =
     List.fold_left (abstract_factors cache) [sol] (Subst.destruct sol)
   else
     [sol]
-let substitute_by_similar_var v t =
-  let vs = TVarSet.rm v (top_vars t) in
-  let nt = vars_with_polarity t |> List.find_map (fun (v', k) ->
-    if TVarSet.mem vs v' then
-    match k with
-    | `Pos -> Some (TVar.typ v')
-    | `Neg -> Some (TVar.typ v' |> neg)
-    | `Both -> (* Cases like Bool & 'a \ 'b  |  Int & 'a & 'b *) None
-    else None
-    )
-  in
-  match nt with
-  | None -> Subst.identity
-  | Some nt -> Subst.construct [(v,nt)]
 let minimize_new_tvars tvars sol (v,t) =
   let mono = TVarSet.union_many [TVar.user_vars () ;  TVarSet.construct [v] ; tvars] in
   let ss = tallying mono [(TVar.typ v, t) ; (t, TVar.typ v)] in
