@@ -56,7 +56,7 @@ let type_check_with_sigs env (var,e,sigs,aty) =
     let (tvs1, t1), (tvs2, t2) = TyScheme.get t1, TyScheme.get t2 in
     TyScheme.mk (TVarSet.union tvs1 tvs2) (cap t1 t2)
   in
-  let typ = List.fold_left tscap (TyScheme.mk_mono any) typs in
+  let typ = List.fold_left tscap (TyScheme.mk_mono any) typs |> TyScheme.simplify in
   if TyScheme.leq typ aty |> not then raise (IncompatibleType (var,typ)) ;
   check_resolved var env typ ;
   var,typ
