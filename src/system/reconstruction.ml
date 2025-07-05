@@ -38,6 +38,7 @@ let substitute_by_similar_var v t =
   match nt with
   | None -> Subst.identity
   | Some nt -> Subst.construct [(v,nt)]
+
 let abstract_factors cache v ty =
   let (factor, _) = factorize (TVarSet.construct [v], TVarSet.empty) ty in
   let res = ref [] in
@@ -71,11 +72,13 @@ let abstract_factors cache sols (v,t) =
   let ss = abstract_factors cache v t in
   sols |> List.map (fun sol -> List.map (fun s -> Subst.compose s sol) ss) |> List.flatten
 let abstract_factors cache tvars sol =
+  (* Note: this simplification does nothing if parameters are fully annotated *)
   if !Config.no_abstract_inter then
     List.fold_left (abstract_factors cache) [sol]
       (Subst.restrict sol tvars |> Subst.destruct)
   else
     [sol]
+
 let minimize_new_tvars tvars sol (v,t) =
   let mono = TVarSet.union_many [TVar.user_vars () ;  TVarSet.construct [v] ; tvars] in
   let ss = tallying mono [(TVar.typ v, t) ; (t, TVar.typ v)] in
@@ -88,7 +91,9 @@ let minimize_new_tvars tvars sol (v,t) =
   in
   List.fold_left aux sol ss
 let minimize_new_tvars tvars sol =
-  List.fold_left (minimize_new_tvars tvars) sol (Subst.destruct sol)
+  (* Note: this simplification does nothing if parameters are fully annotated *)
+  List.fold_left (minimize_new_tvars tvars) sol
+    (Subst.restrict sol tvars |> Subst.destruct)
 
 let tallying_no_result cache env cs =
   let tvars = Env.tvars env in
