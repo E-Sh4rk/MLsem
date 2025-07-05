@@ -91,9 +91,7 @@ let minimize_new_tvars tvars sol (v,t) =
   in
   List.fold_left aux sol ss
 let minimize_new_tvars tvars sol =
-  (* Note: this simplification does nothing if parameters are fully annotated *)
-  List.fold_left (minimize_new_tvars tvars) sol
-    (Subst.restrict sol tvars |> Subst.destruct)
+  List.fold_left (minimize_new_tvars tvars) sol (Subst.destruct sol)
 
 let tallying_no_result cache env cs =
   let tvars = Env.tvars env in
