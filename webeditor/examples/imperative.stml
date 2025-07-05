@@ -57,6 +57,5 @@ let overload1 x y =
   (d[x])[0]<- y ;
   (d[x])[0]
 
-val overload2: (array('a)->())
-          & (dict(int,'a)->())
-let overload2 x = x[0]<- x[1]
+let overload2 (x:array('a)|dict(int,'a)) =
+  x[0]<- x[1]

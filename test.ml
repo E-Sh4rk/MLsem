@@ -147,8 +147,7 @@ let overload1 x y =
   (d[x])[0]<- y ;
   (d[x])[0]
 
-(* val overload2: (array('a)->())
-          & (dict(int,'a)->()) *)
+(* val overload2: (array('a)|dict(int,'a) -> ()) *)
 let overload2 x = x[0]<- x[1]
 
 (* #value_restriction = false *)
