@@ -343,8 +343,9 @@ let type_narrowing2_ok (f:(any -> any) & ('a -> false)) (x:any) =
 let type_narrowing2_ok' ((f,x): ((any -> any) & ('a -> false), any)) =
   if f x then x else 42
 
+
 (*************************************************
-*          Tobin-Hochstadt & Felleisen           *
+*    Examples from Tobin-Hochstadt & Felleisen   *
 *     exampleX = EXPLICITLY ANNOTATED VERSIONS   *
 *     implictX = IMPLICITLY ANNOTATED VERSIONS   *
 *                                                *
@@ -352,20 +353,18 @@ let type_narrowing2_ok' ((f,x): ((any -> any) & ('a -> false), any)) =
 
 (*
  Interesting points:
-  - example2: does not need the annotation, while TH&F yes
   - example6: not typable with the annotation int|string
     (as expected), but if we remove annotations becomes typable.
     That is our system finds the right constraints to make the
     expression typable
   - in examples 10 11 12 we do not have to assume that p is
-    a product the system deduces it alone
+    a product, the system deduces it alone
   - same for the example 14. We do not have to assume that
     the parameter input is int|string and extra is a pair. The system
     finds it alone and it works for user defined "and"
-    (currified or not)
 *)
 
-(* prelude *)
+(* Prelude *)
 
 let and_ = fun (x, y) ->
      if x is true then if y is true then x else false else false
@@ -494,20 +493,20 @@ let implicit13 =
     else 3
 
 let example14 = fun (input : int|string) ->
-fun (extra : (any, any)) ->
- if and_(is_int input , is_int(fst extra)) is true then
-     add input (fst extra)
- else if is_int(fst extra) is true then
-     add (strlen input) (fst extra)
- else 0
+  fun (extra : (any, any)) ->
+    if and_(is_int input , is_int(fst extra)) is true then
+        add input (fst extra)
+    else if is_int(fst extra) is true then
+        add (strlen input) (fst extra)
+    else 0
 
 let implicit14 = fun input ->
-fun extra ->
- if and_(is_int input , is_int(fst extra)) is true then
-     add input (fst extra)
- else if is_int(fst extra) is true then
-     add (strlen input) (fst extra)
- else 0
+  fun extra ->
+    if and_(is_int input , is_int(fst extra)) is true then
+        add input (fst extra)
+    else if is_int(fst extra) is true then
+        add (strlen input) (fst extra)
+    else 0
 
 (*******************************
  *                             *

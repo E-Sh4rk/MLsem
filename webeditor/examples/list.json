@@ -4,6 +4,10 @@
         "path": "functional.stml"
     },
     {
+        "name": "Type Narrowing",
+        "path": "narrowing.stml"
+    },
+    {
         "name": "Imperative Programming",
         "path": "imperative.stml"
     }

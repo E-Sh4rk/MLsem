@@ -1,0 +1,164 @@
+
+(*************************************************
+*    Examples from Tobin-Hochstadt & Felleisen   *
+*     exampleX = EXPLICITLY ANNOTATED VERSIONS   *
+*     implictX = IMPLICITLY ANNOTATED VERSIONS   *
+*                                                *
+**************************************************)
+
+(*
+ Interesting points:
+  - example6: not typable with the annotation int|string
+    (as expected), but if we remove annotations becomes typable.
+    That is our system finds the right constraints to make the
+    expression typable
+  - in examples 10 11 12 we do not have to assume that p is
+    a product, the system deduces it alone
+  - same for the example 14. We do not have to assume that
+    the parameter input is int|string and extra is a pair. The system
+    finds it alone and it works for user defined "and"
+*)
+
+(* Prelude *)
+
+let and_ = fun (x, y) ->
+     if x is true then if y is true then x else false else false
+let not_ = fun x -> if x is true then false else true
+let or_ =  fun (x,y) ->
+  not_ (and_ (not_ x, not_ y))
+
+let is_string = fun x ->
+     if x is string then true else false
+let is_int = fun x ->
+     if x is int then true else false
+
+val strlen : string -> int
+val add : int -> int -> int
+val add1 : int -> int
+val f : (int | string) -> int
+val g : (int, int) -> int
+
+(* Examples Tobin-Hochstadt & Felleisen *)
+
+let example1 = fun (x:any) ->
+  if x is int then add1 x else 0
+
+let implicit1 = fun x ->
+  if x is int then add1 x else 0
+
+
+let example2 = fun (x:string|int) ->
+  if x is int then add1 x else strlen x
+
+let implicit2 = fun x ->
+  if x is int then add1 x else strlen x
+
+
+let example3 = fun (x: any) ->
+  if x is (any \ false) then (x,x) else false
+
+let implicit3 = fun x ->
+  if x is (any \ false) then (x,x) else false
+
+
+let example4 = fun (x : any) ->
+  if or_ (is_int x, is_string x) is true then x else 'A'
+
+let implicit4 = fun x ->
+  if or_ (is_int x, is_string x) is true then x else 'A'
+
+
+let example5 = fun (x : any) -> fun (y : any) ->
+  if and_ (is_int x, is_string y) is true then
+   add x (strlen y) else 0
+
+let implicit5 = fun x -> fun y ->
+  if and_ (is_int x, is_string y) is true then
+   add x (strlen y) else 0
+
+
+let example6 = fun (x : int|string) -> fun (y : any) ->
+  if and_ (is_int x, is_string y) is true then
+   add  x (strlen y) else strlen x
+
+let implicit6 = fun x -> fun y ->
+  if and_ (is_int x, is_string y) is true then
+   add  x (strlen y) else strlen x
+
+
+let example7 = fun (x : any) -> fun (y : any) ->
+  if (if is_int x is true then is_string y else false) is true then
+   add x (strlen y) else 0
+
+let implicit7 = fun x -> fun y ->
+  if (if is_int x is true then is_string y else false) is true then
+   add x (strlen y) else 0
+
+
+let example8 = fun (x : any) ->
+  if or_ (is_int x, is_string x) is true then true else false
+
+let implicit8 = fun x ->
+  if or_ (is_int x, is_string x) is true then true else false
+
+
+let example9 = fun (x : any) ->
+  if
+   (if is_int x is true then is_int x else is_string x)
+   is true then  f x else 0
+
+let implicit9 = fun x  ->
+  if
+   (if is_int x is true then is_int x else is_string x)
+   is true then  f x else 0
+
+
+let example10 = fun (p : (any,any)) ->
+  if is_int (fst p) is true then add1 (fst p) else 7
+
+let implicit10 = fun p ->
+  if is_int (fst p) is true then add1 (fst p) else 7
+
+
+let example11 = fun (p : (any, any)) ->
+  if and_ (is_int (fst p), is_int (snd p)) is true then g p else No
+
+let implicit11 = fun p ->
+  if and_ (is_int (fst p), is_int (snd p)) is true then g p else No
+
+let example12 = fun (p : (any, any)) ->
+  if is_int (fst p) is true then true else false
+
+let implicit12 = fun p ->
+  if is_int (fst p) is true then true else false
+
+
+let example13 =
+ fun (x : any) ->
+   fun (y : any) ->
+    if and_ (is_int x, is_string y) is true then 1
+    else if is_int x is true then 2
+    else 3
+
+let implicit13 =
+ fun x ->
+   fun y ->
+    if and_ (is_int x, is_string y) is true then 1
+    else if is_int x is true then 2
+    else 3
+
+let example14 = fun (input : int|string) ->
+  fun (extra : (any, any)) ->
+    if and_(is_int input , is_int(fst extra)) is true then
+        add input (fst extra)
+    else if is_int(fst extra) is true then
+        add (strlen input) (fst extra)
+    else 0
+
+let implicit14 = fun input ->
+  fun extra ->
+    if and_(is_int input , is_int(fst extra)) is true then
+        add input (fst extra)
+    else if is_int(fst extra) is true then
+        add (strlen input) (fst extra)
+    else 0
