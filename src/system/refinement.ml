@@ -21,6 +21,7 @@ let combine rs1 rs2 =
 
 let sufficient_refinements env e t =
   let rec aux (_,e) t =
+    if is_any t then [REnv.empty] else
     match e with
     | Lambda _ -> []
     | LambdaRec _ -> []
@@ -91,8 +92,7 @@ let sufficient_refinements env e t =
   aux e t
 
 let refine env e t =
-  let base_renv = REnv.empty (*sufficient_refinements env e any |> REnv.conj*) in
-  (* Format.printf "Base: %a@." REnv.pp base_renv ; *)
+  let base_renv = REnv.empty in
   let renvs = sufficient_refinements env e (neg t) in
   let rec aux renv renvs =
     let renvs = renvs |> List.map (fun renv' ->

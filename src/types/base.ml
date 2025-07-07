@@ -34,6 +34,8 @@ let normalize = Sstt.Ty.factorize
 
 let is_empty = Sstt.Ty.is_empty
 let non_empty t = is_empty t |> not
+let is_any = Sstt.Ty.is_any
+let non_any t = is_any t |> not
 let subtype = Sstt.Ty.leq
 let disjoint = Sstt.Ty.disjoint
 let equiv = Sstt.Ty.equiv

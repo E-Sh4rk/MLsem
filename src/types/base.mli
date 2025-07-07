@@ -86,7 +86,9 @@ val apply : typ -> typ -> typ
 val dnf : typ -> (typ * typ) list list
 
 val is_empty : typ -> bool
+val is_any : typ -> bool
 val non_empty: typ -> bool
+val non_any : typ -> bool
 val subtype  : typ -> typ -> bool
 val disjoint : typ -> typ -> bool
 val equiv : typ -> typ -> bool
