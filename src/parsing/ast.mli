@@ -27,6 +27,7 @@ type 'typ lambda_annot = 'typ option
 type ('a, 'typ, 'tag, 'v) pattern =
 | PatType of 'typ
 | PatVar of 'v
+| PatLit of const
 | PatTag of 'tag * ('a, 'typ, 'tag, 'v) pattern
 | PatAnd of ('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'tag, 'v) pattern
 | PatOr of ('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'tag, 'v) pattern

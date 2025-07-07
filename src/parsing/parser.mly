@@ -382,6 +382,7 @@ simple_pattern_nocons:
 atomic_pattern:
   COLON t=atomic_typ { PatType t }
 | v=ID  { PatVar v }
+| c=literal { PatLit c }
 | a=CID { PatType (TAtom a) }
 | t=PCID p=pattern RPAREN { PatTag (t,p) }
 | t=PCID RPAREN { PatType (TTag (t,TBase TUnit)) }

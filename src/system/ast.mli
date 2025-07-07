@@ -3,6 +3,8 @@ open Variable
 open Types.Base
 open Types.Tvar
 
+val typeof_const : Parsing.Ast.const -> typ
+
 type cf = CfWhile | CfCond
 
 type e =

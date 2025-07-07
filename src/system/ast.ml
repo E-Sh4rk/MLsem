@@ -3,6 +3,21 @@ open Variable
 open Types.Base
 open Types.Tvar
 
+let typeof_const c =
+  let open Parsing.Ast in
+  match c with
+  | Unit -> unit_typ
+  | Nil -> nil_typ
+  | EmptyRecord -> empty_closed_record
+  | Bool true -> true_typ
+  | Bool false -> false_typ
+  | Int i -> interval (Some i) (Some i)
+  | Float _ -> float_typ
+  | Char c -> char_interval c c
+  | String str -> single_string str
+
+(* -------------------- *)
+
 type cf = CfWhile | CfCond
 [@@deriving show]
 
@@ -112,6 +127,7 @@ let rec type_of_pat pat =
   let open Ast in
   match pat with
   | PatType t -> t
+  | PatLit c -> typeof_const c
   | PatVar _ -> any
   | PatTag (tag, p) -> mk_tag tag (type_of_pat p)
   | PatAnd (p1, p2) ->
@@ -129,7 +145,7 @@ let rec type_of_pat pat =
 let rec vars_of_pat pat =
   let open Ast in
   match pat with
-  | PatType _ -> VarSet.empty
+  | PatType _ | PatLit _ -> VarSet.empty
   | PatVar x when Variable.equals x dummy_pat_var -> VarSet.empty
   | PatVar x -> VarSet.singleton x
   | PatTag (_, p) -> vars_of_pat p
@@ -176,6 +192,7 @@ let rec def_of_var_pat pat v e =
   | PatAssign (v', c) when Variable.equals v v' -> (Ast.unique_exprid (), Const c)
   | PatAssign _ -> assert false
   | PatType _ -> assert false
+  | PatLit _ -> assert false
 
 let encode_pattern_matching id e pats =
   let x = Variable.create_let None in

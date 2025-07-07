@@ -36,6 +36,7 @@ type 'typ lambda_annot = 'typ option
 type ('a, 'typ, 'tag, 'v) pattern =
 | PatType of 'typ
 | PatVar of 'v
+| PatLit of const
 | PatTag of 'tag * ('a, 'typ, 'tag, 'v) pattern
 | PatAnd of ('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'tag, 'v) pattern
 | PatOr of ('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'tag, 'v) pattern
@@ -202,6 +203,7 @@ let parser_expr_to_expr tenv vtenv name_var_map e =
                 else
                     let var = find_or_def_var str in
                     (PatVar var, vtenv, StrMap.singleton str var)
+            | PatLit c -> (PatLit c, vtenv, StrMap.empty)
             | PatTag (str, p) ->
                 let tag = get_tag tenv str in
                 let (p, vtenv, env) = aux_p vtenv env p in

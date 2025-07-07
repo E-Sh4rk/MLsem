@@ -28,7 +28,7 @@ let sufficient_refinements env e t =
     | Var v -> [REnv.singleton v t]
     | TypeCoerce (_, s) when subtype s t -> [REnv.empty]
     | Abstract s when subtype s t -> [REnv.empty]
-    | Const c when subtype (Checker.typeof_const c) t -> [REnv.empty]
+    | Const c when subtype (typeof_const c) t -> [REnv.empty]
     | Atom a when subtype (mk_atom a) t -> [REnv.empty]
     | ControlFlow _ when subtype unit_typ t -> [REnv.empty]
     | Abstract _ | Const _ | Atom _ | TypeCoerce _ | ControlFlow _ -> []
