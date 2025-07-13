@@ -1,7 +1,7 @@
 module Variable = struct
 
   type kind = Let | Lambda | Gen
-  let data : (int, string option * Position.t list * kind) Hashtbl.t = Hashtbl.create 100
+  let data : (int, string option * Position.t * kind) Hashtbl.t = Hashtbl.create 100
 
   type t = int
   let compare = compare
@@ -15,7 +15,7 @@ module Variable = struct
 
   let create (k:kind) display_name =
     let id = next_id () in
-    Hashtbl.add data id (display_name, [], k) ;
+    Hashtbl.add data id (display_name, Position.dummy, k) ;
     id
 
   let create_let display_name =
@@ -28,12 +28,12 @@ module Variable = struct
     create Gen display_name
 
   let attach_location id loc =
-    let (name, locs, k) = Hashtbl.find data id in
-    Hashtbl.replace data id (name, loc::locs, k)
+    let (name, _, k) = Hashtbl.find data id in
+    Hashtbl.replace data id (name, loc, k)
 
-  let get_locations id =
-    let (_, locs, _) = Hashtbl.find data id
-    in locs
+  let get_location id =
+    let (_, loc, _) = Hashtbl.find data id
+    in loc
 
   let is_let_var id =
     let (_, _, k) = Hashtbl.find data id in

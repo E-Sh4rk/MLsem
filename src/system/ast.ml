@@ -195,7 +195,7 @@ let rec def_of_var_pat pat v e =
   | PatLit _ -> assert false
 
 let encode_pattern_matching e pats =
-  let x = Variable.create_let None in
+  let x = Variable.create_gen None in
   let ex : Ast.expr = (Ast.unique_exprid (), Var x) in
   let ts = pats |> List.map fst |> List.map type_of_pat in
   let t = disj ts in
@@ -233,7 +233,7 @@ let from_parser_ast t =
   in
   let add_let x e =
     let x' = Variable.create_let (Variable.get_name x) in
-    Variable.get_locations x |> List.iter (Variable.attach_location x') ;
+    Variable.get_location x |> Variable.attach_location x' ;
     add_suggs x' (get_sugg x) ;
     Ast.unique_exprid (),
     let_binding x' (Ast.unique_exprid (), Var x) (substitute x x' e)

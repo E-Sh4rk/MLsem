@@ -146,8 +146,8 @@ requirejs(['vs/editor/editor.main','cookie'], function () {
 		function treatResult(res) {
 			if (res["exit_code"] < 0) {
 				let pos = editor.getPosition();
-				if (res["pos"].length > 0) {
-					let range = applyChangesToRange(res["pos"][0]["startOffset"], res["pos"][0]["endOffset"], changes);
+				if (!isDummyPos(res["pos"])) {
+					let range = applyChangesToRange(res["pos"]["startOffset"], res["pos"]["endOffset"], changes);
 					if (range !== null)
 						pos = model.getPositionAt(range[0]);
 				}

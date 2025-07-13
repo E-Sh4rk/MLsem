@@ -76,7 +76,7 @@ let type_check_recs env lst =
 type 'a treat_result =
 | TSuccess of (Variable.t * TyScheme.t) list * float
 | TDone
-| TFailure of Variable.t option * (Position.t list) * string * float
+| TFailure of Variable.t option * Position.t * string * float
 
 exception AlreadyDefined of Variable.t
 
@@ -96,7 +96,7 @@ let sigs_of_def varm senv env str =
 
 let dummy = Variable.create_gen (Some "_")
 let treat (tenv,varm,senv,env) (annot, elem) =
-  let pos = [Position.position annot] in
+  let pos = Position.position annot in
   let time = Unix.gettimeofday () in
   let v = ref dummy in
   try  
@@ -160,18 +160,18 @@ let treat (tenv,varm,senv,env) (annot, elem) =
     (tenv,varm,senv,env), TFailure (Some v, pos, "Symbol already defined.", 0.0)
   | Untypeable (v', eid, msg) ->
     let v = match v' with None -> !v | Some v -> v in
-    let locs =
+    let pos =
       if eid = Ast.dummy_exprid
-      then Variable.get_locations v
-      else Variable.get_locations v (* TODO *)
+      then Variable.get_location v
+      else Variable.get_location v (* TODO *)
     in
-    (tenv,varm,senv,env), TFailure (Some v, locs, msg, retrieve_time time)
+    (tenv,varm,senv,env), TFailure (Some v, pos, msg, retrieve_time time)
   | IncompatibleType (var,_) ->
-    (tenv,varm,senv,env), TFailure (Some var, Variable.get_locations var,
+    (tenv,varm,senv,env), TFailure (Some var, Variable.get_location var,
       "the type inferred is not a subtype of the type specified",
       retrieve_time time)
   | UnresolvedType (var,_) ->
-    (tenv,varm,senv,env), TFailure (Some var, Variable.get_locations var,
+    (tenv,varm,senv,env), TFailure (Some var, Variable.get_location var,
       "the type inferred is not fully resolved",
       retrieve_time time)
 
@@ -210,7 +210,7 @@ let builtin_functions =
 
 let initial_varm =
   builtin_functions |> List.fold_left (fun varm (name, _) ->
-    let var = Variable.create_let (Some name) in
+    let var = Variable.create_gen (Some name) in
     StrMap.add name var varm
   ) Ast.empty_name_var_map
 

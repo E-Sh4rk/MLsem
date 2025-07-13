@@ -8,7 +8,7 @@ module Variable : sig
   val create_lambda : string option -> t
   val create_gen : string option -> t
   val attach_location : t -> Position.t -> unit
-  val get_locations : t -> Position.t list
+  val get_location : t -> Position.t
   val is_let_var : t -> bool
   val is_lambda_var : t -> bool
   val get_name : t -> string option

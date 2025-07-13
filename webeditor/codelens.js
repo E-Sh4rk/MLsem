@@ -16,6 +16,10 @@ function applyChangesToRange(startL, endL, changes) {
     return [startL, endL];
 }
 
+function isDummyPos(pos) {
+    return pos["startOffset"] < 0 || pos["endOffset"] < 0;
+}
+
 let codelensemitter = new monaco.Emitter();
 let typesinfo = [];
 function applyChangesToCurCodeLens(changes) {

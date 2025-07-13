@@ -6,37 +6,40 @@ module Html = Dom_html
 
 let json_of_pos pos =
   let open Position in
-  let startp = start_of_position pos in
-  let endp = end_of_position pos in
-  `Assoc [("startLine", `Int (line startp)) ; ("startCol", `Int (column startp)) ;
-  ("endLine", `Int (line endp)) ; ("endCol", `Int (column endp)) ;
-  ("startOffset", `Int (offset startp)) ; ("endOffset", `Int (offset endp))]
-
-let json_of_pos_list pos =
-  `List (List.map json_of_pos pos)
+  if pos = Position.dummy
+  then
+    `Assoc [("startLine", `Int (-1)) ; ("startCol", `Int (-1)) ;
+    ("endLine", `Int (-1)) ; ("endCol", `Int (-1)) ;
+    ("startOffset", `Int (-1)) ; ("endOffset", `Int (-1))]
+  else
+    let startp = start_of_position pos in
+    let endp = end_of_position pos in
+    `Assoc [("startLine", `Int (line startp)) ; ("startCol", `Int (column startp)) ;
+    ("endLine", `Int (line endp)) ; ("endCol", `Int (column endp)) ;
+    ("startOffset", `Int (offset startp)) ; ("endOffset", `Int (offset endp))]
 
 let add_res res res' =
   match res' with
   | TDone -> res
   | TFailure (Some v, pos, msg, time) ->
     let name = Parsing.Variable.Variable.get_name v |> Option.get in
-    let def_pos = Parsing.Variable.Variable.get_locations v |> List.hd in
+    let def_pos = Parsing.Variable.Variable.get_location v in
     let untyp =
       `Assoc [("name", `String name) ; ("def_pos", json_of_pos def_pos) ; ("time", `Float time) ;
-      ("typeable", `Bool false) ; ("message", `String msg) ; ("pos", json_of_pos_list pos)]
+      ("typeable", `Bool false) ; ("message", `String msg) ; ("pos", json_of_pos pos)]
     in
     untyp::res
   | TFailure (None, pos, msg, time) ->
     let untyp =
-      `Assoc [("time", `Float time) ; ("def_pos", json_of_pos (List.hd pos)) ;
-      ("typeable", `Bool false) ; ("message", `String msg) ; ("pos", json_of_pos_list pos)]
+      `Assoc [("time", `Float time) ; ("def_pos", json_of_pos pos) ;
+      ("typeable", `Bool false) ; ("message", `String msg) ; ("pos", json_of_pos pos)]
     in
     untyp::res
   | TSuccess (lst,time) ->
     let res = ref res in
     lst |> List.iter (fun (v,t)->
       let name = Parsing.Variable.Variable.get_name v |> Option.get in
-      let def_pos = Parsing.Variable.Variable.get_locations v |> List.hd in
+      let def_pos = Parsing.Variable.Variable.get_location v in
       let typ = Format.asprintf "%a" Types.TyScheme.pp_short t in
       let typ =
         `Assoc [("name", `String name) ; ("def_pos", json_of_pos def_pos) ;
@@ -76,7 +79,7 @@ let typecheck code callback =
         in
         ok_answer res
       | PFailure (pos, msg) ->
-        `Assoc [("exit_code", `Int (-2)); ("message", `String msg); ("pos", json_of_pos_list [pos])]
+        `Assoc [("exit_code", `Int (-2)); ("message", `String msg); ("pos", json_of_pos pos)]
     ) with e ->
       `Assoc [("exit_code", `Int (-1)); ("message", `String ("internal error: "^(Printexc.to_string e))); ("pos", `List [])]
   in
