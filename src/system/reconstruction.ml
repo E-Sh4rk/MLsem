@@ -156,6 +156,10 @@ let nc a = IAnnot.A (Annot.nc a)
 
 let rec infer cache env renvs annot (id, e) =
   let open IAnnot in
+  let log msg =
+    let log = (id, msg) in
+    cache.logs := log::!(cache.logs)
+  in
   let retry_with a = infer cache env renvs a (id, e) in
   let to_i =
     (function Annot.BSkip -> IAnnot.BSkip | Annot.BType a -> IAnnot.BType (A a)) in
@@ -205,6 +209,7 @@ let rec infer cache env renvs annot (id, e) =
       let cs = List.combine tys' tys in
       let ss = tallying_with_result cache env (mk_tuple tys') cs in
       let ok_ann = nc (Annot.ALambdaRec (List.combine tys annots)) in
+      log "untypeable recursive function" ;
       Subst (ss, ok_ann, Untyp, empty_cov)
     end
   | Ite _, Infer -> retry_with (AIte (Infer, BInfer, BInfer))
@@ -255,6 +260,7 @@ let rec infer cache env renvs annot (id, e) =
       let tv = TVCache.get cache.tvcache id TVCache.res_tvar in
       let arrow = mk_arrow t2 (TVar.typ tv) in
       let ss = tallying_with_result cache env (TVar.typ tv) [(t1, arrow)] in
+      log "untypeable application" ;
       Subst (ss, nc (Annot.AApp(a1,a2)), Untyp, empty_cov)
     | _ -> assert false
     end
@@ -273,6 +279,7 @@ let rec infer cache env renvs annot (id, e) =
       Subst (ss,ACons(a1,a2),ACons(a1',a2'),r)
     | AllOk ([a1;a2],[_;t2]) ->
       let ss = tallying_no_result cache env [(t2,list_typ)] in
+      log "untypeable cons" ;
       Subst (ss, nc (Annot.ACons(a1,a2)), Untyp, empty_cov)
     | _ -> assert false
     end
@@ -283,6 +290,7 @@ let rec infer cache env renvs annot (id, e) =
       let tv = TVCache.get cache.tvcache id TVCache.res_tvar in
       let ty = Checker.domain_of_proj p (TVar.typ tv) in
       let ss = tallying_with_result cache env (TVar.typ tv) [(s, ty)] in
+      log "untypeable projection" ;
       Subst (ss, nc (Annot.AProj annot'), Untyp, empty_cov)
     | Subst (ss,a,a',r) -> Subst (ss,AProj a,AProj a',r)
     | Fail -> Fail
@@ -293,6 +301,7 @@ let rec infer cache env renvs annot (id, e) =
     begin match infer' cache env renvs annot' e' with
     | Ok (annot', s) ->
       let ss = tallying_no_result cache env [(s,record_any)] in
+      log "untypeable field update" ;
       Subst (ss, nc (Annot.AUpdate(annot',None)), Untyp, empty_cov)
     | Subst (ss,a,a',r) -> Subst (ss,AUpdate (a,None),AUpdate (a',None),r)
     | Fail -> Fail
@@ -304,6 +313,7 @@ let rec infer cache env renvs annot (id, e) =
       Subst (ss,AUpdate(a1,Some a2),AUpdate(a1',Some a2'),r)
     | AllOk ([a1;a2],[s;_]) ->
       let ss = tallying_no_result cache env [(s,record_any)] in
+      log "untypeable field deletion" ;
       Subst (ss, nc (Annot.AUpdate(a1,Some a2)), Untyp, empty_cov)
     | _ -> assert false
     end
@@ -329,6 +339,7 @@ let rec infer cache env renvs annot (id, e) =
     begin match infer' cache env renvs annot' e' with
     | Ok (annot', s) ->
       let ss = tallying_no_result cache env [(s,t)] in
+      log "untypeable constraint" ;
       Subst (ss, nc (Annot.AConstr(annot')), Untyp, empty_cov)
     | Subst (ss,a,a',r) -> Subst (ss,AConstr a,AConstr a',r)
     | Fail -> Fail
@@ -337,6 +348,7 @@ let rec infer cache env renvs annot (id, e) =
     begin match infer' cache env renvs annot' e' with
     | Ok (annot', s) ->
       let ss = tallying_no_result cache env [(s,t)] in
+      log "untypeable coercion" ;
       Subst (ss, nc (Annot.ACoerce(t,annot')), Untyp, empty_cov)
     | Subst (ss,a,a',r) -> Subst (ss,ACoerce (t,a),ACoerce (t,a'),r)
     | Fail -> Fail
