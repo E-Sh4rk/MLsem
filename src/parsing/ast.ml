@@ -78,6 +78,7 @@ type parser_expr = (annotation, type_expr, string, string, varname) t
 type name_var_map = Variable.t StrMap.t
 let empty_name_var_map = StrMap.empty
 
+let dummy_exprid = 0
 let unique_exprid =
     let last_id = ref 0 in
     fun _ -> (

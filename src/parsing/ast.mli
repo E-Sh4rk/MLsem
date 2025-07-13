@@ -67,6 +67,7 @@ type parser_expr = (annotation, type_expr, string, string, varname) t
 type name_var_map = Variable.t StrMap.t
 val empty_name_var_map : name_var_map
 
+val dummy_exprid : exprid
 val unique_exprid : unit -> exprid
 val new_annot : Position.t -> annotation
 val copy_annot : annotation -> annotation

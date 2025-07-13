@@ -11,7 +11,9 @@ type ('a,'b) result =
 | Fail
 | Subst of (Subst.t * typ) list * 'b * 'b * (Parsing.Ast.exprid * REnv.t)
 
-type cache = { dom : Domain.t ; cache : ((Annot.t, IAnnot.t) result) Cache.t ; tvcache : TVCache.t }
+type log = Parsing.Ast.exprid * string
+type cache = { dom : Domain.t ; cache : ((Annot.t, IAnnot.t) result) Cache.t ;
+               tvcache : TVCache.t ; logs : log list ref }
 
 (* Auxiliary *)
 
@@ -442,8 +444,14 @@ and infer_part_seq' cache env renvs e v s lst =
 
 let infer env renvs e =
   let renvs = Refinement.Partitioner.from_renvset renvs in
-  let cache = { dom = Domain.empty ; cache = Cache.empty () ; tvcache = TVCache.empty () } in
+  let cache = { dom = Domain.empty ; cache = Cache.empty () ;
+    tvcache = TVCache.empty () ; logs = ref [] } in
   match infer' cache env renvs IAnnot.Infer e with
-  | Fail -> None
+  | Fail ->
+    begin match !(cache.logs) with
+    | [] ->
+      raise (Checker.Untypeable (Parsing.Ast.dummy_exprid, "annotation reconstruction failed"))
+    | (eid, msg)::_ -> raise (Checker.Untypeable (eid, msg))
+    end
   | Subst _ -> failwith "Top-level environment should not contain an unresolved type variable."
-  | Ok (a,_) -> Some a
+  | Ok (a,_) -> a

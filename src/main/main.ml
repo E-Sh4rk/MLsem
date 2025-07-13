@@ -12,7 +12,7 @@ type def = Variable.t * Ast.expr * typ option
 
 exception IncompatibleType of Variable.t * TyScheme.t
 exception UnresolvedType of Variable.t * TyScheme.t
-exception Untypeable of Variable.t option
+exception Untypeable of Variable.t option * Ast.exprid * string
 
 let sigs_of_ty mono ty =
   let rec aux ty =
@@ -34,11 +34,10 @@ let infer var env e =
   let annot =
     let r = if !Config.type_narrowing then Refinement.refinement_envs env e else REnvSet.empty in
     (* REnvSet.elements r |> List.iter (fun renv -> Format.printf "Renv: %a@." REnv.pp renv) ; *)
-    match Reconstruction.infer env r e with
-    | None ->
+    try Reconstruction.infer env r e with
+    | Checker.Untypeable (eid, msg) ->
       (* Format.printf "@.@.%a@.@." System.Ast.pp e ; *)
-      raise (Untypeable var)
-    | Some annot-> annot
+      raise (Untypeable (var, eid, msg))
   in
   Checker.typeof_def env annot e |> TyScheme.simplify
 let retrieve_time time =
@@ -159,11 +158,14 @@ let treat (tenv,varm,senv,env) (annot, elem) =
   | TypeDefinitionError msg -> (tenv,varm,senv,env), TFailure (None, pos, msg, 0.0)
   | AlreadyDefined v ->
     (tenv,varm,senv,env), TFailure (Some v, pos, "Symbol already defined.", 0.0)
-  | Untypeable (v') ->
+  | Untypeable (v', eid, msg) ->
     let v = match v' with None -> !v | Some v -> v in
-    (* TODO: retrieve pos of exprid *)
-    (tenv,varm,senv,env), TFailure (Some v, Variable.get_locations v,
-      "annotation reconstruction failed", retrieve_time time)
+    let locs =
+      if eid = Ast.dummy_exprid
+      then Variable.get_locations v
+      else Variable.get_locations v (* TODO *)
+    in
+    (tenv,varm,senv,env), TFailure (Some v, locs, msg, retrieve_time time)
   | IncompatibleType (var,_) ->
     (tenv,varm,senv,env), TFailure (Some var, Variable.get_locations var,
       "the type inferred is not a subtype of the type specified",

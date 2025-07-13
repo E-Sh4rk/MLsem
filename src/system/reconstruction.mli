@@ -1,4 +1,5 @@
 open Env
 open Annot
 
-val infer : Env.t -> REnvSet.t -> Ast.t -> Annot.t option
+(* Can raise Checker.Untypeable *)
+val infer : Env.t -> REnvSet.t -> Ast.t -> Annot.t
