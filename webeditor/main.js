@@ -142,6 +142,7 @@ requirejs(['vs/editor/editor.main','cookie'], function () {
 		let lock = false;
 		let changes = [];
 		model.onDidChangeContent((e) => { if (lock) changes.push(...e.changes); });
+		model.onDidChangeContent((e) => { validateMarkers(model, e.changes); });
 		const messageContribution = editor.getContribution('editor.contrib.messageController');
 		function treatResult(res) {
 			if (res["exit_code"] < 0) {
@@ -154,7 +155,7 @@ requirejs(['vs/editor/editor.main','cookie'], function () {
 				messageContribution.showMessage(res["message"], pos);
 			}
 			else {
-				updateCodeLens(res["results"], changes);
+				updateTypeInfo(model, res["results"], changes);
 			}
 		}
 		function initNewWorker() {
@@ -180,7 +181,7 @@ requirejs(['vs/editor/editor.main','cookie'], function () {
 					worker = initNewWorker();
 				}
 				lock = true;
-				clearCodeLens();
+				clearTypeInfo(model);
 				worker.postMessage(model.getValue());
 			} else {
 				requirejs(['typechecker'], function () {

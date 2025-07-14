@@ -16,6 +16,15 @@ function applyChangesToRange(startL, endL, changes) {
     return [startL, endL];
 }
 
+function rangeOfPositions(start, end) {
+    return  {
+                startLineNumber: start.lineNumber,
+                startColumn: start.column,
+                endLineNumber: end.lineNumber,
+                endColumn: end.column
+            };
+}
+
 function isDummyPos(pos) {
     if (pos !== undefined && pos !== null)
         return pos["startOffset"] < 0 || pos["endOffset"] < 0;
@@ -55,25 +64,39 @@ function applyChangesToCurCodeLens(changes) {
         }
     }
 }
-function updateCodeLens(types, changes) {
+function updateTypeInfo(model, types, changes) {
     typesinfo = types;
     applyChangesToCurCodeLens(changes);
     codelensemitter.fire();
+    validateMarkers(model);
 }
-function clearCodeLens() {
-    updateCodeLens([], []);
+function clearTypeInfo(model) {
+    updateTypeInfo(model, [], []);
+}
+
+function validateMarkers(model) {
+    const markers = [];
+    typesinfo.forEach((info) => {
+        if (!info["typeable"] && info["pos"] !== null) {
+            let msg = info["message"];
+            let start = model.getPositionAt(info["pos"]["startOffset"]);
+            let end = model.getPositionAt(info["pos"]["endOffset"]);
+            let range = rangeOfPositions(start, end);
+            markers.push({
+				message: msg,
+				severity: monaco.MarkerSeverity.Warning,
+				startLineNumber: range.startLineNumber,
+				startColumn: range.startColumn,
+				endLineNumber: range.endLineNumber,
+				endColumn: range.endColumn,
+			});
+        }
+    });
+    monaco.editor.setModelMarkers(model, "owner", markers);
 }
 
 function getCodeLens(editor, model) {
     model.onDidChangeContent((e) => { applyChangesToCurCodeLens(e.changes); });
-    function rangeOfPositions(start, end) {
-        return  {
-                    startLineNumber: start.lineNumber,
-                    startColumn: start.column,
-                    endLineNumber: end.lineNumber,
-                    endColumn: end.column
-				};
-    }
     const messageContribution = editor.getContribution('editor.contrib.messageController');
     let copyCmd = editor.addCommand(0, function(ctx, ...arguments) {navigator.clipboard.writeText(arguments[0])});
     let errDetails = editor.addCommand(0, function(ctx, ...arguments) {
