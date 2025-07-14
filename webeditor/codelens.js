@@ -131,7 +131,8 @@ function getCodeLens(editor, model) {
                         dPos = info["pos"]["startOffset"];
                     let tooltip = "Inferred in "+Math.round(info["time"])+"ms\nClick for more info";
                     let msg = "Untypeable: "+info["message"];
-                    return {range: range, id: name, command: {id: errDetails, title: msg, arguments: [dPos,msg], tooltip: tooltip}}
+                    let descr = fullErrorMessage(info);
+                    return {range: range, id: name, command: {id: errDetails, title: msg, arguments: [dPos,descr], tooltip: tooltip}}
                 }
             });
             return {
