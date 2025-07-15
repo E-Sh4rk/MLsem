@@ -413,13 +413,17 @@ and infer_nc' cache env renvs annot e =
   | Ok (a, ty) -> Ok (a, ty)
   | Fail -> Fail
   | Subst (ss, a1, a2, (eid,r)) when ss |> List.map fst |> List.for_all subst_disjoint ->
+    let default =
+      (* Don't add default branch if already covered (also important for error msg) *)
+      if ss |> List.exists (fun (s,_) -> Subst.is_identity s)
+      then [] else [{ IAnnot.coverage=(Some (None, r)) ; ann=a2 }]
+    in
     let branches = ss |> List.map (fun (s,ty) ->
       let ann = IAnnot.substitute s a1 in
       let coverage = (Some (eid, ty), REnv.substitute s r) in
       { IAnnot.coverage=(Some coverage) ; ann }
       ) in
-    let coverage = Some (None, r) in
-    let annot = IAnnot.AInter (branches@[{ coverage ; ann=a2 }]) in
+    let annot = IAnnot.AInter (branches@default) in
     infer' cache env renvs annot e
   | Subst (ss, a1, a2, r) -> Subst (ss, a1, a2, r)
 and infer' cache env renvs annot e =
