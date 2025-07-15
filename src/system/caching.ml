@@ -25,7 +25,7 @@ module Domain = struct
   let add c t = c::t
 
   let env_to_typ ?(normalize=false) renv =
-    let f = if normalize then transform_abstract else Utils.identity in
+    let f = if normalize then transform_abstract else Fun.id in
     let bindings = renv
       |> REnv.bindings |> List.map
         (fun (v, ty) -> (Variable.get_unique_name v, (false, f ty)))

@@ -24,12 +24,10 @@ let log ?(level=0) a =
   if level <= !Config.log_level then Format.fprintf Format.std_formatter a
   else Format.ifprintf Format.std_formatter a
   
-let identity x = x
 let ccmp f e1 e2 r =
   match r with
   | 0 -> f e1 e2
   | n -> n
-let filter_options x = List.filter_map identity x
 
 let rec map3 f l1 l2 l3 =
   match l1, l2, l3 with
