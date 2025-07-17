@@ -57,7 +57,6 @@ type name_var_map = Variable.t StrMap.t
 val empty_name_var_map : name_var_map
 
 val new_annot : Position.t -> annotation
-val copy_annot : annotation -> annotation
 
 val dummy_pat_var : Variable.t
 

@@ -57,8 +57,6 @@ let empty_name_var_map = StrMap.empty
 
 let new_annot p =
     Position.with_pos p (Eid.unique_with_pos p)
-let copy_annot a =
-    new_annot (Position.position a)
 
 let dummy_pat_var_str = "_"
 let dummy_pat_var =
