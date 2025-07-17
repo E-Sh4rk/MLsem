@@ -1,7 +1,7 @@
 open Types.Base
 open Types.Tvar
 open System.Ast
-open System.Variable
+open Variable
 
 let rec type_of_pat pat =
   let open Ast in

@@ -4,7 +4,7 @@ open Types.Additions
 open Types.Tvar
 open Types
 open Parsing
-open System.Variable
+open Variable
 open System.Env
 open System.Ast
 

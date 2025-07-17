@@ -1,18 +1,19 @@
 open Main
+open Variable
 
 let treat_res (acc, res) =
     match res with
     | TSuccess (lst, time) ->
         lst |> List.iter (fun (v,t) ->
             Format.printf "@{<blue;bold>%s@}: %!"
-                (System.Variable.Variable.get_name v |> Option.get) ;
+                (Variable.get_name v |> Option.get) ;
             Format.printf "%a @{<italic;yellow>(checked in %.00fms)@}\n%!"
                 Types.TyScheme.pp_short t time ;
         ) ;
         acc, true
     | TFailure (Some v, pos, msg, descr, time) ->
         Format.printf "@{<blue;bold>%s@}: %!"
-            (System.Variable.Variable.get_name v |> Option.get) ;
+            (Variable.get_name v |> Option.get) ;
         Format.printf "@{<red>%s@} @{<italic;purple>(failed in %.00fms)@}\n%!"
             msg time ;
         Format.printf "@{<italic;cyan>%s@}\n%!"

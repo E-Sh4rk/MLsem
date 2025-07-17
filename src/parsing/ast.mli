@@ -1,6 +1,6 @@
 open Types.Base
 open Types.Additions
-open System.Variable
+open Variable
 open System.Ast
 
 exception SymbolError of string
