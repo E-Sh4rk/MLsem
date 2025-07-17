@@ -13,6 +13,7 @@ module Annot = struct
   | AConst | AAtom
   | AAbstract of typ
   | AAx of Subst.t
+  | AConstruct of t list
   | ALet of t * part
   | AApp of t * t | ACons of t * t
   | AProj of t | ATag of t | AConstr of t | ACoerce of typ * t
@@ -33,6 +34,7 @@ module Annot = struct
       | AConst -> AConst | AAtom -> AAtom
       | AAbstract t -> AAbstract (Subst.apply s t)
       | AAx s' -> AAx (Subst.compose_restr s s')
+      | AConstruct ts -> AConstruct (List.map aux ts)
       | ALet (t, ps) -> ALet (aux t, List.map (fun (ty, t) -> Subst.apply s ty, aux t) ps)
       | AApp (t1, t2) -> AApp (aux t1, aux t2)
       | ACons (t1, t2) -> ACons (aux t1, aux t2)
@@ -70,6 +72,7 @@ module IAnnot = struct
   | A of Annot.t
   | Infer
   | Untyp
+  | AConstruct of t list
   | ALet of t * part
   | AApp of t * t | ACons of t * t
   | AProj of t | ATag of t | AConstr of t | ACoerce of typ * t
@@ -88,6 +91,7 @@ module IAnnot = struct
       | A a -> A (Annot.substitute s a)
       | Infer -> Infer
       | Untyp -> Untyp
+      | AConstruct ts -> AConstruct (List.map aux ts)
       | ALet (t, ps) -> ALet (aux t, List.map (fun (ty, t) -> Subst.apply s ty, aux t) ps)
       | AApp (t1, t2) -> AApp (aux t1, aux t2)
       | ACons (t1, t2) -> ACons (aux t1, aux t2)

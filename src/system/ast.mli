@@ -15,10 +15,12 @@ val typeof_const : const -> typ
 
 type cf = CfWhile | CfCond
 type projection = Pi of int * int | Field of string | Hd | Tl | PiTag of tag
+type constructor = Tuple of int | Cons | RecUpd of string | RecDel of string | Tag of tag | Atom of atom
 type e = (* TODO: factorize constructors? *)
 | Abstract of typ
 | Const of const
 | Var of Variable.t
+| Constructor of constructor * t list
 | Atom of atom
 | Tag of tag * t
 | Lambda of typ * Variable.t * t
@@ -46,4 +48,5 @@ val pp : Format.formatter -> t -> unit
 val pp_e : Format.formatter -> e -> unit
 val pp_cf : Format.formatter -> cf -> unit
 val pp_projection : Format.formatter -> projection -> unit
+val pp_constructor : Format.formatter -> constructor -> unit
 val pp_const : Format.formatter -> const -> unit

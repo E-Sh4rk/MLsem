@@ -26,6 +26,41 @@ let sufficient_refinements env e t =
     | Lambda _ -> []
     | LambdaRec _ -> []
     | Var v -> [REnv.singleton v t]
+    | Constructor (Tuple n, es) when List.length es = n ->
+      tuple_dnf n t
+      |> List.filter (fun b -> subtype (tuple_branch_type b) t)
+      |> List.map (fun ts ->
+        List.map2 (fun e t -> aux e t) es ts
+        |> carthesian_prod' |> List.map REnv.conj
+      ) |> List.flatten
+    | Constructor (Cons, [e1;e2]) ->
+      cons_dnf t
+      |> List.filter (fun b -> subtype (cons_branch_type b) t)
+      |> List.map (fun (t1,t2) ->
+        combine (aux e1 t1) (aux e2 t2)
+      ) |> List.flatten
+    | Constructor (RecUpd label, [e;e']) ->
+      let t = cap t (record_any_with label) in
+      record_dnf t
+      |> List.map (fun b -> record_branch_type b)
+      |> List.filter (fun ti -> subtype ti t)
+      |> List.map (fun ti ->
+        let field_type = get_field ti label in
+        let ti = remove_field_info ti label in
+        combine (aux e ti) (aux e' field_type)
+      ) |> List.flatten
+    | Constructor (RecDel label, [e]) ->
+      let t = cap t (record_any_without label) in
+      record_dnf t
+      |> List.map (fun b -> record_branch_type b)
+      |> List.filter (fun ti -> subtype ti t)
+      |> List.map (fun ti -> 
+        aux e (remove_field_info ti label)
+      ) |> List.flatten
+    | Constructor (Tag tag, [e]) -> aux e (destruct_tag tag t)
+    | Constructor (Atom a, []) ->
+      if subtype (mk_atom a) t then [REnv.empty] else []
+    | Constructor _ -> assert false
     | TypeCoerce (_, s) when subtype s t -> [REnv.empty]
     | Abstract s when subtype s t -> [REnv.empty]
     | Const c when subtype (typeof_const c) t -> [REnv.empty]
@@ -130,6 +165,7 @@ let refinement_envs env e =
   and aux env (_,e) : unit =
     match e with
     | Abstract _ | Const _ | Var _ | Atom _ -> ()
+    | Constructor (_, es) -> es |> List.iter (aux env)
     | Tag (_, e) | Projection (_, e) | RecordUpdate (e, _, None)
     | TypeConstr (e, _) | TypeCoerce (e, _) ->
       aux env e

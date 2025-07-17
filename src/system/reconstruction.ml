@@ -173,6 +173,21 @@ let rec infer cache env renvs annot (id, e) =
     let s = TVCache.get' cache.tvcache id tvs in
     retry_with (nc (Annot.AAx s))
   | Var _, Infer -> Fail
+  | Constructor (_, es), Infer -> retry_with (AConstruct (List.map (fun _ -> Infer) es))
+  | Constructor (c, es), AConstruct annots ->
+    begin match infer_seq' cache env renvs (List.combine annots es) with
+    | OneFail -> Fail
+    | OneSubst (ss, a, a',r) -> Subst (ss,AConstruct a,AConstruct a',r)
+    | AllOk (annots,tys) ->
+      let doms = Checker.domains_of_construct c in
+      let ss = tallying_no_result cache env (List.combine tys doms) in
+      log "untypeable constructor" (fun fmt ->
+        Format.fprintf fmt "expected: %a\ngiven: %a"
+          (Utils.pp_seq pp_typ " ; ") doms
+          (Utils.pp_seq pp_typ " ; ") tys
+        ) ;
+      Subst (ss, nc (Annot.AConstruct annots), Untyp, empty_cov)
+    end
   | Atom _, Infer -> retry_with (nc Annot.AAtom)
   | Tag _, Infer -> retry_with (ATag Infer)
   | Tag (_, e'), ATag annot' ->

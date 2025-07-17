@@ -6,7 +6,7 @@ open Ast
 open Env
 open Variable
 
-(* Utils *)
+(* Projections and constructors *)
 
 let domain_of_proj p ty =
   match p with
@@ -29,6 +29,27 @@ let proj p ty =
   | Hd -> destruct_list ty |> fst
   | Tl -> destruct_list ty |> snd
   | PiTag tag -> destruct_tag tag ty
+
+let domains_of_construct (c:Ast.constructor) =
+  match c with
+  | Tuple n -> List.init n (fun _ -> any)
+  | Cons -> [ any ; list_typ ]
+  | RecUpd _ -> [ record_any ; any ]
+  | RecDel _ -> [ record_any ]
+  | Tag _ -> [ any ]
+  | Atom _ -> []
+
+let construct (c:Ast.constructor) tys =
+  match c, tys with
+  | Tuple n, tys when List.length tys = n -> mk_tuple tys
+  | Cons, [t1 ; t2] -> mk_cons t1 t2
+  | RecUpd lbl, [t1 ; t2] ->
+    let right_record = mk_record false [lbl, (false, t2)] in
+    merge_records t1 right_record
+  | RecDel lbl, [t] -> remove_field t lbl
+  | Tag tag, [t] -> mk_tag tag t
+  | Atom atom, [] -> mk_atom atom
+  | _ -> failwith "Invalid arity for constructor."
 
 (* Expressions *)
 
@@ -66,6 +87,16 @@ let rec typeof' env annot (id,e) =
         untypeable id ("Invalid substitution for "^(Variable.show v)^".")
     end else
       untypeable id ("Undefined variable "^(Variable.show v)^".")
+  | Constructor (c, es), AConstruct annots when List.length es = List.length annots ->
+    let doms = domains_of_construct c in
+    if List.length doms = List.length es then begin
+      let ts = List.map2 (fun e a -> typeof env a e) es annots in
+      if List.for_all2 subtype ts doms then
+        construct c ts
+      else
+        untypeable id ("Invalid domain for constructor.")
+    end else
+      untypeable id ("Invalid arity for constructor.")
   | Atom a, AAtom -> mk_atom a
   | Tag (tag, e), ATag annot -> mk_tag tag (typeof env annot e)
   | Lambda (_, v, e), ALambda (s, annot) ->

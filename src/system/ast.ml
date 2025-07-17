@@ -34,10 +34,13 @@ type cf = CfWhile | CfCond
 [@@deriving show]
 type projection = Pi of int * int | Field of string | Hd | Tl | PiTag of tag
 [@@deriving show]
+type constructor = Tuple of int | Cons | RecUpd of string | RecDel of string | Tag of tag | Atom of atom
+[@@deriving show]
 type e =
 | Abstract of typ
 | Const of const
 | Var of Variable.t
+| Constructor of constructor * t list
 | Atom of atom
 | Tag of tag * t
 | Lambda of typ * Variable.t * t
@@ -63,6 +66,7 @@ let map f =
       | Abstract t -> Abstract t
       | Const c -> Const c
       | Var v -> Var v
+      | Constructor (c,es) -> Constructor (c, List.map aux es)
       | Atom a -> Atom a
       | Tag (t,e) -> Tag (t, aux e)
       | Lambda (d, v, e) -> Lambda (d, v, aux e)
@@ -92,7 +96,7 @@ let fold f =
     | LambdaRec lst -> lst |> List.map (fun (_,_,e) -> e)
     | App (e1,e2) | Cons (e1,e2)
     | RecordUpdate (e1,_,Some e2) | Let (_,_,e1,e2) -> [e1 ; e2]
-    | Tuple es -> es
+    | Constructor (_, es) | Tuple es -> es
     end
     |> List.map aux
     |> f (id,e)
@@ -102,8 +106,8 @@ let fold f =
 let fv' (_,e) accs =
   let acc = List.fold_left VarSet.union VarSet.empty accs in
   match e with
-  | Abstract _ | Const _ | Atom _ | Tag _ | Ite _ | ControlFlow _
-  | App _ | Tuple _ | Cons _ | Projection _
+  | Abstract _ | Const _ | Constructor _ | Atom _ | Tag _ | Ite _
+  | ControlFlow _ | App _ | Tuple _ | Cons _ | Projection _
   | RecordUpdate _ | TypeConstr _ | TypeCoerce _ -> acc
   | Var v -> VarSet.add v acc
   | Let (_, v, _, _) | Lambda (_, v, _) -> VarSet.remove v acc
