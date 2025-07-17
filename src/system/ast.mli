@@ -16,21 +16,16 @@ val typeof_const : const -> typ
 type cf = CfWhile | CfCond
 type projection = Pi of int * int | Field of string | Hd | Tl | PiTag of tag
 type constructor = Tuple of int | Cons | RecUpd of string | RecDel of string | Tag of tag | Atom of atom
-type e = (* TODO: factorize constructors? *)
+type e =
 | Abstract of typ
 | Const of const
 | Var of Variable.t
 | Constructor of constructor * t list
-| Atom of atom
-| Tag of tag * t
 | Lambda of typ * Variable.t * t
 | LambdaRec of (typ * Variable.t * t) list
 | Ite of t * typ * t * t
 | App of t * t
-| Tuple of t list
-| Cons of t * t
 | Projection of projection * t
-| RecordUpdate of t * string * t option
 | Let of (typ list) * Variable.t * t * t
 | TypeConstr of t * typ
 | TypeCoerce of t * typ

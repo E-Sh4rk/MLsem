@@ -64,42 +64,9 @@ let sufficient_refinements env e t =
     | TypeCoerce (_, s) when subtype s t -> [REnv.empty]
     | Abstract s when subtype s t -> [REnv.empty]
     | Const c when subtype (typeof_const c) t -> [REnv.empty]
-    | Atom a when subtype (mk_atom a) t -> [REnv.empty]
     | ControlFlow _ when subtype unit_typ t -> [REnv.empty]
-    | Abstract _ | Const _ | Atom _ | TypeCoerce _ | ControlFlow _ -> []
-    | Tag (tag, e) -> aux e (destruct_tag tag t)
-    | Tuple es ->
-      tuple_dnf (List.length es) t
-      |> List.filter (fun b -> subtype (tuple_branch_type b) t)
-      |> List.map (fun ts ->
-        List.map2 (fun e t -> aux e t) es ts
-        |> carthesian_prod' |> List.map REnv.conj
-      ) |> List.flatten
-    | Cons (e1, e2) ->
-      cons_dnf t
-      |> List.filter (fun b -> subtype (cons_branch_type b) t)
-      |> List.map (fun (t1,t2) ->
-        combine (aux e1 t1) (aux e2 t2)
-      ) |> List.flatten
+    | Abstract _ | Const _ | TypeCoerce _ | ControlFlow _ -> []
     | Projection (p, e) -> aux e (Checker.domain_of_proj p t)
-    | RecordUpdate (e, label, None) ->
-      let t = cap t (record_any_without label) in
-      record_dnf t
-      |> List.map (fun b -> record_branch_type b)
-      |> List.filter (fun ti -> subtype ti t)
-      |> List.map (fun ti -> 
-        aux e (remove_field_info ti label)
-      ) |> List.flatten
-    | RecordUpdate (e, label, Some e') ->
-      let t = cap t (record_any_with label) in
-      record_dnf t
-      |> List.map (fun b -> record_branch_type b)
-      |> List.filter (fun ti -> subtype ti t)
-      |> List.map (fun ti ->
-        let field_type = get_field ti label in
-        let ti = remove_field_info ti label in
-        combine (aux e ti) (aux e' field_type)
-      ) |> List.flatten
     | TypeConstr (e, _) -> aux e t
     | App ((_, Var v), e) when Env.mem v env ->
       let alpha = TVar.mk None in
@@ -164,19 +131,15 @@ let refinement_envs env e =
     aux (Env.add v t env) e
   and aux env (_,e) : unit =
     match e with
-    | Abstract _ | Const _ | Var _ | Atom _ -> ()
+    | Abstract _ | Const _ | Var _ -> ()
     | Constructor (_, es) -> es |> List.iter (aux env)
-    | Tag (_, e) | Projection (_, e) | RecordUpdate (e, _, None)
-    | TypeConstr (e, _) | TypeCoerce (e, _) ->
-      aux env e
+    | Projection (_, e) | TypeConstr (e, _) | TypeCoerce (e, _) -> aux env e
     | Lambda (d, v, e) -> aux_lambda env (d,v,e)
     | LambdaRec lst -> lst |> List.iter (aux_lambda env)
     | Ite (e, tau, e1, e2) | ControlFlow (_, e, tau, e1, e2) ->
       add_refinement env e tau ; add_refinement env e (neg tau) ;
       aux env e1 ; aux env e2
-    | App (e1, e2) | Cons (e1, e2) | RecordUpdate (e1, _, Some e2) ->
-      aux env e1 ; aux env e2
-    | Tuple es -> es |> List.iter (aux env)
+    | App (e1, e2) -> aux env e1 ; aux env e2
     | Let (_, v, e1, e2) ->
       aux env e1 ; aux (Env.add v (typeof env e1) env) e2 ;
       let res' =

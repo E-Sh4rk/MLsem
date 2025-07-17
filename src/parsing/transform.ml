@@ -128,8 +128,8 @@ let expr_to_ast t =
     | Ast.Abstract t -> Abstract t
     | Ast.Const c -> Const c
     | Ast.Var v -> Var v
-    | Ast.Atom a -> Atom a
-    | Ast.Tag (t, e) -> Tag (t, aux e)
+    | Ast.Atom a -> Constructor (Atom a, [])
+    | Ast.Tag (t, e) -> Constructor (Tag t, [aux e])
     | Ast.Suggest (v, tys, (_,e)) ->
       add_suggs v tys ; aux_e e
     | Ast.Lambda (x, a, e) ->
@@ -141,10 +141,11 @@ let expr_to_ast t =
     | Ast.Ite (e,t,e1,e2) -> Ite (aux e, t, aux e1, aux e2)
     | Ast.App (e1,e2) -> App (aux e1, aux e2)
     | Ast.Let (x, e1, e2) -> let_binding x (aux e1) (aux e2)
-    | Ast.Tuple es -> Tuple (List.map aux es)
-    | Ast.Cons (e1, e2) -> Cons (aux e1, aux e2)
+    | Ast.Tuple es -> Constructor (Tuple (List.length es), List.map aux es)
+    | Ast.Cons (e1, e2) -> Constructor (Cons, [aux e1 ; aux e2])
     | Ast.Projection (p, e) -> Projection (p, aux e)
-    | Ast.RecordUpdate (e, lbl, eo) -> RecordUpdate (aux e, lbl, Option.map aux eo)
+    | Ast.RecordUpdate (e, lbl, None) -> Constructor (RecDel lbl, [aux e])
+    | Ast.RecordUpdate (e, lbl, Some e') -> Constructor (RecUpd lbl, [aux e ; aux e'])
     | Ast.TypeConstr (e, ty) -> TypeConstr (aux e, ty)
     | Ast.TypeCoerce (e, ty) -> TypeCoerce (aux e, ty)
     | Ast.PatMatch (e, pats) -> encode_pattern_matching e pats |> aux_e

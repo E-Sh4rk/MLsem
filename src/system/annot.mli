@@ -8,15 +8,14 @@ module Annot : sig
   and part = (typ * t) list
   and a =
   | AConst
-  | AAtom
   | AAbstract of typ
   | AAx of Subst.t
   | AConstruct of t list
   | ALet of t * part
-  | AApp of t * t | ACons of t * t
-  | AProj of t | ATag of t | AConstr of t | ACoerce of typ * t
-  | AUpdate of t * t option
-  | ATuple of t list
+  | AApp of t * t
+  | AProj of t
+  | AConstr of t
+  | ACoerce of typ * t
   | AIte of t * branch * branch
   | ACf of t * branch * branch
   | ALambda of typ * t
@@ -42,10 +41,10 @@ module IAnnot : sig
   | Untyp
   | AConstruct of t list
   | ALet of t * part
-  | AApp of t * t | ACons of t * t
-  | AProj of t | ATag of t | AConstr of t | ACoerce of typ * t
-  | AUpdate of t * t option
-  | ATuple of t list
+  | AApp of t * t
+  | AProj of t
+  | AConstr of t
+  | ACoerce of typ * t
   | AIte of t * branch * branch
   | ACf of t * branch * branch
   | ALambda of typ * t

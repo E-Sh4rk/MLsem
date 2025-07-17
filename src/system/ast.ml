@@ -41,16 +41,11 @@ type e =
 | Const of const
 | Var of Variable.t
 | Constructor of constructor * t list
-| Atom of atom
-| Tag of tag * t
 | Lambda of typ * Variable.t * t
 | LambdaRec of (typ * Variable.t * t) list
 | Ite of t * typ * t * t
 | App of t * t
-| Tuple of t list
-| Cons of t * t
 | Projection of projection * t
-| RecordUpdate of t * string * t option
 | Let of (typ list) * Variable.t * t * t
 | TypeConstr of t * typ
 | TypeCoerce of t * typ
@@ -67,16 +62,11 @@ let map f =
       | Const c -> Const c
       | Var v -> Var v
       | Constructor (c,es) -> Constructor (c, List.map aux es)
-      | Atom a -> Atom a
-      | Tag (t,e) -> Tag (t, aux e)
       | Lambda (d, v, e) -> Lambda (d, v, aux e)
       | LambdaRec lst -> LambdaRec (List.map (fun (ty,v,e) -> (ty,v,aux e)) lst)
       | Ite (e, t, e1, e2) -> Ite (aux e, t, aux e1, aux e2)
       | App (e1, e2) -> App (aux e1, aux e2)
-      | Tuple es -> Tuple (List.map aux es)
-      | Cons (e1, e2) -> Cons (aux e1, aux e2)
       | Projection (p, e) -> Projection (p, aux e)
-      | RecordUpdate (e, str, eo) -> RecordUpdate (aux e, str, Option.map aux eo)
       | Let (ta, v, e1, e2) -> Let (ta, v, aux e1, aux e2)
       | TypeConstr (e, ty) -> TypeConstr (aux e, ty)
       | TypeCoerce (e, ty) -> TypeCoerce (aux e, ty)
@@ -89,14 +79,12 @@ let map f =
 let fold f =
   let rec aux (id,e) =
     begin match e with
-    | Abstract _ | Const _ | Var _ | Atom _ -> []
-    | Tag (_, e) | Lambda (_,_, e) | Projection (_, e)
-    | RecordUpdate (e, _, None) | TypeConstr (e,_) | TypeCoerce (e,_) -> [e]
+    | Abstract _ | Const _ | Var _ -> []
+    | Lambda (_,_, e) | Projection (_, e) | TypeConstr (e,_) | TypeCoerce (e,_) -> [e]
     | Ite (e,_,e1,e2) | ControlFlow (_, e, _, e1, e2) -> [e ; e1 ; e2]
     | LambdaRec lst -> lst |> List.map (fun (_,_,e) -> e)
-    | App (e1,e2) | Cons (e1,e2)
-    | RecordUpdate (e1,_,Some e2) | Let (_,_,e1,e2) -> [e1 ; e2]
-    | Constructor (_, es) | Tuple es -> es
+    | App (e1,e2) | Let (_,_,e1,e2) -> [e1 ; e2]
+    | Constructor (_, es) -> es
     end
     |> List.map aux
     |> f (id,e)
@@ -106,9 +94,8 @@ let fold f =
 let fv' (_,e) accs =
   let acc = List.fold_left VarSet.union VarSet.empty accs in
   match e with
-  | Abstract _ | Const _ | Constructor _ | Atom _ | Tag _ | Ite _
-  | ControlFlow _ | App _ | Tuple _ | Cons _ | Projection _
-  | RecordUpdate _ | TypeConstr _ | TypeCoerce _ -> acc
+  | Abstract _ | Const _ | Constructor _ | Ite _ | ControlFlow _
+  | App _ | Projection _  | TypeConstr _ | TypeCoerce _ -> acc
   | Var v -> VarSet.add v acc
   | Let (_, v, _, _) | Lambda (_, v, _) -> VarSet.remove v acc
   | LambdaRec lst ->

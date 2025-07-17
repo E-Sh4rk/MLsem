@@ -60,11 +60,9 @@ let untypeable id msg = raise (Untypeable { eid=id ; title=msg ; descr=None })
 
 let rec is_value (_,e) =
   match e with
-  | Const _ | Atom _ | Lambda _ | Abstract _ -> true
-  | Tag (_, e) -> is_value e
+  | Const _ | Lambda _ | Abstract _ -> true
+  | Constructor (_, es) -> List.for_all is_value es
   | LambdaRec lst -> List.for_all (fun (_,_,e) -> is_value e) lst
-  | Tuple es -> List.for_all is_value es
-  | Cons (e1, e2) -> is_value e1 && is_value e2
   | _ -> false
 
 let generalize ~e env s =
@@ -97,8 +95,6 @@ let rec typeof' env annot (id,e) =
         untypeable id ("Invalid domain for constructor.")
     end else
       untypeable id ("Invalid arity for constructor.")
-  | Atom a, AAtom -> mk_atom a
-  | Tag (tag, e), ATag annot -> mk_tag tag (typeof env annot e)
   | Lambda (_, v, e), ALambda (s, annot) ->
     let env = Env.add v (TyScheme.mk_mono s) env in
     let t = typeof env annot e in
@@ -132,34 +128,11 @@ let rec typeof' env annot (id,e) =
       then apply t1 t2
       else untypeable id "Invalid application: argument not in the domain."
     else untypeable id "Invalid application: not a function."
-  | Tuple es, ATuple annots when List.length es = List.length annots ->
-    List.combine es annots |> List.map (fun (e, annot) ->
-      typeof env annot e
-    ) |> mk_tuple
-  | Cons (e1, e2), ACons (annot1, annot2) ->
-    let t1 = typeof env annot1 e1 in
-    let t2 = typeof env annot2 e2 in
-    if subtype t2 list_typ
-    then mk_cons t1 t2
-    else untypeable id "Invalid cons: not a list."
   | Projection (p, e), AProj annot ->
     let t = typeof env annot e in
     if subtype t (domain_of_proj p any)
     then proj p t
     else untypeable id "Invalid projection."
-  | RecordUpdate (e, label, None), AUpdate (annot, None) ->
-    let t = typeof env annot e in
-    if subtype t record_any
-    then remove_field t label
-    else untypeable id "Invalid field deletion: not a record."
-  | RecordUpdate (e, label, Some e'), AUpdate (annot, Some annot') ->
-    let t = typeof env annot e in
-    if subtype t record_any
-    then
-      let t' = typeof env annot' e' in
-      let right_record = mk_record false [label, (false, t')] in
-      merge_records t right_record  
-    else untypeable id "Invalid field update: not a record."
   | Let (_, v, e1, e2), ALet (annot1, annots2) ->
     let tvs,s = typeof_def env annot1 e1 |> TyScheme.get in
     let aux (si, annot) =

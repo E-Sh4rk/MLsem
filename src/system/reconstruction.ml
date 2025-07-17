@@ -188,14 +188,6 @@ let rec infer cache env renvs annot (id, e) =
         ) ;
       Subst (ss, nc (Annot.AConstruct annots), Untyp, empty_cov)
     end
-  | Atom _, Infer -> retry_with (nc Annot.AAtom)
-  | Tag _, Infer -> retry_with (ATag Infer)
-  | Tag (_, e'), ATag annot' ->
-    begin match infer' cache env renvs annot' e' with
-    | Ok (annot', _) -> retry_with (nc (Annot.ATag annot'))
-    | Subst (ss,a,a',r) -> Subst (ss,ATag a,ATag a',r)
-    | Fail -> Fail
-    end
   | Lambda (d,_,_), Infer -> retry_with (ALambda (d, Infer))
   | Lambda (_,v,e'), ALambda (ty, annot') ->
     let env' = Env.add v (TyScheme.mk_mono ty) env in
@@ -282,27 +274,6 @@ let rec infer cache env renvs annot (id, e) =
       Subst (ss, nc (Annot.AApp(a1,a2)), Untyp, empty_cov)
     | _ -> assert false
     end
-  | Tuple es, Infer -> retry_with (ATuple (List.map (fun _ -> Infer) es))
-  | Tuple es, ATuple annots ->
-    begin match infer_seq' cache env renvs (List.combine annots es) with
-    | OneFail -> Fail
-    | OneSubst (ss, a, a',r) -> Subst (ss,ATuple a,ATuple a',r)
-    | AllOk (annots,_) -> retry_with (nc (Annot.ATuple annots))
-    end
-  | Cons _, Infer -> retry_with (ACons (Infer, Infer))
-  | Cons (e1,e2), ACons (a1,a2) ->
-    begin match infer_seq' cache env renvs [(a1,e1);(a2,e2)] with
-    | OneFail -> Fail
-    | OneSubst (ss, [a1;a2], [a1';a2'],r) ->
-      Subst (ss,ACons(a1,a2),ACons(a1',a2'),r)
-    | AllOk ([a1;a2],[_;t2]) ->
-      let ss = tallying_no_result cache env [(t2,list_typ)] in
-      log "untypeable cons" (fun fmt ->
-        Format.fprintf fmt "tail: %a" pp_typ t2
-        ) ;
-      Subst (ss, nc (Annot.ACons(a1,a2)), Untyp, empty_cov)
-    | _ -> assert false
-    end
   | Projection _, Infer -> retry_with (AProj Infer)
   | Projection (p,e'), AProj annot' ->
     begin match infer' cache env renvs annot' e' with
@@ -316,32 +287,6 @@ let rec infer cache env renvs annot (id, e) =
       Subst (ss, nc (Annot.AProj annot'), Untyp, empty_cov)
     | Subst (ss,a,a',r) -> Subst (ss,AProj a,AProj a',r)
     | Fail -> Fail
-    end
-  | RecordUpdate (_,_,None), Infer -> retry_with (AUpdate (Infer, None))
-  | RecordUpdate (_,_,Some _), Infer -> retry_with (AUpdate (Infer, Some Infer))
-  | RecordUpdate (e', _, None), AUpdate (annot', None) ->
-    begin match infer' cache env renvs annot' e' with
-    | Ok (annot', s) ->
-      let ss = tallying_no_result cache env [(s,record_any)] in
-      log "untypeable field deletion" (fun fmt ->
-        Format.fprintf fmt "record: %a" pp_typ s
-        ) ;
-      Subst (ss, nc (Annot.AUpdate(annot',None)), Untyp, empty_cov)
-    | Subst (ss,a,a',r) -> Subst (ss,AUpdate (a,None),AUpdate (a',None),r)
-    | Fail -> Fail
-    end
-  | RecordUpdate (e1, _, Some e2), AUpdate (a1, Some a2) ->
-    begin match infer_seq' cache env renvs [(a1,e1);(a2,e2)] with
-    | OneFail -> Fail
-    | OneSubst (ss, [a1;a2], [a1';a2'],r) ->
-      Subst (ss,AUpdate(a1,Some a2),AUpdate(a1',Some a2'),r)
-    | AllOk ([a1;a2],[s;_]) ->
-      let ss = tallying_no_result cache env [(s,record_any)] in
-      log "untypeable field update" (fun fmt ->
-        Format.fprintf fmt "record: %a" pp_typ s
-        ) ;
-      Subst (ss, nc (Annot.AUpdate(a1,Some a2)), Untyp, empty_cov)
-    | _ -> assert false
     end
   | Let (suggs,v,_,_), Infer ->
     let tys = Refinement.Partitioner.partition_for renvs v suggs in

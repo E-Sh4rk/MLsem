@@ -10,15 +10,15 @@ module Annot = struct
   and part = (typ * t) list
   [@@deriving show]
   and a =
-  | AConst | AAtom
+  | AConst
   | AAbstract of typ
   | AAx of Subst.t
   | AConstruct of t list
   | ALet of t * part
-  | AApp of t * t | ACons of t * t
-  | AProj of t | ATag of t | AConstr of t | ACoerce of typ * t
-  | AUpdate of t * t option
-  | ATuple of t list
+  | AApp of t * t
+  | AProj of t
+  | AConstr of t
+  | ACoerce of typ * t
   | AIte of t * branch * branch
   | ACf of t * branch * branch
   | ALambda of typ * t
@@ -31,18 +31,15 @@ module Annot = struct
   let substitute s t =
     let rec aux t =
       let ann = match t.ann with
-      | AConst -> AConst | AAtom -> AAtom
+      | AConst -> AConst
       | AAbstract t -> AAbstract (Subst.apply s t)
       | AAx s' -> AAx (Subst.compose_restr s s')
       | AConstruct ts -> AConstruct (List.map aux ts)
       | ALet (t, ps) -> ALet (aux t, List.map (fun (ty, t) -> Subst.apply s ty, aux t) ps)
       | AApp (t1, t2) -> AApp (aux t1, aux t2)
-      | ACons (t1, t2) -> ACons (aux t1, aux t2)
-      | AProj t -> AProj (aux t) | ATag t -> ATag (aux t)
+      | AProj t -> AProj (aux t)
       | AConstr t -> AConstr (aux t)
       | ACoerce (ty, t) -> ACoerce (Subst.apply s ty, aux t)
-      | AUpdate (t, ot) -> AUpdate (aux t, Option.map aux ot)
-      | ATuple ts -> ATuple (List.map aux ts)
       | AIte (t,b1,b2) -> AIte (aux t, aux_b b1, aux_b b2)
       | ACf (t,b1,b2) -> ACf (aux t, aux_b b1, aux_b b2)
       | ALambda (ty, t) -> ALambda (Subst.apply s ty, aux t)
@@ -74,10 +71,10 @@ module IAnnot = struct
   | Untyp
   | AConstruct of t list
   | ALet of t * part
-  | AApp of t * t | ACons of t * t
-  | AProj of t | ATag of t | AConstr of t | ACoerce of typ * t
-  | AUpdate of t * t option
-  | ATuple of t list
+  | AApp of t * t
+  | AProj of t
+  | AConstr of t
+  | ACoerce of typ * t
   | AIte of t * branch * branch
   | ACf of t * branch * branch
   | ALambda of typ * t
@@ -94,12 +91,9 @@ module IAnnot = struct
       | AConstruct ts -> AConstruct (List.map aux ts)
       | ALet (t, ps) -> ALet (aux t, List.map (fun (ty, t) -> Subst.apply s ty, aux t) ps)
       | AApp (t1, t2) -> AApp (aux t1, aux t2)
-      | ACons (t1, t2) -> ACons (aux t1, aux t2)
-      | AProj t -> AProj (aux t) | ATag t -> ATag (aux t)
+      | AProj t -> AProj (aux t)
       | AConstr t -> AConstr (aux t)
       | ACoerce (ty, t) -> ACoerce (Subst.apply s ty, aux t)
-      | AUpdate (t, ot) -> AUpdate (aux t, Option.map aux ot)
-      | ATuple ts -> ATuple (List.map aux ts)
       | AIte (t,b1,b2) -> AIte (aux t, aux_b b1, aux_b b2)
       | ACf (t,b1,b2) -> ACf (aux t, aux_b b1, aux_b b2)
       | ALambda (ty, t) -> ALambda (Subst.apply s ty, aux t)
