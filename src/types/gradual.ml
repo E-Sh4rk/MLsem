@@ -26,6 +26,7 @@ module GTy = struct
   let equiv (ty1,b1) (ty2,b2) = (b1 = b2) && (equiv ty1 ty2)
 
   let simplify (ty,b) = (Additions.simplify_typ ty, b)
+  let map f (ty, b) = (f ty, b)
 
   let pp fmt (ty,b) =
     if b then

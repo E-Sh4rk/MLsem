@@ -26,6 +26,7 @@ module GTy : sig
     val equiv_static : t -> t -> bool
 
     val simplify : t -> t
+    val map : (typ -> typ) -> t -> t
 
     val pp : Format.formatter -> t -> unit
 end
