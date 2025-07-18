@@ -3,6 +3,7 @@ open Env
 open Types
 open Types.Base
 open Types.Tvar
+open Types.Gradual
 open Types.Additions
 open Utils
 
@@ -54,7 +55,7 @@ let sufficient_refinements env e t =
       record_dnf t
       |> List.map (fun b -> record_branch_type b)
       |> List.filter (fun ti -> subtype ti t)
-      |> List.map (fun ti -> 
+      |> List.map (fun ti ->
         aux e (remove_field_info ti label)
       ) |> List.flatten
     | Constructor (Tag tag, [e]) -> aux e (destruct_tag tag t)
@@ -72,7 +73,7 @@ let sufficient_refinements env e t =
       let alpha = TVar.mk None in
       let (mono, ty) = Env.find v env |> TyScheme.get_fresh in
       let mono = TVarSet.union mono (vars t) in
-      begin match dnf ty with
+      begin match dnf (GTy.static_comp ty) with
       | [] -> []
       | [arrows] ->
         let t1 = branch_type arrows in
@@ -101,7 +102,7 @@ let refine env e t =
       renv' |> REnv.filter (fun v ty ->
         let _, ty' = Env.find v env |> TyScheme.get in
         let ty'' = REnv.find' v renv in
-        subtype (cap ty' ty'') ty |> not
+        subtype (cap (GTy.static_comp ty') ty'') ty |> not
       )
     )
     in
@@ -116,10 +117,9 @@ let rec typeof env (_,e) =
   (* These cases are necessary because of pattern matching encoding *)
   | Projection (p, t) ->
     let _, ty = typeof env t |> TyScheme.get in
-    TyScheme.mk_mono (Checker.proj p ty)
+    TyScheme.mk_mono (GTy.map (Checker.proj p) ty)
   | TypeConstr (t, _) -> typeof env t
-  | TypeCoerce (_, ty) -> TyScheme.mk_mono ty
-  | _ -> TyScheme.mk_mono any
+  | _ -> TyScheme.mk_mono GTy.static
 
 let refinement_envs env e =
   let res = ref REnvSet.empty in
@@ -127,7 +127,7 @@ let refinement_envs env e =
     res := REnvSet.add !res (refine env e t)
   in
   let rec aux_lambda env (d,v,e) =
-    let t = TyScheme.mk_mono d in
+    let t = TyScheme.mk_mono (GTy.mk_static d) in
     aux (Env.add v t env) e
   and aux env (_,e) : unit =
     match e with
