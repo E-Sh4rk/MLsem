@@ -29,6 +29,7 @@ type e =
 | Let of (typ list) * Variable.t * t * t
 | TypeConstr of t * typ
 | TypeCoerce of t * typ
+(* TODO: TypeCast of t * typ *)
 | ControlFlow of cf * t * typ * t * t
 and t = Eid.t * e
 
