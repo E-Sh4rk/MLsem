@@ -645,7 +645,6 @@ let gradual3 x =
   | y -> y
   end
 
-(* TODO: investigate *)
 let gradual4 x =
   match reflect x with
   | y & :int -> y + 1

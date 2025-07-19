@@ -17,8 +17,7 @@ let rec type_of_pat pat =
     cup (type_of_pat p1) (type_of_pat p2)
   | PatTuple ps -> mk_tuple (List.map type_of_pat ps)
   | PatCons (p1, p2) ->
-    let t2 = cap (type_of_pat p2) list_typ in
-    mk_cons (type_of_pat p1) t2
+    mk_cons (type_of_pat p1) (type_of_pat p2)
   | PatRecord (fields, o) ->
     mk_record o (List.map (fun (str, p) -> (str, (false, type_of_pat p))) fields)
   | PatAssign _ -> any

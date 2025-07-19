@@ -19,7 +19,7 @@ let domain_of_proj p ty =
   | Hd ->
     mk_cons ty list_typ
   | Tl ->
-    mk_cons any (cap ty list_typ)
+    mk_cons any ty
   | PiTag tag ->
     mk_tag tag ty
 
