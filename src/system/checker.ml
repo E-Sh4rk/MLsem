@@ -134,6 +134,7 @@ let rec typeof' env annot (id,e) =
   | Let (_, v, e1, e2), ALet (annot1, annots2) ->
     let tvs,s = typeof_def env annot1 e1 |> TyScheme.get in
     let aux (si, annot) =
+      (* TODO: not satisfying *)
       if TVarSet.inter tvs (vars si) |> TVarSet.is_empty then
         let s = TyScheme.mk tvs (GTy.map (cap si) s) in
         typeof (Env.add v s env) annot e2
