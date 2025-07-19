@@ -395,9 +395,9 @@ and infer_b' cache env renvs bannot e s tau =
   let empty_cov = (fst e, REnv.empty) in
   match bannot with
   | IAnnot.BInfer ->
-    let ss = tallying_no_result cache env [(s,neg tau)] in
+    let ss = tallying_no_result cache env [(GTy.ub s,neg tau)] in
     Subst (ss, IAnnot.BSkip, IAnnot.BType Infer, empty_cov)
-  | IAnnot.BSkip -> Ok (Annot.BSkip, empty)
+  | IAnnot.BSkip -> Ok (Annot.BSkip, GTy.empty)
   | IAnnot.BType annot ->
     begin match infer' cache env renvs annot e with
     | Ok (a, ty) -> Ok (Annot.BType a, ty)
@@ -408,10 +408,10 @@ and infer_cf_b' cache env renvs bannot e s tau =
   let retry_with bannot = infer_cf_b' cache env renvs bannot e s tau in
   match bannot with
   | IAnnot.BInfer ->
-    if subtype s (neg tau)
+    if subtype (GTy.ub s) (neg tau)
     then retry_with (IAnnot.BSkip)
     else retry_with (IAnnot.BType Infer)
-  | IAnnot.BSkip -> Ok (Annot.BSkip, empty)
+  | IAnnot.BSkip -> Ok (Annot.BSkip, GTy.empty)
   | IAnnot.BType annot ->
     begin match infer' cache env renvs annot e with
     | Ok (a, ty) (* when subtype ty unit_typ *) -> Ok (Annot.BType a, ty)
@@ -420,7 +420,7 @@ and infer_cf_b' cache env renvs bannot e s tau =
     | Fail -> Fail
     end
 and infer_part' cache env renvs e v (tvs, s) (si,annot) =
-  let t = TyScheme.mk tvs (cap s si) in
+  let t = TyScheme.mk tvs (GTy.cap s (GTy.mk si)) in
   let env = Env.add v t env in
   let renvs = Refinement.Partitioner.filter_compatible renvs v si in
   match infer' cache env renvs annot e with
