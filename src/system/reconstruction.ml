@@ -269,6 +269,7 @@ let rec infer cache env renvs annot (id, e) =
       Subst (ss,AApp(a1,a2),AApp(a1',a2'),r)
     | AllOk ([a1;a2],[t1;t2]) ->
       let tv = TVCache.get cache.tvcache id TVCache.res_tvar in
+      let t1, t2 = GTy.lb t1, GTy.lb t2 in
       let arrow = mk_arrow t2 (TVar.typ tv) in
       let ss = tallying_with_result cache env (TVar.typ tv) [(t1, arrow)] in
       log "untypeable application" (fun fmt ->
@@ -283,6 +284,7 @@ let rec infer cache env renvs annot (id, e) =
     | Ok (annot', s) ->
       let tv = TVCache.get cache.tvcache id TVCache.res_tvar in
       let ty = Checker.domain_of_proj p (TVar.typ tv) in
+      let s = GTy.lb s in
       let ss = tallying_with_result cache env (TVar.typ tv) [(s, ty)] in
       log "untypeable projection" (fun fmt ->
         Format.fprintf fmt "argument: %a" pp_typ s
@@ -300,7 +302,7 @@ let rec infer cache env renvs annot (id, e) =
     | Subst (ss,a,a',r) -> Subst (ss,ALet (a,parts),ALet (a',parts),r)
     | Ok (annot1, s) ->
       let tvs, s = Checker.generalize ~e:e1 env s |> TyScheme.get in
-      let parts = parts |> List.filter (fun (t,_) -> disjoint s t |> not) in
+      let parts = parts |> List.filter (fun (t,_) -> disjoint (GTy.ub s) t |> not) in
       begin match infer_part_seq' cache env renvs e2 v (tvs,s) parts with
       | OneFail -> Fail
       | OneSubst (ss,p,p',r) -> Subst (ss,ALet(A annot1,p),ALet(A annot1,p'),r)
@@ -312,6 +314,7 @@ let rec infer cache env renvs annot (id, e) =
   | TypeConstr (e', t), AConstr annot' ->
     begin match infer' cache env renvs annot' e' with
     | Ok (annot', s) ->
+      let s = GTy.lb s in
       let ss = tallying_no_result cache env [(s,t)] in
       log "untypeable constraint" (fun fmt ->
         Format.fprintf fmt "expected: %a\ngiven: %a" pp_typ t pp_typ s
@@ -323,9 +326,9 @@ let rec infer cache env renvs annot (id, e) =
   | TypeCoerce (e', _), ACoerce (t,annot') ->
     begin match infer' cache env renvs annot' e' with
     | Ok (annot', s) ->
-      let ss = tallying_no_result cache env [(s,t)] in
+      let ss = tallying_no_result cache env [(GTy.lb s, GTy.lb t) ; (GTy.ub s, GTy.ub t)] in
       log "untypeable coercion" (fun fmt ->
-        Format.fprintf fmt "expected: %a\ngiven: %a" pp_typ t pp_typ s
+        Format.fprintf fmt "expected: %a\ngiven: %a" GTy.pp t GTy.pp s
         ) ;
       Subst (ss, nc (Annot.ACoerce(t,annot')), Untyp, empty_cov)
     | Subst (ss,a,a',r) -> Subst (ss,ACoerce (t,a),ACoerce (t,a'),r)
