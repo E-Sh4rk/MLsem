@@ -62,8 +62,8 @@ let sufficient_refinements env e t =
     | Constructor (Atom a, []) ->
       if subtype (mk_atom a) t then [REnv.empty] else []
     | Constructor _ -> assert false
-    | TypeCoerce (_, s) when subtype s t -> [REnv.empty]
-    | Abstract s when subtype s t -> [REnv.empty]
+    | TypeCoerce (_, s) when subtype (GTy.lb s) t -> [REnv.empty]
+    | Abstract s when subtype (GTy.lb s) t -> [REnv.empty]
     | Const c when subtype (typeof_const c) t -> [REnv.empty]
     | ControlFlow _ when subtype unit_typ t -> [REnv.empty]
     | Abstract _ | Const _ | TypeCoerce _ | ControlFlow _ -> []
@@ -119,7 +119,7 @@ let rec typeof env (_,e) =
     let _, ty = typeof env t |> TyScheme.get in
     TyScheme.mk_mono (GTy.map (Checker.proj p) ty)
   | TypeConstr (t, _) -> typeof env t
-  | TypeCoerce (_, ty) -> TyScheme.mk_mono (GTy.mk ty)
+  | TypeCoerce (_, ty) -> TyScheme.mk_mono ty
   | _ -> TyScheme.mk_mono GTy.any
 
 let refinement_envs env e =
@@ -128,7 +128,7 @@ let refinement_envs env e =
     res := REnvSet.add !res (refine env e t)
   in
   let rec aux_lambda env (d,v,e) =
-    let t = TyScheme.mk_mono (GTy.mk d) in
+    let t = TyScheme.mk_mono d in
     aux (Env.add v t env) e
   and aux env (_,e) : unit =
     match e with
