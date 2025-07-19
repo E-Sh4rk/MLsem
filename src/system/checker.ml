@@ -156,7 +156,7 @@ let rec typeof' env annot (id,e) =
       untypeable id ("Partition does not cover the type of "^(Variable.show v)^".")
   | TypeCast (e, ty), AConstr annot ->
     let t = typeof env annot e in
-    if subtype (GTy.lb t) ty then t
+    if subtype (GTy.lb t) ty then GTy.cap t (GTy.mk ty)
     else untypeable id "Type constraint not satisfied."
   | TypeCoerce (e, _), ACoerce (ty, annot) ->
     let t = typeof env annot e in
