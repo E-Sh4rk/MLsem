@@ -97,7 +97,7 @@ let encode_pattern_matching e pats =
   | [] -> assert false
   | (_, e')::pats -> List.fold_left add_branch e' pats
   in
-  let def = (Eid.refresh (fst e), Ast.TypeConstr (e, t)) in
+  let def = (Eid.refresh (fst e), Ast.TypeCast (e, t)) in
   let body = (Eid.unique (), Ast.Suggest (x, ts, body)) in
   Ast.Let (x, def, body)
 
@@ -147,7 +147,7 @@ let expr_to_ast t =
     | Ast.Projection (p, e) -> Projection (p, aux e)
     | Ast.RecordUpdate (e, lbl, None) -> Constructor (RecDel lbl, [aux e])
     | Ast.RecordUpdate (e, lbl, Some e') -> Constructor (RecUpd lbl, [aux e ; aux e'])
-    | Ast.TypeConstr (e, ty) -> TypeConstr (aux e, ty)
+    | Ast.TypeCast (e, ty) -> TypeCast (aux e, ty)
     | Ast.TypeCoerce (e, ty) -> TypeCoerce (aux e, GTy.mk ty)
     | Ast.PatMatch (e, pats) -> encode_pattern_matching e pats |> aux_e
     | Ast.Cond (e,t,e1,None) ->

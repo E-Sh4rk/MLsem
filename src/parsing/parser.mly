@@ -216,7 +216,7 @@ atomic_term:
   let annot = annot $startpos $endpos in
   annot (Ite (t,ty,annot (Const (Bool true)),annot (Const (Bool false))))
   }
-| LPAREN t=term COLON ty=typ RPAREN { annot $startpos $endpos (TypeConstr (t,ty)) }
+| LPAREN t=term COLON ty=typ RPAREN { annot $startpos $endpos (TypeCast (t,ty)) }
 | LPAREN t=term COERCE ty=typ RPAREN { annot $startpos $endpos (TypeCoerce (t,ty)) }
 | LBRACE obr=optional_base_record fs=separated_list(SEMICOLON, field_term) RBRACE
 { record_update $startpos $endpos obr fs }

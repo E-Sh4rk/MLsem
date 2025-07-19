@@ -68,7 +68,7 @@ let sufficient_refinements env e t =
     | ControlFlow _ when subtype unit_typ t -> [REnv.empty]
     | Abstract _ | Const _ | TypeCoerce _ | ControlFlow _ -> []
     | Projection (p, e) -> aux e (Checker.domain_of_proj p t)
-    | TypeConstr (e, _) -> aux e t
+    | TypeCast (e, _) -> aux e t
     | App ((_, Var v), e) when Env.mem v env ->
       let alpha = TVar.mk None in
       let (mono, ty) = Env.find v env |> TyScheme.get_fresh in
@@ -118,7 +118,7 @@ let rec typeof env (_,e) =
   | Projection (p, t) ->
     let _, ty = typeof env t |> TyScheme.get in
     TyScheme.mk_mono (GTy.map (Checker.proj p) ty)
-  | TypeConstr (t, _) -> typeof env t
+  | TypeCast (t, _) -> typeof env t
   | TypeCoerce (_, ty) -> TyScheme.mk_mono ty
   | _ -> TyScheme.mk_mono GTy.any
 
@@ -134,7 +134,7 @@ let refinement_envs env e =
     match e with
     | Abstract _ | Const _ | Var _ -> ()
     | Constructor (_, es) -> es |> List.iter (aux env)
-    | Projection (_, e) | TypeConstr (e, _) | TypeCoerce (e, _) -> aux env e
+    | Projection (_, e) | TypeCast (e, _) | TypeCoerce (e, _) -> aux env e
     | Lambda (d, v, e) -> aux_lambda env (d,v,e)
     | LambdaRec lst -> lst |> List.iter (aux_lambda env)
     | Ite (e, tau, e1, e2) | ControlFlow (_, e, tau, e1, e2) ->

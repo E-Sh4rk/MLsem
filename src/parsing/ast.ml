@@ -40,7 +40,7 @@ and ('a, 'typ, 'ato, 'tag, 'v) ast =
 | Cons of ('a, 'typ, 'ato, 'tag, 'v) t * ('a, 'typ, 'ato, 'tag, 'v) t
 | Projection of projection * ('a, 'typ, 'ato, 'tag, 'v) t
 | RecordUpdate of ('a, 'typ, 'ato, 'tag, 'v) t * string * ('a, 'typ, 'ato, 'tag, 'v) t option
-| TypeConstr of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ
+| TypeCast of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ
 | TypeCoerce of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ
 | PatMatch of ('a, 'typ, 'ato, 'tag, 'v) t * (('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'ato, 'tag, 'v) t) list
 | Cond of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ * ('a, 'typ, 'ato, 'tag, 'v) t * ('a, 'typ, 'ato, 'tag, 'v) t option
@@ -125,10 +125,10 @@ let parser_expr_to_expr tenv vtenv name_var_map e =
         | Projection (p, e) -> Projection (p, aux vtenv env e)
         | RecordUpdate (e1, l, e2) ->
             RecordUpdate (aux vtenv env e1, l, Option.map (aux vtenv env) e2)
-        | TypeConstr (e, ty) ->
+        | TypeCast (e, ty) ->
             let (ty, vtenv) = type_expr_to_typ tenv vtenv ty in
             if is_test_type ty
-            then TypeConstr (aux vtenv env e, ty)
+            then TypeCast (aux vtenv env e, ty)
             else raise (SymbolError ("type constraint should be a test type"))
         | TypeCoerce (e, ty) ->
             let (ty, vtenv) = type_expr_to_typ tenv vtenv ty in

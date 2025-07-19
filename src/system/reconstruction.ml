@@ -309,9 +309,9 @@ let rec infer cache env renvs annot (id, e) =
       | AllOk (p,_) -> retry_with (nc (Annot.ALet (annot1, p)))
       end
     end
-  | TypeConstr _, Infer -> retry_with (AConstr Infer)
+  | TypeCast _, Infer -> retry_with (AConstr Infer)
   | TypeCoerce (_,t), Infer -> retry_with (ACoerce (t,Infer))
-  | TypeConstr (e', t), AConstr annot' ->
+  | TypeCast (e', t), AConstr annot' ->
     begin match infer' cache env renvs annot' e' with
     | Ok (annot', s) ->
       let s = GTy.lb s in

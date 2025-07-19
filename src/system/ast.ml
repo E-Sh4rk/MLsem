@@ -48,7 +48,7 @@ type e =
 | App of t * t
 | Projection of projection * t
 | Let of (typ list) * Variable.t * t * t
-| TypeConstr of t * typ
+| TypeCast of t * typ
 | TypeCoerce of t * GTy.t
 | ControlFlow of cf * t * typ * t * t
 [@@deriving show]
@@ -69,7 +69,7 @@ let map f =
       | App (e1, e2) -> App (aux e1, aux e2)
       | Projection (p, e) -> Projection (p, aux e)
       | Let (ta, v, e1, e2) -> Let (ta, v, aux e1, aux e2)
-      | TypeConstr (e, ty) -> TypeConstr (aux e, ty)
+      | TypeCast (e, ty) -> TypeCast (aux e, ty)
       | TypeCoerce (e, ty) -> TypeCoerce (aux e, ty)
       | ControlFlow (cf, e, t, e1, e2) -> ControlFlow (cf, aux e, t, aux e1, aux e2)
     in
@@ -81,7 +81,7 @@ let fold f =
   let rec aux (id,e) =
     begin match e with
     | Abstract _ | Const _ | Var _ -> []
-    | Lambda (_,_, e) | Projection (_, e) | TypeConstr (e,_) | TypeCoerce (e,_) -> [e]
+    | Lambda (_,_, e) | Projection (_, e) | TypeCast (e,_) | TypeCoerce (e,_) -> [e]
     | Ite (e,_,e1,e2) | ControlFlow (_, e, _, e1, e2) -> [e ; e1 ; e2]
     | LambdaRec lst -> lst |> List.map (fun (_,_,e) -> e)
     | App (e1,e2) | Let (_,_,e1,e2) -> [e1 ; e2]
@@ -96,7 +96,7 @@ let fv' (_,e) accs =
   let acc = List.fold_left VarSet.union VarSet.empty accs in
   match e with
   | Abstract _ | Const _ | Constructor _ | Ite _ | ControlFlow _
-  | App _ | Projection _  | TypeConstr _ | TypeCoerce _ -> acc
+  | App _ | Projection _  | TypeCast _ | TypeCoerce _ -> acc
   | Var v -> VarSet.add v acc
   | Let (_, v, _, _) | Lambda (_, v, _) -> VarSet.remove v acc
   | LambdaRec lst ->
@@ -115,7 +115,7 @@ let substitute v v' e = map (substitute' v v') e
 let apply_subst s e =
   let aux (id,e) =
     let e = match e with
-    (* Ite and TypeConstr should not contain type variables *)
+    (* Ite and TypeCast should not contain type variables *)
     | Abstract t -> Abstract (GTy.substitute s t)
     | Lambda (ty,v,e) -> Lambda (GTy.substitute s ty,v,e)
     | LambdaRec lst -> LambdaRec (List.map (fun (ty,v,e) -> (GTy.substitute s ty, v, e)) lst)

@@ -41,7 +41,7 @@ and ('a, 'typ, 'ato, 'tag, 'v) ast =
 | Cons of ('a, 'typ, 'ato, 'tag, 'v) t * ('a, 'typ, 'ato, 'tag, 'v) t
 | Projection of projection * ('a, 'typ, 'ato, 'tag, 'v) t
 | RecordUpdate of ('a, 'typ, 'ato, 'tag, 'v) t * string * ('a, 'typ, 'ato, 'tag, 'v) t option
-| TypeConstr of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ
+| TypeCast of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ
 | TypeCoerce of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ
 | PatMatch of ('a, 'typ, 'ato, 'tag, 'v) t * (('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'ato, 'tag, 'v) t) list
 | Cond of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ * ('a, 'typ, 'ato, 'tag, 'v) t * ('a, 'typ, 'ato, 'tag, 'v) t option
