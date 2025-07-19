@@ -143,27 +143,27 @@ let rec typeof' env annot (id,e) =
   | Let (_, v, e1, e2), ALet (annot1, annots2) ->
     let tvs,s = typeof_def env annot1 e1 |> TyScheme.get in
     let aux (si, annot) =
-      (* TODO: not satisfying *)
-      if TVarSet.inter tvs (vars si) |> TVarSet.is_empty then
-        let s = TyScheme.mk tvs (GTy.map (cap si) s) in
+      let si = GTy.mk si in
+      if TVarSet.inter tvs (GTy.fv si) |> TVarSet.is_empty then
+        let s = TyScheme.mk tvs (GTy.cap s si) in
         typeof (Env.add v s env) annot e2
       else
         untypeable id ("Partition of "^(Variable.show v)^" contains generalized variables.")
     in
-    if subtype (GTy.map_dyn any s) (List.map fst annots2 |> disj) then
+    if subtype (GTy.ub s) (List.map fst annots2 |> disj) then
       List.map aux annots2 |> GTy.disj
     else
       untypeable id ("Partition does not cover the type of "^(Variable.show v)^".")
   | TypeConstr (e, ty), AConstr annot ->
     let t = typeof env annot e in
-    if subtype (GTy.static_comp t) ty then t
+    if subtype (GTy.lb t) ty then t
     else untypeable id "Type constraint not satisfied."
   | TypeCoerce (e, _), ACoerce (ty, annot) ->
     let t = typeof env annot e in
-    if subtype (GTy.static_comp t) ty then GTy.mk ty (GTy.dyn_comp t)
+    if GTy.leq t ty then ty
     else untypeable id "Impossible type coercion."
   | e, AInter lst ->
-    lst |> List.map (fun a -> typeof env a (id,e)) |> GTy.mapl conj
+    lst |> List.map (fun a -> typeof env a (id,e)) |> GTy.conj
   | e, a ->
     Format.printf "e:@.%a@.@.a:@.%a@.@." Ast.pp_e e Annot.pp_a a ;
     assert false
@@ -178,8 +178,8 @@ and typeof_b env bannot (id,e) s tau =
   match bannot with
   | BType annot -> typeof env annot (id,e)
   | BSkip ->
-    if disjoint (GTy.map_dyn any s) tau |> not
+    if disjoint (GTy.ub s) tau |> not
     then untypeable id "Branch is reachable and must be typed." ;
-    GTy.bot
+    GTy.empty
 and typeof_def env annot e =
   typeof env annot e |> generalize ~e env

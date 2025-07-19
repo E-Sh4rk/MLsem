@@ -28,7 +28,7 @@ type e =
 | App of t * t
 | Projection of projection * t
 | Let of (typ list) * Variable.t * t * t
-| TypeConstr of t * typ (* TODO: rename into TypeCast and add a "runtime" flag? *)
+| TypeConstr of t * typ (* TODO: rename into TypeCast *)
 | TypeCoerce of t * GTy.t
 | ControlFlow of cf * t * typ * t * t
 and t = Eid.t * e
