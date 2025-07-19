@@ -310,7 +310,7 @@ let rec infer cache env renvs annot (id, e) =
       end
     end
   | TypeCast _, Infer -> retry_with (AConstr Infer)
-  | TypeCoerce (_,t), Infer -> retry_with (ACoerce (t,Infer))
+  | TypeCoerce (_,t, _), Infer -> retry_with (ACoerce (t,Infer))
   | TypeCast (e', t), AConstr annot' ->
     begin match infer' cache env renvs annot' e' with
     | Ok (annot', s) ->
@@ -323,11 +323,14 @@ let rec infer cache env renvs annot (id, e) =
     | Subst (ss,a,a',r) -> Subst (ss,AConstr a,AConstr a',r)
     | Fail -> Fail
     end
-  | TypeCoerce (e', _), ACoerce (t,annot') ->
+  | TypeCoerce (e', _, only_lb), ACoerce (t,annot') ->
     begin match infer' cache env renvs annot' e' with
     | Ok (annot', s) ->
-      let ss = tallying_no_result cache env [(GTy.lb s, GTy.lb t) ; (GTy.ub s, GTy.ub t)] in
+      let lbc, ubc = (GTy.lb s, GTy.lb t), (GTy.ub s, GTy.ub t) in
+      let cs = if only_lb then [lbc] else [lbc;ubc] in
+      let ss = tallying_no_result cache env cs in
       log "untypeable coercion" (fun fmt ->
+        let s = if only_lb then GTy.mk (GTy.lb s) else s in
         Format.fprintf fmt "expected: %a\ngiven: %a" GTy.pp t GTy.pp s
         ) ;
       Subst (ss, nc (Annot.ACoerce(t,annot')), Untyp, empty_cov)

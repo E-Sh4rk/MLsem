@@ -56,7 +56,7 @@ let check_resolved var env typ =
 
 let type_check_with_sigs env (var,e,sigs,aty) =
   let e = Transform.expr_to_ast e in
-  let es = List.map (fun s -> coerce (GTy.mk s) e) sigs in
+  let es = List.map (fun s -> coerce true (GTy.mk s) e) sigs in
   let typs = List.map (infer (Some var) env) es in
   let tscap t1 t2 =
     let (tvs1, t1), (tvs2, t2) = TyScheme.get t1, TyScheme.get t2 in

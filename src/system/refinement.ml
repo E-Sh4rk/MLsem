@@ -62,7 +62,7 @@ let sufficient_refinements env e t =
     | Constructor (Atom a, []) ->
       if subtype (mk_atom a) t then [REnv.empty] else []
     | Constructor _ -> assert false
-    | TypeCoerce (_, s) when subtype (GTy.lb s) t -> [REnv.empty]
+    | TypeCoerce (_, s, _) when subtype (GTy.lb s) t -> [REnv.empty]
     | Abstract s when subtype (GTy.lb s) t -> [REnv.empty]
     | Const c when subtype (typeof_const c) t -> [REnv.empty]
     | ControlFlow _ when subtype unit_typ t -> [REnv.empty]
@@ -119,7 +119,7 @@ let rec typeof env (_,e) =
     let _, ty = typeof env t |> TyScheme.get in
     TyScheme.mk_mono (GTy.map (Checker.proj p) ty)
   | TypeCast (t, _) -> typeof env t
-  | TypeCoerce (_, ty) -> TyScheme.mk_mono ty
+  | TypeCoerce (_, ty, _) -> TyScheme.mk_mono ty
   | _ -> TyScheme.mk_mono GTy.any
 
 let refinement_envs env e =
@@ -134,7 +134,7 @@ let refinement_envs env e =
     match e with
     | Abstract _ | Const _ | Var _ -> ()
     | Constructor (_, es) -> es |> List.iter (aux env)
-    | Projection (_, e) | TypeCast (e, _) | TypeCoerce (e, _) -> aux env e
+    | Projection (_, e) | TypeCast (e, _) | TypeCoerce (e, _, _) -> aux env e
     | Lambda (d, v, e) -> aux_lambda env (d,v,e)
     | LambdaRec lst -> lst |> List.iter (aux_lambda env)
     | Ite (e, tau, e1, e2) | ControlFlow (_, e, tau, e1, e2) ->

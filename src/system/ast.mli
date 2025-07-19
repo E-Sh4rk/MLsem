@@ -29,7 +29,7 @@ type e =
 | Projection of projection * t
 | Let of (typ list) * Variable.t * t * t
 | TypeCast of t * typ
-| TypeCoerce of t * GTy.t
+| TypeCoerce of t * GTy.t * bool (* Only check lower-bound *)
 | ControlFlow of cf * t * typ * t * t
 and t = Eid.t * e
 
@@ -38,7 +38,7 @@ val fold : (t -> 'a list -> 'a) -> t -> 'a
 val fv : t -> VarSet.t
 val apply_subst : Subst.t -> t -> t
 val substitute : Variable.t -> Variable.t -> t -> t
-val coerce : GTy.t -> t -> t
+val coerce : bool (* Only check lower-bound *) -> GTy.t -> t -> t
 
 val pp : Format.formatter -> t -> unit
 val pp_e : Format.formatter -> e -> unit

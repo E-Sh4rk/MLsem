@@ -42,7 +42,7 @@ and ('a, 'typ, 'ato, 'tag, 'v) ast =
 | Projection of projection * ('a, 'typ, 'ato, 'tag, 'v) t
 | RecordUpdate of ('a, 'typ, 'ato, 'tag, 'v) t * string * ('a, 'typ, 'ato, 'tag, 'v) t option
 | TypeCast of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ
-| TypeCoerce of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ
+| TypeCoerce of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ * bool (* Only check lower-bound *)
 | PatMatch of ('a, 'typ, 'ato, 'tag, 'v) t * (('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'ato, 'tag, 'v) t) list
 | Cond of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ * ('a, 'typ, 'ato, 'tag, 'v) t * ('a, 'typ, 'ato, 'tag, 'v) t option
 | While of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ * ('a, 'typ, 'ato, 'tag, 'v) t

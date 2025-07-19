@@ -75,7 +75,8 @@
 %token EOF
 %token FUN VAL LET IN FST SND HD TL HASHTAG SUGGEST
 %token IF IS THEN ELSE WHILE DO BEGIN
-%token LPAREN RPAREN IRPAREN EQUAL COMMA CONS COLON COLON_OPT COERCE INTERROGATION_MARK EXCLAMATION_MARK
+%token LPAREN RPAREN IRPAREN EQUAL COMMA CONS COLON COLON_OPT COERCE COERCE_STATIC
+%token INTERROGATION_MARK EXCLAMATION_MARK
 %token ARROW AND OR NEG DIFF
 %token TIMES PLUS MINUS DIV
 %token LBRACE RBRACE DOUBLEPOINT MATCH WITH END POINT LT GT
@@ -217,7 +218,8 @@ atomic_term:
   annot (Ite (t,ty,annot (Const (Bool true)),annot (Const (Bool false))))
   }
 | LPAREN t=term COLON ty=typ RPAREN { annot $startpos $endpos (TypeCast (t,ty)) }
-| LPAREN t=term COERCE ty=typ RPAREN { annot $startpos $endpos (TypeCoerce (t,ty)) }
+| LPAREN t=term COERCE ty=typ RPAREN { annot $startpos $endpos (TypeCoerce (t,ty,false)) }
+| LPAREN t=term COERCE_STATIC ty=typ RPAREN { annot $startpos $endpos (TypeCoerce (t,ty,true)) }
 | LBRACE obr=optional_base_record fs=separated_list(SEMICOLON, field_term) RBRACE
 { record_update $startpos $endpos obr fs }
 | LBRACKET lst=separated_list(SEMICOLON, simple_term) RBRACKET
