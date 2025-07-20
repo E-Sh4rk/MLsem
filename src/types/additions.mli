@@ -11,7 +11,7 @@ exception TypeDefinitionError of string
 type type_base =
     | TInt of Z.t option * Z.t option | TCharInt of char * char | TSString of string
     | TBool | TTrue | TFalse | TUnit | TChar | TAny | TEmpty | TNil
-    | TString | TList | TFloat | TArrowAny | TTupleAny | TTupleN of int | TAtomAny
+    | TString | TList | TFloat | TArrowAny | TTupleAny | TTupleN of int | TEnumAny
     | TTagAny | TRecordAny 
 
 type type_regexp = type_expr Sstt.Extensions.Lists.regexp
@@ -21,7 +21,7 @@ and type_expr =
     | TBase of type_base
     | TCustom of string
     | TApp of  string * type_expr list
-    | TAtom of string
+    | TEnum of string
     | TTag of string * type_expr
     | TTuple of type_expr list
     | TRecord of bool * (string * type_expr * bool) list
@@ -47,7 +47,7 @@ val type_exprs_to_typs : type_env -> var_type_env -> type_expr list -> typ list 
 
 val define_abstract : type_env -> string -> variance list -> type_env
 val define_types : type_env -> var_type_env -> (string * string list * type_expr) list -> type_env
-val get_atom : type_env -> string -> atom
+val get_enum : type_env -> string -> enum
 val get_tag : type_env -> string -> tag
 
 (* Operations on types *)

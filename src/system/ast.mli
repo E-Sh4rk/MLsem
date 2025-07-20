@@ -16,7 +16,7 @@ val typeof_const : const -> typ
 
 type cf = CfWhile | CfCond
 type projection = Pi of int * int | Field of string | Hd | Tl | PiTag of tag
-type constructor = Tuple of int | Cons | RecUpd of string | RecDel of string | Tag of tag | Atom of atom
+type constructor = Tuple of int | Cons | RecUpd of string | RecDel of string | Tag of tag | Enum of enum
 type e =
 | Abstract of GTy.t
 | Const of const

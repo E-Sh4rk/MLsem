@@ -60,12 +60,12 @@ let from_label lbl = Sstt.Label.name lbl
 
 (* ----- *)
 
-type atom = Sstt.Atoms.Atom.t
-let pp_atom = Sstt.Atoms.Atom.pp
-let compare_atom = Sstt.Atoms.Atom.compare
-let define_atom name = name |> Sstt.Atoms.Atom.mk
-let mk_atom atom = atom |> Sstt.Descr.mk_atom |> Sstt.Ty.mk_descr
-let atom_any = Sstt.Atoms.any |> Sstt.Descr.mk_atoms |> Sstt.Ty.mk_descr
+type enum = Sstt.Enums.Atom.t
+let pp_enum = Sstt.Enums.Atom.pp
+let compare_enum = Sstt.Enums.Atom.compare
+let define_enum name = name |> Sstt.Enums.Atom.mk
+let mk_enum enum = enum |> Sstt.Descr.mk_enum |> Sstt.Ty.mk_descr
+let enum_any = Sstt.Enums.any |> Sstt.Descr.mk_enums |> Sstt.Ty.mk_descr
 
 type tag = Sstt.TagComp.Tag.t
 let pp_tag = Sstt.TagComp.Tag.pp

@@ -38,7 +38,7 @@ let domains_of_construct (c:Ast.constructor) =
   | RecUpd _ -> [ record_any ; any ]
   | RecDel _ -> [ record_any ]
   | Tag _ -> [ any ]
-  | Atom _ -> []
+  | Enum _ -> []
 
 let construct (c:Ast.constructor) tys =
   match c, tys with
@@ -49,7 +49,7 @@ let construct (c:Ast.constructor) tys =
     merge_records t1 right_record
   | RecDel lbl, [t] -> remove_field t lbl
   | Tag tag, [t] -> mk_tag tag t
-  | Atom atom, [] -> mk_atom atom
+  | Enum enum, [] -> mk_enum enum
   | _ -> failwith "Invalid arity for constructor."
 
 (* Expressions *)

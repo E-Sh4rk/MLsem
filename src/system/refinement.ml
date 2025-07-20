@@ -59,8 +59,8 @@ let sufficient_refinements env e t =
         aux e (remove_field_info ti label)
       ) |> List.flatten
     | Constructor (Tag tag, [e]) -> aux e (destruct_tag tag t)
-    | Constructor (Atom a, []) ->
-      if subtype (mk_atom a) t then [REnv.empty] else []
+    | Constructor (Enum e, []) ->
+      if subtype (mk_enum e) t then [REnv.empty] else []
     | Constructor _ -> assert false
     | TypeCoerce (_, s, _) when subtype (GTy.lb s) t -> [REnv.empty]
     | Abstract s when subtype (GTy.lb s) t -> [REnv.empty]

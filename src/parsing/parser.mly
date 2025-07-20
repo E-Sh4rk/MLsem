@@ -55,7 +55,7 @@
     | "tuple" -> TBase TTupleAny
     | "arrow" -> TBase TArrowAny
     | "record" -> TBase TRecordAny
-    | "atom" -> TBase TAtomAny
+    | "enum" -> TBase TEnumAny
     | "tag" -> TBase TTagAny
     | "int" -> TBase (TInt (None, None))
     | "char" -> TBase TChar
@@ -207,7 +207,7 @@ atomic_term:
   let f = annot $startpos $endpos (Var "[]") in
   annot $startpos $endpos (App (f, t))
 }
-| c=CID { annot $startpos $endpos (Atom c) }
+| c=CID { annot $startpos $endpos (Enum c) }
 | t=PCID a=term RPAREN { annot $startpos $endpos (Tag (t,a)) }
 | t=PCID RPAREN { annot $startpos $endpos (Tag (t,annot $startpos $endpos (Const Unit))) }
 | l=literal { annot $startpos $endpos (Const l) }
@@ -307,7 +307,7 @@ simple_typ:
 atomic_typ:
   x=type_constant { TBase x }
 | s=ID { builtin_type_or_custom s }
-| s=CID { TAtom s }
+| s=CID { TEnum s }
 | s=PCID t=typ RPAREN { TTag (s, t) }
 | s=PCID RPAREN { TTag (s, TBase TUnit) }
 | s=TVAR { TVar s }
@@ -387,7 +387,7 @@ atomic_pattern:
   COLON t=atomic_typ { PatType t }
 | v=ID  { PatVar v }
 | c=literal { PatLit c }
-| a=CID { PatType (TAtom a) }
+| e=CID { PatType (TEnum e) }
 | t=PCID p=pattern RPAREN { PatTag (t,p) }
 | t=PCID RPAREN { PatType (TTag (t,TBase TUnit)) }
 | LBRACE fs=separated_list(SEMICOLON, pat_field) o=optional_open RBRACE { PatRecord (fs, o) }
