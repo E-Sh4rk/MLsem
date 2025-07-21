@@ -128,7 +128,7 @@ let expr_to_ast t =
     | Ast.Abstract t -> Abstract (GTy.mk t)
     | Ast.Const c -> Const c
     | Ast.Var v -> Var v
-    | Ast.Atom a -> Constructor (Atom a, [])
+    | Ast.Enum e -> Constructor (Enum e, [])
     | Ast.Tag (t, e) -> Constructor (Tag t, [aux e])
     | Ast.Suggest (v, tys, (_,e)) ->
       add_suggs v tys ; aux_e e

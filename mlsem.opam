@@ -13,8 +13,6 @@ depends: [
   "ppx_deriving"
   "zarith"
   "yojson"
-  "js_of_ocaml-ppx"
-  "zarith_stubs_js"
   "odoc" {with-doc}
 ]
 build: [

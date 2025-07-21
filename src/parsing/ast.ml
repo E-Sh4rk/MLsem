@@ -24,32 +24,32 @@ type ('a, 'typ, 'tag, 'v) pattern =
 | PatRecord of (string * (('a, 'typ, 'tag, 'v) pattern)) list * bool
 | PatAssign of 'v * const
 
-and ('a, 'typ, 'ato, 'tag, 'v) ast =
+and ('a, 'typ, 'enu, 'tag, 'v) ast =
 | Abstract of 'typ
 | Const of const
 | Var of 'v
-| Atom of 'ato
-| Tag of 'tag * ('a, 'typ, 'ato, 'tag, 'v) t
-| Suggest of 'v * 'typ list * ('a, 'typ, 'ato, 'tag, 'v) t
-| Lambda of 'v * 'typ lambda_annot * ('a, 'typ, 'ato, 'tag, 'v) t
-| LambdaRec of ('v * 'typ option * ('a, 'typ, 'ato, 'tag, 'v) t) list
-| Ite of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ * ('a, 'typ, 'ato, 'tag, 'v) t * ('a, 'typ, 'ato, 'tag, 'v) t
-| App of ('a, 'typ, 'ato, 'tag, 'v) t * ('a, 'typ, 'ato, 'tag, 'v) t
-| Let of 'v * ('a, 'typ, 'ato, 'tag, 'v) t * ('a, 'typ, 'ato, 'tag, 'v) t
-| Tuple of ('a, 'typ, 'ato, 'tag, 'v) t list
-| Cons of ('a, 'typ, 'ato, 'tag, 'v) t * ('a, 'typ, 'ato, 'tag, 'v) t
-| Projection of projection * ('a, 'typ, 'ato, 'tag, 'v) t
-| RecordUpdate of ('a, 'typ, 'ato, 'tag, 'v) t * string * ('a, 'typ, 'ato, 'tag, 'v) t option
-| TypeCast of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ
-| TypeCoerce of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ * bool
-| PatMatch of ('a, 'typ, 'ato, 'tag, 'v) t * (('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'ato, 'tag, 'v) t) list
-| Cond of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ * ('a, 'typ, 'ato, 'tag, 'v) t * ('a, 'typ, 'ato, 'tag, 'v) t option
-| While of ('a, 'typ, 'ato, 'tag, 'v) t * 'typ * ('a, 'typ, 'ato, 'tag, 'v) t
-| Seq of ('a, 'typ, 'ato, 'tag, 'v) t * ('a, 'typ, 'ato, 'tag, 'v) t
+| Enum of 'enu
+| Tag of 'tag * ('a, 'typ, 'enu, 'tag, 'v) t
+| Suggest of 'v * 'typ list * ('a, 'typ, 'enu, 'tag, 'v) t
+| Lambda of 'v * 'typ lambda_annot * ('a, 'typ, 'enu, 'tag, 'v) t
+| LambdaRec of ('v * 'typ option * ('a, 'typ, 'enu, 'tag, 'v) t) list
+| Ite of ('a, 'typ, 'enu, 'tag, 'v) t * 'typ * ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
+| App of ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
+| Let of 'v * ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
+| Tuple of ('a, 'typ, 'enu, 'tag, 'v) t list
+| Cons of ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
+| Projection of projection * ('a, 'typ, 'enu, 'tag, 'v) t
+| RecordUpdate of ('a, 'typ, 'enu, 'tag, 'v) t * string * ('a, 'typ, 'enu, 'tag, 'v) t option
+| TypeCast of ('a, 'typ, 'enu, 'tag, 'v) t * 'typ
+| TypeCoerce of ('a, 'typ, 'enu, 'tag, 'v) t * 'typ * bool
+| PatMatch of ('a, 'typ, 'enu, 'tag, 'v) t * (('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'enu, 'tag, 'v) t) list
+| Cond of ('a, 'typ, 'enu, 'tag, 'v) t * 'typ * ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t option
+| While of ('a, 'typ, 'enu, 'tag, 'v) t * 'typ * ('a, 'typ, 'enu, 'tag, 'v) t
+| Seq of ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
 
-and ('a, 'typ, 'ato, 'tag, 'v) t = 'a * ('a, 'typ, 'ato, 'tag, 'v) ast
+and ('a, 'typ, 'enu, 'tag, 'v) t = 'a * ('a, 'typ, 'enu, 'tag, 'v) ast
 
-type expr = (Eid.t, typ, atom, tag, Variable.t) t
+type expr = (Eid.t, typ, enum, tag, Variable.t) t
 type parser_expr = (annotation, type_expr, string, string, varname) t
 
 type name_var_map = Variable.t StrMap.t
@@ -88,7 +88,7 @@ let parser_expr_to_expr tenv vtenv name_var_map e =
             Abstract t
         | Const c -> Const c
         | Var str -> Var (aux_var env str)
-        | Atom str -> Atom (get_atom tenv str)
+        | Enum str -> Enum (get_enum tenv str)
         | Tag (str, e) -> Tag (get_tag tenv str, aux vtenv env e)
         | Suggest (str,tys,e) ->
             let tys, vtenv = type_exprs_to_typs tenv vtenv tys in

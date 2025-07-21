@@ -35,7 +35,7 @@ type cf = CfWhile | CfCond
 [@@deriving show]
 type projection = Pi of int * int | Field of string | Hd | Tl | PiTag of tag
 [@@deriving show]
-type constructor = Tuple of int | Cons | RecUpd of string | RecDel of string | Tag of tag | Atom of atom
+type constructor = Tuple of int | Cons | RecUpd of string | RecDel of string | Tag of tag | Enum of enum
 [@@deriving show]
 type e =
 | Abstract of GTy.t

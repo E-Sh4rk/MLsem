@@ -13,7 +13,7 @@ exception TypeDefinitionError of string
 type type_base =
     | TInt of Z.t option * Z.t option | TCharInt of char * char | TSString of string
     | TBool | TTrue | TFalse | TUnit | TChar | TAny | TEmpty | TNil
-    | TString | TList | TFloat | TArrowAny | TTupleAny | TTupleN of int | TAtomAny
+    | TString | TList | TFloat | TArrowAny | TTupleAny | TTupleN of int | TEnumAny
     | TTagAny | TRecordAny 
 
 type type_regexp = type_expr Sstt.Extensions.Lists.regexp
@@ -23,7 +23,7 @@ and type_expr =
     | TBase of type_base
     | TCustom of string
     | TApp of  string * type_expr list
-    | TAtom of string
+    | TEnum of string
     | TTag of string * type_expr
     | TTuple of type_expr list
     | TRecord of bool * (string * type_expr * bool) list
@@ -38,13 +38,13 @@ and type_expr =
 
 type type_env = {
     aliases : (typ * TVar.t list) StrMap.t ; (* User-defined non-parametric types *)
-    mutable atoms : atom StrMap.t ; (* Atoms *)
+    mutable enums : enum StrMap.t ; (* Atoms *)
     mutable tags : tag StrMap.t ; (* Tags *)
     abs : abstract StrMap.t (* Abstract types *)
 }
 type var_type_env = TVar.t StrMap.t (* Var types *)
 
-let empty_tenv = { aliases=StrMap.empty ; atoms=StrMap.empty ;
+let empty_tenv = { aliases=StrMap.empty ; enums=StrMap.empty ;
     tags=StrMap.empty ; abs=StrMap.empty }
 let empty_vtenv = StrMap.empty
 
@@ -63,7 +63,7 @@ let type_base_to_typ t =
     | TTupleAny -> tuple_any
     | TTupleN n -> tuple_n n
     | TTagAny -> tag_any
-    | TAtomAny -> atom_any
+    | TEnumAny -> enum_any
     | TRecordAny -> record_any
 
 let get_alias tenv name args =
@@ -81,13 +81,13 @@ let get_abstract_type tenv name otys =
         | None -> Some (mk_abstract_any abs)
         | Some tys -> Some (mk_abstract abs tys)
         end
-let get_atom tenv name =
-    match StrMap.find_opt name tenv.atoms with
-    | Some a -> a
+let get_enum tenv name =
+    match StrMap.find_opt name tenv.enums with
+    | Some e -> e
     | None ->
-        let a = define_atom name in
-        tenv.atoms <- StrMap.add name a tenv.atoms ;
-        a
+        let e = define_enum name in
+        tenv.enums <- StrMap.add name e tenv.enums ;
+        e
 let get_tag tenv name =
     match StrMap.find_opt name tenv.tags with
     | Some t -> t
@@ -164,7 +164,7 @@ let derecurse_types tenv venv defs =
             | TApp (n, args) ->
                 let args = args |> List.map (aux lcl) in
                 get_name (Some args) n
-            | TAtom name -> get_atom tenv name |> mk_atom
+            | TEnum name -> get_enum tenv name |> mk_enum
             | TTag (name, t) -> mk_tag (get_tag tenv name) (aux lcl t)
             | TTuple ts -> mk_tuple (List.map (aux lcl) ts)
             | TRecord (is_open, fields) ->
@@ -274,7 +274,7 @@ let is_test_type t =
                 if ps <> [] || ns <> [] then raise NotTestType ;
                 let open Sstt.Descr in
                 components d |> List.iter (function
-                    | Atoms _ | Intervals _ | Tuples _ | Records _ -> ()
+                    | Enums _ | Intervals _ | Tuples _ | Records _ -> ()
                     | Tags t ->
                         Tags.destruct t |> snd |> List.iter (fun comp ->
                             let tag = Sstt.TagComp.tag comp in
@@ -326,7 +326,7 @@ let trans_descr f d =
   let open Sstt.Descr in
   d |> components |> List.map (function
     | Intervals i -> Intervals i
-    | Atoms a -> Atoms a
+    | Enums e -> Enums e
     | Tags t -> Tags (trans_tags f t)
     | Arrows a -> Arrows a
     | Tuples t -> Tuples t
