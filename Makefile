@@ -36,6 +36,9 @@ wasm:
 test:
 	opam exec -- dune runtest
 
+time:
+	./time.sh
+
 perf:
 	sudo perf record --call-graph=dwarf -- ./_build/default/src/main/prototype.exe
 	sudo perf report
