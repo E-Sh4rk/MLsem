@@ -34,6 +34,8 @@ let top_instance (tvs,t) =
   let t = GTy.map (Additions.top_instance mono) t in
   mk tvs t
 let simplify (tvs,ty) = (tvs, GTy.simplify ty)
+let normalize (tvs,ty) = (tvs, GTy.normalize ty)
+let norm_and_simpl ts = ts |> normalize |> simplify
 let pp fmt (tvs, ty) =
   if TVarSet.is_empty tvs
   then Format.fprintf fmt "%a" GTy.pp ty

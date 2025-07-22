@@ -173,7 +173,7 @@ and typeof env annot e =
   match annot.cache with
   | Some ty -> ty
   | None ->
-    let ty = typeof' env annot.ann e |> GTy.normalize in
+    let ty = typeof' env annot.ann e in
     annot.cache <- Some ty ;
     ty
 and typeof_b env bannot (id,e) s tau =

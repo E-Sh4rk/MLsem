@@ -29,7 +29,7 @@ let sigs_of_ty mono ty =
   in
   if ty |> vars_internal |> TVarSet.is_empty then
     let sigs = aux ty in
-    Some (sigs, GTy.mk ty |> TyScheme.mk_poly_except mono |> TyScheme.simplify)
+    Some (sigs, GTy.mk ty |> TyScheme.mk_poly_except mono |> TyScheme.norm_and_simpl)
   else None
 let infer var env e =
   let annot =
@@ -44,7 +44,7 @@ let infer var env e =
       (* Format.printf "@.@.%a@.@." System.Ast.pp e ; *)
       raise (Untypeable (var, err))
   in
-  let ty = System.Checker.typeof_def env annot e |> TyScheme.simplify in
+  let ty = System.Checker.typeof_def env annot e |> TyScheme.norm_and_simpl in
   let (tvs, ty) = TyScheme.get ty in
   TyScheme.mk tvs (GTy.ub ty |> GTy.mk)
 let retrieve_time time =
@@ -66,7 +66,7 @@ let type_check_with_sigs env (var,e,sigs,aty) =
       let (tvs1, t1), (tvs2, t2) = TyScheme.get t1, TyScheme.get t2 in
       TyScheme.mk (TVarSet.union tvs1 tvs2) (GTy.cap t1 t2)
     in
-    let typ = List.fold_left tscap (TyScheme.mk_mono GTy.any) typs |> TyScheme.simplify in
+    let typ = List.fold_left tscap (TyScheme.mk_mono GTy.any) typs |> TyScheme.norm_and_simpl in
     if TyScheme.leq typ aty |> not then raise (IncompatibleType (var,typ)) ;
     check_resolved var env typ ;
     var,typ
