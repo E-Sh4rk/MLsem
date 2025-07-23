@@ -86,12 +86,18 @@ let string_of_lex_pos p =
 
 let string_of_pos p =
   let filename = filename_of_position p in
-  let l = line p.start_p in
-  let c1, c2 = characters p.start_p p.end_p in
+  if p = dummy then
     if filename = "" then
-      Printf.sprintf "Line %d, characters %d-%d" l c1 c2
-    else
-      Printf.sprintf "File \"%s\", line %d, characters %d-%d" filename l c1 c2
+        Printf.sprintf "Unknown position"
+      else
+        Printf.sprintf "File \"%s\"" filename
+  else
+    let l = line p.start_p in
+    let c1, c2 = characters p.start_p p.end_p in
+      if filename = "" then
+        Printf.sprintf "Line %d, characters %d-%d" l c1 c2
+      else
+        Printf.sprintf "File \"%s\", line %d, characters %d-%d" filename l c1 c2
 
 let pos_or_undef = function
   | None -> dummy

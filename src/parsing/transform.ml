@@ -83,12 +83,13 @@ let encode_pattern_matching e pats =
     let vars = vars_of_pat pat in
     let add_def acc v =
       let d = def_of_var_pat pat v ex in
-      (Eid.unique (), Ast.Let (v, d, acc))
+      (Eid.refresh (fst acc), Ast.Let (v, d, acc))
     in
     List.fold_left add_def e' (VarSet.elements vars)
   in
   let add_branch acc (t, e') =
-    (Eid.unique (), Ast.Ite (ex, t, e', acc))
+    let p1, p2 = Eid.loc (fst e'), Eid.loc (fst acc) in
+    (Eid.unique_with_pos (Position.join p1 p2), Ast.Ite (ex, t, e', acc))
   in
   let pats = pats |> List.map (fun (pat, e') ->
     (type_of_pat pat, body_of_pat pat e')) |> List.rev in
@@ -97,7 +98,7 @@ let encode_pattern_matching e pats =
   | (_, e')::pats -> List.fold_left add_branch e' pats
   in
   let def = (Eid.refresh (fst e), Ast.TypeCast (e, t)) in
-  let body = (Eid.unique (), Ast.Suggest (x, ts, body)) in
+  let body = (Eid.refresh (fst body), Ast.Suggest (x, ts, body)) in
   Ast.Let (x, def, body)
 
 let expr_to_ast t =
