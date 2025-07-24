@@ -46,7 +46,9 @@ let infer var env e =
   in
   let ty = System.Checker.typeof_def env annot e |> TyScheme.norm_and_simpl in
   let (tvs, ty) = TyScheme.get ty in
-  TyScheme.mk tvs (GTy.ub ty |> GTy.mk)
+  let ty = TyScheme.mk tvs (GTy.ub ty |> GTy.mk) in
+  let msg = System.Analyzer.analyze e annot in
+  ty, msg
 let retrieve_time time =
   let time' = Unix.gettimeofday () in
   (time' -. time) *. 1000.
@@ -57,11 +59,12 @@ let check_resolved var env typ =
 let type_check_with_sigs env (var,e,sigs,aty) =
   if sigs = [] then
     (* Dyn type *)
-    var, aty
+    (var, aty), []
   else
     let e = Transform.expr_to_ast e in
     let es = List.map (fun s -> coerce (!Config.allow_implicit_downcast) (GTy.mk s) e) sigs in
-    let typs = List.map (infer (Some var) env) es in
+    let typs, msg = List.map (infer (Some var) env) es |> List.split in
+    let msg = List.concat msg in
     let tscap t1 t2 =
       let (tvs1, t1), (tvs2, t2) = TyScheme.get t1, TyScheme.get t2 in
       TyScheme.mk (TVarSet.union tvs1 tvs2) (GTy.cap t1 t2)
@@ -69,23 +72,25 @@ let type_check_with_sigs env (var,e,sigs,aty) =
     let typ = List.fold_left tscap (TyScheme.mk_mono GTy.any) typs |> TyScheme.norm_and_simpl in
     if TyScheme.leq typ aty |> not then raise (IncompatibleType (var,typ)) ;
     check_resolved var env typ ;
-    var,typ
+    (var,typ),msg
 
 let type_check_recs pos env lst =
   let e =
     Eid.unique_with_pos pos,
     Parsing.Ast.LambdaRec (List.map (fun (v,e) -> (v,None,e)) lst) in
   let e = Transform.expr_to_ast e in
-  let tvs, ty = infer None env e |> TyScheme.get in
+  let ty, msg = infer None env e in
+  let tvs, ty = ty |> TyScheme.get in
   let n = List.length lst in
   List.mapi (fun i (var,_) ->
     let ty = TyScheme.mk tvs (GTy.map (pi n i) ty) |> TyScheme.bot_instance in
     check_resolved var env ty ;
     (var, ty)
-  ) lst
+  ) lst, msg
 
+type message = System.Analyzer.severity * Position.t * string * string option
 type 'a treat_result =
-| TSuccess of (Variable.t * TyScheme.t) list * float
+| TSuccess of (Variable.t * TyScheme.t) list * message list * float
 | TDone
 | TFailure of Variable.t option * Position.t * string * string option * float
 
@@ -129,11 +134,14 @@ let treat (tenv,varm,senv,env) (annot, elem) =
         | None -> Either.Right (var, e)
         | Some (sigs,aty) -> Either.Left (var, e, sigs, aty)
         ) lst in
-      let tys1 = type_check_recs pos env recs in
+      let tys1, msg1 = type_check_recs pos env recs in
       let env = List.fold_left (fun env (v,ty) -> Env.add v ty env) env tys1 in
-      let tys2 = List.map (type_check_with_sigs env) sigs in
+      let tys2, msg2 = List.map (type_check_with_sigs env) sigs |> List.split in
+      let msg = msg1@(List.concat msg2) |> List.map (fun r ->
+        (r.System.Analyzer.severity, Eid.loc r.eid, r.title, r.descr)
+      ) in
       let senv = List.fold_left (fun senv (v,_) -> VarMap.remove v senv) senv tys2 in
-      (tenv,varm,senv,env), TSuccess (tys1@tys2,retrieve_time time)
+      (tenv,varm,senv,env), TSuccess (tys1@tys2,msg,retrieve_time time)
     | Ast.SigDef (name, tyo) ->
       check_not_defined varm name ;
       let v = Variable.create_let (Some name) in

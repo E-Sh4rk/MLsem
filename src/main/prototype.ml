@@ -1,14 +1,27 @@
 open Main
 open Variable
 
+let severity_to_str s =
+    match s with
+    | System.Analyzer.Error -> "Error"
+    | Warning -> "Warning"
+    | Notice -> "Notice"
+    | Message -> "Message"
+
 let treat_res (acc, res) =
     match res with
-    | TSuccess (lst, time) ->
+    | TSuccess (lst, msg, time) ->
         lst |> List.iter (fun (v,t) ->
             Format.printf "@{<blue;bold>%s@}: %!"
                 (Variable.get_name v |> Option.get) ;
             Format.printf "%a @{<italic;yellow>(checked in %.00fms)@}\n%!"
                 Types.TyScheme.pp_short t time ;
+        ) ;
+        msg |> List.iter (fun (s,pos,title,descr) ->
+            Format.printf "@{<italic;bold;cyan>[%s]@} @{<italic;cyan>%s@} @{<italic;cyan>%s@}\n%!"
+                (severity_to_str s) (Position.string_of_pos pos) title ;
+            descr |> Option.iter (Format.printf "@{<italic;cyan>%s@}\n%!") ;
+
         ) ;
         acc, true
     | TFailure (Some v, pos, msg, descr, time) ->

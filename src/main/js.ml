@@ -38,7 +38,7 @@ let add_res res res' =
       ("typeable", `Bool false) ; ("message", `String msg) ; ("pos", json_of_pos pos)]@descr)
     in
     untyp::res
-  | TSuccess (lst,time) ->
+  | TSuccess (lst,_,time) (* TODO: msg *) ->
     let res = ref res in
     lst |> List.iter (fun (v,t)->
       let name = Variable.get_name v |> Option.get in
