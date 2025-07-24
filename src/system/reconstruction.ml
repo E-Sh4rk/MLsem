@@ -298,9 +298,9 @@ let rec infer cache env renvs annot (id, e) =
       | AllOk (p,_) -> retry_with (nc (Annot.ALet (annot1, p)))
       end
     end
-  | TypeCast _, Infer -> retry_with (AConstr Infer)
+  | TypeCast _, Infer -> retry_with (ACast Infer)
   | TypeCoerce (_,t, _), Infer -> retry_with (ACoerce (t,Infer))
-  | TypeCast (e', t), AConstr annot' ->
+  | TypeCast (e', t), ACast annot' ->
     begin match infer' cache env renvs annot' e' with
     | Ok (annot', s) ->
       let s = GTy.lb s in
@@ -308,8 +308,8 @@ let rec infer cache env renvs annot (id, e) =
       log "untypeable constraint" (fun fmt ->
         Format.fprintf fmt "expected: %a\ngiven: %a" pp_typ t pp_typ s
         ) ;
-      Subst (ss, nc (Annot.AConstr(annot')), Untyp, empty_cov)
-    | Subst (ss,a,a',r) -> Subst (ss,AConstr a,AConstr a',r)
+      Subst (ss, nc (Annot.ACast(annot')), Untyp, empty_cov)
+    | Subst (ss,a,a',r) -> Subst (ss,ACast a,ACast a',r)
     | Fail -> Fail
     end
   | TypeCoerce (e', _, only_lb), ACoerce (t,annot') ->

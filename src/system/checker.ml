@@ -154,7 +154,7 @@ let rec typeof' env annot (id,e) =
       List.map aux annots2 |> GTy.disj
     else
       untypeable id ("Partition does not cover the type of "^(Variable.show v)^".")
-  | TypeCast (e, ty), AConstr annot ->
+  | TypeCast (e, ty), ACast annot ->
     let t = typeof env annot e in
     if subtype (GTy.lb t) ty then GTy.cap t (GTy.mk ty)
     else untypeable id "Type constraint not satisfied."

@@ -15,7 +15,7 @@ module Annot : sig
   | ALet of t * part
   | AApp of t * t
   | AProj of t
-  | AConstr of t
+  | ACast of t
   | ACoerce of GTy.t * t
   | AIte of t * branch * branch
   | ACf of t * branch * branch
@@ -44,7 +44,7 @@ module IAnnot : sig
   | ALet of t * part
   | AApp of t * t
   | AProj of t
-  | AConstr of t
+  | ACast of t
   | ACoerce of GTy.t * t
   | AIte of t * branch * branch
   | ACf of t * branch * branch

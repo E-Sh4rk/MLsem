@@ -18,7 +18,7 @@ module Annot = struct
   | ALet of t * part
   | AApp of t * t
   | AProj of t
-  | AConstr of t
+  | ACast of t
   | ACoerce of GTy.t * t
   | AIte of t * branch * branch
   | ACf of t * branch * branch
@@ -39,7 +39,7 @@ module Annot = struct
       | ALet (t, ps) -> ALet (aux t, List.map (fun (ty, t) -> Subst.apply s ty, aux t) ps)
       | AApp (t1, t2) -> AApp (aux t1, aux t2)
       | AProj t -> AProj (aux t)
-      | AConstr t -> AConstr (aux t)
+      | ACast t -> ACast (aux t)
       | ACoerce (ty, t) -> ACoerce (GTy.substitute s ty, aux t)
       | AIte (t,b1,b2) -> AIte (aux t, aux_b b1, aux_b b2)
       | ACf (t,b1,b2) -> ACf (aux t, aux_b b1, aux_b b2)
@@ -74,7 +74,7 @@ module IAnnot = struct
   | ALet of t * part
   | AApp of t * t
   | AProj of t
-  | AConstr of t
+  | ACast of t
   | ACoerce of GTy.t * t
   | AIte of t * branch * branch
   | ACf of t * branch * branch
@@ -93,7 +93,7 @@ module IAnnot = struct
       | ALet (t, ps) -> ALet (aux t, List.map (fun (ty, t) -> Subst.apply s ty, aux t) ps)
       | AApp (t1, t2) -> AApp (aux t1, aux t2)
       | AProj t -> AProj (aux t)
-      | AConstr t -> AConstr (aux t)
+      | ACast t -> ACast (aux t)
       | ACoerce (ty, t) -> ACoerce (GTy.substitute s ty, aux t)
       | AIte (t,b1,b2) -> AIte (aux t, aux_b b1, aux_b b2)
       | ACf (t,b1,b2) -> ACf (aux t, aux_b b1, aux_b b2)
