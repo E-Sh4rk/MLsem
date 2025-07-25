@@ -42,22 +42,31 @@ function fullErrorMessage(res) {
 
 let codelensemitter = new monaco.Emitter();
 let typesinfo = [];
+function updatePos(arr, changes) {
+    if (isDummyPos(arr["pos"])) arr["pos"] = null;
+    if (arr["pos"] !== null) {
+        let startD = arr["pos"]["startOffset"];
+        let endD = arr["pos"]["endOffset"];
+        let rangeD = applyChangesToRange(startD, endD, changes);
+        if (rangeD === null) {
+            arr["pos"] = null;
+        }
+        else {
+            arr["pos"]["startOffset"] = rangeD[0];
+            arr["pos"]["endOffset"] = rangeD[1];
+        }
+    }
+}
 function applyChangesToCurCodeLens(changes) {
     for (let i = 0; i < typesinfo.length; i++) {
         // Pos
-        if (isDummyPos(typesinfo[i]["pos"])) typesinfo[i]["pos"] = null;
-        if (typesinfo[i]["pos"] !== null) {
-            let startD = typesinfo[i]["pos"]["startOffset"];
-            let endD = typesinfo[i]["pos"]["endOffset"];
-            let rangeD = applyChangesToRange(startD, endD, changes);
-            if (rangeD === null) {
-                typesinfo[i]["pos"] = null;
-            }
-            else {
-                typesinfo[i]["pos"]["startOffset"] = rangeD[0];
-                typesinfo[i]["pos"]["endOffset"] = rangeD[1];
+        updatePos(typesinfo[i], changes);
+        if (typesinfo[i]["messages"]) {
+            for (let j = 0; j < typesinfo[i]["messages"].length; j++) {
+                updatePos(typesinfo[i]["messages"][j], changes);
             }
         }
+        else typesinfo[i]["messages"] = null;
         // Def_pos
         let startL = typesinfo[i]["def_pos"]["startOffset"];
         let endL = typesinfo[i]["def_pos"]["endOffset"];
@@ -84,19 +93,46 @@ function clearTypeInfo(model) {
 
 function validateMarkers(model) {
     const markers = [];
-    typesinfo.forEach((info) => {
-        if (!info["typeable"] && info["pos"] !== null) {
+    function addMarker(info, severity) {
+        if (info["severity"]) {
+            switch (info["severity"]) {
+            case "error":
+                severity = monaco.MarkerSeverity.Error;
+                break;
+            case "warning":
+                severity = monaco.MarkerSeverity.Warning;
+                break;
+            case "notice":
+                severity = monaco.MarkerSeverity.Info;
+                break;
+            case "message":
+                severity = monaco.MarkerSeverity.Hint;
+                break;
+            default:
+            }
+        }
+        if (info["pos"] !== null) {
             let start = model.getPositionAt(info["pos"]["startOffset"]);
             let end = model.getPositionAt(info["pos"]["endOffset"]);
             let range = rangeOfPositions(start, end);
             markers.push({
 				message: fullErrorMessage(info),
-				severity: monaco.MarkerSeverity.Warning,
+				severity: severity,
 				startLineNumber: range.startLineNumber,
 				startColumn: range.startColumn,
 				endLineNumber: range.endLineNumber,
 				endColumn: range.endColumn,
 			});
+        }
+    }
+    typesinfo.forEach((info) => {
+        if (!info["typeable"]) {
+            addMarker(info, monaco.MarkerSeverity.Error);
+        }
+        if (info["messages"] !== null) {
+            for (let j = 0; j < info["messages"].length; j++) {
+                addMarker(info["messages"][j], monaco.MarkerSeverity.Hint);
+            }
         }
     });
     monaco.editor.setModelMarkers(model, "owner", markers);
