@@ -75,7 +75,8 @@
 %token EOF
 %token FUN VAL LET IN FST SND HD TL HASHTAG SUGGEST
 %token IF IS THEN ELSE WHILE DO BEGIN
-%token LPAREN RPAREN IRPAREN EQUAL COMMA CONS COLON COLON_OPT COERCE COERCE_STATIC
+%token LPAREN RPAREN IRPAREN EQUAL COMMA CONS COLON COLON_OPT
+%token COERCE COERCE_STATIC COERCE_NOCHECK
 %token INTERROGATION_MARK EXCLAMATION_MARK
 %token ARROW AND OR NEG DIFF
 %token TIMES PLUS MINUS DIV
@@ -219,12 +220,14 @@ atomic_term:
   annot (Ite (t,ty,annot (Const (Bool true)),annot (Const (Bool false))))
   }
 | LPAREN t=term COLON ty=typ RPAREN { annot $startpos $endpos (TypeCast (t,ty)) }
-| LPAREN t=term COERCE ty=typ RPAREN { annot $startpos $endpos (TypeCoerce (t,ty,Check)) }
-| LPAREN t=term COERCE_STATIC ty=typ RPAREN { annot $startpos $endpos (TypeCoerce (t,ty,CheckStatic)) }
+| LPAREN t=term c=coerce ty=typ RPAREN { annot $startpos $endpos (TypeCoerce (t,ty,c)) }
 | LBRACE obr=optional_base_record fs=separated_list(SEMICOLON, field_term) RBRACE
 { record_update $startpos $endpos obr fs }
 | LBRACKET lst=separated_list(SEMICOLON, simple_term) RBRACKET
 { list_of_elts $startpos $endpos lst }
+
+%inline coerce:
+  COERCE { Check } | COERCE_STATIC { CheckStatic } | COERCE_NOCHECK { NoCheck }
 
 %inline optional_base_record:
   { annot $startpos $endpos (Const EmptyRecord) }

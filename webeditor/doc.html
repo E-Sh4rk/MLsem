@@ -187,9 +187,10 @@
         <var>e</var> ::= <var>lit</var>
             | <var>gid</var>
             | <var>cid</var> [<kbd>(</kbd><var>e</var><kbd>)</kbd>]
-            | <kbd>(</kbd><var>e</var> <kbd>:</kbd> <var>t</var> <kbd>)</kbd>
-            | <kbd>(</kbd><var>e</var> <kbd>:&gt;</kbd> <var>t</var> <kbd>)</kbd>
-            | <kbd>(</kbd><var>e</var> <kbd>:&gt;&gt;</kbd> <var>t</var> <kbd>)</kbd>
+            | <kbd>(</kbd><var>e</var> <kbd>:</kbd> <var>t</var><kbd>)</kbd>
+            | <kbd>(</kbd><var>e</var> <kbd>:&gt;</kbd> <var>t</var><kbd>)</kbd>
+            | <kbd>(</kbd><var>e</var> <kbd>:&gt;&gt;</kbd> <var>t</var><kbd>)</kbd>
+            | <kbd>(</kbd><var>e</var> <kbd>:&gt;&gt;&gt;</kbd> <var>t</var><kbd>)</kbd>
             | <kbd>{</kbd> [<var>e</var> <kbd>with</kbd>] <var>id</var><kbd>=</kbd><var>e</var><kbd>;</kbd>...<kbd>;</kbd><var>id</var><kbd>=</kbd><var>e</var> <kbd>}</kbd>
             | <kbd>[</kbd> <var>e</var><kbd>;</kbd> ... <kbd>;</kbd><var>e</var> <kbd>]</kbd>
             | <var>e</var> <kbd>,</kbd>...<kbd>,</kbd> <var>e</var>
@@ -221,8 +222,9 @@
             <li>type casts, e.g. <kbd> (x : bool)</kbd></li>
             <li>type coercions, e.g. <kbd>(42 :> int)</kbd> which
             can be used locally to coerce the type of an expression into
-            a supertype. Another type coercion operator <kbd>(x :>> int)</kbd>
-            is available and allows coercion of the dynamic type into any type.</li>
+            a supertype. Two other type coercion operators are available: <kbd>(x :>> int)</kbd>
+            allows coercion of the dynamic part of a type into any type,
+            and <kbd>(x :>>> int)</kbd> allows coercion of a type into any type (unchecked coercion).</li>
             <li>constructors for products, lists and records</li>
             <li>anonymous functions</li>
             <li>local let binding (defined using either a variable or a <a href="#pattern">pattern</a>)</li>
