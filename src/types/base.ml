@@ -119,7 +119,7 @@ let single_string str = Sstt.Extensions.Strings.str str
 
 let mk_tuple ts = ts |> Sstt.Descr.mk_tuple |> Sstt.Ty.mk_descr
 let tuple_any = Sstt.Tuples.any |> Sstt.Descr.mk_tuples |> Sstt.Ty.mk_descr
-let tuple_n n = Sstt.Tuples.TupleComp.any n |> Sstt.Descr.mk_tuplecomp |> Sstt.Ty.mk_descr
+let tuple_n n = Sstt.TupleComp.any n |> Sstt.Descr.mk_tuplecomp |> Sstt.Ty.mk_descr
 
 let pi n i t =
   t |> Sstt.Ty.get_descr |> Sstt.Descr.get_tuples
