@@ -1,7 +1,7 @@
+open Common
 open Main
 open Js_of_ocaml
 open Yojson.Basic
-open System.Variable
 
 module Html = Dom_html
 
@@ -13,7 +13,7 @@ let severity_to_str s =
     | Message -> "message"
 
 let json_of_pos pos =
-  let open System.Position in
+  let open Position in
   if pos = dummy
   then
     `Assoc [("startLine", `Int (-1)) ; ("startCol", `Int (-1)) ;

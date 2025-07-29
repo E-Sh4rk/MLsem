@@ -39,8 +39,8 @@ module type Env = sig
     val pp_filtered : string list -> Format.formatter -> t -> unit
 end
 
-module Make(T:T) : Env with type ty:=T.t
 module Env : Env with type ty:=TyScheme.t
+
 module REnv : sig
   include Env with type ty:=typ
   val find' : Variable.t -> t -> typ

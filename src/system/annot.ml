@@ -1,7 +1,7 @@
+open Common
 open Types.Base
 open Types.Tvar
 open Types.Gradual
-open Env
 
 module Annot = struct
   type branch = BType of t | BSkip

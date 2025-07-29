@@ -2,7 +2,7 @@
  (name main)
  (public_name mlsem)
  (wrapped false)
- (libraries types parsing utils system)
+ (libraries types common parsing utils system)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.ord ppx_deriving.eq))
  (modules main config))

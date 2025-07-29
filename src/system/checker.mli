@@ -1,7 +1,7 @@
+open Common
 open Types.Base
 open Types
 open Annot
-open Env
 open Gradual
 
 val domain_of_proj : Ast.projection -> typ -> typ

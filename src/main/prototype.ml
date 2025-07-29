@@ -1,5 +1,5 @@
+open Common
 open Main
-open System.Variable
 
 let severity_to_str s =
     match s with

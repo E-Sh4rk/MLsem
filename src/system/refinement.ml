@@ -1,5 +1,5 @@
+open Common
 open Ast
-open Env
 open Types
 open Types.Base
 open Types.Tvar

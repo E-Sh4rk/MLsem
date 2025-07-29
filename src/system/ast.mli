@@ -1,4 +1,4 @@
-open Variable
+open Common
 open Types.Base
 open Types.Tvar
 open Types.Gradual

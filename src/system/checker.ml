@@ -1,11 +1,10 @@
+open Common
 open Types
 open Types.Base
 open Types.Tvar
+open Types.Gradual
 open Annot
 open Ast
-open Env
-open Variable
-open Types.Gradual
 
 (* Projections and constructors *)
 

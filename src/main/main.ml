@@ -1,3 +1,4 @@
+open Common
 open Parsing.IO
 open Types.Base
 open Types.Builder
@@ -5,11 +6,7 @@ open Types.Tvar
 open Types.Gradual
 open Types
 open Parsing
-open System.Variable
-open System.Env
 open System.Ast
-module Eid = System.Eid
-module Position = System.Position
 
 type def = Variable.t * Ast.expr * typ option
 

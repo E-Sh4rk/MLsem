@@ -1,3 +1,4 @@
+open Common
 open Annot
 
 type severity = Message | Notice | Warning | Error

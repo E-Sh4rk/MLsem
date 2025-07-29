@@ -1,17 +1,13 @@
-module PAst = Ast
-
-open System
+open Common
 open Types.Base
 open Types.Tvar
 open Types.Gradual
-open System.Ast
-open System.Variable
 
 let rec type_of_pat pat =
-  let open PAst in
+  let open Ast in
   match pat with
   | PatType t -> t
-  | PatLit c -> typeof_const c
+  | PatLit c -> System.Ast.typeof_const c
   | PatVar _ -> any
   | PatTag (tag, p) -> mk_tag tag (type_of_pat p)
   | PatAnd (p1, p2) ->
@@ -26,7 +22,7 @@ let rec type_of_pat pat =
   | PatAssign _ -> any
 
 let rec vars_of_pat pat =
-  let open PAst in
+  let open Ast in
   match pat with
   | PatType _ | PatLit _ -> VarSet.empty
   | PatVar x when Variable.equals x dummy_pat_var -> VarSet.empty
@@ -43,7 +39,7 @@ let rec vars_of_pat pat =
   | PatAssign (x,_) -> VarSet.singleton x
 
 let rec def_of_var_pat pat v e =
-  let open PAst in
+  let open Ast in
   assert (Variable.equals v dummy_pat_var |> not) ;
   match pat with
   | PatVar v' when Variable.equals v v' -> e
@@ -78,7 +74,7 @@ let rec def_of_var_pat pat v e =
   | PatLit _ -> assert false
 
 let encode_pattern_matching e pats =
-  let open PAst in
+  let open Ast in
   let x = Variable.create_gen None in
   let ex = (Eid.unique (), Var x) in
   let ts = pats |> List.map fst |> List.map type_of_pat in
@@ -106,6 +102,7 @@ let encode_pattern_matching e pats =
   Let (x, def, body)
 
 let expr_to_ast t =
+  let open System.Ast in
   let sugg : (Variable.t, typ list) Hashtbl.t = Hashtbl.create 100 in
   let get_sugg v =
     match Hashtbl.find_opt sugg v with Some lst -> lst | None -> []
@@ -130,7 +127,7 @@ let expr_to_ast t =
   in
   let rec aux_e e =
     match e with
-    | PAst.Abstract t -> Abstract (GTy.mk t)
+    | Ast.Abstract t -> Abstract (GTy.mk t)
     | Const c -> Const c
     | Var v -> Var v
     | Enum e -> Constructor (Enum e, [])

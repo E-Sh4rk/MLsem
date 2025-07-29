@@ -6,7 +6,7 @@
 (library
  (name parsing)
  (public_name mlsem.parsing)
- (libraries types system utils)
+ (libraries types common system utils)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.ord ppx_deriving.eq))
  (modules (:standard)))

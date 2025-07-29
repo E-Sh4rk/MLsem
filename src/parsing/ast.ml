@@ -1,7 +1,6 @@
-open System
+open Common
 open Types.Base
 open Types.Builder
-open System.Variable
 open System.Ast
 
 exception SymbolError of string
