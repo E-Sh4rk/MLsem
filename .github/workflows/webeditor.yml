@@ -39,9 +39,10 @@ jobs:
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
           opam-pin: false
-      - name: Install OCaml dependencies
+      - name: Install OCaml dependencies and build doc
         run: |
           make deps
+          make doc
 
       # Build web version
       - name: Use Node.js
