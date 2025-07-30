@@ -4,7 +4,7 @@ open Types.Builder
 open Types
 open System.Ast
 
-type def = Variable.t * Ast.expr * Ty.t option
+type def = Variable.t * PAst.expr * Ty.t option
 
 exception IncompatibleType of Variable.t * TyScheme.t
 exception UnresolvedType of Variable.t * TyScheme.t
@@ -73,7 +73,7 @@ let type_check_with_sigs env (var,e,sigs,aty) =
 let type_check_recs pos env lst =
   let e =
     Eid.unique_with_pos pos,
-    Ast.LambdaRec (List.map (fun (v,e) -> (v,None,e)) lst) in
+    PAst.LambdaRec (List.map (fun (v,e) -> (v,None,e)) lst) in
   let e = Transform.expr_to_ast e in
   let ty, msg = infer None env e in
   let tvs, ty = ty |> TyScheme.get in
@@ -113,7 +113,7 @@ let treat (tenv,varm,senv,env) (annot, elem) =
   let v = ref dummy in
   try  
     match elem with
-    | Ast.Definitions lst ->
+    | PAst.Definitions lst ->
       let varm = ref varm in
       let lst = lst |> List.map (fun (name, e) ->
         let var, sigs = sigs_of_def !varm senv env name in
@@ -125,7 +125,7 @@ let treat (tenv,varm,senv,env) (annot, elem) =
       let varm = !varm in
       let sigs, recs = List.partition_map (fun (var, e, sigs) ->
         v := var ;
-        let e = Ast.parser_expr_to_expr tenv empty_vtenv varm e in
+        let e = PAst.parser_expr_to_expr tenv empty_vtenv varm e in
         match sigs with
         | None -> Either.Right (var, e)
         | Some (sigs,aty) -> Either.Left (var, e, sigs, aty)
@@ -138,7 +138,7 @@ let treat (tenv,varm,senv,env) (annot, elem) =
       ) in
       let senv = List.fold_left (fun senv (v,_) -> VarMap.remove v senv) senv tys2 in
       (tenv,varm,senv,env), TSuccess (tys1@tys2,msg,retrieve_time time)
-    | Ast.SigDef (name, tyo) ->
+    | PAst.SigDef (name, tyo) ->
       check_not_defined varm name ;
       let v = Variable.create_let (Some name) in
       Variable.attach_location v (Position.position annot) ;
@@ -160,7 +160,7 @@ let treat (tenv,varm,senv,env) (annot, elem) =
           (tenv,varm,senv,env), TDone
         end
       end
-    | Ast.Command (str, c) ->
+    | PAst.Command (str, c) ->
       begin match str, c with
       | "value_restriction", Bool b -> System.Config.value_restriction := b
       | "type_narrowing", Bool b -> Config.type_narrowing := b
@@ -170,14 +170,14 @@ let treat (tenv,varm,senv,env) (annot, elem) =
       | _ -> failwith ("Invalid command "^str)
       end ;
       (tenv,varm,senv,env), TDone
-    | Ast.Types lst ->
+    | PAst.Types lst ->
       let tenv = define_types tenv empty_vtenv lst in
       (tenv,varm,senv,env), TDone
-    | Ast.AbsType (name, vs) ->
+    | PAst.AbsType (name, vs) ->
       let tenv = define_abstract tenv name vs in
       (tenv,varm,senv,env), TDone
   with
-  | Ast.SymbolError msg -> (tenv,varm,senv,env), TFailure (Some !v, pos, msg, None, 0.0)
+  | PAst.SymbolError msg -> (tenv,varm,senv,env), TFailure (Some !v, pos, msg, None, 0.0)
   | TypeDefinitionError msg -> (tenv,varm,senv,env), TFailure (None, pos, msg, None, 0.0)
   | AlreadyDefined v ->
     (tenv,varm,senv,env), TFailure (Some v, pos, "Symbol already defined.", None, 0.0)
@@ -200,13 +200,15 @@ let treat (tenv,varm,senv,env) (annot, elem) =
       retrieve_time time)
 
 let treat_sig envs (annot,elem) =
+  let open PAst in
   match elem with
-  | Ast.Types _ | Ast.AbsType _ | Ast.SigDef _ -> treat envs (annot,elem)
-  | Ast.Command _ | Ast.Definitions _ -> envs, TDone
+  | Types _ | AbsType _ | SigDef _ -> treat envs (annot,elem)
+  | Command _ | Definitions _ -> envs, TDone
 let treat_def envs (annot,elem) =
+  let open PAst in
   match elem with
-  | Ast.Types _ | Ast.AbsType _ | Ast.SigDef _ -> envs, TDone
-  | Ast.Command _ | Ast.Definitions _ -> treat envs (annot,elem)
+  | Types _ | AbsType _ | SigDef _ -> envs, TDone
+  | Command _ | Definitions _ -> treat envs (annot,elem)
 let treat_all_sigs envs elts =
   let rec aux envs elts =
     match elts with
@@ -236,7 +238,7 @@ let initial_varm =
   builtin_functions |> List.fold_left (fun varm (name, _) ->
     let var = Variable.create_gen (Some name) in
     StrMap.add name var varm
-  ) Ast.empty_name_var_map
+  ) PAst.empty_name_var_map
 
 let initial_env =
   builtin_functions |> List.fold_left (fun env (name, t) ->
@@ -249,7 +251,7 @@ let initial_senv = VarMap.empty
 let initial_tenv = empty_tenv
 
 type parsing_result =
-| PSuccess of Ast.parser_program
+| PSuccess of PAst.parser_program
 | PFailure of Position.t * string
 
 let parse f =
@@ -260,6 +262,6 @@ let parse f =
     in
     PSuccess p
   with
-  | Ast.LexicalError(pos, msg) -> PFailure (pos, msg)
-  | Ast.SyntaxError (pos, msg) -> PFailure (pos, msg)
+  | PAst.LexicalError(pos, msg) -> PFailure (pos, msg)
+  | PAst.SyntaxError (pos, msg) -> PFailure (pos, msg)
 

@@ -2,12 +2,12 @@
 
   open Common
   open System.Ast
-  open Ast
+  open PAst
   open Types.Builder
   open Types
 
   let annot sp ep e =
-    (Ast.new_annot (Position.lex_join sp ep), e)
+    (new_annot (Position.lex_join sp ep), e)
 
   let tmp_var = "__encoding"
   let abstraction startpos endpos lst t =
@@ -93,9 +93,9 @@
 %token<string> LSTRING
 %token<string> INFIX PREFIX INDEXED OPID
 
-%type<Ast.parser_expr> term
-%start<Ast.parser_expr> unique_term
-%start<Ast.parser_program> program
+%type<parser_expr> term
+%start<parser_expr> unique_term
+%start<parser_program> program
 
 %right ARROW
 %left OR

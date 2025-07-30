@@ -9,7 +9,7 @@ web-deps:
 	cd webeditor ; npm ci
 
 build:
-	opam exec -- dune build src/main/prototype.exe
+	opam exec -- dune build src/bin/native.exe
 
 doc:
 	opam exec -- dune build @doc
@@ -17,23 +17,23 @@ doc:
 	cp -r _build/default/_doc/_html/ webeditor/doc
 
 run:
-	opam exec -- dune exec ./src/main/prototype.exe
+	opam exec -- dune exec ./src/bin/native.exe
 
 clean:
 	opam exec -- dune clean
 	rm -f ./webeditor/typechecker.js ./webeditor/version.txt
 
 js:
-	opam exec -- dune build --profile release src/main/js.bc.js
-	cp _build/default/src/main/js.bc.js ./webeditor/typechecker.js
+	opam exec -- dune build --profile release src/bin/js.bc.js
+	cp _build/default/src/bin/js.bc.js ./webeditor/typechecker.js
 	chmod +w ./webeditor/typechecker.js
 	git describe --always --tags HEAD > ./webeditor/version.txt
 	chmod +w ./webeditor/version.txt
 
 wasm:
-	opam exec -- dune build --profile release src/main/wasm.bc.wasm.js
-	cp _build/default/src/main/wasm.bc.wasm.js ./webeditor/typechecker.js
-	cp -r _build/default/src/main/wasm.bc.wasm.assets ./webeditor/
+	opam exec -- dune build --profile release src/bin/wasm.bc.wasm.js
+	cp _build/default/src/bin/wasm.bc.wasm.js ./webeditor/typechecker.js
+	cp -r _build/default/src/bin/wasm.bc.wasm.assets ./webeditor/
 	chmod +w ./webeditor/typechecker.js ./webeditor/wasm.bc.wasm.assets ./webeditor/wasm.bc.wasm.assets/*
 	git describe --always --tags HEAD > ./webeditor/version.txt
 	chmod +w ./webeditor/version.txt
@@ -45,5 +45,5 @@ time:
 	./time.sh
 
 perf:
-	sudo perf record --call-graph=dwarf -- ./_build/default/src/main/prototype.exe
+	sudo perf record --call-graph=dwarf -- ./_build/default/src/bin/native.exe
 	sudo perf report

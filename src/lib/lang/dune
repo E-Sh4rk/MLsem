@@ -1,0 +1,8 @@
+(library
+ (name mlsem_lang)
+ (public_name mlsem-lang)
+ (libraries types common utils system)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.ord ppx_deriving.eq)))
+
+(include_subdirs unqualified)

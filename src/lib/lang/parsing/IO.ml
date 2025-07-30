@@ -8,9 +8,9 @@ let pos_of_lexbuf lexbuf =
 let parse_with_errors parser buf =
   try parser Lexer.token buf with
   | Lexer.LexerError msg ->
-    raise (Ast.LexicalError (pos_of_lexbuf buf, msg))
+    raise (PAst.LexicalError (pos_of_lexbuf buf, msg))
   | Parser.Error ->
-    raise (Ast.SyntaxError (pos_of_lexbuf buf, "syntax error"))
+    raise (PAst.SyntaxError (pos_of_lexbuf buf, "syntax error"))
 
 let parse_expr_file source_filename =
   let cin = open_in source_filename in

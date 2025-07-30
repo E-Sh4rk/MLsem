@@ -1,4 +1,4 @@
-open Ast
+open PAst
 
 val parse_expr_file : string -> parser_expr
 val parse_expr_string : string -> parser_expr

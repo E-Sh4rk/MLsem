@@ -201,6 +201,6 @@ module Partitioner = struct
       if REnv.mem v renv then Some (REnv.find v renv) else None
     ) |> List.map isolate_conjuncts |> List.flatten in
     extra@tys |> partition
-    (* |> (fun tys -> Format.printf "Partition for %a: %a@." Parsing.Variable.Variable.pp v
+    (* |> (fun tys -> Format.printf "Partition for %a: %a@." Variable.pp v
       (Utils.pp_list Ty.pp) tys ; tys) *)
 end

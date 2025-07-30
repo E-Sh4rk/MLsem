@@ -2,7 +2,7 @@ open Common
 open Types
 
 let rec type_of_pat pat =
-  let open Ast in
+  let open PAst in
   match pat with
   | PatType t -> t
   | PatLit c -> System.Ast.typeof_const c
@@ -20,7 +20,7 @@ let rec type_of_pat pat =
   | PatAssign _ -> Ty.any
 
 let rec vars_of_pat pat =
-  let open Ast in
+  let open PAst in
   match pat with
   | PatType _ | PatLit _ -> VarSet.empty
   | PatVar x when Variable.equals x dummy_pat_var -> VarSet.empty
@@ -37,7 +37,7 @@ let rec vars_of_pat pat =
   | PatAssign (x,_) -> VarSet.singleton x
 
 let rec def_of_var_pat pat v e =
-  let open Ast in
+  let open PAst in
   assert (Variable.equals v dummy_pat_var |> not) ;
   match pat with
   | PatVar v' when Variable.equals v v' -> e
@@ -72,7 +72,7 @@ let rec def_of_var_pat pat v e =
   | PatLit _ -> assert false
 
 let encode_pattern_matching e pats =
-  let open Ast in
+  let open PAst in
   let x = Variable.create_gen None in
   let ex = (Eid.unique (), Var x) in
   let ts = pats |> List.map fst |> List.map type_of_pat in
@@ -125,7 +125,7 @@ let expr_to_ast t =
   in
   let rec aux_e e =
     match e with
-    | Ast.Abstract t -> Abstract (GTy.mk t)
+    | PAst.Abstract t -> Abstract (GTy.mk t)
     | Const c -> Const c
     | Var v -> Var v
     | Enum e -> Constructor (Enum e, [])

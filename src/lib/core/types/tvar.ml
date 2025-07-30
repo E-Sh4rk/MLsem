@@ -203,8 +203,6 @@ let pp_typ_short fmt t =
   let t = Subst.apply (vars t |> shorten_names) t in
   Ty.pp fmt t
 
-(* Operations on types *)
-
 let clean_subst' ~pos ~neg mono ts =
   vars_with_polarity' ts |>
   List.filter_map (fun (v,p) ->
@@ -231,14 +229,6 @@ let tallying mono cs =
   Sstt.Tallying.tally mono cs
 let tallying_with_prio mono prio cs =
   Sstt.Tallying.tally_with_priority prio mono cs
-let test_tallying mono cs = tallying mono cs <> []
-(* let tallying_with_unprio mono unprio cs =
-  let (tys1,tys2) = List.split cs in
-  let prio = TVarSet.diff
-    (vars' (tys1@tys2))
-    (TVarSet.union (TVarSet.construct unprio) mono)
-    |> TVarSet.destruct in
-  tallying_with_prio mono (prio@(List.rev unprio)) cs *)
 
 let factorize (pvs, nvs) t =
   let dnf = Sstt.Ty.def t |> Sstt.VDescr.dnf in

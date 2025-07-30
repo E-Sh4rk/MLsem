@@ -62,7 +62,6 @@ module Subst : sig
     val remove : t -> TVarSet.t -> t
     val split : t -> TVarSet.t -> t * t
     val is_renaming : t -> bool
-    (* val inverse_renaming : t -> t *)
     val pp : Format.formatter -> t -> unit
 end
 
@@ -81,8 +80,6 @@ val refresh : TVarSet.t -> Subst.t
 val shorten_names : TVarSet.t -> Subst.t
 val pp_typ_short : Format.formatter -> Ty.t -> unit
 
-(* Operations on types *)
-
 (** [clean p n mono t] substitutes in [t]
     all type variables not in [mono] and only occurring positively by [p], and
     all type variables not in [mono] and only occurring negatively by [n] *)
@@ -94,9 +91,7 @@ val clean_subst' : pos:Ty.t -> neg:Ty.t -> TVarSet.t -> Ty.t list -> Subst.t
 val bot_instance : TVarSet.t -> Ty.t -> Ty.t
 val top_instance : TVarSet.t -> Ty.t -> Ty.t
 
-val test_tallying : TVarSet.t -> (Ty.t * Ty.t) list -> bool
 val tallying : TVarSet.t -> (Ty.t * Ty.t) list -> Subst.t list
 val tallying_with_prio : TVarSet.t -> (TVar.t list) -> (Ty.t * Ty.t) list -> Subst.t list
-(* val tallying_with_unprio : TVarSet.t -> (TVar.t list) -> (Ty.t * Ty.t) list -> Subst.t list *)
 
 val factorize : TVarSet.t * TVarSet.t -> Ty.t -> Ty.t * Ty.t

@@ -1,23 +1,16 @@
-(library
- (name main)
- (public_name mlsem-lang)
- (wrapped false)
- (libraries types common parsing utils system)
- (preprocess
-  (pps ppx_deriving.show ppx_deriving.ord ppx_deriving.eq))
- (modules main config))
-
 (executable
- (name prototype)
+ (name native)
  (public_name mlsem)
  (package mlsem-bin)
- (libraries main)
- (modules prototype))
+ (libraries mlsem_lang unix)
+ (modes
+  (best exe))
+ (modules native))
 
 (library
  (name web)
  (wrapped false)
- (libraries main yojson)
+ (libraries mlsem_lang yojson)
  (preprocess
   (pps js_of_ocaml-ppx))
  (modules web))
