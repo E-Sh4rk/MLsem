@@ -9,7 +9,6 @@ module Annot = struct
   and part = (Ty.t * t) list
   [@@deriving show]
   and a =
-  | AConst
   | AAbstract of GTy.t
   | AAx of Subst.t
   | AConstruct of t list
@@ -30,7 +29,6 @@ module Annot = struct
   let substitute s t =
     let rec aux t =
       let ann = match t.ann with
-      | AConst -> AConst
       | AAbstract t -> AAbstract (GTy.substitute s t)
       | AAx s' -> AAx (Subst.compose_restr s s')
       | AConstruct ts -> AConstruct (List.map aux ts)

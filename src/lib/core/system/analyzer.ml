@@ -9,7 +9,7 @@ type msg = { eid: Eid.t ; severity: severity ; title: string ; descr: string opt
 let rec iter_ann f (id,e) a =
   let children =
     match e, a.Annot.ann with
-    | _, AConst | _, AAbstract _ | _, AAx _ -> []
+    | _, AAbstract _ | _, AAx _ -> []
     | Constructor (_, es), AConstruct anns when List.length es = List.length anns ->
       List.combine es anns
     | Let (_, _, e1, e2), ALet (a1, anns) ->

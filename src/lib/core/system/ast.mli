@@ -20,7 +20,6 @@ type constructor =
 | Tag of Tag.t | Enum of Enum.t | Choice of int
 type e =
 | Abstract of GTy.t
-| Const of const
 | Var of Variable.t
 | Constructor of constructor * t list
 | Lambda of GTy.t * Variable.t * t

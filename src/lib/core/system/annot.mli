@@ -6,7 +6,6 @@ module Annot : sig
   and inter = t list
   and part = (Ty.t * t) list
   and a =
-  | AConst
   | AAbstract of GTy.t
   | AAx of Subst.t
   | AConstruct of t list

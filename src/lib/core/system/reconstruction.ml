@@ -155,7 +155,6 @@ let rec infer cache env renvs annot (id, e) =
   | _, A a -> Ok (a, Checker.typeof env a (id, e))
   | _, Untyp -> Fail
   | Abstract ty, Infer -> retry_with (nc (Annot.AAbstract ty))
-  | Const _, Infer -> retry_with (nc Annot.AConst)
   | Var v, Infer when Env.mem v env ->
     let (tvs,_) = Env.find v env |> TyScheme.get in
     let s = TVCache.get' cache.tvcache id tvs in
