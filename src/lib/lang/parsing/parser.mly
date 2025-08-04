@@ -2,6 +2,7 @@
 
   open Common
   open System.Ast
+  open System.Const
   open PAst
   open Types.Builder
   open Types

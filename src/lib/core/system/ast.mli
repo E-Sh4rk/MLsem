@@ -1,17 +1,6 @@
 open Common
 open Types
 
-type const =
-| Unit | Nil
-| EmptyRecord
-| Bool of bool
-| Int of Z.t
-| Float of float
-| Char of char
-| String of string
-
-val typeof_const : const -> Ty.t
-
 type cf = CfWhile | CfCond | CfOther
 type coerce = Check | CheckStatic | NoCheck
 type projection = Pi of int * int | Field of string | Hd | Tl | PiTag of Tag.t
@@ -46,4 +35,3 @@ val pp_cf : Format.formatter -> cf -> unit
 val pp_coerce : Format.formatter -> coerce -> unit
 val pp_projection : Format.formatter -> projection -> unit
 val pp_constructor : Format.formatter -> constructor -> unit
-val pp_const : Format.formatter -> const -> unit

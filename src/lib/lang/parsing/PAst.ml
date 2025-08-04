@@ -2,6 +2,7 @@ open Common
 open Types
 open Types.Builder
 open System.Ast
+open System
 
 exception SymbolError of string
 exception LexicalError of Position.t * string
@@ -15,18 +16,18 @@ type 'typ lambda_annot = 'typ option
 type ('a, 'typ, 'tag, 'v) pattern =
 | PatType of 'typ
 | PatVar of 'v
-| PatLit of const
+| PatLit of Const.t
 | PatTag of 'tag * ('a, 'typ, 'tag, 'v) pattern
 | PatAnd of ('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'tag, 'v) pattern
 | PatOr of ('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'tag, 'v) pattern
 | PatTuple of ('a, 'typ, 'tag, 'v) pattern list
 | PatCons of ('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'tag, 'v) pattern
 | PatRecord of (string * (('a, 'typ, 'tag, 'v) pattern)) list * bool
-| PatAssign of 'v * const
+| PatAssign of 'v * Const.t
 
 and ('a, 'typ, 'enu, 'tag, 'v) ast =
 | Magic of 'typ
-| Const of const
+| Const of Const.t
 | Var of 'v
 | Enum of 'enu
 | Tag of 'tag * ('a, 'typ, 'enu, 'tag, 'v) t
@@ -223,6 +224,6 @@ type parser_element =
 | SigDef of string * type_expr option
 | Types of (string * string list * type_expr) list
 | AbsType of string * Abstract.variance list
-| Command of string * const
+| Command of string * Const.t
 
 type parser_program = (annotation * parser_element) list

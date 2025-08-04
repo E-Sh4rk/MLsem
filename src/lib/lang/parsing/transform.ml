@@ -5,7 +5,7 @@ let rec type_of_pat pat =
   let open PAst in
   match pat with
   | PatType t -> t
-  | PatLit c -> System.Ast.typeof_const c
+  | PatLit c -> System.Const.typeof c
   | PatVar _ -> Ty.any
   | PatTag (tag, p) -> Tag.mk tag (type_of_pat p)
   | PatAnd (p1, p2) ->
@@ -126,7 +126,7 @@ let expr_to_ast t =
   let rec aux_e e =
     match e with
     | PAst.Magic t -> Value (GTy.mk t)
-    | Const c -> Value (typeof_const c |> GTy.mk)
+    | Const c -> Value (System.Const.typeof c |> GTy.mk)
     | Var v -> Var v
     | Enum e -> Constructor (Enum e, [])
     | Tag (t, e) -> Constructor (Tag t, [aux e])
