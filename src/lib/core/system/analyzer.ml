@@ -17,9 +17,12 @@ let rec iter_ann f (id,e) a =
     | App (e1,e2), AApp (a1,a2) -> [(e1,a1) ; (e2,a2)]
     | Projection (_, e), AProj a | TypeCast (e, _), ACast a
     | TypeCoerce (e, _, _), ACoerce (_, a) | Lambda (_, _, e), ALambda (_, a) -> [(e,a)]
-    | Ite (e, _, e1, e2), AIte (a, b1, b2) | ControlFlow (_, e, _, e1, e2), ACf (a, b1, b2) ->
+    | Ite (e, _, e1, e2), AIte (a, b1, b2) ->
       (e,a)::([(e1,b1);(e2,b2)] |> List.filter_map (fun (e,b) ->
         match b with Annot.BSkip -> None | BType a -> Some (e,a)))
+    | ControlFlow (_, e, _, e1, e2), ACf (a, b1, b2) ->
+      (e,a)::([(e1,b1);(e2,b2)] |> List.filter_map (fun (e,b) ->
+        match e,b with _, Annot.BSkip | None, _ -> None | Some e, BType a -> Some (e,a)))
     | LambdaRec lst, ALambdaRec anns when List.length lst = List.length anns ->
       List.combine lst anns |> List.map (fun ((_,_,e), (_, a)) -> (e,a))
     | _, AInter anns -> anns |> List.map (fun a -> ((id,e), a))

@@ -116,8 +116,8 @@ let rec typeof' env annot (id,e) =
     GTy.cup t1 t2
   | ControlFlow (_, e, tau, e1, e2), ACf (annot, b1, b2) ->
     let s = typeof env annot e in
-    let _ = typeof_b env b1 e1 s tau in
-    let _ = typeof_b env b2 e2 s (Ty.neg tau) in
+    typeof_cf_b env b1 e1 s tau ;
+    typeof_cf_b env b2 e2 s (Ty.neg tau) ;
     GTy.mk Ty.unit
   | App (e1, e2), AApp (annot1, annot2) ->
     let check ty1 ty2 =
@@ -182,5 +182,10 @@ and typeof_b env bannot (id,e) s tau =
     if Ty.disjoint (GTy.ub s) tau |> not
     then untypeable id "Branch is reachable and must be typed." ;
     GTy.empty
+and typeof_cf_b env bannot eo s tau =
+  match eo, bannot with
+  | None, BSkip -> ()
+  | Some e, bannot -> typeof_b env bannot e s tau |> ignore
+  | _, _ -> assert false
 and typeof_def env annot e =
   typeof env annot e |> generalize ~e env

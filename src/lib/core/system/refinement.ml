@@ -141,9 +141,13 @@ let refinement_envs env e =
     | Projection (_, e) | TypeCast (e, _) | TypeCoerce (e, _, _) -> aux env e
     | Lambda (d, v, e) -> aux_lambda env (d,v,e)
     | LambdaRec lst -> lst |> List.iter (aux_lambda env)
-    | Ite (e, tau, e1, e2) | ControlFlow (_, e, tau, e1, e2) ->
+    | Ite (e, tau, e1, e2) ->
       add_refinement env e tau ; add_refinement env e (Ty.neg tau) ;
       aux env e1 ; aux env e2
+    | ControlFlow (_, e, tau, e1, e2) ->
+      if e1 <> None then add_refinement env e tau ;
+      if e2 <> None then add_refinement env e (Ty.neg tau) ;
+      Option.iter (aux env) e1 ; Option.iter (aux env) e2
     | App (e1, e2) -> aux env e1 ; aux env e2
     | Let (_, v, e1, e2) ->
       aux env e1 ; aux (Env.add v (typeof env e1) env) e2 ;

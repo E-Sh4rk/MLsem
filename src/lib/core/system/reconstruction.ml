@@ -396,21 +396,23 @@ and infer_b' cache env renvs bannot e s tau =
     | Subst (ss,a1,a2,r) -> Subst (ss,IAnnot.BType a1,IAnnot.BType a2,r)
     | Fail -> Fail
     end
-and infer_cf_b' cache env renvs bannot e s tau =
-  let retry_with bannot = infer_cf_b' cache env renvs bannot e s tau in
-  match bannot with
-  | IAnnot.BInfer ->
+and infer_cf_b' cache env renvs bannot eo s tau =
+  let retry_with bannot = infer_cf_b' cache env renvs bannot eo s tau in
+  match eo, bannot with
+  | None, IAnnot.BInfer -> retry_with (IAnnot.BSkip)
+  | Some _, IAnnot.BInfer ->
     if Ty.leq (GTy.ub s) (Ty.neg tau)
     then retry_with (IAnnot.BSkip)
     else retry_with (IAnnot.BType Infer)
-  | IAnnot.BSkip -> Ok (Annot.BSkip, GTy.empty)
-  | IAnnot.BType annot ->
+  | _, IAnnot.BSkip -> Ok (Annot.BSkip, GTy.empty)
+  | Some e, IAnnot.BType annot ->
     begin match infer' cache env renvs annot e with
     | Ok (a, ty) (* when Ty.leq ty Ty.unit *) -> Ok (Annot.BType a, ty)
     (* | Ok _ -> Fail *)
     | Subst (ss,a1,a2,r) -> Subst (ss,IAnnot.BType a1,IAnnot.BType a2,r)
     | Fail -> Fail
     end
+  | _, _ -> assert false
 and infer_part' cache env renvs e v (tvs, s) (si,annot) =
   let t = TyScheme.mk tvs (GTy.cap s (GTy.mk si)) in
   let env = Env.add v t env in

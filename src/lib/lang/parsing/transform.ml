@@ -151,11 +151,10 @@ let expr_to_ast t =
       let ty = match tyo with None -> GTy.dyn | Some ty -> GTy.mk ty in
       TypeCoerce (aux e, ty, c)
     | PatMatch (e, pats) -> encode_pattern_matching e pats |> aux_e
-    | Cond (e,t,e1,None) ->
-      ControlFlow (CfCond, aux e, t, aux e1, (Eid.unique (), Value (GTy.mk Ty.unit)))
-    | Cond (e,t,e1,Some e2) -> ControlFlow (CfCond, aux e, t, aux e1, aux e2)
+    | Cond (e,t,e1,e2) ->
+      ControlFlow (CfCond, aux e, t, Some (aux e1), Option.map aux e2)
     | While (e,t,e1) ->
-      ControlFlow (CfWhile, aux e, t, aux e1, (Eid.unique (), Value (GTy.mk Ty.unit)))
+      ControlFlow (CfWhile, aux e, t, Some (aux e1), None)
     | Seq (e1, e2) -> Let ([], Variable.create_gen None, aux e1, aux e2)
   and aux (id, e) =
     (id, aux_e e)

@@ -23,7 +23,7 @@ type e =
 | Let of (Ty.t list) * Variable.t * t * t
 | TypeCast of t * Ty.t
 | TypeCoerce of t * GTy.t * coerce
-| ControlFlow of cf * t * Ty.t * t * t
+| ControlFlow of cf * t * Ty.t * t option * t option
 [@@deriving show]
 and t = Eid.t * e
 [@@deriving show]
@@ -43,7 +43,8 @@ let map f =
       | Let (ta, v, e1, e2) -> Let (ta, v, aux e1, aux e2)
       | TypeCast (e, ty) -> TypeCast (aux e, ty)
       | TypeCoerce (e, ty, b) -> TypeCoerce (aux e, ty, b)
-      | ControlFlow (cf, e, t, e1, e2) -> ControlFlow (cf, aux e, t, aux e1, aux e2)
+      | ControlFlow (cf, e, t, e1, e2) ->
+        ControlFlow (cf, aux e, t, Option.map aux e1, Option.map aux e2)
     in
     f (id,e)
   in
@@ -53,10 +54,12 @@ let fold f =
   let rec aux (id,e) =
     begin match e with
     | Value _ | Var _ -> []
-    | Lambda (_,_, e) | Projection (_, e) | TypeCast (e,_) | TypeCoerce (e,_,_) -> [e]
-    | Ite (e,_,e1,e2) | ControlFlow (_, e, _, e1, e2) -> [e ; e1 ; e2]
+    | Lambda (_,_, e) | Projection (_, e) | TypeCast (e,_) | TypeCoerce (e,_,_)
+    | ControlFlow (_, e, _, None, None) -> [e]
+    | Ite (e,_,e1,e2) | ControlFlow (_, e, _, Some e1, Some e2) -> [e ; e1 ; e2]
     | LambdaRec lst -> lst |> List.map (fun (_,_,e) -> e)
-    | App (e1,e2) | Let (_,_,e1,e2) -> [e1 ; e2]
+    | App (e1,e2) | Let (_,_,e1,e2)
+    | ControlFlow (_, e1, _, Some e2, None) | ControlFlow (_, e1, _, None, Some e2) -> [e1 ; e2]
     | Constructor (_, es) -> es
     end
     |> List.map aux
