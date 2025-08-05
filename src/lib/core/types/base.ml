@@ -103,7 +103,7 @@ module Abstract = struct
   let mk = Sstt.Extensions.Abstracts.mk
   let any = Sstt.Extensions.Abstracts.mk_any
   let trans_tagcomp f c =
-    match Sstt.Extensions.Abstracts.destruct c with
+    match Sstt.Extensions.Abstracts.destruct_tagcomp c with
     | None -> c
     | Some (abs, dnf) ->
       let dnf = f (abs, dnf) in
