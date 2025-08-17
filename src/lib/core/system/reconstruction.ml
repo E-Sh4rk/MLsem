@@ -168,12 +168,15 @@ let rec infer cache env renvs annot (id, e) =
     | OneFail -> Fail
     | OneSubst (ss, a, a',r) -> Subst (ss,AConstruct a,AConstruct a',r)
     | AllOk (annots,tys) ->
-      let doms = Checker.domains_of_construct c in
+      let doms = Checker.domains_of_construct c Ty.any in
       let tys = List.map GTy.lb tys in
-      let ss = tallying_simpl ~infer:true cache env (Checker.construct c tys) (List.combine tys doms) in
+      let ss =
+        doms |> List.concat_map (fun doms ->
+        tallying_simpl ~infer:true cache env (Checker.construct c tys) (List.combine tys doms)
+      ) in
       log "untypeable constructor" (fun fmt ->
         Format.fprintf fmt "expected: %a\ngiven: %a"
-          (Utils.pp_seq Ty.pp " ; ") doms
+          (Utils.pp_seq (Utils.pp_seq Ty.pp " ; ") " ;; ") doms
           (Utils.pp_seq Ty.pp " ; ") tys
         ) ;
       Subst (ss, nc (Annot.AConstruct annots), Untyp, empty_cov)

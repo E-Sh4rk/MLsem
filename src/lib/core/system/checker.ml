@@ -27,15 +27,37 @@ let proj p ty =
   | Tl -> Lst.proj ty |> snd
   | PiTag tag -> Tag.proj tag ty
 
-let domains_of_construct (c:Ast.constructor) =
+let remove_field_info t label =
+  let t = Record.remove_field t label in
+  let singleton = Record.mk false [label, (true, Ty.any)] in
+  Record.merge t singleton
+let domains_of_construct (c:Ast.constructor) ty =
   match c with
-  | Tuple n -> List.init n (fun _ -> Ty.any)
-  | Choice n -> List.init n (fun _ -> Ty.any)
-  | Cons -> [ Ty.any ; Lst.any ]
-  | RecUpd _ -> [ Record.any ; Ty.any ]
-  | RecDel _ -> [ Record.any ]
-  | Tag _ -> [ Ty.any ]
-  | Enum _ -> []
+  | Tuple n ->
+    Tuple.dnf n ty
+    |> List.filter (fun b -> Ty.leq (Tuple.mk b) ty)
+  | Choice n -> [List.init n (fun _ -> ty)]
+  | Cons ->
+    Lst.dnf ty
+    |> List.filter (fun (a,b) -> Ty.leq (Lst.cons a b) ty)
+    |> List.map (fun (t1,t2) -> [t1;t2])
+  | RecUpd label ->
+    Ty.cap ty (Record.any_with label)
+    |> Record.dnf
+    |> List.map (fun (fields,o) -> Record.mk o fields)
+    |> List.filter (fun ti -> Ty.leq ti ty)
+    |> List.map (fun ti ->
+      [ remove_field_info ti label ; Record.proj ti label ]
+    )
+  | RecDel label ->
+    Ty.cap ty (Record.any_without label)
+    |> Record.dnf
+    |> List.map (fun (fields,o) -> Record.mk o fields)
+    |> List.filter (fun ti -> Ty.leq ti ty)
+    |> List.map (fun ti -> [ remove_field_info ti label ])
+  | Tag tag -> [ [ Tag.proj tag ty ] ]
+  | Enum e when Ty.leq (Enum.typ e) ty -> [ [] ]
+  | Enum _ -> [ ]
 
 let construct (c:Ast.constructor) tys =
   match c, tys with
@@ -48,7 +70,7 @@ let construct (c:Ast.constructor) tys =
   | RecDel lbl, [t] -> Record.remove_field t lbl
   | Tag tag, [t] -> Tag.mk tag t
   | Enum enum, [] -> Enum.typ enum
-  | _ -> failwith "Invalid arity for constructor."
+  | _ -> raise (Invalid_argument "Invalid arity for constructor.")
 
 (* Expressions *)
 
@@ -85,16 +107,15 @@ let rec typeof' env annot (id,e) =
     end else
       untypeable id ("Undefined variable "^(Variable.show v)^".")
   | Constructor (c, es), AConstruct annots when List.length es = List.length annots ->
-    let doms = domains_of_construct c in
-    if List.length doms = List.length es then
-      let check tys = List.for_all2 Ty.leq tys doms in
-      let tys = List.map2 (fun e a -> typeof env a e) es annots in
-      begin match GTy.opl check (construct c) tys with
-      | Some ty -> ty
-      | None -> untypeable id ("Invalid domain for constructor.")
-      end
-    else
-      untypeable id ("Invalid arity for constructor.")
+    let doms = domains_of_construct c Ty.any in
+    let check tys =
+      doms |> List.exists (fun doms -> List.for_all2 Ty.leq tys doms)
+    in
+    let tys = List.map2 (fun e a -> typeof env a e) es annots in
+    begin match GTy.opl check (construct c) tys with
+    | Some ty -> ty
+    | None -> untypeable id ("Invalid domain for constructor.")
+    end
   | Lambda (_, v, e), ALambda (s, annot) ->
     let env = Env.add v (TyScheme.mk_mono s) env in
     let t = typeof env annot e in

@@ -17,56 +17,20 @@ let combine rs1 rs2 =
   carthesian_prod rs1 rs2
   |> List.map (fun (r1, r2) -> REnv.cap r1 r2)
 
+let combine' rss =
+  carthesian_prod' rss |> List.map REnv.conj
+
 let sufficient_refinements env e t =
-  let remove_field_info t label =
-    let t = Record.remove_field t label in
-    let singleton = Record.mk false [label, (true, Ty.any)] in
-    Record.merge t singleton
-  in
   let rec aux (_,e) t =
     if Ty.is_any t then [REnv.empty] else
     match e with
     | Lambda _ -> []
     | LambdaRec _ -> []
     | Var v -> [REnv.singleton v t]
-    | Constructor (Tuple n, es) when List.length es = n ->
-      Tuple.dnf n t
-      |> List.filter (fun b -> Ty.leq (Tuple.mk b) t)
+    | Constructor (c, es) ->
+      Checker.domains_of_construct c t
       |> List.concat_map (fun ts ->
-        List.map2 (fun e t -> aux e t) es ts
-          |> carthesian_prod' |> List.map REnv.conj
-        )
-    | Constructor (Choice n, es) when List.length es = n ->
-      List.map (fun e -> aux e t) es
-      |> carthesian_prod' |> List.map REnv.conj
-    | Constructor (Cons, [e1;e2]) ->
-      Lst.dnf t
-      |> List.filter (fun (a,b) -> Ty.leq (Lst.cons a b) t)
-      |> List.concat_map (fun (t1,t2) ->
-          combine (aux e1 t1) (aux e2 t2)
-        )
-    | Constructor (RecUpd label, [e;e']) ->
-      let t = Ty.cap t (Record.any_with label) in
-      Record.dnf t
-      |> List.map (fun (fields,o) -> Record.mk o fields)
-      |> List.filter (fun ti -> Ty.leq ti t)
-      |> List.concat_map (fun ti ->
-          let field_type = Record.proj ti label in
-          let ti = remove_field_info ti label in
-          combine (aux e ti) (aux e' field_type)
-        )
-    | Constructor (RecDel label, [e]) ->
-      let t = Ty.cap t (Record.any_without label) in
-      Record.dnf t
-      |> List.map (fun (fields,o) -> Record.mk o fields)
-      |> List.filter (fun ti -> Ty.leq ti t)
-      |> List.concat_map (fun ti ->
-          aux e (remove_field_info ti label)
-        )
-    | Constructor (Tag tag, [e]) -> aux e (Tag.proj tag t)
-    | Constructor (Enum e, []) ->
-      if Ty.leq (Enum.typ e) t then [REnv.empty] else []
-    | Constructor _ -> assert false
+        List.map2 (fun e t -> aux e t) es ts |> combine')
     | TypeCoerce (_, s, _) when Ty.leq (GTy.lb s) t -> [REnv.empty]
     | Value s when Ty.leq (GTy.lb s) t -> [REnv.empty]
     | ControlFlow _ when Ty.leq Ty.unit t -> [REnv.empty]
