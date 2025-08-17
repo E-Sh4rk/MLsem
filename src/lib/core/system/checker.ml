@@ -18,6 +18,7 @@ let domain_of_proj p ty =
     Lst.cons Ty.any ty
   | PiTag tag ->
     Tag.mk tag ty
+  | PCustom r -> r.pdom ty
 
 let proj p ty =
   match p with
@@ -26,6 +27,7 @@ let proj p ty =
   | Hd -> Lst.proj ty |> fst
   | Tl -> Lst.proj ty |> snd
   | PiTag tag -> Tag.proj tag ty
+  | PCustom r -> r.proj ty
 
 let remove_field_info t label =
   let t = Record.remove_field t label in
@@ -58,6 +60,7 @@ let domains_of_construct (c:Ast.constructor) ty =
   | Tag tag -> [ [ Tag.proj tag ty ] ]
   | Enum e when Ty.leq (Enum.typ e) ty -> [ [] ]
   | Enum _ -> [ ]
+  | CCustom r -> r.cdom ty
 
 let construct (c:Ast.constructor) tys =
   match c, tys with
@@ -70,6 +73,7 @@ let construct (c:Ast.constructor) tys =
   | RecDel lbl, [t] -> Record.remove_field t lbl
   | Tag tag, [t] -> Tag.mk tag t
   | Enum enum, [] -> Enum.typ enum
+  | CCustom r, tys -> r.cons tys
   | _ -> raise (Invalid_argument "Invalid arity for constructor.")
 
 (* Expressions *)

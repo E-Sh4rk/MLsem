@@ -5,11 +5,14 @@ type cf = CfWhile | CfCond | CfOther
 [@@deriving show]
 type coerce = Check | CheckStatic | NoCheck
 [@@deriving show]
-type projection = Pi of int * int | Field of string | Hd | Tl | PiTag of Tag.t
+type projection =
+| Pi of int * int | Field of string | Hd | Tl | PiTag of Tag.t
+| PCustom of { pdom: Ty.t -> Ty.t ; proj: Ty.t -> Ty.t }
 [@@deriving show]
 type constructor =
 | Tuple of int | Cons | RecUpd of string | RecDel of string
 | Tag of Tag.t | Enum of Enum.t | Choice of int
+| CCustom of { cdom: Ty.t -> Ty.t list list ; cons: Ty.t list -> Ty.t }
 [@@deriving show]
 type e =
 | Value of GTy.t
