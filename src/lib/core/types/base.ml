@@ -106,9 +106,11 @@ module Abstract = struct
   let mk = Sstt.Extensions.Abstracts.mk
   let any = Sstt.Extensions.Abstracts.mk_any
   let trans_tagcomp f c =
-    match Sstt.Extensions.Abstracts.destruct_tagcomp c with
+    let ty = Sstt.Tags.mk_comp c |> Sstt.Descr.mk_tags |> Sstt.Ty.mk_descr in
+    let abs = Sstt.TagComp.tag c in
+    match Sstt.Extensions.Abstracts.destruct abs ty with
     | exception _ -> c
-    | (abs, dnf) ->
+    | dnf ->
       let dnf = f (abs, dnf) in
       let mk_line (ps,ns) =
           let ps = ps |> List.map (fun lst -> mk abs lst) |> Ty.conj in
