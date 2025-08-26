@@ -251,9 +251,9 @@ module Arrow = struct
 
   let dnf t =
     let a = Sstt.Ty.get_descr t |> Sstt.Descr.get_arrows in
-    Sstt.Arrows.dnf a |> Sstt.Arrows.Dnf.simplify |> List.map (fun (ps,_,_) -> ps)
+    Sstt.Arrows.dnf a |> List.map fst
 
   let of_dnf lst =
-    lst |> List.map (fun ps -> (ps,[],true)) |> Sstt.Arrows.of_dnf
+    lst |> List.map (fun ps -> (ps,[])) |> Sstt.Arrows.of_dnf
     |> Sstt.Descr.mk_arrows |> Sstt.Ty.mk_descr
 end
