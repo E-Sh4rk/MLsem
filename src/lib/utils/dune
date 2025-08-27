@@ -1,5 +1,5 @@
 (library
- (name utils)
+ (name mlsem_utils)
  (wrapped false)
  (package mlsem)
  (libraries str)

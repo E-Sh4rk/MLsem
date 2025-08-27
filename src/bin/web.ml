@@ -1,3 +1,4 @@
+open Mlsem
 open Common
 open Mlsem_lang.Main
 open Js_of_ocaml

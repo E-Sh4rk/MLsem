@@ -1,5 +1,6 @@
 %{ (* Emacs, use -*- tuareg -*- to open this file. *)
 
+  open Mlsem
   open Common
   open System.Ast
   open System.Const

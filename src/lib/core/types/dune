@@ -1,5 +1,5 @@
 (library
  (name types)
  (public_name mlsem.types)
- (libraries utils sstt unix)
+ (libraries mlsem_utils sstt unix)
  (modules (:standard)))

@@ -1,7 +1,7 @@
 (library
  (name common)
  (public_name mlsem.common)
- (libraries types utils)
+ (libraries types mlsem_utils)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq))
  (modules (:standard)))

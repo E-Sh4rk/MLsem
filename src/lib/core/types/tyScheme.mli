@@ -1,12 +1,12 @@
 open Tvar
 
 type t
-val mk : TVarSet.t -> Gradual.t -> t
-val mk_poly_except : TVarSet.t -> Gradual.t -> t
-val mk_mono : Gradual.t -> t
-val mk_poly : Gradual.t -> t
-val get : t -> TVarSet.t * Gradual.t
-val get_fresh : t -> TVarSet.t * Gradual.t
+val mk : TVarSet.t -> GTy.t -> t
+val mk_poly_except : TVarSet.t -> GTy.t -> t
+val mk_mono : GTy.t -> t
+val mk_poly : GTy.t -> t
+val get : t -> TVarSet.t * GTy.t
+val get_fresh : t -> TVarSet.t * GTy.t
 val fv : t -> TVarSet.t
 val substitute : Subst.t -> t -> t
 val leq : t -> t -> bool

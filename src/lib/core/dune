@@ -1,0 +1,8 @@
+(library
+ (name mlsem)
+ (public_name mlsem)
+ (libraries mlsem_utils common system types zarith sstt unix)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))
+
+

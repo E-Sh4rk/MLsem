@@ -6,6 +6,6 @@ module TVarSet = Tvar.TVarSet
 module Subst = Tvar.Subst
 module TVOp = Tvar.TVOp
 
-module GTy = Gradual
-module TyScheme = Scheme
+module GTy = GTy
+module TyScheme = TyScheme
 include Builder
