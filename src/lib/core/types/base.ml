@@ -80,7 +80,7 @@ module Tag = struct
   let mk tag ty = Sstt.Descr.mk_tag (tag, ty) |> Sstt.Ty.mk_descr
   let proj tag ty =
     Sstt.Ty.get_descr ty |> Sstt.Descr.get_tags |> Sstt.Tags.get tag
-    |> Sstt.TagComp.as_atom |> snd
+    |> Sstt.Op.TagComp.as_atom |> snd
   let any = Sstt.Tags.any |> Sstt.Descr.mk_tags |> Sstt.Ty.mk_descr
 end
 
