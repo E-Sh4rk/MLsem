@@ -112,6 +112,9 @@ module Record : sig
     val proj : Ty.t -> string -> Ty.t
     val merge : Ty.t -> Ty.t -> Ty.t
     val remove_field : Ty.t -> string -> Ty.t
+
+    val from_label : Sstt.Label.t -> string
+    val to_label : string -> Sstt.Label.t
 end
 
 (** @canonical Mlsem.Types.Arrow *)
