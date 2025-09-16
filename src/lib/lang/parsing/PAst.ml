@@ -13,10 +13,11 @@ type varname = string
 type annotation = Eid.t Position.located
 
 type 'typ lambda_annot = 'typ option
+type 'v vdef = Immut of 'v | Mut of 'v
 
 type ('a, 'typ, 'tag, 'v) pattern =
 | PatType of 'typ
-| PatVar of 'v
+| PatVar of 'v vdef
 | PatLit of Const.t
 | PatTag of 'tag * ('a, 'typ, 'tag, 'v) pattern
 | PatAnd of ('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'tag, 'v) pattern
@@ -24,7 +25,7 @@ type ('a, 'typ, 'tag, 'v) pattern =
 | PatTuple of ('a, 'typ, 'tag, 'v) pattern list
 | PatCons of ('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'tag, 'v) pattern
 | PatRecord of (string * (('a, 'typ, 'tag, 'v) pattern)) list * bool
-| PatAssign of 'v * Const.t
+| PatAssign of 'v vdef * Const.t
 
 and ('a, 'typ, 'enu, 'tag, 'v) ast =
 | Magic of 'typ
@@ -33,11 +34,11 @@ and ('a, 'typ, 'enu, 'tag, 'v) ast =
 | Enum of 'enu
 | Tag of 'tag * ('a, 'typ, 'enu, 'tag, 'v) t
 | Suggest of 'v * 'typ list * ('a, 'typ, 'enu, 'tag, 'v) t
-| Lambda of 'v * 'typ lambda_annot * ('a, 'typ, 'enu, 'tag, 'v) t
+| Lambda of 'v vdef * 'typ lambda_annot * ('a, 'typ, 'enu, 'tag, 'v) t
 | LambdaRec of ('v * 'typ lambda_annot * ('a, 'typ, 'enu, 'tag, 'v) t) list
 | Ite of ('a, 'typ, 'enu, 'tag, 'v) t * 'typ * ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
 | App of ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
-| Let of 'v * ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
+| Let of 'v vdef * ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
 | Tuple of ('a, 'typ, 'enu, 'tag, 'v) t list
 | Cons of ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
 | Projection of projection * ('a, 'typ, 'enu, 'tag, 'v) t
@@ -63,6 +64,9 @@ let empty_name_var_map = NameMap.empty
 
 let new_annot p =
     Position.with_pos p (Eid.unique_with_pos p)
+
+let of_vdef = function Mut v -> (true, v) | Immut v -> (false, v)
+let to_vdef mut v = if mut then Mut v else Immut v
 
 let parser_expr_to_expr tenv vtenv name_var_map e =
     let aux_a tyo vtenv =
@@ -96,12 +100,13 @@ let parser_expr_to_expr tenv vtenv name_var_map e =
             let tys, vtenv = type_exprs_to_typs tenv vtenv tys in
             let var = aux_var env str in
             Suggest (var, tys, aux vtenv env e)
-        | Lambda (str,da,e) ->
+        | Lambda (vdef,da,e) ->
             let da, vtenv = aux_a da vtenv in
-            let var = Variable.create_lambda (Some str) in
+            let mut, str = of_vdef vdef in
+            let var = MVariable.create_lambda mut (Some str) in
             Variable.attach_location var pos ;
             let env = NameMap.add str var env in
-            Lambda (var, da, aux vtenv env e)
+            Lambda (to_vdef mut var, da, aux vtenv env e)
         | LambdaRec lst ->
             let aux (str,tyo,e) =
                 let var = Variable.create_lambda (Some str) in
@@ -115,11 +120,12 @@ let parser_expr_to_expr tenv vtenv name_var_map e =
             let (t, vtenv) = aux_cond tenv vtenv t in
             Ite (aux vtenv env e, t, aux vtenv env e1, aux vtenv env e2)
         | App (e1, e2) -> App (aux vtenv env e1, aux vtenv env e2)
-        | Let (str, e1, e2) ->
-            let var = Variable.create_let (Some str) in
+        | Let (vdef, e1, e2) ->
+            let mut, str = of_vdef vdef in
+            let var = MVariable.create_let mut (Some str) in
             Variable.attach_location var pos ;
             let env' = NameMap.add str var env in
-            Let (var, aux vtenv env e1, aux vtenv env' e2)
+            Let (to_vdef mut var, aux vtenv env e1, aux vtenv env' e2)
         | Tuple es ->
             Tuple (List.map (aux vtenv env) es)
         | Cons (e1, e2) ->
@@ -158,13 +164,16 @@ let parser_expr_to_expr tenv vtenv name_var_map e =
                 else raise (SymbolError ("matched variables "^str^" are conflicting")))
         in
         let rec aux_p vtenv env pat =
-            let find_or_def_var str =
+            let find_or_def_var vdef =
+                let mut, str = of_vdef vdef in
                 if NameMap.mem str env
-                then NameMap.find str env
+                then
+                    let v = NameMap.find str env in
+                    if mut = MVariable.is_mutable v then mut, v, str
+                    else raise (SymbolError ("inconsistent mutability for var '"^str^"'"))
                 else
-                    let var = Variable.create_let (Some str) in
-                    Variable.attach_location var pos ;
-                    var
+                    let var = MVariable.create_let mut (Some str) in
+                    Variable.attach_location var pos ; mut, var, str
             in
             match pat with
             | PatType t ->
@@ -172,9 +181,9 @@ let parser_expr_to_expr tenv vtenv name_var_map e =
                 if is_test_type t
                 then (PatType t, vtenv, NameMap.empty)
                 else raise (SymbolError ("typecases should use test types"))
-            | PatVar str ->
-                let var = find_or_def_var str in
-                (PatVar var, vtenv, NameMap.singleton str var)
+            | PatVar vdef ->
+                let mut, var, str = find_or_def_var vdef in
+                (PatVar (to_vdef mut var), vtenv, NameMap.singleton str var)
             | PatLit c -> (PatLit c, vtenv, NameMap.empty)
             | PatTag (str, p) ->
                 let tag = get_tag tenv str in
@@ -209,9 +218,9 @@ let parser_expr_to_expr tenv vtenv name_var_map e =
                         ((name, p)::fields, vtenv, merge_disj acc_env env')
                 ) ([], vtenv, env) fields in
                 (PatRecord (List.rev fields, o), vtenv, env)
-            | PatAssign (str, c) ->
-                let var = find_or_def_var str in
-                (PatAssign (var, c), vtenv, NameMap.singleton str var)
+            | PatAssign (vdef, c) ->
+                let mut, var, str = find_or_def_var vdef in
+                (PatAssign (to_vdef mut var, c), vtenv, NameMap.singleton str var)
         in
         let (pat, vtenv, env') = aux_p vtenv NameMap.empty pat in
         let env = NameMap.add_seq (NameMap.to_seq env') env in

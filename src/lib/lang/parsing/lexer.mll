@@ -92,6 +92,7 @@ rule token = parse
 | "fun"   { FUN }
 | "val"   { VAL }
 | "let"   { LET }
+| "mut"   { MUT }
 | "in"    { IN }
 | "fst"   { FST }
 | "snd"   { SND }
