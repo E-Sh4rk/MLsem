@@ -4,9 +4,15 @@ open Types
 type t = Variable.t
 
 let all = Hashtbl.create 100
-let create name =
+let create_let mut name =
   let v = Variable.create_let name in
-  Hashtbl.add all v () ; v
+  if mut then Hashtbl.add all v () ; v
+let create_gen mut name =
+  let v = Variable.create_gen name in
+  if mut then Hashtbl.add all v () ; v
+let create_lambda mut name =
+  let v = Variable.create_lambda name in
+  if mut then Hashtbl.add all v () ; v
 
 let is_mutable v = Hashtbl.mem all v
 

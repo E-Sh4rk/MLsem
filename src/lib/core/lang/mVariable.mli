@@ -3,7 +3,9 @@ open Types
 
 type t = Variable.t
 
-val create : string option -> t
+val create_let : bool (* mutable? *) -> string option -> t
+val create_gen : bool (* mutable? *) -> string option -> t
+val create_lambda : bool (* mutable? *) -> string option -> t
 val is_mutable : Variable.t -> bool
 
 val add_to_env : Env.t -> Variable.t -> Ty.t -> Env.t

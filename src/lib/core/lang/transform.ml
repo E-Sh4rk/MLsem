@@ -262,11 +262,7 @@ let transform t =
         SA.Var v
     | Constructor (c, es) -> SA.Constructor (c, List.map aux es)
     | Lambda (tys, ty, x, e) ->
-      let x' =
-        if MVariable.is_mutable x
-        then MVariable.create (Variable.get_name x)
-        else Variable.create_let (Variable.get_name x)
-      in
+      let x' = MVariable.create_let (MVariable.is_mutable x) (Variable.get_name x) in
       Variable.get_location x |> Variable.attach_location x' ;
       let body =
         Eid.refresh (fst e),
