@@ -23,7 +23,7 @@ type e =
 | Value of GTy.t
 | Var of Variable.t
 | Constructor of SA.constructor * t list
-| Lambda of GTy.t * Variable.t * t
+| Lambda of Ty.t list (* Decomposition, similar to Let bindings *) * GTy.t * Variable.t * t
 | LambdaRec of (GTy.t * Variable.t * t) list
 | Ite of t * Ty.t * t * t
 | PatMatch of t * (pattern * t) list
@@ -32,6 +32,7 @@ type e =
 | Let of Ty.t list * Variable.t * t * t
 | TypeCast of t * Ty.t
 | TypeCoerce of t * GTy.t * SA.coerce
+| VarAssign of Variable.t * t (* Will be untypeable if v is not mutable *)
 | Conditional of bool (* allow break *) * t * Ty.t * t * t (* Conditional void blocks *)
 | If of t * Ty.t * t * t option
 | While of t * Ty.t * t
@@ -89,7 +90,7 @@ let map_tl f (id,e) =
     | Value t -> Value t
     | Var v -> Var v
     | Constructor (c,es) -> Constructor (c, List.map f es)
-    | Lambda (d, v, e) -> Lambda (d, v, f e)
+    | Lambda (tys, d, v, e) -> Lambda (tys, d, v, f e)
     | LambdaRec lst ->
       LambdaRec (List.map (fun (ty,v,e) -> (ty,v,f e)) lst)
     | Ite (e, t, e1, e2) -> Ite (f e, t, f e1, f e2)
@@ -97,9 +98,10 @@ let map_tl f (id,e) =
       PatMatch (f e, List.map (fun (pat, e) -> pat, f e) pats)
     | App (e1, e2) -> App (f e1, f e2)
     | Projection (p, e) -> Projection (p, f e)
-    | Let (ta, v, e1, e2) -> Let (ta, v, f e1, f e2)
+    | Let (tys, v, e1, e2) -> Let (tys, v, f e1, f e2)
     | TypeCast (e, ty) -> TypeCast (f e, ty)
     | TypeCoerce (e, ty, b) -> TypeCoerce (f e, ty, b)
+    | VarAssign (v, e) -> VarAssign (v, f e)
     | Conditional (b, e, ty, e1, e2) -> Conditional (b, f e, ty, f e1, f e2)
     | If (e, ty, e1, e2) -> If (f e, ty, f e1, Option.map f e2)
     | While (e, ty, e') -> While (f e, ty, f e')
@@ -138,7 +140,7 @@ let fill_hole n elt e =
 let bv e =
   let bv = ref VarSet.empty in
   let aux (_,e) = match e with
-  | Lambda (_, v, _) | Let (_, v, _, _) -> bv := VarSet.add v !bv
+  | Lambda (_, _, v, _) | Let (_, v, _, _) -> bv := VarSet.add v !bv
   | LambdaRec lst -> lst |> List.iter (fun (_, v, _) -> bv := VarSet.add v !bv)
   | PatMatch (_,pats) ->
     bv := List.fold_left (fun acc (pat,_) -> VarSet.union acc (bv_pat pat)) !bv pats
@@ -149,7 +151,7 @@ let bv e =
 let uv e =
   let uv = ref VarSet.empty in
   let aux (_,e) = match e with
-  | Var v -> uv := VarSet.add v !uv
+  | Var v | VarAssign (v,_) -> uv := VarSet.add v !uv
   | _ -> ()
   in
   iter aux e ; !uv
@@ -157,10 +159,11 @@ let uv e =
 let fv e = VarSet.diff (uv e) (bv e)
 let vars e = VarSet.union (uv e) (bv e)
 
-let rename v v' =
+let rename_fv v v' =
   let aux (id, e) =
     let e = match e with
     | Var v'' when Variable.equals v v'' -> Var v'
+    | VarAssign (v'', e) when Variable.equals v v'' -> VarAssign (v', e)
     | e -> e
     in
     (id, e)

@@ -11,16 +11,6 @@ let expr_to_ast t =
   let add_suggs v tys =
     Hashtbl.replace sugg v (tys@(get_sugg v))
   in
-  let let_binding x e1 e2 =
-    Let (get_sugg x, x, e1, e2)
-  in
-  let add_let x e =
-    let x' = Variable.create_let (Variable.get_name x) in
-    Variable.get_location x |> Variable.attach_location x' ;
-    add_suggs x' (get_sugg x) ;
-    Eid.refresh (fst e),
-    let_binding x' (Eid.unique (), Var x) (rename x x' e)
-  in
   let lambda_annot x a =
     match a with
     | None -> TVar.mk KInfer (Variable.get_name x) |> TVar.typ |> GTy.mk
@@ -48,15 +38,13 @@ let expr_to_ast t =
     | Tag (t, e) -> Constructor (Tag t, [aux e])
     | Suggest (v, tys, (_,e)) ->
       add_suggs v tys ; aux_e e
-    | Lambda (x, a, e) ->
-      let e = aux e |> add_let x in
-      Lambda (lambda_annot x a, x, e)
+    | Lambda (x, a, e) -> Lambda (get_sugg x, lambda_annot x a, x, aux e)
     | LambdaRec lst ->
       let aux (x,a,e) = (lambda_annot x a, x, aux e) in
       LambdaRec (List.map aux lst)
     | Ite (e,t,e1,e2) -> Ite (aux e, t, aux e1, aux e2)
     | App (e1,e2) -> App (aux e1, aux e2)
-    | Let (x, e1, e2) -> let_binding x (aux e1) (aux e2)
+    | Let (x, e1, e2) -> Let (get_sugg x, x, aux e1, aux e2)
     | Tuple es -> Constructor (Tuple (List.length es), List.map aux es)
     | Cons (e1, e2) -> Constructor (Cons, [aux e1 ; aux e2])
     | Projection (p, e) -> Projection (p, aux e)

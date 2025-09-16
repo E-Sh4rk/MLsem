@@ -136,6 +136,8 @@ let rec eliminate_break e =
       (id, TypeCast (hole, tau)) |> cont' |> aux e
     | TypeCoerce (e, ty, c) ->
       (id, TypeCoerce (hole, ty, c)) |> cont' |> aux e
+    | VarAssign (v, e) ->
+      (id, VarAssign (v, hole)) |> cont' |> aux e
     | Constructor (c, [e]) ->
       (id, Constructor (c, [hole])) |> cont' |> aux e
     | Constructor (c, es) ->
@@ -149,7 +151,7 @@ let rec eliminate_break e =
       (id, Ite (hole, tau, e1, e2)) |> cont' |> aux e
     | Ite (e, tau, e1, e2) ->
       (id, Ite (hole, tau, aux e1 cont, aux e2 cont)) |> aux e
-    | Lambda (ty, x, e) -> (id, Lambda (ty, x, eliminate_break e)) |> cont'
+    | Lambda (tys, ty, x, e) -> (id, Lambda (tys, ty, x, eliminate_break e)) |> cont'
     | LambdaRec lst ->
       (id, LambdaRec (List.map (fun (ty,v,e) -> ty,v,eliminate_inner_break e) lst)) |> cont'
     | Conditional (true, e, tau, e1, e2) ->
@@ -171,7 +173,7 @@ let rec eliminate_break e =
   aux e hole
 and eliminate_inner_break e =
   let f = function
-  | (id,Lambda (ty, v, e)) -> Some (id, Lambda (ty, v, eliminate_break e))
+  | (id,Lambda (tys, ty, v, e)) -> Some (id, Lambda (tys, ty, v, eliminate_break e))
   | (id,Conditional (true, e, t, e1, e2)) ->
     Some (id, Conditional (true, eliminate_inner_break e, t, eliminate_break e1, eliminate_break e2))
   | _ -> None
@@ -205,6 +207,8 @@ let rec eliminate_return e =
       (id, TypeCast (hole, tau)) |> cont' |> aux e
     | TypeCoerce (e, ty, c) ->
       (id, TypeCoerce (hole, ty, c)) |> cont' |> aux e
+    | VarAssign (v, e) ->
+      (id, VarAssign (v, hole)) |> cont' |> aux e
     | Constructor (c, [e]) ->
       (id, Constructor (c, [hole])) |> cont' |> aux e
     | Constructor (c, es) ->
@@ -218,7 +222,7 @@ let rec eliminate_return e =
       (id, Ite (hole, tau, e1, e2)) |> cont' |> aux e
     | Ite (e, tau, e1, e2) ->
       (id, Ite (hole, tau, aux e1 cont, aux e2 cont)) |> aux e
-    | Lambda (ty, x, e) -> (id, Lambda (ty, x, eliminate_return e)) |> cont'
+    | Lambda (tys, ty, x, e) -> (id, Lambda (tys, ty, x, eliminate_return e)) |> cont'
     | LambdaRec lst ->
       (id, LambdaRec (List.map (fun (ty,v,e) -> ty,v,eliminate_inner_return e) lst)) |> cont'
     | Conditional (b, e, tau, e1, e2) when not (has_return e1) && not (has_return e2) ->
@@ -238,7 +242,7 @@ let rec eliminate_return e =
   aux e hole
 and eliminate_inner_return e =
   let f = function
-  | (id,Lambda (ty, v, e)) -> Some (id, Lambda (ty, v, eliminate_return e))
+  | (id,Lambda (tys, ty, v, e)) -> Some (id, Lambda (tys, ty, v, eliminate_return e))
   | _ -> None
   in
   map' f e
@@ -251,18 +255,47 @@ let transform t =
     let e = match e with
     | Void -> SA.Value (GTy.mk !System.Config.void_ty)
     | Value t -> SA.Value t
-    | Var v -> SA.Var v
+    | Var v ->
+      if MVariable.is_mutable v then
+        SA.App ((Eid.unique (), SA.Value (MVariable.ref_get () |> GTy.mk)),
+                (Eid.unique (), SA.Var v))
+      else
+        SA.Var v
     | Constructor (c, es) -> SA.Constructor (c, List.map aux es)
-    | Lambda (ty, x, e) -> SA.Lambda (ty, x, aux e)
+    | Lambda (tys, ty, x, e) ->
+      let x' =
+        if MVariable.is_mutable x
+        then MVariable.create (Variable.get_name x)
+        else Variable.create_let (Variable.get_name x)
+      in
+      Variable.get_location x |> Variable.attach_location x' ;
+      let body =
+        Eid.refresh (fst e),
+        Let (tys, x', (Eid.unique (), Var x), rename_fv x x' e)
+      in
+      SA.Lambda (ty, x, aux body)
     | LambdaRec lst ->
       let aux (ty,x,e) = (ty, x, aux e) in
       SA.LambdaRec (List.map aux lst)
     | Ite (e,t,e1,e2) -> SA.Ite (aux e, t, aux e1, aux e2)
     | App (e1,e2) -> SA.App (aux e1, aux e2)
     | Projection (p, e) -> SA.Projection (p, aux e)
-    | Let (tys, x, e1, e2) -> SA.Let (tys, x, aux e1, aux e2)
+    | Let (tys, x, e1, e2) ->
+      let tys, def = if MVariable.is_mutable x
+        then [], (Eid.unique (), SA.App (
+          (Eid.unique (), SA.Value (MVariable.ref_cons () |> GTy.mk)),
+          aux e1))
+        else tys, aux e1
+      in
+      SA.Let (tys, x, def, aux e2)
     | TypeCast (e, ty) -> SA.TypeCast (aux e, ty)
     | TypeCoerce (e, ty, c) -> SA.TypeCoerce (aux e, ty, c)
+    | VarAssign (v, e) -> SA.App (
+        (Eid.unique (), SA.Value (MVariable.ref_assign () |> GTy.mk)),
+        (Eid.unique (), SA.Constructor (SA.Tuple 2,[
+            (Eid.unique (), SA.Var v) ; aux e
+        ]))
+      )
     | Conditional (_,e,t,e1,(_,Void)) -> SA.Conditional (aux e, t, aux e1)
     | Conditional (_,e,t,(_,Void),e2) -> SA.Conditional (aux e, Ty.neg t, aux e2)
     | Conditional (b, e,t,e1,e2) ->

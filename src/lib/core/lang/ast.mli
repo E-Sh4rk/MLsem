@@ -2,8 +2,6 @@ open Common
 open Types
 module SA = System.Ast
 
-(* TODO: Add mutable vars and assignments to the language *)
-
 type pattern_constructor =
 | PCTuple of int
 | PCCons
@@ -25,7 +23,7 @@ type e =
 | Value of GTy.t
 | Var of Variable.t
 | Constructor of SA.constructor * t list
-| Lambda of GTy.t * Variable.t * t
+| Lambda of Ty.t list (* Decomposition, similar to Let bindings *) * GTy.t * Variable.t * t
 | LambdaRec of (GTy.t * Variable.t * t) list
 | Ite of t * Ty.t * t * t
 | PatMatch of t * (pattern * t) list
@@ -34,6 +32,7 @@ type e =
 | Let of Ty.t list * Variable.t * t * t
 | TypeCast of t * Ty.t
 | TypeCoerce of t * GTy.t * SA.coerce
+| VarAssign of Variable.t * t (* Will be untypeable if v is not mutable *)
 | Conditional of bool (* allow break *) * t * Ty.t * t * t (* Conditional void blocks *)
 | If of t * Ty.t * t * t option
 | While of t * Ty.t * t
@@ -57,7 +56,7 @@ val iter : (t -> unit) -> t -> unit
 val iter' : (t -> bool (* continue inside *)) -> t -> unit
 val fv : t -> VarSet.t
 val vars : t -> VarSet.t
-val rename : Variable.t -> Variable.t -> t -> t
+val rename_fv : Variable.t -> Variable.t -> t -> t
 
 val pp_pattern_constructor : Format.formatter -> pattern_constructor -> unit
 val pp_pattern : Format.formatter -> pattern -> unit
