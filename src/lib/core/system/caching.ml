@@ -1,5 +1,5 @@
-open Common
-open Types
+open Mlsem_common
+open Mlsem_types
 open Annot
 
 module Domain = struct

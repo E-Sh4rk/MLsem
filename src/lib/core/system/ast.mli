@@ -1,5 +1,5 @@
-open Common
-open Types
+open Mlsem_common
+open Mlsem_types
 
 type pcustom = { pdom: Ty.t -> Ty.t ; proj: Ty.t -> Ty.t ; pgen: bool }
 type ccustom = { cdom: Ty.t -> Ty.t list list ; cons: Ty.t list -> Ty.t ; cgen: bool }

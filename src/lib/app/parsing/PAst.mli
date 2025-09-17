@@ -1,9 +1,8 @@
-open Mlsem
-open Common
-open Types.Builder
-open Types
-open System.Ast
-open Lang
+open Mlsem_common
+open Mlsem_types.Builder
+open Mlsem_types
+open Mlsem_system.Ast
+open Mlsem_lang
 
 exception SymbolError of string
 exception LexicalError of Position.t * string

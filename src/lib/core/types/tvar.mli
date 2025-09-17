@@ -40,13 +40,13 @@ module type TVarSet = sig
     val pp : Format.formatter -> t -> unit
 end
 
-(** @canonical Types.TVar *)
+(** @canonical Mlsem_types.TVar *)
 module rec TVar : (TVar with type set := TVarSet.t)
 
-(** @canonical Types.TVarSet *)
+(** @canonical Mlsem_types.TVarSet *)
 and TVarSet : (TVarSet with type var := TVar.t)
 
-(** @canonical Types.Subst *)
+(** @canonical Mlsem_types.Subst *)
 module Subst : sig
     type t
     val construct : (TVar.t * Ty.t) list -> t
@@ -69,7 +69,7 @@ module Subst : sig
     val pp : Format.formatter -> t -> unit
 end
 
-(** @canonical Types.TVOp *)
+(** @canonical Mlsem_types.TVOp *)
 module TVOp : sig
     val vars : Ty.t -> TVarSet.t
     val vars' : Ty.t list -> TVarSet.t

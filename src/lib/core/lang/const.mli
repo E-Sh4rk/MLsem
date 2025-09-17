@@ -1,4 +1,4 @@
-open Types
+open Mlsem_types
 
 type t =
 | Unit | Nil

@@ -1,4 +1,4 @@
-open Types
+open Mlsem_types
 
 module Zd = struct
   type t = Z.t

@@ -1,6 +1,6 @@
-open Common
+open Mlsem_common
 open Annot
-open Types
+open Mlsem_types
 open TVOp
 open Ast
 open Caching

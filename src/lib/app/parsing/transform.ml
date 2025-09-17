@@ -1,9 +1,8 @@
-open Mlsem
-open Common
-open Types
+open Mlsem_common
+open Mlsem_types
 
 let expr_to_ast t =
-  let open Lang.Ast in
+  let open Mlsem_lang.Ast in
   let sugg = Hashtbl.create 100 in
   let get_sugg v =
     match Hashtbl.find_opt sugg v with Some lst -> lst | None -> []
@@ -19,7 +18,7 @@ let expr_to_ast t =
   let rec aux_pat = function
     | PAst.PatType ty -> PType ty
     | PatVar (_, v) -> PVar v
-    | PatLit c -> PType (Lang.Const.typeof c)
+    | PatLit c -> PType (Mlsem_lang.Const.typeof c)
     | PatTag (t, pat) -> PConstructor (PCTag t, [aux_pat pat])
     | PatTuple pats -> PConstructor (PCTuple (List.length pats), List.map aux_pat pats)
     | PatCons (p1, p2) -> PConstructor (PCCons, [aux_pat p1; aux_pat p2])
@@ -27,12 +26,12 @@ let expr_to_ast t =
       PConstructor (PCRec (List.map fst fields, opened), fields |> List.map snd |> List.map aux_pat)
     | PatAnd (p1, p2) -> PAnd (aux_pat p1, aux_pat p2)
     | PatOr (p1, p2) -> POr (aux_pat p1, aux_pat p2)
-    | PatAssign ((_,v), c) -> PAssign (v, Lang.Const.typeof c |> GTy.mk)
+    | PatAssign ((_,v), c) -> PAssign (v, Mlsem_lang.Const.typeof c |> GTy.mk)
   in
   let rec aux_e e =
     match e with
     | PAst.Magic t -> Value (GTy.mk t)
-    | Const c -> Value (Lang.Const.typeof c |> GTy.mk)
+    | Const c -> Value (Mlsem_lang.Const.typeof c |> GTy.mk)
     | Var v -> Var v
     | Enum e -> Constructor (Enum e, [])
     | Tag (t, e) -> Constructor (Tag t, [aux e])
@@ -66,4 +65,4 @@ let expr_to_ast t =
   and aux (id, e) =
     (id, aux_e e)
   in
-  aux t |> Lang.Transform.transform
+  aux t |> Mlsem_lang.Transform.transform

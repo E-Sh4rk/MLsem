@@ -1,5 +1,4 @@
-open Mlsem
-open Common
+open Mlsem_common
 open Mlsem_app.Main
 open Js_of_ocaml
 open Yojson.Basic
@@ -8,7 +7,7 @@ module Html = Dom_html
 
 let severity_to_str s =
     match s with
-    | System.Analyzer.Error -> "error"
+    | Mlsem_system.Analyzer.Error -> "error"
     | Warning -> "warning"
     | Notice -> "notice"
     | Message -> "message"
@@ -56,7 +55,7 @@ let add_res res res' =
     lst |> List.iter (fun (v,t)->
       let name = Variable.get_name v |> Option.get in
       let def_pos = Variable.get_location v in
-      let typ = Format.asprintf "%a" Types.TyScheme.pp_short t in
+      let typ = Format.asprintf "%a" Mlsem_types.TyScheme.pp_short t in
       let typ =
         `Assoc [("name", `String name) ; ("def_pos", json_of_pos def_pos) ;
         ("typeable", `Bool true) ; ("type", `String typ) ; ("time", `Float time) ;

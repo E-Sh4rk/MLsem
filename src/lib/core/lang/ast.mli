@@ -1,6 +1,6 @@
-open Common
-open Types
-module SA = System.Ast
+open Mlsem_common
+open Mlsem_types
+module SA = Mlsem_system.Ast
 
 type pattern_constructor =
 | PCTuple of int
@@ -9,7 +9,6 @@ type pattern_constructor =
 | PCTag of Tag.t
 | PCEnum of Enum.t
 | PCCustom of SA.ccustom * SA.pcustom list
-[@@deriving show]
 type pattern =
 | PType of Ty.t
 | PVar of Variable.t
@@ -17,7 +16,6 @@ type pattern =
 | PAnd of pattern * pattern
 | POr of pattern * pattern
 | PAssign of Variable.t * GTy.t
-[@@deriving show]
 type e =
 | Void
 | Value of GTy.t
@@ -41,9 +39,7 @@ type e =
 | Return of t
 | Break
 | Hole of int
-[@@deriving show]
 and t = Eid.t * e
-[@@deriving show]
 
 val map_pat : (pattern -> pattern) -> pattern -> pattern
 val map_pat' : (pattern -> pattern option) -> pattern -> pattern

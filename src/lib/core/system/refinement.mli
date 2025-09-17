@@ -1,5 +1,5 @@
-open Common
-open Types
+open Mlsem_common
+open Mlsem_types
 
 val refine : Env.t -> Ast.t -> Ty.t -> REnv.t
 val refinement_envs : Env.t -> Ast.t -> REnvSet.t

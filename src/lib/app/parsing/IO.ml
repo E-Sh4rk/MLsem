@@ -1,5 +1,4 @@
-open Mlsem
-open Common
+open Mlsem_common
 open Lexing
 
 let pos_of_lexbuf lexbuf =

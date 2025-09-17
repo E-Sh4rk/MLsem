@@ -1,6 +1,6 @@
-open Common
+open Mlsem_common
 open Ast
-open Types
+open Mlsem_types
 open TVOp
 open Mlsem_utils
 

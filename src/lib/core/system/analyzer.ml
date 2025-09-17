@@ -1,7 +1,7 @@
-open Common
+open Mlsem_common
 open Annot
 open Ast
-open Types
+open Mlsem_types
 
 type severity = Message | Notice | Warning | Error
 type msg = { eid: Eid.t ; severity: severity ; title: string ; descr: string option }

@@ -1,5 +1,5 @@
 
-module Common = Common
-module System = System
-module Types = Types
-module Lang = Lang
+module Common = Mlsem_common
+module System = Mlsem_system
+module Types = Mlsem_types
+module Lang = Mlsem_lang

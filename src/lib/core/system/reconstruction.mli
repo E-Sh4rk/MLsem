@@ -1,4 +1,4 @@
-open Common
+open Mlsem_common
 open Annot
 
 (* Can raise Checker.Untypeable *)

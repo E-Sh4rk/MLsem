@@ -1,5 +1,5 @@
 open Var
-open Types
+open Mlsem_types
 
 module type Env = sig
     type t
@@ -29,10 +29,10 @@ module type Env = sig
     val pp_filtered : string list -> Format.formatter -> t -> unit
 end
 
-(** @canonical Common.Env *)
+(** @canonical Mlsem_common.Env *)
 module Env : Env with type ty:=TyScheme.t
 
-(** @canonical Common.REnv *)
+(** @canonical Mlsem_common.REnv *)
 module REnv : sig
   include Env with type ty:=Ty.t
   val find' : Variable.t -> t -> Ty.t
@@ -44,7 +44,7 @@ module REnv : sig
   val neg_approx : t -> t option
 end
 
-(** @canonical Common.REnvSet *)
+(** @canonical Mlsem_common.REnvSet *)
 module REnvSet : sig
   type t
   val empty : t

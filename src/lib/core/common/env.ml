@@ -1,5 +1,5 @@
 open Var
-open Types
+open Mlsem_types
 
 module type T = sig
   type t

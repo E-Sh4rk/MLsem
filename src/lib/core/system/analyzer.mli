@@ -1,4 +1,4 @@
-open Common
+open Mlsem_common
 open Annot
 
 type severity = Message | Notice | Warning | Error

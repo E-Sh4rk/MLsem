@@ -1,5 +1,5 @@
-open Common
-open Types
+open Mlsem_common
+open Mlsem_types
 
 module Annot : sig
   type branch = BType of t | BSkip

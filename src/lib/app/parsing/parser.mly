@@ -1,11 +1,10 @@
 %{ (* Emacs, use -*- tuareg -*- to open this file. *)
 
-  open Mlsem
-  open Common
-  open System.Ast
-  open Lang.Const
+  open Mlsem_common
+  open Mlsem_system.Ast
+  open Mlsem_lang.Const
   open PAst
-  open Types.TyExpr
+  open Mlsem_types.TyExpr
 
   let annot sp ep e =
     (new_annot (Position.lex_join sp ep), e)

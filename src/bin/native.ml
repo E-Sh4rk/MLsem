@@ -1,11 +1,10 @@
-open Mlsem
-open Common
+open Mlsem_common
 open Mlsem_app.Main
 open Mlsem_utils
 
 let severity_to_str s =
     match s with
-    | System.Analyzer.Error -> "Error"
+    | Mlsem_system.Analyzer.Error -> "Error"
     | Warning -> "Warning"
     | Notice -> "Notice"
     | Message -> "Message"
@@ -17,7 +16,7 @@ let treat_res (acc, res) =
             Format.printf "@{<blue;bold>%s@}: %!"
                 (Variable.get_name v |> Option.get) ;
             Format.printf "%a @{<italic;yellow>(checked in %.00fms)@}\n%!"
-                Types.TyScheme.pp_short t time ;
+                Mlsem_types.TyScheme.pp_short t time ;
         ) ;
         msg |> List.iter (fun (s,pos,title,descr) ->
             Format.printf "@{<italic;bold;cyan>[%s]@} @{<italic;cyan>%s@} @{<italic;cyan>%s@}\n%!"

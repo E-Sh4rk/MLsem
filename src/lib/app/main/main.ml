@@ -1,16 +1,15 @@
-open Mlsem
-open Common
+open Mlsem_common
 open IO
-open Types.Builder
-open Types
-open System.Ast
-module MVariable = Lang.MVariable
+open Mlsem_types.Builder
+open Mlsem_types
+open Mlsem_system.Ast
+module MVariable = Mlsem_lang.MVariable
 
 type def = Variable.t * PAst.expr * Ty.t option
 
 exception IncompatibleType of Variable.t * TyScheme.t
 exception UnresolvedType of Variable.t * TyScheme.t
-exception Untypeable of Variable.t option * System.Checker.error
+exception Untypeable of Variable.t option * Mlsem_system.Checker.error
 
 module NameMap = PAst.NameMap
 
@@ -35,19 +34,19 @@ let infer var env e =
   let annot =
     let r =
       if !Config.type_narrowing
-      then System.Refinement.refinement_envs env e
+      then Mlsem_system.Refinement.refinement_envs env e
       else REnvSet.empty
     in
     (* REnvSet.elements r |> List.iter (fun renv -> Format.printf "Renv: %a@." REnv.pp renv) ; *)
-    try System.Reconstruction.infer env r e with
-    | System.Checker.Untypeable err ->
-      (* Format.printf "@.@.%a@.@." System.Ast.pp e ; *)
+    try Mlsem_system.Reconstruction.infer env r e with
+    | Mlsem_system.Checker.Untypeable err ->
+      (* Format.printf "@.@.%a@.@." Mlsem_system.Ast.pp e ; *)
       raise (Untypeable (var, err))
   in
-  let ty = System.Checker.typeof_def env annot e |> TyScheme.norm_and_simpl in
+  let ty = Mlsem_system.Checker.typeof_def env annot e |> TyScheme.norm_and_simpl in
   let (tvs, ty) = TyScheme.get ty in
   let ty = TyScheme.mk tvs (GTy.ub ty |> GTy.mk) in
-  let msg = System.Analyzer.analyze e annot in
+  let msg = Mlsem_system.Analyzer.analyze e annot in
   ty, msg
 let retrieve_time time =
   let time' = Unix.gettimeofday () in
@@ -89,7 +88,7 @@ let type_check_recs pos env lst =
     (var, ty)
   ) lst, msg
 
-type message = System.Analyzer.severity * Position.t * string * string option
+type message = Mlsem_system.Analyzer.severity * Position.t * string * string option
 type 'a treat_result =
 | TSuccess of (Variable.t * TyScheme.t) list * message list * float
 | TDone
@@ -150,7 +149,7 @@ let treat (tenv,varm,senv,env) (annot, elem) =
       ) env tys1 in
       let tys2, msg2 = List.map (type_check_with_sigs env) sigs |> List.split in
       let msg = msg1@(List.concat msg2) |> List.map (fun r ->
-        (r.System.Analyzer.severity, Eid.loc r.eid, r.title, r.descr)
+        (r.Mlsem_system.Analyzer.severity, Eid.loc r.eid, r.title, r.descr)
       ) in
       let senv = List.fold_left (fun senv (v,_) -> VarMap.remove v senv) senv tys2 in
       (tenv,varm,senv,env), TSuccess (tys1@tys2,msg,retrieve_time time)
@@ -185,12 +184,12 @@ let treat (tenv,varm,senv,env) (annot, elem) =
       end
     | PAst.Command (str, c) ->
       begin match str, c with
-      | "value_restriction", Bool b -> System.Config.value_restriction := b
+      | "value_restriction", Bool b -> Mlsem_system.Config.value_restriction := b
       | "type_narrowing", Bool b -> Config.type_narrowing := b
       | "allow_implicit_downcast", Bool b -> Config.allow_implicit_downcast := b
-      | "infer_overload", Bool b -> System.Config.infer_overload := b
-      | "no_empty_param", Bool b -> System.Config.no_empty_param := b
-      | "no_abstract_inter", Bool b -> System.Config.no_abstract_inter := b
+      | "infer_overload", Bool b -> Mlsem_system.Config.infer_overload := b
+      | "no_empty_param", Bool b -> Mlsem_system.Config.no_empty_param := b
+      | "no_abstract_inter", Bool b -> Mlsem_system.Config.no_abstract_inter := b
       | _ -> failwith ("Invalid command "^str)
       end ;
       (tenv,varm,senv,env), TDone

@@ -1,7 +1,7 @@
-open Common
-open Types
+open Mlsem_common
+open Mlsem_types
 open Ast
-module SA = System.Ast
+module SA = Mlsem_system.Ast
 
 (* Pattern Matching *)
 
@@ -25,7 +25,7 @@ let proj_of_patconstr c i =
 
 let type_of_patconstr c args =
   let constr = constr_of_patconstr c in
-  System.Checker.construct constr args
+  Mlsem_system.Checker.construct constr args
 
 let rec type_of_pat pat =
   match pat with
@@ -281,7 +281,7 @@ and treat_returns v e =
 let transform t =
   let rec aux (id, e) =
     let e = match e with
-    | Void -> SA.Value (GTy.mk !System.Config.void_ty)
+    | Void -> SA.Value (GTy.mk !Mlsem_system.Config.void_ty)
     | Value t -> SA.Value t
     | Var v ->
       if MVariable.is_mutable v then
@@ -307,7 +307,7 @@ let transform t =
     | Declare (x, e) when MVariable.is_mutable x ->
       let def = Eid.unique (), SA.App (
           (Eid.unique (), SA.Value (MVariable.ref_uninit x |> GTy.mk)),
-          (Eid.unique (), SA.Value (!System.Config.void_ty |> GTy.mk))) in
+          (Eid.unique (), SA.Value (!Mlsem_system.Config.void_ty |> GTy.mk))) in
       SA.Let ([], x, def, aux e)
     | Declare _ -> invalid_arg "Cannot declare an immutable variable."
     | Let (tys, x, e1, e2) ->

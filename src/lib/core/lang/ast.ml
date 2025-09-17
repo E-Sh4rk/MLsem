@@ -1,6 +1,6 @@
-open Common
-open Types
-module SA = System.Ast
+open Mlsem_common
+open Mlsem_types
+module SA = Mlsem_system.Ast
 
 type pattern_constructor =
 | PCTuple of int

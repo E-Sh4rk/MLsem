@@ -1,5 +1,5 @@
-open Common
-open Types
+open Mlsem_common
+open Mlsem_types
 
 type t = Variable.t
 type kind = Immut | AnnotMut of Ty.t | Mut
