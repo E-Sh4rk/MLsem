@@ -13,11 +13,12 @@ type varname = string
 type annotation = Eid.t Position.located
 
 type 'typ lambda_annot = 'typ option
-type 'v vdef = Immut of 'v | Mut of 'v
+type 'typ vkind = Immut | AnnotMut of 'typ | Mut
+type ('typ,'v) vdef = 'typ vkind * 'v
 
 type ('a, 'typ, 'tag, 'v) pattern =
 | PatType of 'typ
-| PatVar of 'v vdef
+| PatVar of ('typ,'v) vdef
 | PatLit of Const.t
 | PatTag of 'tag * ('a, 'typ, 'tag, 'v) pattern
 | PatAnd of ('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'tag, 'v) pattern
@@ -25,7 +26,7 @@ type ('a, 'typ, 'tag, 'v) pattern =
 | PatTuple of ('a, 'typ, 'tag, 'v) pattern list
 | PatCons of ('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'tag, 'v) pattern
 | PatRecord of (string * (('a, 'typ, 'tag, 'v) pattern)) list * bool
-| PatAssign of 'v vdef * Const.t
+| PatAssign of ('typ,'v) vdef * Const.t
 
 and ('a, 'typ, 'enu, 'tag, 'v) ast =
 | Magic of 'typ
@@ -34,11 +35,11 @@ and ('a, 'typ, 'enu, 'tag, 'v) ast =
 | Enum of 'enu
 | Tag of 'tag * ('a, 'typ, 'enu, 'tag, 'v) t
 | Suggest of 'v * 'typ list * ('a, 'typ, 'enu, 'tag, 'v) t
-| Lambda of 'v vdef * 'typ lambda_annot * ('a, 'typ, 'enu, 'tag, 'v) t
+| Lambda of ('typ,'v) vdef * 'typ lambda_annot * ('a, 'typ, 'enu, 'tag, 'v) t
 | LambdaRec of ('v * 'typ lambda_annot * ('a, 'typ, 'enu, 'tag, 'v) t) list
 | Ite of ('a, 'typ, 'enu, 'tag, 'v) t * 'typ * ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
 | App of ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
-| Let of 'v vdef * ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
+| Let of ('typ,'v) vdef * ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
 | Tuple of ('a, 'typ, 'enu, 'tag, 'v) t list
 | Cons of ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
 | Projection of projection * ('a, 'typ, 'enu, 'tag, 'v) t
@@ -65,9 +66,6 @@ let empty_name_var_map = NameMap.empty
 let new_annot p =
     Position.with_pos p (Eid.unique_with_pos p)
 
-let of_vdef = function Mut v -> (true, v) | Immut v -> (false, v)
-let to_vdef mut v = if mut then Mut v else Immut v
-
 let parser_expr_to_expr tenv vtenv name_var_map e =
     let aux_a tyo vtenv =
         match tyo with
@@ -87,6 +85,13 @@ let parser_expr_to_expr tenv vtenv name_var_map e =
         then NameMap.find str env
         else raise (SymbolError ("undefined symbol "^str))
     in
+    let aux_vkind tenv vtenv k =
+        match k with
+        | Immut -> (MVariable.Immut, Immut, vtenv) | Mut -> (MVariable.Mut, Mut, vtenv)
+        | AnnotMut ty ->
+            let (ty, vtenv) = type_expr_to_typ tenv vtenv ty in
+            MVariable.AnnotMut ty, AnnotMut ty, vtenv
+    in
     let rec aux vtenv env ((eid,pos),e) =
         let e = match e with
         | Magic t ->
@@ -100,13 +105,13 @@ let parser_expr_to_expr tenv vtenv name_var_map e =
             let tys, vtenv = type_exprs_to_typs tenv vtenv tys in
             let var = aux_var env str in
             Suggest (var, tys, aux vtenv env e)
-        | Lambda (vdef,da,e) ->
+        | Lambda ((kind,str),da,e) ->
+            let mkind, kind, vtenv = aux_vkind tenv vtenv kind in
             let da, vtenv = aux_a da vtenv in
-            let mut, str = of_vdef vdef in
-            let var = MVariable.create_lambda mut (Some str) in
+            let var = MVariable.create_lambda mkind (Some str) in
             Variable.attach_location var pos ;
             let env = NameMap.add str var env in
-            Lambda (to_vdef mut var, da, aux vtenv env e)
+            Lambda ((kind, var), da, aux vtenv env e)
         | LambdaRec lst ->
             let aux (str,tyo,e) =
                 let var = Variable.create_lambda (Some str) in
@@ -120,12 +125,12 @@ let parser_expr_to_expr tenv vtenv name_var_map e =
             let (t, vtenv) = aux_cond tenv vtenv t in
             Ite (aux vtenv env e, t, aux vtenv env e1, aux vtenv env e2)
         | App (e1, e2) -> App (aux vtenv env e1, aux vtenv env e2)
-        | Let (vdef, e1, e2) ->
-            let mut, str = of_vdef vdef in
-            let var = MVariable.create_let mut (Some str) in
+        | Let ((kind,str), e1, e2) ->
+            let mkind, kind, vtenv = aux_vkind tenv vtenv kind in
+            let var = MVariable.create_let mkind (Some str) in
             Variable.attach_location var pos ;
             let env' = NameMap.add str var env in
-            Let (to_vdef mut var, aux vtenv env e1, aux vtenv env' e2)
+            Let ((kind, var), aux vtenv env e1, aux vtenv env' e2)
         | Tuple es ->
             Tuple (List.map (aux vtenv env) es)
         | Cons (e1, e2) ->
@@ -164,16 +169,16 @@ let parser_expr_to_expr tenv vtenv name_var_map e =
                 else raise (SymbolError ("matched variables "^str^" are conflicting")))
         in
         let rec aux_p vtenv env pat =
-            let find_or_def_var vdef =
-                let mut, str = of_vdef vdef in
+            let find_or_def_var tenv vtenv (kind, str) =
+                let mkind, kind, vtenv = aux_vkind tenv vtenv kind in
                 if NameMap.mem str env
                 then
                     let v = NameMap.find str env in
-                    if mut = MVariable.is_mutable v then mut, v, str
+                    if MVariable.kind_equal (MVariable.kind v) mkind then kind, v, str, vtenv
                     else raise (SymbolError ("inconsistent mutability for var '"^str^"'"))
                 else
-                    let var = MVariable.create_let mut (Some str) in
-                    Variable.attach_location var pos ; mut, var, str
+                    let var = MVariable.create_let mkind (Some str) in
+                    Variable.attach_location var pos ; kind, var, str, vtenv
             in
             match pat with
             | PatType t ->
@@ -182,8 +187,8 @@ let parser_expr_to_expr tenv vtenv name_var_map e =
                 then (PatType t, vtenv, NameMap.empty)
                 else raise (SymbolError ("typecases should use test types"))
             | PatVar vdef ->
-                let mut, var, str = find_or_def_var vdef in
-                (PatVar (to_vdef mut var), vtenv, NameMap.singleton str var)
+                let mut, var, str, vtenv = find_or_def_var tenv vtenv vdef in
+                (PatVar (mut, var), vtenv, NameMap.singleton str var)
             | PatLit c -> (PatLit c, vtenv, NameMap.empty)
             | PatTag (str, p) ->
                 let tag = get_tag tenv str in
@@ -219,8 +224,8 @@ let parser_expr_to_expr tenv vtenv name_var_map e =
                 ) ([], vtenv, env) fields in
                 (PatRecord (List.rev fields, o), vtenv, env)
             | PatAssign (vdef, c) ->
-                let mut, var, str = find_or_def_var vdef in
-                (PatAssign (to_vdef mut var, c), vtenv, NameMap.singleton str var)
+                let mut, var, str, vtenv = find_or_def_var tenv vtenv vdef in
+                (PatAssign ((mut, var), c), vtenv, NameMap.singleton str var)
         in
         let (pat, vtenv, env') = aux_p vtenv NameMap.empty pat in
         let env = NameMap.add_seq (NameMap.to_seq env') env in

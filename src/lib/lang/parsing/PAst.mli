@@ -14,11 +14,12 @@ type varname = string
 type annotation = Eid.t Position.located
 
 type 'typ lambda_annot = 'typ option
-type 'v vdef = Immut of 'v | Mut of 'v
+type 'typ vkind = Immut | AnnotMut of 'typ | Mut
+type ('typ,'v) vdef = 'typ vkind * 'v
 
 type ('a, 'typ, 'tag, 'v) pattern =
 | PatType of 'typ
-| PatVar of 'v vdef
+| PatVar of ('typ,'v) vdef
 | PatLit of Const.t
 | PatTag of 'tag * ('a, 'typ, 'tag, 'v) pattern
 | PatAnd of ('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'tag, 'v) pattern
@@ -26,7 +27,7 @@ type ('a, 'typ, 'tag, 'v) pattern =
 | PatTuple of ('a, 'typ, 'tag, 'v) pattern list
 | PatCons of ('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'tag, 'v) pattern
 | PatRecord of (string * (('a, 'typ, 'tag, 'v) pattern)) list * bool
-| PatAssign of 'v vdef * Const.t
+| PatAssign of ('typ,'v) vdef * Const.t
 
 and ('a, 'typ, 'enu, 'tag, 'v) ast =
 | Magic of 'typ
@@ -35,11 +36,11 @@ and ('a, 'typ, 'enu, 'tag, 'v) ast =
 | Enum of 'enu
 | Tag of 'tag * ('a, 'typ, 'enu, 'tag, 'v) t
 | Suggest of 'v * 'typ list * ('a, 'typ, 'enu, 'tag, 'v) t
-| Lambda of 'v vdef * 'typ lambda_annot * ('a, 'typ, 'enu, 'tag, 'v) t
+| Lambda of ('typ,'v) vdef * 'typ lambda_annot * ('a, 'typ, 'enu, 'tag, 'v) t
 | LambdaRec of ('v * 'typ lambda_annot * ('a, 'typ, 'enu, 'tag, 'v) t) list
 | Ite of ('a, 'typ, 'enu, 'tag, 'v) t * 'typ * ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
 | App of ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
-| Let of 'v vdef * ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
+| Let of ('typ,'v) vdef * ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
 | Tuple of ('a, 'typ, 'enu, 'tag, 'v) t list
 | Cons of ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
 | Projection of projection * ('a, 'typ, 'enu, 'tag, 'v) t

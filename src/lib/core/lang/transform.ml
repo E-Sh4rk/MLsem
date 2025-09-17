@@ -256,13 +256,13 @@ let transform t =
     | Value t -> SA.Value t
     | Var v ->
       if MVariable.is_mutable v then
-        SA.App ((Eid.unique (), SA.Value (MVariable.ref_get () |> GTy.mk)),
+        SA.App ((Eid.unique (), SA.Value (MVariable.ref_get v |> GTy.mk)),
                 (Eid.unique (), SA.Var v))
       else
         SA.Var v
     | Constructor (c, es) -> SA.Constructor (c, List.map aux es)
     | Lambda (tys, ty, x, e) ->
-      let x' = MVariable.create_let (MVariable.is_mutable x) (Variable.get_name x) in
+      let x' = MVariable.create_let (MVariable.kind x) (Variable.get_name x) in
       Variable.get_location x |> Variable.attach_location x' ;
       let body =
         Eid.refresh (fst e),
@@ -278,7 +278,7 @@ let transform t =
     | Let (tys, x, e1, e2) ->
       let tys, def = if MVariable.is_mutable x
         then [], (Eid.unique (), SA.App (
-          (Eid.unique (), SA.Value (MVariable.ref_cons () |> GTy.mk)),
+          (Eid.unique (), SA.Value (MVariable.ref_cons x |> GTy.mk)),
           aux e1))
         else tys, aux e1
       in
@@ -286,7 +286,7 @@ let transform t =
     | TypeCast (e, ty) -> SA.TypeCast (aux e, ty)
     | TypeCoerce (e, ty, c) -> SA.TypeCoerce (aux e, ty, c)
     | VarAssign (v, e) when MVariable.is_mutable v -> SA.App (
-        (Eid.unique (), SA.Value (MVariable.ref_assign () |> GTy.mk)),
+        (Eid.unique (), SA.Value (MVariable.ref_assign v |> GTy.mk)),
         (Eid.unique (), SA.Constructor (SA.Tuple 2,[
             (Eid.unique (), SA.Var v) ; aux e
         ]))

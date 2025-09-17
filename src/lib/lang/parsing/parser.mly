@@ -10,8 +10,6 @@
   let annot sp ep e =
     (new_annot (Position.lex_join sp ep), e)
 
-  let vdef mut id = if mut then Mut id else Immut id
-
   let tmp_var = "__encoding"
   let abstraction startpos endpos lst t =
     let step acc (da, pat) =
@@ -20,7 +18,7 @@
       | pat ->
         let test = annot startpos endpos (Var tmp_var) in
         let body = annot startpos endpos (PatMatch (test, [(pat, acc)])) in
-        annot startpos endpos (Lambda (Immut tmp_var, da, body))
+        annot startpos endpos (Lambda ((Immut, tmp_var), da, body))
     in
     List.rev lst |> List.fold_left step t
 
@@ -139,18 +137,24 @@ element:
   { TBase TTrue }
 | IS t=typ { t }
 
-%inline mut:
-  { false }
-| MUT { true }
+%inline mid:
+| MUT id=ID { (Mut, id) }
+| MUT id=ID COLON ty=typ { (AnnotMut ty, id) }
+
+%inline id_mid:
+  id=ID { (Immut, id) }
+| LPAREN MUT id=ID RPAREN { (Mut, id) }
+| LPAREN MUT id=ID COLON ty=typ RPAREN { (AnnotMut ty, id) }
 
 term:
   t=simple_term { t }
 | FUN ais=parameter+ ARROW t = terms { abstraction $startpos $endpos ais t }
-| LET mut=mut id=generalized_identifier ais=parameter* EQUAL td=term IN t=terms
+| LET id=generalized_identifier ais=parameter* EQUAL td=term IN t=terms
   {
     let td = abstraction $startpos $endpos ais td in
-    annot $startpos $endpos (Let (vdef mut id, td, t))
+    annot $startpos $endpos (Let ((Immut, id), td, t))
   }
+| LET mid=mid EQUAL td=term IN t=terms { annot $startpos $endpos (Let (mid, td, t)) }
 | LET p=ppattern EQUAL td=term IN t=terms { let_pattern $startpos $endpos p td t }
 | SUGGEST id=generalized_identifier IS tys=separated_nonempty_list(OR_KW, typ) IN t=terms
 { annot $startpos $endpos (Suggest (id, tys, t)) }
@@ -262,11 +266,8 @@ lint:
 | { None }
 | COLON ty=typ { Some ty }
 
-%inline mid:
-  mut=mut id=ID { vdef mut id }
-
 parameter:
-  arg = mid { (None, PatVar arg) }
+  arg = id_mid { (None, PatVar arg) }
 | LPAREN arg = pattern opta = optional_typ RPAREN
 { (opta, arg) }
 
@@ -396,7 +397,7 @@ simple_pattern_nocons:
 
 atomic_pattern:
   COLON t=atomic_typ { PatType t }
-| v=mid  { PatVar v }
+| v=id_mid  { PatVar v }
 | PLACEHOLDER_VAR  { PatType (TBase TAny) }
 | c=literal { PatLit c }
 | e=CID { PatType (TEnum e) }
@@ -405,9 +406,9 @@ atomic_pattern:
 | LBRACE fs=separated_list(SEMICOLON, pat_field) o=optional_open RBRACE { PatRecord (fs, o) }
 | LPAREN RPAREN { PatType (TBase TUnit) }
 | LPAREN p=pattern RPAREN { p }
-| v=mid EQUAL c=literal { PatAssign (v, c) }
+| v=id_mid EQUAL c=literal { PatAssign (v, c) }
 | LBRACKET lst=separated_list(SEMICOLON, pattern) RBRACKET { list_of_pats lst }
 
 %inline pat_field:
   id=ID EQUAL p=simple_pattern { (id, p) }
-| id=ID { (id, PatVar (Immut id)) }
+| id=ID { (id, PatVar (Immut, id)) }

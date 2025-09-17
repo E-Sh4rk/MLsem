@@ -2,8 +2,6 @@ open Mlsem
 open Common
 open Types
 
-let of_vdef = function PAst.Mut v | PAst.Immut v -> v
-
 let expr_to_ast t =
   let open Lang.Ast in
   let sugg = Hashtbl.create 100 in
@@ -20,7 +18,7 @@ let expr_to_ast t =
   in
   let rec aux_pat = function
     | PAst.PatType ty -> PType ty
-    | PatVar v -> PVar (of_vdef v)
+    | PatVar (_, v) -> PVar v
     | PatLit c -> PType (Lang.Const.typeof c)
     | PatTag (t, pat) -> PConstructor (PCTag t, [aux_pat pat])
     | PatTuple pats -> PConstructor (PCTuple (List.length pats), List.map aux_pat pats)
@@ -29,7 +27,7 @@ let expr_to_ast t =
       PConstructor (PCRec (List.map fst fields, opened), fields |> List.map snd |> List.map aux_pat)
     | PatAnd (p1, p2) -> PAnd (aux_pat p1, aux_pat p2)
     | PatOr (p1, p2) -> POr (aux_pat p1, aux_pat p2)
-    | PatAssign (v, c) -> PAssign (of_vdef v, Lang.Const.typeof c |> GTy.mk)
+    | PatAssign ((_,v), c) -> PAssign (v, Lang.Const.typeof c |> GTy.mk)
   in
   let rec aux_e e =
     match e with
@@ -40,17 +38,13 @@ let expr_to_ast t =
     | Tag (t, e) -> Constructor (Tag t, [aux e])
     | Suggest (v, tys, (_,e)) ->
       add_suggs v tys ; aux_e e
-    | Lambda (x, a, e) ->
-      let x = of_vdef x in
-      Lambda (get_sugg x, lambda_annot x a, x, aux e)
+    | Lambda ((_,x), a, e) -> Lambda (get_sugg x, lambda_annot x a, x, aux e)
     | LambdaRec lst ->
       let aux (x,a,e) = (lambda_annot x a, x, aux e) in
       LambdaRec (List.map aux lst)
     | Ite (e,t,e1,e2) -> Ite (aux e, t, aux e1, aux e2)
     | App (e1,e2) -> App (aux e1, aux e2)
-    | Let (x, e1, e2) ->
-      let x = of_vdef x in
-      Let (get_sugg x, x, aux e1, aux e2)
+    | Let ((_,x), e1, e2) -> Let (get_sugg x, x, aux e1, aux e2)
     | Tuple es -> Constructor (Tuple (List.length es), List.map aux es)
     | Cons (e1, e2) -> Constructor (Cons, [aux e1 ; aux e2])
     | Projection (p, e) -> Projection (p, aux e)
