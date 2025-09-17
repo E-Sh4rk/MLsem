@@ -69,8 +69,8 @@ val new_annot : Position.t -> annotation
 val parser_expr_to_expr : type_env -> var_type_env -> name_var_map -> parser_expr -> expr
 
 type parser_element =
-| Definitions of (string * parser_expr) list
-| SigDef of string * type_expr option
+| Definitions of ((type_expr, string) vdef * parser_expr) list
+| SigDef of string * bool (* mutable *) * type_expr option
 | Types of (string * string list * type_expr) list
 | AbsType of string * int
 | Command of string * Const.t

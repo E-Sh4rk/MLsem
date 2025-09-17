@@ -115,14 +115,19 @@ unique_term: t=terms EOF { t }
 | id=generalized_identifier ais=parameter* EQUAL t=terms
 {
   let t = abstraction $startpos $endpos ais t in
-  (id, t)
+  ((Immut,id), t)
 }
+| mid=mid EQUAL t=terms { (mid, t) }
+
+%inline mut:
+  { false }
+| MUT { true }
 
 element:
 | LET ds=separated_nonempty_list(AND_KW, tl_let) { annot $symbolstartpos $endpos (Definitions ds) }
-| VAL id=generalized_identifier COLON ty=typ { annot $symbolstartpos $endpos (SigDef (id, Some ty)) }
-| VAL id=generalized_identifier | VAL id=generalized_identifier COLON HASHTAG
-{ annot $symbolstartpos $endpos (SigDef (id, None)) }
+| VAL m=mut id=generalized_identifier COLON ty=typ { annot $symbolstartpos $endpos (SigDef (id, m, Some ty)) }
+| VAL m=mut id=generalized_identifier | VAL m=mut id=generalized_identifier COLON HASHTAG
+{ annot $symbolstartpos $endpos (SigDef (id, m, None)) }
 | TYPE ts=separated_nonempty_list(AND_KW, param_type_def) { annot $symbolstartpos $endpos (Types ts) }
 | ABSTRACT TYPE name=ID params=abs_params { annot $symbolstartpos $endpos (AbsType (name, params)) }
 | HASHTAG cmd=ID EQUAL v=literal { annot $symbolstartpos $endpos (Command (cmd, v)) }

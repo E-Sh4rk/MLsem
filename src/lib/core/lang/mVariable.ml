@@ -36,14 +36,27 @@ let kind_equal k1 k2 =
   | AnnotMut ty1, AnnotMut ty2 when Ty.equiv ty1 ty2 -> true
   | _, _ -> false
 
+let kind_leq k1 k2 =
+  match k1, k2 with
+  | Immut, Immut -> true
+  | Mut, Mut -> true
+  | AnnotMut _, Mut -> true
+  | AnnotMut ty1, AnnotMut ty2 when Ty.leq ty1 ty2 -> true
+  | _, _ -> false
+
 let ref_abs = Abstract.define "ref" 1
 let mk_ref ty = Abstract.mk ref_abs [ty]
 
-let add_to_env env v =
+let add_to_env v ty env =
   match Hashtbl.find_opt all v with
-  | None -> invalid_arg "Variable must be mutable."
-  | Some None -> invalid_arg "Variable must be annotated."
-  | Some (Some ty) -> Env.add v (mk_ref ty |> GTy.mk |> TyScheme.mk_mono) env
+  | None -> Env.add v ty env
+  | Some None -> invalid_arg "Top-level mutable variables must be annotated."
+  | Some (Some ty') ->
+    if TVOp.vars ty' |> TVarSet.is_empty |> not
+    then invalid_arg "Top-level mutable variables must not contain type variables." ;
+    if Ty.leq (TyScheme.get ty |> snd |> GTy.lb) ty' |> not
+    then invalid_arg "Top-level mutable variable has an incompatible type." ;
+    Env.add v (mk_ref ty' |> GTy.mk |> TyScheme.mk_mono) env
 
 let subst_if_ann v a ty =
   match Hashtbl.find_opt all v with

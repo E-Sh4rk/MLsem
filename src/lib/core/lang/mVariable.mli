@@ -10,8 +10,10 @@ val create_lambda : kind -> string option -> t
 val is_mutable : Variable.t -> bool
 val kind : Variable.t -> kind
 val kind_equal : kind -> kind -> bool
+val kind_leq : kind -> kind -> bool
 
-val add_to_env : Env.t -> Variable.t -> Env.t
+(* May raise Invalid_argument *)
+val add_to_env : Variable.t -> TyScheme.t -> Env.t -> Env.t
 
 val ref_cons : Variable.t -> Ty.t
 val ref_get : Variable.t -> Ty.t
