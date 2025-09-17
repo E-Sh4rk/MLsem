@@ -695,13 +695,12 @@ let mut_narrowing_fail =
   end ;
   y
 
-(* TODO *)
 let mut_narrowing_ok =
   let mut y = 42 in
   let yv = y in
   while yv is ~Nil do
-    y := succ yv ;
+    let mut yv = succ yv in
     (* ... *)
-    if y > 100 do y := Nil end
+    if yv > 100 do y := Nil end
   end ;
   y
