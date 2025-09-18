@@ -14,5 +14,9 @@
     {
         "name": "Gradual Typing",
         "path": "gradual.stml"
+    },
+    {
+        "name": "Imperative Programming (advanced)",
+        "path": "imperative_advanced.stml"
     }
 ]

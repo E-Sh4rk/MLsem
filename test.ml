@@ -688,6 +688,9 @@ let mut_valid =
 
 val mut my
 let mut my = 42
+let read_mut = my
+let read_mut_cast = (my :>> bool)
+let write_mut = my := false
 
 let mut_param (mut a) =
     a := 42 ; a

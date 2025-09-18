@@ -1,0 +1,20 @@
+
+# value_restriction = true
+
+(* If not specifying the type of a top-level mutable variable, it is considered dyn *)
+let mut a = 42
+let read_a = a
+let read_a_cast = (a :>> bool)
+let write_a = a := true
+
+let mut b : int = 73
+let read_b = b
+let write_b = b := true
+
+let typeof_cf x =
+  if x is string do return "string" end ;
+  if x is bool do return "bool" end ;
+  if x is int do return "int" end ;
+  if x is char do return "char" end ;
+  if x is () do return "unit" end ;
+  "object"
