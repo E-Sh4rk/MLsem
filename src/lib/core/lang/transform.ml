@@ -4,7 +4,7 @@ open Ast
 module SA = Mlsem_system.Ast
 
 let voidify e =
-  Constructor (SA.Ignore !Config.void_ty, [e])
+  Eid.unique (), Constructor (SA.Ignore !Config.void_ty, [e])
 
 (* Pattern Matching *)
 
@@ -165,9 +165,7 @@ let rec eliminate_break e =
       let e1, e2 = eliminate_inner_break e1, eliminate_inner_break e2 in
       (id, VoidConditional (false, hole, tau, e1, e2)) |> cont' |> aux e
     | VoidConditional (false, e, tau, e1, e2) ->
-      let e1 = Eid.unique (), voidify e1 in
-      let e2 = Eid.unique (), voidify e2 in
-      (id, Ite (hole, tau, aux e1 cont, aux e2 cont)) |> aux e
+      (id, Ite (hole, tau, aux (voidify e1) cont, aux (voidify e2) cont)) |> aux e
     | Seq (e1,e2) -> (id, Seq (hole, aux e2 cont)) |> aux e1
     | Return e -> (id, Return hole) |> cont' |> aux e
     | Break -> id, Value (GTy.mk Ty.empty)
@@ -237,9 +235,7 @@ let rec eliminate_return e =
       let e1, e2 = eliminate_inner_return e1, eliminate_inner_return e2 in
       (id, VoidConditional (false, hole, tau, e1, e2)) |> cont' |> aux e
     | VoidConditional (false, e, tau, e1, e2) ->
-      let e1 = Eid.unique (), voidify e1 in
-      let e2 = Eid.unique (), voidify e2 in
-      (id, Ite (hole, tau, aux e1 cont, aux e2 cont)) |> aux e
+      (id, Ite (hole, tau, aux (voidify e1) cont, aux (voidify e2) cont)) |> aux e
     | Seq (e1,e2) -> (id, Seq (hole, aux e2 cont)) |> aux e1
     | Return e -> e
     | PatMatch _ | If _ | While _ | VoidConditional (true, _, _, _, _) -> assert false
@@ -262,8 +258,7 @@ let rec unify_returns e =
   then
     let v = MVariable.create_let MVariable.Mut (Some "res") in
     let body = Eid.unique (), VarAssign (v, treat_returns v e) in
-    let body = Eid.unique (), voidify body in
-    let body = Eid.unique (), Seq (body, (Eid.unique (), Var v)) in
+    let body = Eid.unique (), Seq (voidify body, (Eid.unique (), Var v)) in
     Eid.unique (), Declare (v, body)
   else unify_inner_returns e
 and unify_inner_returns e =
@@ -337,8 +332,8 @@ let transform t =
       )
     | VarAssign _ -> invalid_arg "Cannot assign to an immutable variable."
     | VoidConditional (_,e,t,e1,e2) ->
-      let e = Eid.unique (), SA.Ite (aux e, t, aux e1, aux e2) in
-      SA.Constructor (SA.Ignore !Config.void_ty, [e])
+      let e1, e2 = voidify e1 |> aux, voidify e2 |> aux in
+      SA.Ite (aux e, t, e1, e2)
     | Seq (e1, e2) -> Let ([], Variable.create_gen None, aux e1, aux e2)
     | Break | Return _ -> SA.Value (GTy.mk Ty.empty) (* Fallback for breaks and unified returns *)
     | PatMatch _ | If _ | While _ -> assert false
