@@ -19,7 +19,7 @@ type pattern =
 | PAssign of Variable.t * GTy.t
 [@@deriving show]
 type e =
-| Void
+| Void | Voidify of t
 | Isolate of t (* Prevent control flow encodings (CPS-like transformations) *)
 | Value of GTy.t
 | Var of Variable.t
@@ -90,6 +90,7 @@ let map_tl f (id,e) =
   let e =
     match e with
     | Void -> Void
+    | Voidify e -> Voidify (f e)
     | Isolate e -> Isolate (f e)
     | Value t -> Value t
     | Var v -> Var v

@@ -3,9 +3,6 @@ open Mlsem_types
 open Ast
 module SA = Mlsem_system.Ast
 
-let voidify e =
-  Eid.unique (), Constructor (SA.Ignore !Config.void_ty, [e])
-
 (* Pattern Matching *)
 
 let constr_of_patconstr = function
@@ -133,6 +130,7 @@ let rec eliminate_break e =
     let cont' e = fill cont e in
     match e with
     | Void | Value _ | Var _ | Constructor (_,[]) | Exc -> cont' (id,e)
+    | Voidify e -> (id, Voidify hole) |> cont' |> aux e
     | Isolate e -> (id, Isolate (eliminate_inner_break e)) |> cont'
     | Declare (tys, v, e) -> (id, Declare (tys, v, aux e cont))
     | Let (tys, v, e1, e2) ->
@@ -172,7 +170,8 @@ let rec eliminate_break e =
       let e1, e2 = eliminate_inner_break e1, eliminate_inner_break e2 in
       (id, VoidConditional (false, hole, tau, e1, e2)) |> cont' |> aux e
     | VoidConditional (false, e, tau, e1, e2) ->
-      (id, Ite (hole, tau, aux (voidify e1) cont, aux (voidify e2) cont)) |> aux e
+      let e1, e2 = (Eid.unique (), Voidify e1), (Eid.unique (), Voidify e2) in
+      (id, Ite (hole, tau, aux e1 cont, aux e2 cont)) |> aux e
     | Seq (e1,e2) -> (id, Seq (hole, aux e2 cont)) |> aux e1
     | Return e -> (id, Return hole) |> cont' |> aux e
     | Break -> id, Value (GTy.mk Ty.empty)
@@ -212,6 +211,7 @@ let rec eliminate_return e =
     let cont' e = fill cont e in
     match e with
     | Void | Value _ | Var _ | Constructor (_,[]) | Break | Exc -> cont' (id,e)
+    | Voidify e -> (id, Voidify hole) |> cont' |> aux e
     | Isolate e -> (id, Isolate (eliminate_inner_return e)) |> cont'
     | Declare (tys, v, e) -> (id, Declare (tys, v, aux e cont))
     | Let (tys, v, e1, e2) ->
@@ -249,7 +249,8 @@ let rec eliminate_return e =
       let e1, e2 = eliminate_inner_return e1, eliminate_inner_return e2 in
       (id, VoidConditional (false, hole, tau, e1, e2)) |> cont' |> aux e
     | VoidConditional (false, e, tau, e1, e2) ->
-      (id, Ite (hole, tau, aux (voidify e1) cont, aux (voidify e2) cont)) |> aux e
+      let e1, e2 = (Eid.unique (), Voidify e1), (Eid.unique (), Voidify e2) in
+      (id, Ite (hole, tau, aux e1 cont, aux e2 cont)) |> aux e
     | Seq (e1,e2) -> (id, Seq (hole, aux e2 cont)) |> aux e1
     | Return e -> e
     | PatMatch _ | If _ | While _ | VoidConditional (true, _, _, _, _) -> assert false
@@ -282,7 +283,7 @@ let rec unify_returns e =
   then
     let v = MVariable.create_let MVariable.Mut (Some "res") in
     let body = Eid.unique (), VarAssign (v, treat_returns v e) in
-    let body = Eid.unique (), Seq (voidify body, (Eid.unique (), Var v)) in
+    let body = Eid.unique (), Seq ((Eid.unique (), Voidify body), (Eid.unique (), Var v)) in
     Eid.unique (), Declare ([], v, body)
   else unify_inner_returns e
 and unify_inner_returns e =
@@ -307,61 +308,30 @@ and treat_returns v e =
 let transform t =
   let rec aux (id, e) =
     let e = match e with
-    | Void -> SA.Value (GTy.mk !Config.void_ty)
+    | Void -> MAst.Void
+    | Voidify e -> MAst.Voidify (aux e)
     | Isolate e -> aux e |> snd
-    | Value t -> SA.Value t
-    | Var v ->
-      if MVariable.is_mutable v then
-        SA.App ((Eid.unique (), SA.Value (MVariable.ref_get v |> GTy.mk)),
-                (Eid.unique (), SA.Var v))
-      else
-        SA.Var v
-    | Constructor (c, es) -> SA.Constructor (c, List.map aux es)
-    | Lambda (tys, ty, x, e) ->
-      let x1 = MVariable.create_let Immut (Variable.get_name x) in
-      let x2 = MVariable.create_let (MVariable.kind x) (Variable.get_name x) in
-      Variable.get_location x |> Variable.attach_location x1 ;
-      Variable.get_location x |> Variable.attach_location x2 ;
-      let body =
-        Eid.refresh (fst e),
-        Let (tys, x2, (Eid.unique (), Var x1), rename_fv x x2 e)
-      in
-      SA.Lambda (ty, x1, aux body)
+    | Value t -> MAst.Value t
+    | Var v -> MAst.Var v
+    | Constructor (c, es) -> MAst.Constructor (c, List.map aux es)
+    | Lambda (tys, ty, x, e) -> MAst.Lambda (tys, ty, x, aux e)
     | LambdaRec lst ->
       let aux (ty,x,e) = (ty, x, aux e) in
-      SA.LambdaRec (List.map aux lst)
-    | Ite (e,t,e1,e2) -> SA.Ite (aux e, t, aux e1, aux e2)
-    | Try es -> SA.Constructor (SA.Choice (List.length es), List.map aux es)
-    | App (e1,e2) -> SA.App (aux e1, aux e2)
-    | Projection (p, e) -> SA.Projection (p, aux e)
-    | Declare (_, x, e) when MVariable.is_mutable x ->
-      let def = Eid.unique (), SA.App (
-          (Eid.unique (), SA.Value (MVariable.ref_uninit x |> GTy.mk)),
-          (Eid.unique (), SA.Value (Ty.unit |> GTy.mk))) in
-      SA.Let ([], x, def, aux e)
-    | Declare _ -> invalid_arg "Cannot declare an immutable variable."
-    | Let (tys, x, e1, e2) ->
-      let tys, def = if MVariable.is_mutable x
-        then [], (Eid.unique (), SA.App (
-          (Eid.unique (), SA.Value (MVariable.ref_cons x |> GTy.mk)),
-          aux e1))
-        else tys, aux e1
-      in
-      SA.Let (tys, x, def, aux e2)
-    | TypeCast (e, ty) -> SA.TypeCast (aux e, ty)
-    | TypeCoerce (e, ty, c) -> SA.TypeCoerce (aux e, ty, c)
-    | VarAssign (v, e) when MVariable.is_mutable v -> SA.App (
-        (Eid.unique (), SA.Value (MVariable.ref_assign v |> GTy.mk)),
-        (Eid.unique (), SA.Constructor (SA.Tuple 2,[
-            (Eid.unique (), SA.Var v) ; aux e
-        ]))
-      )
-    | VarAssign _ -> invalid_arg "Cannot assign to an immutable variable."
+      MAst.LambdaRec (List.map aux lst)
+    | Ite (e,t,e1,e2) -> MAst.Ite (aux e, t, aux e1, aux e2)
+    | Try es -> MAst.Try (List.map aux es)
+    | App (e1,e2) -> MAst.App (aux e1, aux e2)
+    | Projection (p, e) -> MAst.Projection (p, aux e)
+    | Declare (tys, x, e) -> MAst.Declare (tys, x, aux e)
+    | Let (tys, x, e1, e2) -> MAst.Let (tys, x, aux e1, aux e2)
+    | TypeCast (e, ty) -> MAst.TypeCast (aux e, ty)
+    | TypeCoerce (e, ty, c) -> MAst.TypeCoerce (aux e, ty, c)
+    | VarAssign (v, e) -> MAst.VarAssign (v, aux e)
     | VoidConditional (_,e,t,e1,e2) ->
-      let e1, e2 = voidify e1 |> aux, voidify e2 |> aux in
-      SA.Ite (aux e, t, e1, e2)
-    | Seq (e1, e2) -> Let ([], Variable.create_gen None, aux e1, aux e2)
-    | Break | Return _ | Exc -> SA.Value (GTy.mk Ty.empty) (* Fallback for breaks, exc, and unified returns *)
+      let e1, e2 = (Eid.unique (), Voidify e1) |> aux, (Eid.unique (), Voidify e2) |> aux in
+      MAst.Ite (aux e, t, e1, e2)
+    | Seq (e1, e2) -> MAst.Seq (aux e1, aux e2)
+    | Break | Return _ | Exc -> Exc (* Fallback for breaks, exc, and unified returns *)
     | PatMatch _ | If _ | While _ -> assert false
     | Hole _ -> invalid_arg "Expression should not contain a hole."
     in
@@ -369,7 +339,7 @@ let transform t =
   in
   aux t
 
-let transform t =
+let eliminate_cf t =
   t
   |> eliminate_pattern_matching
   |> eliminate_if_while
@@ -377,3 +347,8 @@ let transform t =
   |> eliminate_return
   |> unify_returns
   |> transform
+
+let transform t =
+  t
+  |> eliminate_cf
+  |> MAst.to_system_ast

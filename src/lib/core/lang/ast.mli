@@ -17,7 +17,7 @@ type pattern =
 | POr of pattern * pattern
 | PAssign of Variable.t * GTy.t
 type e =
-| Void
+| Void | Voidify of t
 | Isolate of t (* Prevent control flow encodings (CPS-like transformations) *)
 | Value of GTy.t
 | Var of Variable.t
@@ -47,12 +47,12 @@ val map_pat : (pattern -> pattern) -> pattern -> pattern
 val map_pat' : (pattern -> pattern option) -> pattern -> pattern
 val iter_pat : (pattern -> unit) -> pattern -> unit
 val iter_pat' : (pattern -> bool (* continue inside *)) -> pattern -> unit
-val fill_hole : int -> t -> t -> t
 
 val map : (t -> t) -> t -> t
 val map' : (t -> t option) -> t -> t
 val iter : (t -> unit) -> t -> unit
 val iter' : (t -> bool (* continue inside *)) -> t -> unit
+val fill_hole : int -> t -> t -> t
 val fv : t -> VarSet.t
 val vars : t -> VarSet.t
 val rename_fv : Variable.t -> Variable.t -> t -> t
