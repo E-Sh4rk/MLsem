@@ -141,7 +141,7 @@ let rec try_elim_ret bid e =
     | Isolate _ | App _ | Constructor (_, _::_::_)
     | Lambda _ | LambdaRec _ -> cont' (id,e)
     | Voidify e -> (id, Voidify hole) |> cont' |> aux e
-    | Declare (tys, v, e) -> (id, Declare (tys, v, aux e cont))
+    | Declare (v, e) -> (id, Declare (v, aux e cont))
     | Let (tys, v, e1, e2) ->
       (id, Let (tys, v, hole, aux e2 cont)) |> aux e1
     | Projection (p, e) ->
@@ -192,7 +192,7 @@ let rec elim_ret_args bid e =
     let v = MVariable.create_let MVariable.Mut (Some "res") in
     let body = Eid.unique (), VarAssign (v, treat_rets bid v e) in
     let body = Eid.unique (), Seq ((Eid.unique (), Voidify body), (Eid.unique (), Var v)) in
-    Eid.unique (), Declare ([], v, body)
+    Eid.unique (), Declare (v, body)
   else e
 and treat_rets bid v e =
   let f = function
@@ -244,7 +244,7 @@ let transform t =
     | Try es -> MAst.Try (List.map aux es)
     | App (e1,e2) -> MAst.App (aux e1, aux e2)
     | Projection (p, e) -> MAst.Projection (p, aux e)
-    | Declare (tys, x, e) -> MAst.Declare (tys, x, aux e)
+    | Declare (x, e) -> MAst.Declare (x, aux e)
     | Let (tys, x, e1, e2) -> MAst.Let (tys, x, aux e1, aux e2)
     | TypeCast (e, ty) -> MAst.TypeCast (aux e, ty)
     | TypeCoerce (e, ty, c) -> MAst.TypeCoerce (aux e, ty, c)

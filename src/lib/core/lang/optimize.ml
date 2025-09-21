@@ -50,6 +50,15 @@ let optimize_cf e =
       let env, e = aux env e in
       let (env1, e1), (env2, e2) = aux env e1, aux env e2 in
       merge_envs env1 env2, Ite (e, ty, e1, e2)
+    | App (e1, e2) ->
+      let (env1, e1), (env2, e2) = aux env e1, aux env e2 in
+      merge_envs env1 env2, App (e1, e2)
+    | Projection (p, e) ->
+      let env, e = aux env e in
+      env, Projection (p, e)
+    | Declare (v, e) ->
+      let env, e = aux env e in
+      env, Declare (v, e)
     | _ -> failwith "TODO"
     in
     map, (id, e)

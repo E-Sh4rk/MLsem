@@ -33,7 +33,7 @@ type e =
 | PatMatch of t * (pattern * t) list
 | App of t * t
 | Projection of SA.projection * t
-| Declare of Ty.t list * Variable.t * t (* Cannot be translated to system AST if v is not mutable *)
+| Declare of Variable.t * t (* Cannot be translated to system AST if v is not mutable *)
 | Let of Ty.t list * Variable.t * t * t
 | TypeCast of t * Ty.t
 | TypeCoerce of t * GTy.t * SA.coerce
@@ -109,7 +109,7 @@ let map_tl f (id,e) =
       PatMatch (f e, List.map (fun (pat, e) -> pat, f e) pats)
     | App (e1, e2) -> App (f e1, f e2)
     | Projection (p, e) -> Projection (p, f e)
-    | Declare (tys, v, e) -> Declare (tys, v, f e)
+    | Declare (v, e) -> Declare (v, f e)
     | Let (tys, v, e1, e2) -> Let (tys, v, f e1, f e2)
     | TypeCast (e, ty) -> TypeCast (f e, ty)
     | TypeCoerce (e, ty, b) -> TypeCoerce (f e, ty, b)
@@ -153,7 +153,7 @@ let fill_hole n elt e =
 let bv e =
   let bv = ref VarSet.empty in
   let aux (_,e) = match e with
-  | Lambda (_, _, v, _) | Let (_, v, _, _) | Declare (_, v, _) -> bv := VarSet.add v !bv
+  | Lambda (_, _, v, _) | Let (_, v, _, _) | Declare (v, _) -> bv := VarSet.add v !bv
   | LambdaRec lst -> lst |> List.iter (fun (_, v, _) -> bv := VarSet.add v !bv)
   | PatMatch (_,pats) ->
     bv := List.fold_left (fun acc (pat,_) -> VarSet.union acc (bv_pat pat)) !bv pats

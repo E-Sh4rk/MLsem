@@ -12,7 +12,7 @@ type e =
 | Ite of t * Ty.t * t * t
 | App of t * t
 | Projection of SA.projection * t
-| Declare of Ty.t list * Variable.t * t (* Cannot be translated to system AST if v is not mutable *)
+| Declare of Variable.t * t (* Cannot be translated to system AST if v is not mutable *)
 | Let of Ty.t list * Variable.t * t * t
 | TypeCast of t * Ty.t
 | TypeCoerce of t * GTy.t * SA.coerce
@@ -37,7 +37,7 @@ let map_tl f (id,e) =
     | Ite (e, t, e1, e2) -> Ite (f e, t, f e1, f e2)
     | App (e1, e2) -> App (f e1, f e2)
     | Projection (p, e) -> Projection (p, f e)
-    | Declare (tys, v, e) -> Declare (tys, v, f e)
+    | Declare (v, e) -> Declare (v, f e)
     | Let (tys, v, e1, e2) -> Let (tys, v, f e1, f e2)
     | TypeCast (e, ty) -> TypeCast (f e, ty)
     | TypeCoerce (e, ty, b) -> TypeCoerce (f e, ty, b)
@@ -72,7 +72,7 @@ let iter' f e =
 let bv e =
   let bv = ref VarSet.empty in
   let aux (_,e) = match e with
-  | Lambda (_, _, v, _) | Let (_, v, _, _) | Declare (_, v, _) -> bv := VarSet.add v !bv
+  | Lambda (_, _, v, _) | Let (_, v, _, _) | Declare (v, _) -> bv := VarSet.add v !bv
   | LambdaRec lst -> lst |> List.iter (fun (_, v, _) -> bv := VarSet.add v !bv)
   | _ -> ()
   in
@@ -134,7 +134,7 @@ let to_system_ast t =
     | Ite (e,t,e1,e2) -> SA.Ite (aux e, t, aux e1, aux e2)
     | App (e1,e2) -> SA.App (aux e1, aux e2)
     | Projection (p, e) -> SA.Projection (p, aux e)
-    | Declare (_, x, e) when MVariable.is_mutable x ->
+    | Declare (x, e) when MVariable.is_mutable x ->
       let def = Eid.unique (), SA.App (
           (Eid.unique (), SA.Value (MVariable.ref_uninit x |> GTy.mk)),
           (Eid.unique (), SA.Value (Ty.unit |> GTy.mk))) in
