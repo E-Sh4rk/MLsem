@@ -70,8 +70,8 @@ let optimize_cf e =
       env, Declare (v, e)
     | Let (tys, v, e1, e2) when MVariable.is_mutable v ->
       let v' = MVariable.create_lambda MVariable.Immut (Variable.get_name v) in
-      let env, e1 = aux { env with map=VarMap.singleton v v' } e1 in
-      let env, e2 = aux env e2 in
+      let env, e1 = aux env e1 in
+      let env, e2 = aux { env with map=VarMap.singleton v v' } e2 in
       let e2 = Eid.unique (), Let ([], v, (Eid.unique (), Var v'), e2) in
       env, Let (tys, v', e1, e2)
     | Let (tys, v, e1, e2) ->
@@ -84,7 +84,13 @@ let optimize_cf e =
     | TypeCoerce (e, ty, c) ->
       let env, e = aux env e in
       env, TypeCoerce (e, ty, c)
-    | VarAssign _ -> failwith "TODO"
+    | VarAssign (v, e) ->
+      let v' = MVariable.create_lambda MVariable.Immut (Variable.get_name v) in
+      let env, e = aux env e in
+      let env = { env with map=VarMap.singleton v v' } in
+      let e' = failwith "TODO" in
+      let e' = Eid.unique (), Let ([], v, (Eid.unique (), Var v'), e') in
+      env, Let ([], v', e, e')
     | Seq (e1, e2) ->
       let env, e1 = aux env e1 in
       let env, e2 = aux env e2 in
