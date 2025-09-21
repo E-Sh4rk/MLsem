@@ -223,7 +223,7 @@ let eliminate_blocks e =
 
 (* Main *)
 
-let transform t =
+let eliminate_cf t =
   let rec aux (id, e) =
     let e = match e with
     | Hole n -> MAst.Hole n
@@ -260,9 +260,10 @@ let eliminate_cf t =
   |> eliminate_pattern_matching
   |> eliminate_if_while_break_return
   |> eliminate_blocks
-  |> transform
+  |> eliminate_cf
 
 let transform t =
   t
   |> eliminate_cf
+  |> Optimize.optimize_cf
   |> MAst.to_system_ast

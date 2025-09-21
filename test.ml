@@ -695,22 +695,12 @@ let write_mut = my := false
 let mut_param (mut a) =
     a := 42 ; a
 
-let mut_narrowing_fail =
+let mut_narrowing =
   let mut y = 42 in
   while y is ~Nil do
     y := succ y ;
     (* ... *)
     if y > 100 do y := Nil end
-  end ;
-  y
-
-let mut_narrowing_ok =
-  let mut y = 42 in
-  let yv = y in
-  while yv is ~Nil do
-    let mut yv = succ yv in
-    (* ... *)
-    if yv > 100 do y := Nil end
   end ;
   y
 
