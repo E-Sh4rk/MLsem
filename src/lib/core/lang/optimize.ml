@@ -109,4 +109,4 @@ let optimize_cf e =
     let env', ctx, e = aux env e in
     merge_envs env env', fill ctx e
   in
-  aux { captured=VarSet.empty ; map=VarMap.empty } e
+  aux' { captured=VarSet.empty ; map=VarMap.empty } e |> snd
