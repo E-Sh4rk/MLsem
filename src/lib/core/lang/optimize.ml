@@ -1,9 +1,21 @@
 open MAst
 open Mlsem_common
 
+let written_vars e =
+  let wv = ref VarSet.empty in
+  let aux (_,e) = match e with
+  | VarAssign (v,_) -> wv := VarSet.add v !wv
+  | _ -> ()
+  in
+  iter aux e ; !wv
+
 type env = { captured:VarSet.t ; map:Variable.t VarMap.t }
 
 let optimize_cf e =
+  let restrict_env ~capture env vs =
+    { map = List.fold_right VarMap.remove (VarSet.elements vs) env.map ;
+      captured = if capture then VarSet.union env.captured vs else env.captured }
+  in
   let merge_envs env1 env2 =
     let map = VarMap.merge (fun _ v1 v2 ->
       match v1, v2 with
@@ -24,6 +36,8 @@ let optimize_cf e =
     | Var v when VarMap.mem v env.map -> env, Var (VarMap.find v env.map)
     | Var v -> env, Var v
     | Constructor (c, es) ->
+      let wv = List.map written_vars es |> List.fold_left VarSet.union VarSet.empty in
+      let env = restrict_env ~capture:false env wv in
       let envs, es = List.map (aux env) es |> List.split in
       merge_envs' env envs, Constructor (c, es)
     | Lambda (tys, ty, v, e) ->
@@ -36,9 +50,7 @@ let optimize_cf e =
         else
           v, aux { env with map=VarMap.empty } e |> snd
       in
-      let fv = fv e in
-      let env = { map=List.fold_right VarMap.remove (VarSet.elements fv) env.map ;
-                  captured=VarSet.union env.captured fv } in
+      let env = restrict_env ~capture:true env (written_vars e) in
       env, Lambda (tys, ty, v, e)
     | LambdaRec lst ->
       let envs, es = List.map (fun (_,_,e) -> aux env e) lst |> List.split in
@@ -66,7 +78,22 @@ let optimize_cf e =
       let env, e1 = aux env e1 in
       let env, e2 = aux env e2 in
       env, Let (tys, v, e1, e2)
-    | _ -> failwith "TODO"
+    | TypeCast (e, ty) ->
+      let env, e = aux env e in
+      env, TypeCast (e, ty)
+    | TypeCoerce (e, ty, c) ->
+      let env, e = aux env e in
+      env, TypeCoerce (e, ty, c)
+    | VarAssign _ -> failwith "TODO"
+    | Seq (e1, e2) ->
+      let env, e1 = aux env e1 in
+      let env, e2 = aux env e2 in
+      env, Seq (e1, e2)
+    | Try es ->
+      let wv = List.map written_vars es |> List.fold_left VarSet.union VarSet.empty in
+      let env = restrict_env ~capture:false env wv in
+      let envs, es = List.map (aux env) es |> List.split in
+      merge_envs' env envs, Try es
     in
     map, (id, e)
   in
