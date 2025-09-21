@@ -2,9 +2,6 @@ open Mlsem_common
 open Mlsem_types
 module SA = Mlsem_system.Ast
 
-(* TODO: we should consider Constructor as being a blackbox
-   even if it has only one parameter (ex: lazy constructor) *)
-
 type blockid = BFun | BLoop | BOther of int
 type pattern_constructor =
 | PCTuple of int

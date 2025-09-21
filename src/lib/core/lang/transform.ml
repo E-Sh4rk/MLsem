@@ -123,7 +123,7 @@ let has_eliminable_ret bid e =
   try
     let f = function
     | (_, Lambda _) | (_, LambdaRec _) -> false
-    | (_, Isolate _) | (_, App _) | (_, Constructor (_, _::_::_)) -> false
+    | (_, Isolate _) | (_, App _) | (_, Constructor _) -> false
     | (_, Block _) -> assert false
     | (_, Ret (bid', _)) when bid=bid' -> raise Exit
     | _ -> true
@@ -137,9 +137,8 @@ let rec try_elim_ret bid e =
   let rec aux (id,e) cont =
     let cont' e = fill cont e in
     match e with
-    | Void | Value _ | Var _ | Constructor (_,[]) | Exc
-    | Isolate _ | App _ | Constructor (_, _::_::_)
-    | Lambda _ | LambdaRec _ -> cont' (id,e)
+    | Void | Value _ | Var _ | Exc | Isolate _
+    | App _ | Constructor _ | Lambda _ | LambdaRec _ -> cont' (id,e)
     | Voidify e -> (id, Voidify hole) |> cont' |> aux e
     | Declare (v, e) -> (id, Declare (v, aux e cont))
     | Let (tys, v, e1, e2) ->
@@ -152,8 +151,6 @@ let rec try_elim_ret bid e =
       (id, TypeCoerce (hole, ty, c)) |> cont' |> aux e
     | VarAssign (v, e) ->
       (id, VarAssign (v, hole)) |> cont' |> aux e
-    | Constructor (c, [e]) ->
-      (id, Constructor (c, [hole])) |> cont' |> aux e
     | Try es when not (List.exists (has_eliminable_ret bid) es) ->
       (* Do not duplicate the continuation if unnecessary *)
       (id, Try es) |> cont'

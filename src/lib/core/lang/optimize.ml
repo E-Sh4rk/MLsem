@@ -23,9 +23,6 @@ let optimize_cf e =
     | Voidify e -> let (map, (_,e)) = aux env e in map, e
     | Var v when VarMap.mem v env.map -> env, Var (VarMap.find v env.map)
     | Var v -> env, Var v
-    | Constructor (c, [e]) ->
-      let env, e = aux env e in
-      env, Constructor (c, [e])
     | Constructor (c, es) ->
       let envs, es = List.map (aux env) es |> List.split in
       merge_envs' env envs, Constructor (c, es)
