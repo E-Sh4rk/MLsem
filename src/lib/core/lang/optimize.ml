@@ -1,6 +1,18 @@
 open MAst
 open Mlsem_common
 
+let clean_unused_defs e =
+  let f (id,e) =
+    match e with
+    | Declare (v, e) when VarSet.mem v (fv e) |> not -> e
+    | Let (_, v, (_, Var _), e2) when VarSet.mem v (fv e2) |> not -> e2
+    | e -> (id,e)
+  in
+  map f e
+
+(* TODO: turn assign into let mut of a new var if possible by scoping
+   (start from the end) *)
+
 let written_vars e =
   let wv = ref VarSet.empty in
   let aux (_,e) = match e with
@@ -110,3 +122,6 @@ let optimize_cf e =
     merge_envs env env', fill ctx e
   in
   aux' { captured=VarSet.empty ; map=VarMap.empty } e |> snd
+
+let optimize_cf e =
+  e |> optimize_cf |> clean_unused_defs
