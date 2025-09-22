@@ -12,6 +12,18 @@ let clean_unused_defs e =
 
 (* TODO: turn assign into let mut of a new var if possible by scoping
    (start from the end) *)
+let split_mut_defs e =
+  let rec aux uv (* vars that may be used after that point *) (id, e) =
+    match e with
+   | Hole _ | Exc | Void | Value _ | Var _ -> (id, e)
+   | Constructor (c, es) ->
+    let uv = List.fold_left VarSet.union uv (List.map fv es) in
+    let es = List.map (aux uv) es in
+    id, Constructor (c, es)
+   | _-> failwith "TODO"
+  in
+  aux (fv e (* global vars *)) e
+  [@@ocaml.warning "-32"]
 
 let written_vars e =
   let wv = ref VarSet.empty in
