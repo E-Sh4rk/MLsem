@@ -704,11 +704,20 @@ let mut_narrowing =
   end ;
   y
 
-let mut_seq =
+let mut_seq1 =
   let mut y = false in
   while <bool> do y := false end ;
   y := 42 ;
   while <bool> do y := 42 end ;
+  y
+
+let mut_seq2 =
+  let mut y = false in
+  while <bool> do y := false end ;
+  y := 42 ;
+  while <bool> do y := 42 end ;
+  y := Nil ;
+  while <bool> do y := Nil end ;
   y
 
 let mut_and_return (_) =

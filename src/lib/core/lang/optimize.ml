@@ -17,8 +17,7 @@ let read_vars e =
   in
   iter aux e ; !rv
 
-(* TODO: have a stack of mut *)
-type env = { captured:VarSet.t ; immut:Variable.t VarMap.t ; mut:Variable.t VarMap.t }
+type env = { captured:VarSet.t ; immut:Variable.t VarMap.t ; mut:Variable.t list VarMap.t }
 
 let optimize_cf e =
   let hole = Eid.dummy, Hole 0 in
@@ -52,9 +51,16 @@ let optimize_cf e =
   let add_immut env v v' =
     { env with immut = VarMap.add v v' env.immut }|> norm
   in
-  let add_mut env v v' =
-    { env with mut = VarMap.add v v' env.mut }|> norm
+  let has_immut env v = VarMap.mem v env.immut in
+  let get_immut env v = VarMap.find v env.immut in
+  let get_muts env v =
+    match VarMap.find_opt v env.mut with None -> [] | Some mut -> mut
   in
+  let add_mut env v v' =
+    { env with mut = VarMap.add v (v'::(get_muts env v)) env.mut }|> norm
+  in
+  let has_mut env v = get_muts env v |> List.is_empty |> not in
+  let get_mut env v = get_muts env v |> List.hd in
   let reset_env env =
     { captured=env.captured ; mut=VarMap.empty ; immut=VarMap.empty }
   in
@@ -66,8 +72,8 @@ let optimize_cf e =
       (* It would be unsound to move an expr of type empty outside *)
       let env, e = aux' env e in
       env, hole, (id, Voidify e)
-    | Var v when VarMap.mem v env.immut -> env, hole, (id, Var (VarMap.find v env.immut))
-    | Var v when VarMap.mem v env.mut -> env, hole, (id, Var (VarMap.find v env.mut))
+    | Var v when has_immut env v -> env, hole, (id, Var (get_immut env v))
+    | Var v when has_mut env v -> env, hole, (id, Var (get_mut env v))
     | Var v -> env, hole, (id, Var v)
     | Constructor (c, es) ->
       let wv = List.map written_vars es |> List.fold_left VarSet.union VarSet.empty in
@@ -124,19 +130,18 @@ let optimize_cf e =
       let vimmut = MVariable.create_let MVariable.Immut (Variable.get_name v) in
       let env = add_immut env v vimmut in
       let ctx = fill ctx (Eid.unique (), Let ([], vimmut, e, hole)) in
-      let env, ctx =
-        if VarMap.mem v env.mut
-        then
-          env, ctx
-        else
-          let vmut = MVariable.create_let (MVariable.kind v) (Variable.get_name v) in
-          add_mut env v vmut, fill ctx (Eid.unique (), Declare (vmut, hole))
+      let vmut = MVariable.create_let (MVariable.kind v) (Variable.get_name v) in
+      let env = add_mut env v vmut in
+      let ctx = fill ctx (Eid.unique (), Declare (vmut, hole)) in
+      let vmuts = get_muts env v in
+      let e = Eid.unique (), VarAssign (v, (Eid.unique (), Var vimmut)) in
+      let add_assign e v =
+        Eid.unique (), Seq (
+          e,
+          (Eid.unique (), VarAssign (v, (Eid.unique (), Var vimmut)))
+        )
       in
-      let vmut = VarMap.find v env.mut in
-      env, ctx, (id, Seq (
-        (Eid.unique (), VarAssign (v, (Eid.unique (), Var vimmut))),
-        (Eid.unique (), VarAssign (vmut, (Eid.unique (), Var vimmut)))
-      ))
+      env, ctx, List.fold_left add_assign e vmuts
     | Seq (e1, e2) ->
       let env, ctx1, e1 = aux env e1 in
       let env, ctx2, e2 = aux env e2 in
