@@ -139,7 +139,10 @@ let rec try_elim_ret bid e =
     match e with
     | Hole _ | Void | Value _ | Var _ | Exc | Isolate _
     | App _ | Constructor _ | Lambda _ | LambdaRec _ -> cont' (id,e)
-    | Voidify e -> (id, Voidify hole) |> cont' |> aux e
+    | Voidify e ->
+      (* Sound even when e is empty, because the continuation
+         is always called at least once for non-ret expr *)
+      (id, Voidify hole) |> cont' |> aux e
     | Declare (v, e) -> (id, Declare (v, aux e cont))
     | Let (tys, v, e1, e2) ->
       (id, Let (tys, v, hole, aux e2 cont)) |> aux e1

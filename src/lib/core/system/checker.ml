@@ -111,11 +111,12 @@ let constr_is_gen c =
 let rec is_gen (_,e) =
   match e with
   | Lambda _ | Value _ -> true
-  | Var _ | Let _ | Ite _ | App _ -> false
+  | Var _ | App _ -> false
   | Constructor (c, es) -> constr_is_gen c && List.for_all is_gen es
   | Projection (p, e) -> proj_is_gen p && is_gen e
   | LambdaRec lst -> List.for_all (fun (_,_,e) -> is_gen e) lst
-  | TypeCast (e, _) | TypeCoerce (e, _, _) -> is_gen e
+  | Let (_, _, _, e) | TypeCast (e, _) | TypeCoerce (e, _, _) -> is_gen e
+  | Ite (_, _, e1, e2) -> is_gen e1 && is_gen e2
 
 let generalize ~e env s =
   if not (!Config.value_restriction) || is_gen e then
