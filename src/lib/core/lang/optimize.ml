@@ -76,6 +76,7 @@ let optimize_cf e =
     | Var v when has_mut env v -> env, hole, (id, Var (get_mut env v))
     | Var v -> env, hole, (id, Var v)
     | Constructor (c, es) ->
+      (* TODO: For Constructor, LambdaRec, App and Try, only consider written vars of others *)
       let wv = List.map written_vars es |> List.fold_left VarSet.union VarSet.empty in
       let env = restrict_immut env wv in
       let envs, es = List.map (aux' env) es |> List.split in
@@ -85,6 +86,8 @@ let optimize_cf e =
       let env = add_captured env (written_vars e) in
       env, hole, (id, Lambda (tys, ty, v, e))
     | LambdaRec lst ->
+      let wv = List.map (fun (_,_,e) -> written_vars e) lst |> List.fold_left VarSet.union VarSet.empty in
+      let env = restrict_immut env wv in
       let envs, es = List.map (fun (_,_,e) -> aux' env e) lst |> List.split in
       merge_envs' env envs, hole, (id, LambdaRec (List.map2 (fun e (d,v,_) -> d,v,e) es lst))
     | Ite (e, ty, e1, e2) ->
@@ -92,6 +95,8 @@ let optimize_cf e =
       let (env1, e1), (env2, e2) = aux' env e1, aux' env e2 in
       merge_envs' env [env1 ; env2], ctx, (id, Ite (e, ty, e1, e2))
     | App (e1, e2) ->
+      let wv = List.map written_vars [e1;e2] |> List.fold_left VarSet.union VarSet.empty in
+      let env = restrict_immut env wv in
       let (env1, e1), (env2, e2) = aux' env e1, aux' env e2 in
       merge_envs' env [env1 ; env2], hole, (id, App (e1, e2))
     | Projection (p, e) ->
@@ -151,13 +156,70 @@ let optimize_cf e =
 
 (* === Cleaning === *)
 
-let clean_unused_assigns e =
+let captured_vars e =
+  let cv = ref VarSet.empty in
+  let aux (_,e) = match e with
+  | Lambda (_, _, _, e) -> cv := VarSet.union !cv (read_vars e) ; false
+  | _ -> true
+  in
+  iter' aux e ; !cv
+
+let rec clean_unused_assigns e =
+  let cv = captured_vars e in
+  let rec aux
+      rv (* Variables that MAY be read before being written *)
+      (id,e) =
+    match e with
+    | Hole _ -> failwith "Unsupported hole."
+    | Exc | Void | Value _ -> (id, e), rv
+    | Voidify e -> let e, rv = aux rv e in (id, Voidify e), rv
+    | Var v -> (id, Var v), VarSet.add v rv
+    | Constructor (c, es) ->
+      (* TODO: For Constructor, LambdaRec, App and Try, only consider written vars of others *)
+      let rv = List.map read_vars es |> List.fold_left VarSet.union rv in
+      (id, Constructor (c, List.map (aux rv) es |> List.map fst)), rv
+    | Lambda (tys, ty, v, e) ->
+      (id, Lambda (tys, ty, v, clean_unused_assigns e)), rv
+    | LambdaRec lst ->
+      let rv = List.map (fun (_,_,e) -> read_vars e) lst |> List.fold_left VarSet.union rv in
+      (id, LambdaRec (List.map (fun (ty,v,e) -> ty, v, aux rv e |> fst) lst)), rv
+    | Ite (e, ty, e1, e2) ->
+      let (e1, rv1), (e2, rv2) = aux rv e1, aux rv e2 in
+      let rv = VarSet.union rv1 rv2 in
+      let e, rv = aux rv e in
+      (id, Ite (e,ty,e1,e2)), rv
+    | App (e1, e2) ->
+      let rv = List.map read_vars [e1;e2] |> List.fold_left VarSet.union rv in
+      (id, App (aux rv e1 |> fst, aux rv e2 |> fst)), rv
+    | Projection (p, e) -> let e, rv = aux rv e in (id, Projection (p, e)), rv
+    | Declare (v, e) -> let e, rv = aux rv e in (id, Declare (v, e)), rv
+    | Let (tys, v, e1, e2) ->
+      let e2, rv = aux rv e2 in
+      let e1, rv = aux rv e1 in
+      (id, Let (tys, v, e1, e2)), rv
+    | TypeCast (e, ty) -> let e, rv = aux rv e in (id, TypeCast (e, ty)), rv
+    | TypeCoerce (e, ty, c) -> let e, rv = aux rv e in (id, TypeCoerce (e, ty, c)), rv
+    | VarAssign (v, e) when VarSet.mem v (VarSet.union cv rv)->
+      let rv = VarSet.remove v rv in
+      let e, rv = aux rv e in (id, VarAssign (v, e)), rv
+    | VarAssign (_, e) -> let e, rv = aux rv e in (id, Voidify e), rv
+    | Seq (e1, e2) ->
+      let e2, rv = aux rv e2 in
+      let e1, rv = aux rv e1 in
+      (id, Seq (e1, e2)), rv
+    | Try es ->
+      let rv = List.map read_vars es |> List.fold_left VarSet.union rv in
+      (id, Try (List.map (aux rv) es |> List.map fst)), rv
+  in
+  aux (fv e (* Global vars *)) e |> fst
+
+(* let clean_unused_assigns e =
   let f rv (id, e) =
     match e with
     | VarAssign (v, e) when VarSet.mem v rv |> not -> id, Voidify e
     | e -> id, e
   in
-  map (f (read_vars e)) e
+  map (f (read_vars e)) e *)
 
 let clean_unused_defs e =
   let f (id,e) =
