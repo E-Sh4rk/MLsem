@@ -1,5 +1,6 @@
 open MAst
 open Mlsem_common
+open Mlsem_utils
 
 let written_vars e =
   let wv = ref VarSet.empty in
@@ -141,10 +142,13 @@ let optimize_cf e =
       let env, es = aux_parallel env es in
       env, hole, (id, Try es)
   and aux_parallel env es =
-    (* TODO: only consider written vars of others *)
-    let wv = List.map written_vars es |> List.fold_left VarSet.union VarSet.empty in
-    let env = restrict_immut env wv in
-    let envs, es = List.map (aux' env) es |> List.split in
+    let envs, es = es
+      |> List.map (fun e -> e, written_vars e)
+      |> Utils.add_others |> List.map (fun ((e,_), es) ->
+      let wv = List.map snd es |> List.fold_left VarSet.union VarSet.empty in
+      let env = restrict_immut env wv in
+      aux' env e
+      ) |> List.split in
     merge_envs' env envs, es
   and aux' env e =
     let env', ctx, e = aux env e in
@@ -209,9 +213,13 @@ let rec clean_unused_assigns e =
       let es, rv = aux_parallel rv es in
       (id, Try es), rv
   and aux_parallel rv es =
-      (* TODO: only consider written vars of others *)
-      let rv = List.map read_vars es |> List.fold_left VarSet.union rv in
-      List.map (aux rv) es |> List.map fst, rv
+    let es, rvs = es
+      |> List.map (fun e -> e, read_vars e)
+      |> Utils.add_others |> List.map (fun ((e,_), es) ->
+      let rv = List.map snd es |> List.fold_left VarSet.union rv in
+      aux rv e
+      ) |> List.split in
+    es, rvs |> List.fold_left VarSet.union rv
   in
   aux (fv e (* Global vars *)) e |> fst
 
