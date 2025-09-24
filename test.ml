@@ -354,7 +354,6 @@ let example10 = fun (p : (any,any)) ->
 let implicit10 = fun p ->
   if is_int (fst p) is true then add1 (fst p) else 7
 
-(* TODO: fix *)
 let example11 = fun (p : (any, any)) ->
   if and_ (is_int (fst p), is_int (snd p)) is true then g p else No
 
