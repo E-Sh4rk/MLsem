@@ -259,7 +259,7 @@ let builtin_functions =
 
 let initial_varm =
   builtin_functions |> List.fold_left (fun varm (name, _) ->
-    let var = Variable.create_gen (Some name) in
+    let var = MVariable.create_let Immut (Some name) in
     NameMap.add name var varm
   ) PAst.empty_name_var_map
 

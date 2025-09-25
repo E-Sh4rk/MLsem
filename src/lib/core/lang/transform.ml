@@ -64,7 +64,7 @@ let rec def_of_var_pat pat v e =
     def_of_var_pat (List.nth ps i) v (Eid.unique (), Projection (proj_of_patconstr c i, e))
 
 let encode_pattern_matching e pats =
-  let x = Variable.create_gen None in
+  let x = MVariable.create_let Immut None in
   let ts = pats |> List.map fst |> List.map type_of_pat in
   let body_of_pat pat e =
     let add_def acc v =

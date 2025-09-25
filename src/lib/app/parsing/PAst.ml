@@ -114,7 +114,7 @@ let parser_expr_to_expr tenv vtenv name_var_map e =
             Lambda (var, da, aux vtenv env e)
         | LambdaRec lst ->
             let aux (str,tyo,e) =
-                let var = Variable.create_lambda (Some str) in
+                let var = MVariable.create_lambda Immut (Some str) in
                 Variable.attach_location var pos ;
                 let env = NameMap.add str var env in
                 let a, vtenv = aux_a tyo vtenv in
