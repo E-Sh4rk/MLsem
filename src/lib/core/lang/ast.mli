@@ -35,7 +35,7 @@ type e =
 | TypeCast of t * Ty.t
 | TypeCoerce of t * GTy.t * SA.coerce
 | VarAssign of Variable.t * t (* Cannot be translated to system AST if v is not mutable *)
-| Try of t list
+| Try of t * t
 | Seq of t * t
 | Block of blockid * t
 | Ret of blockid * t option

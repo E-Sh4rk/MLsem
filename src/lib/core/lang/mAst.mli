@@ -19,7 +19,7 @@ type e =
 | TypeCoerce of t * GTy.t * SA.coerce
 | VarAssign of Variable.t * t (* Cannot be translated to system AST if v is not mutable *)
 | Seq of t * t
-| Try of t list
+| Try of t * t
 and t = Eid.t * e
 
 val map : (t -> t) -> t -> t

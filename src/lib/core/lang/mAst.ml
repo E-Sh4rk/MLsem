@@ -19,7 +19,7 @@ type e =
 | TypeCoerce of t * GTy.t * SA.coerce
 | VarAssign of Variable.t * t (* Cannot be translated to system AST if v is not mutable *)
 | Seq of t * t
-| Try of t list
+| Try of t * t
 [@@deriving show]
 and t = Eid.t * e
 [@@deriving show]
@@ -45,7 +45,7 @@ let map_tl f (id,e) =
     | TypeCoerce (e, ty, b) -> TypeCoerce (f e, ty, b)
     | VarAssign (v, e) -> VarAssign (v, f e)
     | Seq (e1, e2) -> Seq (f e1, f e2)
-    | Try es -> Try (List.map f es)
+    | Try (e1, e2) -> Try (f e1, f e2)
   in
   (id,e)
 
@@ -162,7 +162,7 @@ let to_system_ast t =
       )
     | VarAssign _ -> invalid_arg "Cannot assign to an immutable variable."
     | Seq (e1, e2) -> Let ([], Variable.create_gen None, aux e1, aux e2)
-    | Try es -> SA.Constructor (SA.Choice (List.length es), List.map aux es)
+    | Try (e1, e2) -> SA.Constructor (SA.Choice 2, [aux e1 ; aux e2])
     | Hole _ -> invalid_arg "Expression should not contain a hole."
     in
     (id, e)

@@ -154,16 +154,11 @@ let rec try_elim_ret bid e =
       (id, TypeCoerce (hole, ty, c)) |> cont' |> aux e
     | VarAssign (v, e) ->
       (id, VarAssign (v, hole)) |> cont' |> aux e
-    | Try es ->
-      let es, es' = List.partition (has_eliminable_ret bid) es in
-      let es = es |> List.map (fun e -> aux e cont) in
-      begin match es, es' with
-      | [], es' -> (id, Try es') |> cont'
-      | es, [] -> (id, Try es)
-      | es, [e'] -> (id, Try (es@[cont' e']))
-      | es, es' -> (id, Try (es@[(Eid.unique (), Try es') |> cont']))
-      end
-    | Ite (e, tau, e1, e2) when not ((has_eliminable_ret bid) e1) && not ((has_eliminable_ret bid) e2) ->
+    | Try (e1, e2) when not (has_eliminable_ret bid e1) && not (has_eliminable_ret bid e2) ->
+      (* Do not duplicate the continuation if unnecessary *)
+      (id, Try (e1, e2)) |> cont'
+    | Try (e1, e2) -> (id, Try (aux e1 cont, aux e2 cont))
+    | Ite (e, tau, e1, e2) when not (has_eliminable_ret bid e1) && not (has_eliminable_ret bid e2) ->
       (* Do not duplicate the continuation if unnecessary *)
       (id, Ite (hole, tau, e1, e2)) |> cont' |> aux e
     | Ite (e, tau, e1, e2) ->
@@ -246,7 +241,7 @@ let eliminate_cf t =
       let aux (ty,x,e) = (ty, x, aux e) in
       MAst.LambdaRec (List.map aux lst)
     | Ite (e,t,e1,e2) -> MAst.Ite (aux e, t, aux e1, aux e2)
-    | Try es -> MAst.Try (List.map aux es)
+    | Try (e1,e2) -> MAst.Try (aux e1, aux e2)
     | App (e1,e2) -> MAst.App (aux e1, aux e2)
     | Projection (p, e) -> MAst.Projection (p, aux e)
     | Declare (x, e) -> MAst.Declare (x, aux e)

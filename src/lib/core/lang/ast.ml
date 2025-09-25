@@ -38,7 +38,7 @@ type e =
 | TypeCast of t * Ty.t
 | TypeCoerce of t * GTy.t * SA.coerce
 | VarAssign of Variable.t * t (* Cannot be translated to system AST if v is not mutable *)
-| Try of t list
+| Try of t * t
 | Seq of t * t
 | Block of blockid * t
 | Ret of blockid * t option
@@ -114,7 +114,7 @@ let map_tl f (id,e) =
     | TypeCast (e, ty) -> TypeCast (f e, ty)
     | TypeCoerce (e, ty, b) -> TypeCoerce (f e, ty, b)
     | VarAssign (v, e) -> VarAssign (v, f e)
-    | Try es -> Try (List.map f es)
+    | Try (e1, e2) -> Try (f e1, f e2)
     | Seq (e1, e2) -> Seq (f e1, f e2)
     | Block (bid, e) -> Block (bid, f e)
     | Ret (bid, eo) -> Ret (bid, Option.map f eo)
