@@ -7,6 +7,7 @@ module Variable : sig
   val compare : t -> t -> int
   val equals : t -> t -> bool
   val create : string option -> t
+  val refresh : t -> t
   val attach_location : t -> Position.t -> unit
   val get_location : t -> Position.t
   val get_name : t -> string option

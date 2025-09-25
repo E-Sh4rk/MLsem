@@ -17,6 +17,12 @@ module Variable = struct
     Hashtbl.add data id (display_name, Position.dummy) ;
     id
 
+  let refresh id =
+    let (name, loc) = Hashtbl.find data id in
+    let id = next_id () in
+    Hashtbl.add data id (name, loc) ;
+    id
+
   let attach_location id loc =
     let (name, _) = Hashtbl.find data id in
     Hashtbl.replace data id (name, loc)

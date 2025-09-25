@@ -188,7 +188,7 @@ let has_ret ~count_noarg bid e =
 let rec elim_ret_args bid (id,e) =
   if has_ret ~count_noarg:false bid (id,e)
   then
-    let v = MVariable.create MVariable.Mut (Some "res") in
+    let v = MVariable.create MVariable.Mut None in
     let body = Eid.refresh id, VarAssign (v, treat_rets bid v (id,e)) in
     let body = Eid.refresh id, Seq ((Eid.refresh id, Voidify body), (Eid.unique (), Var v)) in
     Eid.refresh id, Declare (v, body)

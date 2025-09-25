@@ -5,6 +5,7 @@ type t = Variable.t
 type kind = Immut | AnnotMut of Ty.t | Mut
 
 val create : kind -> string option -> t
+val refresh : kind -> t -> t
 val is_mutable : Variable.t -> bool
 val kind : Variable.t -> kind
 val kind_equal : kind -> kind -> bool

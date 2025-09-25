@@ -16,6 +16,10 @@ let create kind name =
   let v = Variable.create name in
   add_to_tbl v kind ; v
 
+let refresh kind v =
+  let v = Variable.refresh v in
+  add_to_tbl v kind ; v
+
 let is_mutable v = Hashtbl.mem all v
 let kind v =
   match Hashtbl.find_opt all v with

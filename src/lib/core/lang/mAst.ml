@@ -123,7 +123,7 @@ let to_system_ast t =
     | Constructor (c, es) -> SA.Constructor (c, List.map aux es)
     | Lambda (tys, ty, x, e) ->
       if MVariable.is_mutable x then invalid_arg "Variable of Lambda cannot be mutable." ;
-      let x' = MVariable.create Immut (Variable.get_name x) in
+      let x' = MVariable.refresh Immut x in
       let body =
         Eid.refresh (fst e),
         Let (tys, x', (Eid.unique (), Var x), rename_fv x x' e)

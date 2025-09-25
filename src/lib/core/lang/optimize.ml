@@ -101,7 +101,7 @@ let optimize_cf e =
       let env, ctx, e = aux env e in
       env, (id, Declare (v, ctx)), e
     | Let (tys, v, e1, e2) when MVariable.is_mutable v ->
-      let v' = MVariable.create MVariable.Immut (Variable.get_name v) in
+      let v' = MVariable.refresh MVariable.Immut v in
       let env, ctx1, e1 = aux env e1 in
       let ctx1 = fill ctx1 (Eid.unique (), Let (tys, v', e1, hole)) in
       let ctx1 = fill ctx1 (Eid.unique (), Let ([], v, (Eid.unique (), Var v'), hole)) in
@@ -119,10 +119,10 @@ let optimize_cf e =
       env, ctx, (id, TypeCoerce (e, ty, c))
     | VarAssign (v, e) ->
       let env, ctx, e = aux env e in
-      let vimmut = MVariable.create MVariable.Immut (Variable.get_name v) in
+      let vimmut = MVariable.refresh MVariable.Immut v in
       let env = add_immut env v vimmut in
       let ctx = fill ctx (Eid.unique (), Let ([], vimmut, e, hole)) in
-      let vmut = MVariable.create (MVariable.kind v) (Variable.get_name v) in
+      let vmut = MVariable.refresh (MVariable.kind v) v in
       let env = add_mut env v vmut in
       let ctx = fill ctx (Eid.unique (), Declare (vmut, hole)) in
       let vmuts = get_muts env v in
