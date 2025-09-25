@@ -123,7 +123,7 @@ let to_system_ast t =
     | Constructor (c, es) -> SA.Constructor (c, List.map aux es)
     | Lambda (tys, ty, x, e) ->
       if MVariable.is_mutable x then invalid_arg "Variable of Lambda cannot be mutable." ;
-      let x' = MVariable.create_let Immut (Variable.get_name x) in
+      let x' = MVariable.create Immut (Variable.get_name x) in
       let body =
         Eid.refresh (fst e),
         Let (tys, x', (Eid.unique (), Var x), rename_fv x x' e)
@@ -160,7 +160,7 @@ let to_system_ast t =
         ]))
       )
     | VarAssign _ -> invalid_arg "Cannot assign to an immutable variable."
-    | Seq (e1, e2) -> Let ([], MVariable.create_gen Immut None, aux e1, aux e2)
+    | Seq (e1, e2) -> Let ([], MVariable.create Immut None, aux e1, aux e2)
     | Try (e1, e2) -> SA.Constructor (SA.Choice 2, [aux e1 ; aux e2])
     | Hole _ -> invalid_arg "Expression should not contain a hole."
     in

@@ -12,14 +12,8 @@ let add_to_tbl v kind =
   | Mut -> Hashtbl.add all v None
   | AnnotMut ty -> Hashtbl.add all v (Some ty)
 
-let create_let kind name =
-  let v = Variable.create_let name in
-  add_to_tbl v kind ; v
-let create_gen kind name =
-  let v = Variable.create_gen name in
-  add_to_tbl v kind ; v
-let create_lambda kind name =
-  let v = Variable.create_lambda name in
+let create kind name =
+  let v = Variable.create name in
   add_to_tbl v kind ; v
 
 let is_mutable v = Hashtbl.mem all v

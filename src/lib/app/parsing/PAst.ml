@@ -108,13 +108,13 @@ let parser_expr_to_expr tenv vtenv name_var_map e =
             Suggest (var, tys, aux vtenv env e)
         | Lambda (str,da,e) ->
             let da, vtenv = aux_a da vtenv in
-            let var = MVariable.create_lambda Immut (Some str) in
+            let var = MVariable.create Immut (Some str) in
             Variable.attach_location var pos ;
             let env = NameMap.add str var env in
             Lambda (var, da, aux vtenv env e)
         | LambdaRec lst ->
             let aux (str,tyo,e) =
-                let var = MVariable.create_lambda Immut (Some str) in
+                let var = MVariable.create Immut (Some str) in
                 Variable.attach_location var pos ;
                 let env = NameMap.add str var env in
                 let a, vtenv = aux_a tyo vtenv in
@@ -127,7 +127,7 @@ let parser_expr_to_expr tenv vtenv name_var_map e =
         | App (e1, e2) -> App (aux vtenv env e1, aux vtenv env e2)
         | Let ((kind,str), e1, e2) ->
             let mkind, kind, vtenv = aux_vkind tenv vtenv kind in
-            let var = MVariable.create_let mkind (Some str) in
+            let var = MVariable.create mkind (Some str) in
             Variable.attach_location var pos ;
             let env' = NameMap.add str var env in
             Let ((kind, var), aux vtenv env e1, aux vtenv env' e2)
@@ -179,7 +179,7 @@ let parser_expr_to_expr tenv vtenv name_var_map e =
                     if MVariable.kind_equal (MVariable.kind v) mkind then kind, v, str, vtenv
                     else raise (SymbolError ("inconsistent mutability for var '"^str^"'"))
                 else
-                    let var = MVariable.create_let mkind (Some str) in
+                    let var = MVariable.create mkind (Some str) in
                     Variable.attach_location var pos ; kind, var, str, vtenv
             in
             match pat with

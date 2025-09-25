@@ -64,7 +64,7 @@ let rec def_of_var_pat pat v e =
     def_of_var_pat (List.nth ps i) v (Eid.unique (), Projection (proj_of_patconstr c i, e))
 
 let encode_pattern_matching e pats =
-  let x = MVariable.create_let Immut None in
+  let x = MVariable.create Immut None in
   let ts = pats |> List.map fst |> List.map type_of_pat in
   let body_of_pat pat e =
     let add_def acc v =
@@ -188,7 +188,7 @@ let has_ret ~count_noarg bid e =
 let rec elim_ret_args bid (id,e) =
   if has_ret ~count_noarg:false bid (id,e)
   then
-    let v = MVariable.create_let MVariable.Mut (Some "res") in
+    let v = MVariable.create MVariable.Mut (Some "res") in
     let body = Eid.refresh id, VarAssign (v, treat_rets bid v (id,e)) in
     let body = Eid.refresh id, Seq ((Eid.refresh id, Voidify body), (Eid.unique (), Var v)) in
     Eid.refresh id, Declare (v, body)

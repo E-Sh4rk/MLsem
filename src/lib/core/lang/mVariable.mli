@@ -4,9 +4,7 @@ open Mlsem_types
 type t = Variable.t
 type kind = Immut | AnnotMut of Ty.t | Mut
 
-val create_let : kind -> string option -> t
-val create_gen : kind -> string option -> t
-val create_lambda : kind -> string option -> t
+val create : kind -> string option -> t
 val is_mutable : Variable.t -> bool
 val kind : Variable.t -> kind
 val kind_equal : kind -> kind -> bool

@@ -108,7 +108,7 @@ let sigs_of_def tenv varm senv env (kind,str) =
   in
   match NameMap.find_opt str varm with
   | None ->
-    let var = MVariable.create_let kind (Some str) in
+    let var = MVariable.create kind (Some str) in
     var, None
   | Some v ->
     begin match VarMap.find_opt v senv with
@@ -118,7 +118,7 @@ let sigs_of_def tenv varm senv env (kind,str) =
       v, Some (sigs, Env.find v env)
     end
 
-let dummy = Variable.create_gen (Some "_")
+let dummy = Variable.create (Some "_")
 let treat (tenv,varm,senv,env) (annot, elem) =
   let pos = Position.position annot in
   let time = Unix.gettimeofday () in
@@ -158,7 +158,7 @@ let treat (tenv,varm,senv,env) (annot, elem) =
       begin match tyo with
       | None ->
         let kind = if mut then MVariable.Mut else MVariable.Immut in
-        let v = MVariable.create_let kind (Some name) in
+        let v = MVariable.create kind (Some name) in
         Variable.attach_location v (Position.position annot) ;
         let varm = NameMap.add name v varm in
         let senv = VarMap.add v [] senv in
@@ -167,7 +167,7 @@ let treat (tenv,varm,senv,env) (annot, elem) =
       | Some ty ->
         let (ty, _) = type_expr_to_typ tenv empty_vtenv ty in
         let kind = if mut then MVariable.AnnotMut ty else MVariable.Immut in
-        let v = MVariable.create_let kind (Some name) in
+        let v = MVariable.create kind (Some name) in
         Variable.attach_location v (Position.position annot) ;
         begin match sigs_of_ty (Env.tvars env) ty with
         | None -> (tenv,varm,senv,env),
@@ -259,7 +259,7 @@ let builtin_functions =
 
 let initial_varm =
   builtin_functions |> List.fold_left (fun varm (name, _) ->
-    let var = MVariable.create_let Immut (Some name) in
+    let var = MVariable.create Immut (Some name) in
     NameMap.add name var varm
   ) PAst.empty_name_var_map
 

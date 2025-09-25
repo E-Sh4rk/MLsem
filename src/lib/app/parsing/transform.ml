@@ -40,13 +40,13 @@ let expr_to_ast t =
       add_suggs v tys ; aux_e e
     | Lambda (x, a, e) ->
       let name = Variable.get_name x in
-      let x' = MVariable.create_lambda MVariable.Immut name in
+      let x' = MVariable.create MVariable.Immut name in
       let e = aux e |> rename_fv x x' in
       Lambda (get_sugg x, lambda_annot name a, x', e)
     | LambdaRec lst ->
       let lst = lst |> List.map (fun (x,a,e) ->
         let name = Variable.get_name x in
-        x, name, MVariable.create_lambda MVariable.Immut name, a, e) in
+        x, name, MVariable.create MVariable.Immut name, a, e) in
       let aux (_,name,x',a,e) =
         lambda_annot name a, x',
         List.fold_left (fun e (x,_,x',_,_) -> rename_fv x x' e) (aux e) lst
