@@ -1,10 +1,10 @@
 open Mlsem_common
 open Mlsem_types
 
-type pcustom = { pdom: Ty.t -> Ty.t ; proj: Ty.t -> Ty.t ; pgen: bool }
-[@@deriving show]
-type ccustom = { cdom: Ty.t -> Ty.t list list ; cons: Ty.t list -> Ty.t ; cgen:bool }
-[@@deriving show]
+type pcustom = { pname: string ; pdom: Ty.t -> Ty.t ; proj: Ty.t -> Ty.t ; pgen: bool }
+let pp_pcustom fmt pc = Format.fprintf fmt "%s" pc.pname
+type ccustom = { cname: string ; cdom: Ty.t -> Ty.t list list ; cons: Ty.t list -> Ty.t ; cgen: bool }
+let pp_ccustom fmt cc = Format.fprintf fmt "%s" cc.cname
 type check = Check | CheckStatic | NoCheck
 [@@deriving show]
 type projection =

@@ -1,6 +1,21 @@
 open MAst
 open Mlsem_common
 open Mlsem_utils
+module SA = Mlsem_system.Ast
+
+let eval_order_of_constructor c =
+  match c with
+  | SA.Tuple _ -> !Config.tuple_eval_order
+  | SA.Cons -> !Config.cons_eval_order
+  | SA.Rec _ -> !Config.record_eval_order
+  | SA.RecUpd _ -> !Config.recupd_eval_order
+  | SA.Tag _ | SA.Enum _ | SA.RecDel _ -> Config.LeftToRight
+  | SA.Choice _ | SA.Ignore _ -> Config.UnknownOrder
+  | SA.CCustom c ->
+    begin match Hashtbl.find_opt Config.ccustom_eval_order c.cname with
+    | None -> Config.UnknownOrder
+    | Some o -> o
+    end
 
 let written_vars e =
   let wv = ref VarSet.empty in
@@ -77,7 +92,7 @@ let optimize_cf e =
     | Var v when has_mut env v -> env, hole, (id, Var (get_mut env v))
     | Var v -> env, hole, (id, Var v)
     | Constructor (c, es) ->
-      let env, ctx, es = aux_parallel env es in
+      let env, ctx, es = aux_order (eval_order_of_constructor c) env es in
       env, ctx, (id, Constructor (c, es))
     | Lambda (tys, ty, v, e) ->
       let e = aux' (reset_env env) e |> snd in
@@ -92,13 +107,7 @@ let optimize_cf e =
       let (env1, e1), (env2, e2) = aux' env e1, aux' env e2 in
       merge_envs' env [env1 ; env2], ctx, (id, Ite (e, ty, e1, e2))
     | App (e1, e2) ->
-      let aux =
-        match !Config.app_eval_order with
-        | LeftToRight -> aux_sequence
-        | RightToLeft -> aux_sequence_rev
-        | UnknownOrder -> aux_parallel
-      in
-      let env, ctx, es = aux env [e1;e2] in
+      let env, ctx, es = aux_order !Config.app_eval_order env [e1;e2] in
       env, ctx, (id, App (List.nth es 0, List.nth es 1))
     | Projection (p, e) ->
       let env, ctx, e = aux env e in
@@ -166,6 +175,11 @@ let optimize_cf e =
   and aux_sequence_rev env es =
     let env, ctx, es = aux_sequence env (List.rev es) in
     env, ctx, List.rev es
+  and aux_order order =
+    match order with
+    | Config.LeftToRight -> aux_sequence
+    | Config.RightToLeft -> aux_sequence_rev
+    | Config.UnknownOrder -> aux_parallel
   and aux' env e =
     let env', ctx, e = aux env e in
     merge_envs env env', fill ctx e
@@ -193,7 +207,7 @@ let rec clean_unused_assigns e =
     | Voidify e -> let e, rv = aux rv e in (id, Voidify e), rv
     | Var v -> (id, Var v), VarSet.add v rv
     | Constructor (c, es) ->
-      let es, rv = aux_parallel rv es in
+      let es, rv = aux_order (eval_order_of_constructor c) rv es in
       (id, Constructor (c, es)), rv
     | Lambda (tys, ty, v, e) ->
       (id, Lambda (tys, ty, v, clean_unused_assigns e)), rv
@@ -207,13 +221,7 @@ let rec clean_unused_assigns e =
       let e, rv = aux rv e in
       (id, Ite (e,ty,e1,e2)), rv
     | App (e1, e2) ->
-      let aux =
-        match !Config.app_eval_order with
-        | LeftToRight -> aux_sequence
-        | RightToLeft -> aux_sequence_rev
-        | UnknownOrder -> aux_parallel
-      in
-      let es, rv = aux rv [e1;e2] in
+      let es, rv = aux_order !Config.app_eval_order rv [e1;e2] in
       (id, App (List.nth es 0, List.nth es 1)), rv 
     | Projection (p, e) -> let e, rv = aux rv e in (id, Projection (p, e)), rv
     | Declare (v, e) -> let e, rv = aux rv e in (id, Declare (v, e)), rv
@@ -249,6 +257,11 @@ let rec clean_unused_assigns e =
     in
     let rv, es = List.fold_right f es (rv, []) in
     es, rv
+  and aux_order order =
+    match order with
+    | Config.LeftToRight -> aux_sequence
+    | Config.RightToLeft -> aux_sequence_rev
+    | Config.UnknownOrder -> aux_parallel
   and aux_sequence_rev env es =
     let es, rv = aux_sequence env (List.rev es) in
     List.rev es, rv

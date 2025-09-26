@@ -1,8 +1,8 @@
 open Mlsem_common
 open Mlsem_types
 
-type pcustom = { pdom: Ty.t -> Ty.t ; proj: Ty.t -> Ty.t ; pgen: bool }
-type ccustom = { cdom: Ty.t -> Ty.t list list ; cons: Ty.t list -> Ty.t ; cgen: bool }
+type pcustom = { pname: string ; pdom: Ty.t -> Ty.t ; proj: Ty.t -> Ty.t ; pgen: bool }
+type ccustom = { cname: string ; cdom: Ty.t -> Ty.t list list ; cons: Ty.t list -> Ty.t ; cgen: bool }
 type check = Check | CheckStatic | NoCheck
 type projection =
 | Pi of int * int | Field of string | Hd | Tl | PiTag of Tag.t
