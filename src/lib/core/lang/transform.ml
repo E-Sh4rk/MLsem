@@ -123,7 +123,7 @@ let has_eliminable_ret bid e =
   try
     let f = function
     | (_, Lambda _) | (_, LambdaRec _) -> false
-    | (_, Isolate _) | (_, App _) | (_, Constructor _) -> false
+    | (_, Isolate _) | (_, App _) | (_, Constructor _) | (_, Projection _) -> false
     | (_, Block _) -> assert false
     | (_, Ret (bid', _)) when bid=bid' -> raise Exit
     | _ -> true
@@ -138,7 +138,7 @@ let rec try_elim_ret bid e =
     let cont' e = fill cont e in
     match e with
     | Hole _ | Void | Value _ | Var _ | Exc | Isolate _
-    | App _ | Constructor _ | Lambda _ | LambdaRec _ -> cont' (id,e)
+    | App _ | Constructor _ | Projection _ | Lambda _ | LambdaRec _ -> cont' (id,e)
     | Voidify e ->
       (* Sound even when e is empty, because the continuation
          is always called at least once for non-ret expr *)
@@ -146,8 +146,6 @@ let rec try_elim_ret bid e =
     | Declare (v, e) -> (id, Declare (v, aux e cont))
     | Let (tys, v, e1, e2) ->
       (id, Let (tys, v, hole, aux e2 cont)) |> aux e1
-    | Projection (p, e) ->
-      (id, Projection (p, hole)) |> cont' |> aux e
     | TypeCast (e, tau) ->
       (id, TypeCast (hole, tau)) |> cont' |> aux e
     | TypeCoerce (e, ty, c) ->
