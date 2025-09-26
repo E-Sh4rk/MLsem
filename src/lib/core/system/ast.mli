@@ -3,7 +3,7 @@ open Mlsem_types
 
 type pcustom = { pdom: Ty.t -> Ty.t ; proj: Ty.t -> Ty.t ; pgen: bool }
 type ccustom = { cdom: Ty.t -> Ty.t list list ; cons: Ty.t list -> Ty.t ; cgen: bool }
-type coerce = Check | CheckStatic | NoCheck
+type check = Check | CheckStatic | NoCheck
 type projection =
 | Pi of int * int | Field of string | Hd | Tl | PiTag of Tag.t
 | PCustom of pcustom
@@ -21,8 +21,8 @@ type e =
 | App of t * t
 | Projection of projection * t
 | Let of (Ty.t list) * Variable.t * t * t
-| TypeCast of t * Ty.t
-| TypeCoerce of t * GTy.t * coerce
+| TypeCast of t * Ty.t * check
+| TypeCoerce of t * GTy.t * check
 and t = Eid.t * e
 
 val map : (t -> t) -> t -> t
@@ -33,11 +33,11 @@ val fv : t -> VarSet.t
 val vars : t -> VarSet.t
 val apply_subst : Subst.t -> t -> t
 
-val coerce : coerce -> GTy.t -> t -> t
+val coerce : check -> GTy.t -> t -> t
 
 val pp : Format.formatter -> t -> unit
 val pp_e : Format.formatter -> e -> unit
-val pp_coerce : Format.formatter -> coerce -> unit
+val pp_check : Format.formatter -> check -> unit
 val pp_projection : Format.formatter -> projection -> unit
 val pp_constructor : Format.formatter -> constructor -> unit
 val pp_pcustom : Format.formatter -> pcustom -> unit

@@ -83,7 +83,7 @@ let encode_pattern_matching e pats =
   | [] -> assert false
   | (_, e')::pats -> List.fold_left add_branch e' pats
   in
-  let e = (Eid.refresh (fst e), TypeCast (e, Ty.disj ts)) in
+  let e = (Eid.refresh (fst e), TypeCast (e, Ty.disj ts, SA.CheckStatic)) in
   Let (ts, x, e, body)
 
 let eliminate_pattern_matching e =
@@ -146,8 +146,8 @@ let rec try_elim_ret bid e =
     | Declare (v, e) -> (id, Declare (v, aux e cont))
     | Let (tys, v, e1, e2) ->
       (id, Let (tys, v, hole, aux e2 cont)) |> aux e1
-    | TypeCast (e, tau) ->
-      (id, TypeCast (hole, tau)) |> cont' |> aux e
+    | TypeCast (e, tau, c) ->
+      (id, TypeCast (hole, tau, c)) |> cont' |> aux e
     | TypeCoerce (e, ty, c) ->
       (id, TypeCoerce (hole, ty, c)) |> cont' |> aux e
     | VarAssign (v, e) ->
@@ -244,7 +244,7 @@ let eliminate_cf t =
     | Projection (p, e) -> MAst.Projection (p, aux e)
     | Declare (x, e) -> MAst.Declare (x, aux e)
     | Let (tys, x, e1, e2) -> MAst.Let (tys, x, aux e1, aux e2)
-    | TypeCast (e, ty) -> MAst.TypeCast (aux e, ty)
+    | TypeCast (e, ty, c) -> MAst.TypeCast (aux e, ty, c)
     | TypeCoerce (e, ty, c) -> MAst.TypeCoerce (aux e, ty, c)
     | VarAssign (v, e) -> MAst.VarAssign (v, aux e)
     | Seq (e1, e2) -> MAst.Seq (aux e1, aux e2)

@@ -117,9 +117,9 @@ let optimize_cf e =
       let env, ctx1, e1 = aux env e1 in
       let env, ctx2, e2 = aux env e2 in
       env, fill ctx1 (id, Let (tys, v, e1, ctx2)), e2
-    | TypeCast (e, ty) ->
+    | TypeCast (e, ty, c) ->
       let env, ctx, e = aux env e in
-      env, ctx, (id, TypeCast (e, ty))
+      env, ctx, (id, TypeCast (e, ty, c))
     | TypeCoerce (e, ty, c) ->
       let env, ctx, e = aux env e in
       env, ctx, (id, TypeCoerce (e, ty, c))
@@ -221,7 +221,7 @@ let rec clean_unused_assigns e =
       let e2, rv = aux rv e2 in
       let e1, rv = aux rv e1 in
       (id, Let (tys, v, e1, e2)), rv
-    | TypeCast (e, ty) -> let e, rv = aux rv e in (id, TypeCast (e, ty)), rv
+    | TypeCast (e, ty, c) -> let e, rv = aux rv e in (id, TypeCast (e, ty, c)), rv
     | TypeCoerce (e, ty, c) -> let e, rv = aux rv e in (id, TypeCoerce (e, ty, c)), rv
     | VarAssign (v, e) when VarSet.mem v (VarSet.union cv rv)->
       let rv = VarSet.remove v rv in

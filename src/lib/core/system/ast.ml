@@ -5,7 +5,7 @@ type pcustom = { pdom: Ty.t -> Ty.t ; proj: Ty.t -> Ty.t ; pgen: bool }
 [@@deriving show]
 type ccustom = { cdom: Ty.t -> Ty.t list list ; cons: Ty.t list -> Ty.t ; cgen:bool }
 [@@deriving show]
-type coerce = Check | CheckStatic | NoCheck
+type check = Check | CheckStatic | NoCheck
 [@@deriving show]
 type projection =
 | Pi of int * int | Field of string | Hd | Tl | PiTag of Tag.t
@@ -26,8 +26,8 @@ type e =
 | App of t * t
 | Projection of projection * t
 | Let of (Ty.t list) * Variable.t * t * t
-| TypeCast of t * Ty.t
-| TypeCoerce of t * GTy.t * coerce
+| TypeCast of t * Ty.t * check
+| TypeCoerce of t * GTy.t * check
 [@@deriving show]
 and t = Eid.t * e
 [@@deriving show]
@@ -44,8 +44,8 @@ let map_tl f (id,e) =
     | App (e1, e2) -> App (f e1, f e2)
     | Projection (p, e) -> Projection (p, f e)
     | Let (ta, v, e1, e2) -> Let (ta, v, f e1, f e2)
-    | TypeCast (e, ty) -> TypeCast (f e, ty)
-    | TypeCoerce (e, ty, b) -> TypeCoerce (f e, ty, b)
+    | TypeCast (e, ty, c) -> TypeCast (f e, ty, c)
+    | TypeCoerce (e, ty, c) -> TypeCoerce (f e, ty, c)
   in
   (id,e)
 

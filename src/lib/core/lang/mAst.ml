@@ -15,8 +15,8 @@ type e =
 | Projection of SA.projection * t
 | Declare of Variable.t * t (* Cannot be translated to system AST if v is not mutable *)
 | Let of Ty.t list * Variable.t * t * t
-| TypeCast of t * Ty.t
-| TypeCoerce of t * GTy.t * SA.coerce
+| TypeCast of t * Ty.t * SA.check
+| TypeCoerce of t * GTy.t * SA.check
 | VarAssign of Variable.t * t (* Cannot be translated to system AST if v is not mutable *)
 | Seq of t * t
 | Try of t * t
@@ -41,8 +41,8 @@ let map_tl f (id,e) =
     | Projection (p, e) -> Projection (p, f e)
     | Declare (v, e) -> Declare (v, f e)
     | Let (tys, v, e1, e2) -> Let (tys, v, f e1, f e2)
-    | TypeCast (e, ty) -> TypeCast (f e, ty)
-    | TypeCoerce (e, ty, b) -> TypeCoerce (f e, ty, b)
+    | TypeCast (e, ty, c) -> TypeCast (f e, ty, c)
+    | TypeCoerce (e, ty, c) -> TypeCoerce (f e, ty, c)
     | VarAssign (v, e) -> VarAssign (v, f e)
     | Seq (e1, e2) -> Seq (f e1, f e2)
     | Try (e1, e2) -> Try (f e1, f e2)
@@ -151,7 +151,7 @@ let to_system_ast t =
         else tys, aux e1
       in
       SA.Let (tys, x, def, aux e2)
-    | TypeCast (e, ty) -> SA.TypeCast (aux e, ty)
+    | TypeCast (e, ty, c) -> SA.TypeCast (aux e, ty, c)
     | TypeCoerce (e, ty, c) -> SA.TypeCoerce (aux e, ty, c)
     | VarAssign (v, e) when MVariable.is_mutable v -> SA.App (
         (Eid.unique (), SA.Value (MVariable.ref_assign v |> GTy.mk)),

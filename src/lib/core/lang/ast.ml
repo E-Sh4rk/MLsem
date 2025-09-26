@@ -35,8 +35,8 @@ type e =
 | Projection of SA.projection * t
 | Declare of Variable.t * t (* Cannot be translated to system AST if v is not mutable *)
 | Let of Ty.t list * Variable.t * t * t
-| TypeCast of t * Ty.t
-| TypeCoerce of t * GTy.t * SA.coerce
+| TypeCast of t * Ty.t * SA.check
+| TypeCoerce of t * GTy.t * SA.check
 | VarAssign of Variable.t * t (* Cannot be translated to system AST if v is not mutable *)
 | Try of t * t
 | Seq of t * t
@@ -111,8 +111,8 @@ let map_tl f (id,e) =
     | Projection (p, e) -> Projection (p, f e)
     | Declare (v, e) -> Declare (v, f e)
     | Let (tys, v, e1, e2) -> Let (tys, v, f e1, f e2)
-    | TypeCast (e, ty) -> TypeCast (f e, ty)
-    | TypeCoerce (e, ty, b) -> TypeCoerce (f e, ty, b)
+    | TypeCast (e, ty, c) -> TypeCast (f e, ty, c)
+    | TypeCoerce (e, ty, c) -> TypeCoerce (f e, ty, c)
     | VarAssign (v, e) -> VarAssign (v, f e)
     | Try (e1, e2) -> Try (f e1, f e2)
     | Seq (e1, e2) -> Seq (f e1, f e2)

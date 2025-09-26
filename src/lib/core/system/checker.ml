@@ -115,7 +115,7 @@ let rec is_gen (_,e) =
   | Constructor (c, es) -> constr_is_gen c && List.for_all is_gen es
   | Projection (p, e) -> proj_is_gen p && is_gen e
   | LambdaRec lst -> List.for_all (fun (_,_,e) -> is_gen e) lst
-  | Let (_, _, _, e) | TypeCast (e, _) | TypeCoerce (e, _, _) -> is_gen e
+  | Let (_, _, _, e) | TypeCast (e, _, _) | TypeCoerce (e, _, _) -> is_gen e
   | Ite (_, _, e1, e2) -> is_gen e1 && is_gen e2
 
 let generalize ~e env s =
@@ -199,9 +199,12 @@ let rec typeof' env annot (id,e) =
       List.map aux annots2 |> GTy.disj
     else
       untypeable id ("Partition does not cover the type of "^(Variable.show v)^".")
-  | TypeCast (e, ty), ACast annot ->
+  | TypeCast (e, ty, c), ACast annot ->
     let t = typeof env annot e in
-    if Ty.leq (GTy.lb t) ty then GTy.cap t (GTy.mk ty)
+    if (c = Check && GTy.leq t (GTy.mk ty))
+    || (c = CheckStatic && Ty.leq (GTy.lb t) ty)
+    || (c = NoCheck)
+    then GTy.cap t (GTy.mk ty)
     else untypeable id "Type constraint not satisfied."
   | TypeCoerce (e, _, c), ACoerce (ty, annot) ->
     let t = typeof env annot e in

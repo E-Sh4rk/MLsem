@@ -280,13 +280,17 @@ let rec infer cache env renvs annot (id, e) =
     end
   | TypeCast _, Infer -> retry_with (ACast Infer)
   | TypeCoerce (_,t, _), Infer -> retry_with (ACoerce (t,Infer))
-  | TypeCast (e', t), ACast annot' ->
+  | TypeCast (e', t, c), ACast annot' ->
     begin match infer' cache env renvs annot' e' with
     | Ok (annot', s) ->
-      let s = GTy.lb s in
-      let ss = tallying_simpl ~infer:true env s [(s,t)] in
-      log "untypeable constraint" (fun fmt ->
-        Format.fprintf fmt "expected: %a\ngiven: %a" Ty.pp t Ty.pp s
+      let cs = match c with
+        | Check -> [GTy.ub s, t] | CheckStatic -> [GTy.lb s, t] | NoCheck -> [] in
+      let ss = tallying_simpl ~infer:true env (GTy.lb s |> Ty.cap t) cs in
+      log "untypeable cast" (fun fmt ->
+        if c = Check then
+          Format.fprintf fmt "expected: %a\ngiven: %a" Ty.pp t GTy.pp s
+        else if c = CheckStatic then
+          Format.fprintf fmt "expected: %a\ngiven: %a" Ty.pp t Ty.pp (GTy.lb s)
         ) ;
       Subst (ss, nc (Annot.ACast(annot')), Untyp, empty_cov)
     | Subst (ss,a,a',r) -> Subst (ss,ACast a,ACast a',r)

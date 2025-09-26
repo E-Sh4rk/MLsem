@@ -8,10 +8,12 @@ let rec typeof env (_,e) =
   match e with
   | Var v when Env.mem v env -> Env.find v env
   (* The cases below are necessary because of pattern matching encoding *)
-  | Projection (p, t) ->
-    let _, ty = typeof env t |> TyScheme.get in
+  | Projection (p, e) ->
+    let _, ty = typeof env e |> TyScheme.get in
     TyScheme.mk_mono (GTy.map (Checker.proj p) ty)
-  | TypeCast (t, _) -> typeof env t
+  | TypeCast (e, ty, _) ->
+    let _, ty' = typeof env e |> TyScheme.get in
+    TyScheme.mk_mono (GTy.cap (GTy.mk ty) ty')
   | TypeCoerce (_, ty, _) -> TyScheme.mk_mono ty
   | _ -> TyScheme.mk_mono GTy.any
 
@@ -46,7 +48,7 @@ let sufficient_refinements env e t =
     | Value s when Ty.leq (GTy.lb s) t -> [REnv.empty]
     | Value _ | TypeCoerce _ -> []
     | Projection (p, e) -> aux env e (Checker.domain_of_proj p t)
-    | TypeCast (e, _) -> aux env e t
+    | TypeCast (e, _, _) -> aux env e t
     | App ((_, Var v), e) when Env.mem v env ->
       let alpha = TVar.mk KInfer None in
       let (mono, ty) = Env.find v env |> TyScheme.get_fresh in
@@ -109,7 +111,7 @@ let refinement_envs env e =
     match e with
     | Value _ | Var _ -> ()
     | Constructor (_, es) -> es |> List.iter (aux env)
-    | Projection (_, e) | TypeCast (e, _) | TypeCoerce (e, _, _) -> aux env e
+    | Projection (_, e) | TypeCast (e, _, _) | TypeCoerce (e, _, _) -> aux env e
     | Lambda (d, v, e) -> aux_lambda env (d,v,e)
     | LambdaRec lst -> lst |> List.iter (aux_lambda env)
     | Ite (e, tau, e1, e2) ->
