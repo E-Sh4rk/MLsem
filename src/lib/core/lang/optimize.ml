@@ -152,6 +152,10 @@ let optimize_cf e =
         )
       in
       env, ctx, List.fold_left add_assign e vmuts
+    | Loop e ->
+      let env = restrict_immut env (written_vars e) in
+      let env, e = aux' env e in
+      env, hole, (id, Loop e)
     | Seq (e1, e2) ->
       let env, ctx1, e1 = aux env e1 in
       let env, ctx2, e2 = aux env e2 in
@@ -240,6 +244,10 @@ let rec clean_unused_assigns e =
       let rv = VarSet.remove v rv in
       let e, rv = aux rv e in (id, VarAssign (v, e)), rv
     | VarAssign (_, e) -> let e, rv = aux rv e in (id, Voidify e), rv
+    | Loop e ->
+      let rv = VarSet.union rv (read_vars e) in
+      let e, rv = aux rv e in
+      (id, Loop e), rv
     | Seq (e1, e2) ->
       let e2, rv = aux rv e2 in
       let e1, rv = aux rv e1 in

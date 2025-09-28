@@ -109,8 +109,8 @@ let eliminate_if_while_break_return e =
       Ite (e, t, (Eid.refresh (fst e1), Voidify e1), (Eid.refresh (fst e2), Voidify e2))
     | While (e,t,e1) ->
       let block = Eid.refresh (fst e1), Block (BLoop, e1) in
-      Ite (e, t, (Eid.refresh (fst block), Voidify block), (Eid.unique (), Void))
-      (* TODO: Add a Loop construct *)
+      let body = Ite (e, t, (Eid.refresh (fst block), Voidify block), (Eid.unique (), Void)) in
+      Loop (Eid.refresh (fst block), body)
     | Break -> Ret (BLoop, None)
     | Return e -> Ret (BFun, Some e)
     | e -> e
@@ -144,6 +144,7 @@ let rec try_elim_ret bid e =
       (* Sound even when e is empty, because the continuation
          is always called at least once for non-ret expr *)
       (id, Voidify hole) |> cont' |> aux e
+    | Loop e -> (id, Loop (aux e cont))
     | Declare (v, e) -> (id, Declare (v, aux e cont))
     | Let (tys, v, e1, e2) ->
       (id, Let (tys, v, hole, aux e2 cont)) |> aux e1
@@ -248,6 +249,7 @@ let eliminate_cf t =
     | TypeCast (e, ty, c) -> MAst.TypeCast (aux e, ty, c)
     | TypeCoerce (e, ty, c) -> MAst.TypeCoerce (aux e, ty, c)
     | VarAssign (v, e) -> MAst.VarAssign (v, aux e)
+    | Loop e -> MAst.Loop (aux e)
     | Seq (e1, e2) -> MAst.Seq (aux e1, aux e2)
     | Exc -> Exc
     | PatMatch _ | If _ | While _ | Break | Return _ | Block _ -> assert false

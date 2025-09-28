@@ -18,6 +18,7 @@ type e =
 | TypeCast of t * Ty.t * SA.check
 | TypeCoerce of t * GTy.t * SA.check
 | VarAssign of Variable.t * t (* Cannot be translated to system AST if v is not mutable *)
+| Loop of t
 | Seq of t * t
 | Try of t * t
 and t = Eid.t * e
