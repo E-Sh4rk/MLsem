@@ -108,9 +108,9 @@ let eliminate_if_while_break_return e =
     | If (e,t,e1,Some e2) ->
       Ite (e, t, (Eid.refresh (fst e1), Voidify e1), (Eid.refresh (fst e2), Voidify e2))
     | While (e,t,e1) ->
-      let block = Eid.refresh (fst e1), Block (BLoop, e1) in
-      let body = Ite (e, t, (Eid.refresh (fst block), Voidify block), (Eid.unique (), Void)) in
-      Loop (Eid.refresh (fst block), body)
+      let body = Ite (e, t, (Eid.refresh (fst e1), Voidify e1), (Eid.unique (), Void)) in
+      let loop = Eid.refresh id, Loop (Eid.refresh id, body) in
+      Block (BLoop, loop)
     | Break -> Ret (BLoop, None)
     | Return e -> Ret (BFun, Some e)
     | e -> e
@@ -165,7 +165,7 @@ let rec try_elim_ret bid e =
       (id, Ite (hole, tau, aux e1 cont, aux e2 cont)) |> aux e
     | Seq (e1,e2) -> (id, Seq (hole, aux e2 cont)) |> aux e1
     | Block _ -> assert false
-    | Ret (bid', None) when bid'=bid -> id, Exc
+    | Ret (bid', None) when bid'=bid -> id, Void
     | Ret (bid', Some e) when bid'=bid -> try_elim_ret bid e
     | Ret (bid', None) -> (id, Ret (bid', None)) |> cont'
     | Ret (bid', Some e) -> (id, Ret (bid', Some hole)) |> cont' |> aux e
