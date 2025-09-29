@@ -216,7 +216,7 @@ let captured_vars e =
   iter' aux e ; !cv
 
 let rec clean_unused_assigns e =
-  let cv = captured_vars e in
+  let cv = VarSet.union (captured_vars e) (fv e (* Global vars *)) in
   let rec aux
       rv (* Variables that MAY be read before being written *)
       (id,e) =
@@ -291,7 +291,7 @@ let rec clean_unused_assigns e =
     let es, rv = aux_sequence env (List.rev es) in
     List.rev es, rv
   in
-  aux (fv e (* Global vars *)) e |> fst
+  aux VarSet.empty e |> fst
 
 (* let clean_unused_assigns e =
   let f rv (id, e) =
