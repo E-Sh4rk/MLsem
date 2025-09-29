@@ -47,3 +47,11 @@ let loop_tricky_narrowing x =
     y := y + x
   end ;
   return y
+
+let loop_invalid x =
+  let mut y = x in
+  while true do
+    y := y + 1 ;
+    y := false
+  end ;
+  y
