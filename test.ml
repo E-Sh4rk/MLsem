@@ -639,7 +639,7 @@ let gradual4_ann x =
   | y -> 42::y
   end
 
-(* ========= INFERENCE OF NON-OVERLOADED TYPES ========= *)
+(* ========= INFERENCE OF NON-OVERLOADED TYPES, HEURISTICS ========= *)
 
 # infer_overload = false
 
@@ -657,6 +657,17 @@ let map_noannot2 f lst =
   end
 
 # infer_overload = true
+
+val f1 : int -> int
+val f2 : bool -> bool
+val f3 : string -> string
+val f4 : char -> char
+val f5 : () -> ()
+val f6 : Nil -> Nil
+
+let test_alt a = [ f1 a | [ f2 a | [ f3 a | [ f4 a | [ f5 a | f6 a ] ] ] ] ]
+let fall = [ f1 | [ f2 | [ f3 | [ f4 | [ f5 | f6 ] ] ] ] ]
+let test_noalt a = fall a 
 
 (* ========= CONTROL FLOW ========= *)
 

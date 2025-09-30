@@ -245,6 +245,7 @@ atomic_term:
 { record_update $startpos $endpos br fs }
 | LBRACKET lst=separated_list(SEMICOLON, simple_term) RBRACKET
 { list_of_elts $startpos $endpos lst }
+| LBRACKET t1=term OR t2=term RBRACKET { annot $startpos $endpos (Alt (t1,t2)) }
 
 %inline coerce:
   COERCE { Check } | COERCE_STATIC { CheckStatic } | COERCE_NOCHECK { NoCheck }
