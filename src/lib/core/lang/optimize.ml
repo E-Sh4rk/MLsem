@@ -67,30 +67,19 @@ let optimize_cf e =
   let add_immut env v v' =
     { env with immut = VarMap.add v v' env.immut }|> norm
   in
-  let has_immut env v = VarMap.mem v env.immut in
-  let get_immut env v = VarMap.find v env.immut in
+  let has_immut env v = MVariable.is_mutable v |> not || VarMap.mem v env.immut in
+  let get_immut env v = if MVariable.is_mutable v then VarMap.find v env.immut else v in
   let get_muts env v =
     match VarMap.find_opt v env.mut with None -> [] | Some mut -> mut
   in
   let add_mut env v v' =
     { env with mut = VarMap.add v (v'::(get_muts env v)) env.mut }|> norm
   in
-  let has_mut env v = get_muts env v |> List.is_empty |> not in
-  let get_mut env v = get_muts env v |> List.hd in
+  let get_preferred_mut env v = match get_muts env v with hd::_ -> hd | [] -> v in
   let reset_env env =
     { captured=env.captured ; mut=VarMap.empty ; immut=VarMap.empty }
   in
   let rec aux env (id, e) =
-    let env, ctx' =
-      read_vars (id, e)
-      |> VarSet.elements |> List.filter MVariable.is_mutable
-      |> List.filter (fun v -> has_immut env v |> not)
-      |> List.fold_left (fun (env, ctx') v ->
-        let v' = MVariable.refresh MVariable.Immut v in
-        add_immut env v v',
-        fill ctx' (Eid.refresh id, Let ([], v', (Eid.unique (), Var v), hole))
-      ) (env, hole)
-    in
     let env, ctx, e = match e with
     | Hole _ -> failwith "Unsupported hole."
     | Exc | Void | Value _ -> env, hole, (id, e)
@@ -99,8 +88,11 @@ let optimize_cf e =
       let env, e = aux' env e in
       env, hole, (id, Voidify e)
     | Var v when has_immut env v -> env, hole, (id, Var (get_immut env v))
-    | Var v when has_mut env v -> env, hole, (id, Var (get_mut env v))
-    | Var v -> env, hole, (id, Var v)
+    | Var v ->
+      let v' = MVariable.refresh MVariable.Immut v in
+      let env = add_immut env v v' in
+      let ctx = Eid.refresh id, Let ([], v', (Eid.unique (), Var (get_preferred_mut env v)), hole) in
+      env, ctx, (id, Var v')
     | Constructor (c, es) ->
       let env, ctx, es = aux_order (eval_order_of_constructor c) env es in
       env, ctx, (id, Constructor (c, es))
@@ -177,7 +169,7 @@ let optimize_cf e =
       let (env1, e1), (env2, e2) = aux' env e1, aux' env e2 in
       merge_envs' env [env1;env2], hole, (id, Alt (e1, e2))
     in
-    env, fill ctx' ctx, e
+    env, ctx, e
   and aux_parallel env es =
     let envs, es = es
       |> List.map (fun e -> e, written_vars e)
@@ -255,8 +247,10 @@ let rec clean_unused_assigns e =
       (id, Let (tys, v, e1, e2)), rv
     | TypeCast (e, ty, c) -> let e, rv = aux rv e in (id, TypeCast (e, ty, c)), rv
     | TypeCoerce (e, ty, c) -> let e, rv = aux rv e in (id, TypeCoerce (e, ty, c)), rv
-    | VarAssign (v, e) when VarSet.mem v (VarSet.union cv rv)->
-      let rv = VarSet.remove v rv in
+    | VarAssign (v, e) when VarSet.mem v (VarSet.union cv rv) ->
+      (* let rv = VarSet.remove v rv in *)
+      (* Not safe to do so: e could diverge, skipping the assignment *)
+      (* TODO: improve *)
       let e, rv = aux rv e in (id, VarAssign (v, e)), rv
     | VarAssign (_, e) -> let e, rv = aux rv e in (id, Voidify e), rv
     | Loop e ->

@@ -123,8 +123,8 @@ let eliminate_if_while_break_return e =
 let has_eliminable_ret bid e =
   try
     let f = function
-    | (_, Lambda _) | (_, LambdaRec _) -> false
-    | (_, Isolate _) | (_, App _) | (_, Constructor _) | (_, Projection _) -> false
+    | (_, Lambda _) | (_, LambdaRec _) | (_, Isolate _)
+    | (_, App _) | (_, Constructor _) | (_, Projection _) | (_, Alt _) -> false
     | (_, Block _) -> assert false
     | (_, Ret (bid', _)) when bid=bid' -> raise Exit
     | _ -> true
@@ -139,12 +139,14 @@ let rec try_elim_ret bid e =
     let cont' e = fill cont e in
     match e with
     | Hole _ | Void | Value _ | Var _ | Exc | Isolate _
-    | App _ | Constructor _ | Projection _ | Lambda _ | LambdaRec _ -> cont' (id,e)
+    | App _ | Constructor _ | Projection _ | Lambda _ | LambdaRec _ | Alt _ -> cont' (id,e)
     | Voidify e ->
       (* Sound even when e is empty, because the continuation
          is always called at least once for non-ret expr *)
       (id, Voidify hole) |> cont' |> aux e
-    | Loop e -> (id, Loop (aux e cont))
+    | Loop e ->
+      (* Note: pushing the Loop outside may prevent optimisations from applying *)
+      (id, Loop (aux e cont))
     | Declare (v, e) -> (id, Declare (v, aux e cont))
     | Let (tys, v, e1, e2) ->
       (id, Let (tys, v, hole, aux e2 cont)) |> aux e1
@@ -163,10 +165,6 @@ let rec try_elim_ret bid e =
       (id, Ite (hole, tau, e1, e2)) |> cont' |> aux e
     | Ite (e, tau, e1, e2) ->
       (id, Ite (hole, tau, aux e1 cont, aux e2 cont)) |> aux e
-    | Alt (e1, e2) when not (has_eliminable_ret bid e1) && not (has_eliminable_ret bid e2) ->
-      (* Do not duplicate the continuation if unnecessary *)
-      (id, Alt (e1, e2)) |> cont'
-    | Alt (e1, e2) -> (id, Alt (aux e1 cont, aux e2 cont))
     | Seq (e1,e2) -> (id, Seq (hole, aux e2 cont)) |> aux e1
     | Block _ -> assert false
     | Ret (bid', None) when bid'=bid -> id, Void
@@ -176,6 +174,7 @@ let rec try_elim_ret bid e =
     | PatMatch _ | If _ | While _  | Break | Return _ -> assert false
   in
   aux e hole
+  [@@ocaml.warning "-32"]
 
 let has_ret ~count_noarg bid e =
   try
@@ -220,6 +219,7 @@ let elim_all_ret_noarg bid e =
   map' f e
 
 let eliminate_blocks e =
+  (* TODO: maybe we should not call try_elim_ret... *)
   let aux (id,e) =
     match e with
     | Block (bid, e) ->

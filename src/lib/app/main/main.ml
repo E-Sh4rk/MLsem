@@ -32,6 +32,7 @@ let sigs_of_ty mono ty =
   else None
 let infer var env e =
   let annot =
+    (* Format.printf "@.@.%a@.@." Mlsem_system.Ast.pp e ; *)
     let r =
       if !Config.type_narrowing
       then Mlsem_system.Refinement.refinement_envs env e
