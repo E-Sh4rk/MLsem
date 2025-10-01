@@ -775,3 +775,12 @@ let loop_invalid x =
     y := false
   end ;
   y
+
+let loop_valid x =
+	let mut y = x in
+  while true do
+    if y is ~int do break end ;
+    y := y + 1 ;
+    y := false
+  end ;
+  y

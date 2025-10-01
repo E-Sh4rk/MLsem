@@ -124,7 +124,7 @@ let eliminate_if_while_break_return e =
 let has_eliminable_ret bid e =
   try
     let f = function
-    | (_, Lambda _) | (_, LambdaRec _) | (_, Isolate _)
+    | (_, Lambda _) | (_, LambdaRec _) | (_, Isolate _) | (_, Loop _)
     | (_, App _) | (_, Constructor _) | (_, Projection _) | (_, Alt _) -> false
     | (_, Block _) -> assert false
     | (_, Ret (bid', _)) when bid=bid' -> raise Exit
@@ -133,21 +133,19 @@ let has_eliminable_ret bid e =
     iter' f e ; false
   with Exit -> true
 
+(* TODO: improve *)
 let rec try_elim_ret bid e =
   let hole = Eid.dummy, Hole 0 in
   let fill e elt = fill_hole 0 elt e in
   let rec aux (id,e) cont =
     let cont' e = fill cont e in
     match e with
-    | Hole _ | Void | Value _ | Var _ | Exc | Isolate _
+    | Hole _ | Void | Value _ | Var _ | Exc | Isolate _ | Loop _
     | App _ | Constructor _ | Projection _ | Lambda _ | LambdaRec _ | Alt _ -> cont' (id,e)
     | Voidify e ->
       (* Sound even when e is empty, because the continuation
          is always called at least once for non-ret expr *)
       (id, Voidify hole) |> cont' |> aux e
-    | Loop e ->
-      (* TODO: pushing the Loop outside may prevent optimisations from applying *)
-      (id, Loop (aux e cont))
     | Declare (v, e) -> (id, Declare (v, aux e cont))
     | Let (tys, v, e1, e2) ->
       (id, Let (tys, v, hole, aux e2 cont)) |> aux e1
@@ -175,14 +173,13 @@ let rec try_elim_ret bid e =
     | PatMatch _ | If _ | While _  | Break | Return _ -> assert false
   in
   aux e hole
-  [@@ocaml.warning "-32"]
 
-let has_ret ~count_noarg bid e =
+let has_ret ~incl_noarg bid e =
   try
     let f = function
     | (_, Lambda _) | (_, LambdaRec _) -> false
     | (_, Block _) -> assert false
-    | (_, Ret (bid',None)) when count_noarg && bid'=bid -> raise Exit
+    | (_, Ret (bid',None)) when incl_noarg && bid'=bid -> raise Exit
     | (_, Ret (bid',Some _)) when bid'=bid -> raise Exit
     | _ -> true
     in
@@ -190,7 +187,7 @@ let has_ret ~count_noarg bid e =
   with Exit -> true
 
 let rec elim_ret_args bid (id,e) =
-  if has_ret ~count_noarg:false bid (id,e)
+  if has_ret ~incl_noarg:false bid (id,e)
   then
     let v = MVariable.create MVariable.Mut None in
     let body = Eid.refresh id, VarAssign (v, treat_rets bid v (id,e)) in
@@ -219,6 +216,20 @@ let elim_all_ret_noarg bid e =
   in
   map' f e
 
+let clean_unreachable e =
+  let rec ends_with_exc e =
+    match snd e with
+    | Exc -> true
+    | Seq (_, e2) -> ends_with_exc e2
+    | _ -> false
+  in
+  let f = function
+  | (_, Block _) -> assert false
+  | (_, Seq (e, _)) when ends_with_exc e -> e
+  | e -> e
+  in
+  map f e
+
 let eliminate_blocks e =
   let aux (id,e) =
     match e with
@@ -226,7 +237,7 @@ let eliminate_blocks e =
       try_elim_ret bid e |> elim_ret_args bid |> elim_all_ret_noarg bid
     | e -> id, e
   in
-  map aux e
+  map aux e |> clean_unreachable
 
 (* Main *)
 
