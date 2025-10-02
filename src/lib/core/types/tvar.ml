@@ -113,6 +113,7 @@ module Subst = struct
   let is_identity = Sstt.Subst.is_identity
   let apply = Sstt.Subst.apply
   let dom = Sstt.Subst.domain
+  let intro = Sstt.Subst.intro
   let mem s v = Sstt.VarSet.mem v (dom s)
   let rm = Sstt.Subst.remove
   let find = Sstt.Subst.find
@@ -230,6 +231,8 @@ module TVOp = struct
     Sstt.Tallying.tally mono cs
   let tallying_with_prio mono prio cs =
     Sstt.Tallying.tally_with_priority prio mono cs
+  let decompose mono t1 t2 =
+    Sstt.Tallying.decompose mono t1 t2
 
   let factorize (pvs, nvs) t =
     let dnf = Sstt.Ty.def t |> Sstt.VDescr.dnf in

@@ -53,6 +53,7 @@ module Subst : sig
     val identity : t
     val is_identity : t -> bool
     val dom : t -> TVarSet.t
+    val intro : t -> TVarSet.t
     val vars : t -> TVarSet.t
     val mem : t -> TVar.t -> bool
     val rm: TVar.t -> t -> t
@@ -98,6 +99,7 @@ module TVOp : sig
 
     val tallying : TVarSet.t -> (Ty.t * Ty.t) list -> Subst.t list
     val tallying_with_prio : TVarSet.t -> (TVar.t list) -> (Ty.t * Ty.t) list -> Subst.t list
+    val decompose : TVarSet.t -> Subst.t -> Subst.t -> Subst.t list
 
     val factorize : TVarSet.t * TVarSet.t -> Ty.t -> Ty.t * Ty.t
 end
