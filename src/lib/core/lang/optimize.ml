@@ -91,7 +91,7 @@ let optimize_cf e =
     | Var v ->
       let v' = MVariable.refresh MVariable.Immut v in
       let env = add_immut env v v' in
-      let ctx = Eid.refresh id, Let ([], v', (Eid.unique (), Var (get_preferred_mut env v)), hole) in
+      let ctx = Eid.unique (), Let ([], v', (Eid.unique (), Var (get_preferred_mut env v)), hole) in
       env, ctx, (id, Var v')
     | Constructor (c, es) ->
       let env, ctx, es = aux_order (eval_order_of_constructor c) env es in

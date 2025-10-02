@@ -101,7 +101,7 @@ let eliminate_if_while_break_return e =
   let aux (id,e) =
     let e = match e with
     | Lambda (tys, ty, v, e) ->
-      let block = Eid.refresh (fst e), Block (BFun, e) in
+      let block = Eid.refresh id, Block (BFun, e) in
       Lambda (tys, ty, v, block)
     | If (e,t,e1,e2) ->
       let e2 = match e2 with None -> Eid.unique (), Exc | Some e2 -> e2 in
