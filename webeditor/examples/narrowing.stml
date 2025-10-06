@@ -77,7 +77,13 @@ let implicit5 = fun x -> fun y ->
    add x (strlen y) else 0
 
 
-let example6 = fun (x : int|string) -> fun (y : any) ->
+(* Annotations for this one are invalid: y can be any only if x is string *)
+let example6_invalid = fun (x : int|string) -> fun (y : any) ->
+  if and_ (is_int x, is_string y) is true then
+   add  x (strlen y) else strlen x
+
+val example6 : (int -> string -> int) & (string -> any -> int)
+let example6 = fun x -> fun y ->
   if and_ (is_int x, is_string y) is true then
    add  x (strlen y) else strlen x
 

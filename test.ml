@@ -241,19 +241,6 @@ let bal l x d r =
 *                                                *
 **************************************************)
 
-(*
- Interesting points:
-  - example6: not typable with the annotation int|string
-    (as expected), but if we remove annotations becomes typable.
-    That is our system finds the right constraints to make the
-    expression typable
-  - in examples 10 11 12 we do not have to assume that p is
-    a product, the system deduces it alone
-  - same for the example 14. We do not have to assume that
-    the parameter input is int|string and extra is a pair. The system
-    finds it alone and it works for user defined "and"
-*)
-
 (* Prelude *)
 
 let and_ = fun (x, y) ->
@@ -311,8 +298,13 @@ let implicit5 = fun x -> fun y ->
   if and_ (is_int x, is_string y) is true then
    add x (strlen y) else 0
 
+(* Annotations for this one are invalid: y can be any only if x is string *)
+let example6_invalid = fun (x : int|string) -> fun (y : any) ->
+  if and_ (is_int x, is_string y) is true then
+   add  x (strlen y) else strlen x
 
-let example6 = fun (x : int|string) -> fun (y : any) ->
+val example6 : (int -> string -> int) & (string -> any -> int)
+let example6 = fun x -> fun y ->
   if and_ (is_int x, is_string y) is true then
    add  x (strlen y) else strlen x
 
@@ -756,7 +748,6 @@ let order (x:(int|Nil,int|Nil)|Nil) =
   if snd x is Nil do return fst x end ;
   if (snd x) < (fst x) do x := (snd x, fst x) end ;
   return x
-
 
 val rand : () -> any
 val is_int : (int -> true) & (~int -> false)

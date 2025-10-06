@@ -119,6 +119,8 @@ let rec coerce c ty (id,t) =
   try match t with
   | Let (tys, v, e1, e2) ->
     id, Let (tys, v, e1, coerce c ty e2)
+  | Ite (e, tau, e1, e2) ->
+    id, Ite (e, tau, coerce c ty e1, coerce c ty e2)
   | Lambda (da,v,e) ->
     let d = GTy.map Arrow.domain ty in
     let cd = GTy.map2 Arrow.apply ty d in
