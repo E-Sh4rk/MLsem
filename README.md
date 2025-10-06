@@ -2,7 +2,17 @@
 
 Our test corpus is in the file `test.ml`.
 It uses the extension `.ml` because the syntax is close to OCaml's syntax,
-but it is not valid OCaml code. 
+but it is not valid OCaml code.
+
+## Notes for the reviewers
+
+The easiest way to test the prototype is to follow the `Testing the Wasm version (prebuilt)` section. The only requirement is Python 3, in order to be able to start a local http web server.
+
+Structure of the source code:
+- `src/lib/core/types/`: bindings for set-theoretic types (definition, subtyping, tallying, etc.)
+- `src/lib/core/common/`: auxiliary definitions (type environment, variable, etc.)
+- `src/lib/core/system/`: the core language (module `AST`), type system (module `Checker`), and reconstruction algorithm (module `Reconstruction`) described in Section 2 and 3 of the paper
+- `src/lib/core/lang/`: source language (module `AST`), minimal imperative language (module `MAst`) and program transformations described in Section 5 of the paper
 
 ## Testing the Wasm version (prebuilt)
 
