@@ -5,20 +5,20 @@
 
 (generate_opam_files true)
 
-(authors "Mickael Laurent")
+(authors "Anonymized")
 
-(maintainers "Mickael Laurent")
+(maintainers "Anonymized")
 
-(homepage "https://github.com/E-Sh4rk/MLsem")
+(homepage "Anonymized")
 
-(bug_reports "https://github.com/E-Sh4rk/MLsem/issues")
+(bug_reports "Anonymized")
 
 (license "MIT")
 
 (package
  (name mlsem-types)
  (synopsis "Type bindings for MLsem")
- (depends (ocaml (>= 5.3.0)) dune (sstt (>= 0.1.0)) zarith)
+ (depends (ocaml (>= 5.3.0)) dune zarith)
 )
 
 (package
