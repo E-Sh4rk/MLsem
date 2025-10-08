@@ -35,7 +35,7 @@ let read_vars e =
 
 type env = { captured:VarSet.t ; immut:Variable.t VarMap.t ; mut:Variable.t list VarMap.t }
 
-let optimize_cf e =
+let optimize_dataflow e =
   let hole = Eid.dummy, Hole 0 in
   let fill e elt = fill_hole 0 elt e in
   let norm env =
@@ -325,5 +325,5 @@ let clean_nop e =
   in
   map f e
 
-let optimize_cf e =
-  e |> optimize_cf |> clean_unused_assigns |> clean_unused_defs |> clean_nop
+let optimize_dataflow e =
+  e |> optimize_dataflow |> clean_unused_assigns |> clean_unused_defs |> clean_nop

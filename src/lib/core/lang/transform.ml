@@ -295,5 +295,5 @@ let eliminate_cf t =
 let transform t =
   t
   |> eliminate_cf
-  |> Optimize.optimize_cf
+  |> Optimize.optimize_dataflow
   |> MAst.to_system_ast

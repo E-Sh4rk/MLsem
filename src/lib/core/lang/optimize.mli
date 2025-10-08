@@ -1,2 +1,2 @@
 
-val optimize_cf : MAst.t -> MAst.t
+val optimize_dataflow : MAst.t -> MAst.t
