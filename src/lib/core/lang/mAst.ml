@@ -8,16 +8,16 @@ type e =
 | Value of GTy.t
 | Var of Variable.t
 | Constructor of SA.constructor * t list
-| Lambda of Ty.t list (* Decomposition, similar to Let bindings *) * GTy.t * Variable.t * t
+| Lambda of Ty.t list * GTy.t * Variable.t * t
 | LambdaRec of (GTy.t * Variable.t * t) list
 | Ite of t * Ty.t * t * t
 | App of t * t
 | Projection of SA.projection * t
-| Declare of Variable.t * t (* Cannot be translated to system AST if v is not mutable *)
+| Declare of Variable.t * t
 | Let of Ty.t list * Variable.t * t * t
 | TypeCast of t * Ty.t * SA.check
 | TypeCoerce of t * GTy.t * SA.check
-| VarAssign of Variable.t * t (* Cannot be translated to system AST if v is not mutable *)
+| VarAssign of Variable.t * t
 | Loop of t
 | Seq of t * t
 | Try of t * t
