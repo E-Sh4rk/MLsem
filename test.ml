@@ -785,3 +785,16 @@ let filter_imp (f:('a -> bool) & ('b -> false)) (arr:array('a|'b)) =
     i := i + 1
   end ;
   return res
+
+val filter_imp_test : array(42|13|"abc")
+(* we have to specify a type for filter_imp_test,
+   otherwise the type inference will infer array(42|13|"abc"|'a) where 'a cannot be generalized,
+   which will error as top-level definitions cannot have unquantified type variables *)
+let filter_imp_test =
+  let mut arr = array () in
+  push arr 42 ;
+  push arr false ;
+  push arr 13 ;
+  arr := filter_imp (fun x -> (x is int)) arr ;
+  push arr "abc" ;
+  arr
