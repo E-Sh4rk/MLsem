@@ -39,25 +39,40 @@ let treat_res (acc, res) =
         acc, false
     | TDone -> acc, true
 
+(* Command line *)
+let usage_msg = "mlsem [-record <output>] <file1> [<file2>] ..."
+let record = ref None
+let input_files = ref []
+
+let anon_fun filename =
+    input_files := filename::!input_files
+let record_fun filename =
+    record := Some filename
+
+let speclist =
+    [("-record", Arg.String record_fun, "Record tallying instances to a file")]
+
 let () =
+    Arg.parse speclist anon_fun usage_msg ;
     (* Printexc.record_backtrace true; *)
     if Unix.isatty Unix.stdout then Colors.add_ansi_marking Format.std_formatter ;
     try
-        let fn = ref "test.ml" in
-        if Array.length Sys.argv > 1 then fn := Sys.argv.(1) ;
-        match parse (`File !fn) with
-        | PSuccess program ->
-            let time0 = Unix.gettimeofday () in
-            let envs = (initial_tenv, initial_varm, initial_senv, initial_env) in
-            let envs, ok = treat_all_sigs envs program |> treat_res in
-            if ok then
-                List.fold_left (fun acc e ->
-                    treat_def acc e |> treat_res |> fst
-                ) envs program |> ignore ;
-            let time1 = Unix.gettimeofday () in
-            Format.printf "@.@{<bold;green>Total time: %.02fs@}@." (time1 -. time0)
-        | PFailure (pos, msg) ->
-            Format.printf "@{<bold;red>%s: %s@}@." (Position.string_of_pos pos) msg
+        (* TODO: JSON export of recording *)
+        !input_files |> List.iter (fun fn ->
+            match parse (`File fn) with
+            | PSuccess program ->
+                let time0 = Unix.gettimeofday () in
+                let envs = (initial_tenv, initial_varm, initial_senv, initial_env) in
+                let envs, ok = treat_all_sigs envs program |> treat_res in
+                if ok then
+                    List.fold_left (fun acc e ->
+                        treat_def acc e |> treat_res |> fst
+                    ) envs program |> ignore ;
+                let time1 = Unix.gettimeofday () in
+                Format.printf "@.@{<bold;green>Total time: %.02fs@}@." (time1 -. time0)
+            | PFailure (pos, msg) ->
+                Format.printf "@{<bold;red>%s: %s@}@." (Position.string_of_pos pos) msg
+        )
     with e ->
         let msg = Printexc.to_string e
         and stack = Printexc.get_backtrace () in

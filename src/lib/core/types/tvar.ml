@@ -225,8 +225,10 @@ module TVOp = struct
       clean ~pos:Ty.any ~neg:Ty.empty mono
 
   let tallying mono cs =
+    Recording.record mono [] cs ;
     Sstt.Tallying.tally mono cs
   let tallying_with_prio mono prio cs =
+    Recording.record mono prio cs ;
     Sstt.Tallying.tally_with_priority prio mono cs
   let decompose mono t1 t2 =
     Sstt.Tallying.decompose mono t1 t2

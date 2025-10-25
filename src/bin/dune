@@ -2,7 +2,7 @@
  (name native)
  (public_name mlsem)
  (package mlsem-bin)
- (libraries mlsem_app unix)
+ (libraries mlsem_app unix yojson)
  (modes
   (best exe))
  (modules native))
