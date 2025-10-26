@@ -59,7 +59,7 @@ let save_recorded file =
             let res = if List.is_empty priority then res else res@[("priority", `List priority)] in
             `Assoc res
         ) in
-        to_file file (`List instances)
+        to_file ~suf:"" file (`List instances)
     )
 
 (* Command line *)
