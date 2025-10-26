@@ -22,4 +22,4 @@ let record mono priority cs =
     tally_calls := {vars=order;mono;priority;constraints=cs}::!tally_calls
   end
 let clear () = tally_calls := []
-let tally_calls () = !tally_calls
+let tally_calls () = List.rev !tally_calls

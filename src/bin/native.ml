@@ -1,7 +1,7 @@
 open Mlsem_common
 open Mlsem_app.Main
 open Mlsem_utils
-open Yojson.Basic
+open Yojson.Safe
 open Mlsem_types
 
 let severity_to_str s =
@@ -52,14 +52,21 @@ let save_recorded file =
             let vars, mono, priority =
                 to_str r.vars, to_str r.mono, to_str r.priority in
             let cs = r.constraints |> List.map (fun (s,t) ->
-                    `Assoc [("lhs", ty_to_string s) ; ("rhs", ty_to_string t)]
+                `Tuple  [ty_to_string s ; ty_to_string t]
                 )
             in
-            let res = [ ("vars", `List vars) ; ("mono", `List mono) ; ("constraints", `List cs) ] in
-            let res = if List.is_empty priority then res else res@[("priority", `List priority)] in
+            let res = [ ("vars", `List vars) ; ("mono", `List mono) ; ("constr", `List cs) ] in
+            let res = if List.is_empty priority then res else res@[("prio", `List priority)] in
             `Assoc res
         ) in
-        to_file ~suf:"" file (`List instances)
+        let oc = open_out file in
+        try
+            pretty_to_channel oc (`List instances) ;
+            close_out oc
+        with e ->
+            close_out_noerr oc;
+            raise e
+        (* to_file ~suf:"" file (`List instances) *)
     )
 
 (* Command line *)
