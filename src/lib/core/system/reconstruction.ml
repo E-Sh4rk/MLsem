@@ -86,10 +86,9 @@ let tallying_simpl env res cs =
   let ntvars s = TVarSet.union tvars (Subst.restrict s tvars |> Subst.intro) in
   let mono = TVar.all_vars KNoInfer in
   let is_better (s1,r1) (s2,r2) =
-    let mono = TVarSet.union mono tvars in
-    let s1, s2 = Subst.restrict s1 tvars, Subst.restrict s2 tvars in
-    TVOp.decompose (TVarSet.union mono tvars) s1 s2
-    |> List.exists (fun s' -> TVOp.tallying mono [(Subst.apply s' r1, r2)] <> [])
+    let mono2 = TVarSet.union_many [ mono ; ntvars s2 ; TVOp.vars r2 ] in
+    TVOp.decompose mono (Subst.restrict s1 tvars) (Subst.restrict s2 tvars)
+    |> List.exists (fun s' -> TVOp.tallying mono2 [(Subst.apply s' r1, r2)] <> [])
   in
   let not_redundant s ss =
     ss |> List.for_all (fun s' -> is_better s' s |> not)
