@@ -1,4 +1,9 @@
 
+val (<) : int -> int -> bool
+val (<=) : int -> int -> bool
+val (>) : int -> int -> bool
+val (>=) : int -> int -> bool
+
 (* ========= SIGNATURES & ANNOTATIONS ========= *)
 
 val valint : int
@@ -36,11 +41,6 @@ let record_ab_open ({ a ; b ..}) = { a ; b }
 let record_ab ({ a ; b }) = { a ; b }
 
 (* ========= OPAQUE TYPES & IMPERATIVE PROGRAMMING ======== *)
-
-val (<) : int -> int -> bool
-val (<=) : int -> int -> bool
-val (>) : int -> int -> bool
-val (>=) : int -> int -> bool
 
 abstract type ref('a)
 val ref : 'a -> ref('a)
@@ -659,7 +659,7 @@ val f6 : Nil -> Nil
 
 let test_alt a = [ f1 a | f2 a | f3 a | f4 a | f5 a | f6 a ]
 let fall = [ f1 | f2 | f3 | f4 | f5 | f6 ]
-let test_noalt a = fall a 
+let test_noalt a = fall a
 
 (* ========= CONTROL FLOW ========= *)
 

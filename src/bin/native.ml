@@ -88,7 +88,9 @@ let () =
     if Unix.isatty Unix.stdout then Colors.add_ansi_marking Format.std_formatter ;
     if !record <> None then Recording.start_recording () ;
     try
+        let time = Unix.gettimeofday () in
         List.rev !input_files |> List.iter (fun fn ->
+            Format.printf "@.@{<bold>===== Processing %s =====@}@." fn ;
             match parse (`File fn) with
             | PSuccess program ->
                 let time0 = Unix.gettimeofday () in
@@ -99,10 +101,12 @@ let () =
                         treat_def acc e |> treat_res |> fst
                     ) envs program |> ignore ;
                 let time1 = Unix.gettimeofday () in
-                Format.printf "@.@{<bold;green>Total time: %.02fs@}@." (time1 -. time0)
+                Format.printf "@{<bold;green>Total time: %.02fs@}@." (time1 -. time0)
             | PFailure (pos, msg) ->
                 Format.printf "@{<bold;red>%s: %s@}@." (Position.string_of_pos pos) msg
         ) ;
+        let time = (Unix.gettimeofday ()) -. time in
+        Format.printf "@.@{<bold>Cumulated total time: %.02fs@}@." time ;
         save_recorded !record
     with e ->
         let msg = Printexc.to_string e

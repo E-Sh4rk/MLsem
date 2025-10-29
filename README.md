@@ -1,6 +1,6 @@
 # MLsem
 
-Our test corpus is in the file `test.ml`.
+Our test corpus are in the directory `tests`.
 It uses the extension `.ml` because the syntax is close to OCaml's syntax,
 but it is not valid OCaml code. 
 
@@ -17,7 +17,7 @@ make
 ```
 
 This will run the native version of the prototype and
-type-check the definitions in `test.ml`.
+type-check the definitions in the directory `tests`.
 
 
 ## Testing the Wasm version

@@ -17,10 +17,10 @@ doc:
 	cp -r _build/default/_doc/_html/ webeditor/doc
 
 run:
-	opam exec -- dune exec ./src/bin/native.exe test.ml
+	opam exec -- dune exec ./src/bin/native.exe tests/*.ml
 
 record:
-	opam exec -- dune exec -- ./src/bin/native.exe -record test.json test.ml
+	opam exec -- dune exec -- ./src/bin/native.exe -record test.json tests/*.ml
 
 clean:
 	opam exec -- dune clean
@@ -47,5 +47,5 @@ time:
 	./time.sh
 
 perf:
-	sudo perf record --call-graph=dwarf -- ./_build/default/src/bin/native.exe test.ml
+	sudo perf record --call-graph=dwarf -- ./_build/default/src/bin/native.exe tests/*.ml
 	sudo perf report

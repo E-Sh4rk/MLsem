@@ -32,17 +32,17 @@ compare_output () {
 if [ "$1" = "perf" ]
 then
     dune build src/bin/native.exe
-    perf record --call-graph=dwarf -- _build/default/src/bin/native.exe test.ml >/dev/null 2>&1
+    perf record --call-graph=dwarf -- _build/default/src/bin/native.exe tests/*.ml >/dev/null 2>&1
 elif [ "$1" = "report" ]
 then
     perf report
 elif [ "$1" = "ref" ]
 then
-    dune exec src/bin/native.exe test.ml  > "$BASE_DIR"/timing.ref
+    dune exec src/bin/native.exe tests/*.ml  > "$BASE_DIR"/timing.ref
     exit 0
 elif [ "$1" = "diff" ]
 then
-     dune exec --display=quiet -- src/bin/native.exe test.ml > "$BASE_DIR"/timing.tmp
+     dune exec --display=quiet -- src/bin/native.exe tests/*.ml > "$BASE_DIR"/timing.tmp
      compare_output "$BASE_DIR"/timing.ref "$BASE_DIR"/timing.tmp || exit 1
      exit 0
 elif [ "$1" = "time" ]
@@ -51,7 +51,7 @@ then
     for i in `seq $N`
     do
         echo -n Run "$i ... "
-        dune exec --display=quiet -- src/bin/native.exe test.ml > "$BASE_DIR"/timing.tmp
+        dune exec --display=quiet -- src/bin/native.exe tests/*.ml > "$BASE_DIR"/timing.tmp
         compare_output "$BASE_DIR"/timing.ref "$BASE_DIR"/timing.tmp || exit 1
         T=`cat "$BASE_DIR"/timing.tmp | grep 'Total time' | grep -o '[0-9]\+[.][0-9]\+'`
         echo "$T"
