@@ -8,14 +8,15 @@
     lexbuf
 
   let char_for_backslash = function
-    | 'n' -> '\010'
-    | 'r' -> '\013'
-    | 'b' -> '\008'
-    | 't' -> '\009'
-    | c   -> c
+    | "n" -> '\010'
+    | "r" -> '\013'
+    | "b" -> '\008'
+    | "t" -> '\009'
+    | c when String.length c = 1 -> c.[0]
+    | c -> Char.chr (int_of_string ("0o"^c))
 }
 
-let backslash_escapes = ['\\' '\'' '"' 'n' 't' 'b' 'r' ' ']
+let backslash_escapes = ['\\' '\'' '"' 'n' 't' 'b' 'r' ' '] | ['0'-'7']['0'-'7']['0'-'7']
 
 let newline = ('\010' | '\013' | "\013\010")
 

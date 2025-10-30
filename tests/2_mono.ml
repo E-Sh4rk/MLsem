@@ -1,5 +1,4 @@
 
-val compare : (int,int) | (bool,bool) | (string,string) | (char,char) | (float,float) -> int
 val (=) : (int,int) | (bool,bool) | (string,string) | (char,char) | (float,float) -> bool
 
 #infer_overload = false
@@ -59,7 +58,7 @@ let succ x =
 
 let test2 (y:(5..15)) = succ (succ (succ (succ (succ y))))
 
-(* Overloaded behaviors *)
+(* Boolean operations *)
 
 let to_bool x =
   match x with
@@ -68,7 +67,25 @@ let to_bool x =
   | false -> false
   | true -> true
   | y & :float -> y = 0.0
+  | "" -> false
+  | :string -> true
+  | '\000' -> false
+  | :char -> true
   end
+
+let land (x,y) =
+  match (x,y) with
+  | (true,true) -> true
+  | _ -> false
+  end
+
+let (&&) (x,y) = land (to_bool x, to_bool y)
+
+let and1 = 42 && 0
+let and2 = "" && true
+let and3 = 42 && "42"
+let and4 = 17.0 && 42.0
+let and5 = 'c' && "c"
 
 #infer_overload = true
 #type_narrowing = true
