@@ -122,6 +122,7 @@ let sigs_of_def tenv varm senv env (kind,str) =
 
 let dummy = Variable.create (Some "_")
 let treat (tenv,varm,senv,env) (annot, elem) =
+  Ty.reset_parametrized () ;
   let pos = Position.position annot in
   let time = Unix.gettimeofday () in
   let v = ref dummy in

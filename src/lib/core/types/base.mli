@@ -3,10 +3,18 @@
 module Ty : sig
     type t = Sstt.Ty.t
 
+    (* Alias registering (for pretty printing) *)
     val register : string -> t -> unit
+    val register_parametrized : string -> t list -> t -> unit
+    val set_max_parametrized : int -> unit
+    val reset_parametrized : unit -> unit
+
+    (* Pretty-printing *)
     val add_printer_param : Sstt.Printer.params -> unit
     val printer_params : unit -> Sstt.Printer.params
+    val printer_params' : Sstt.Subst.t -> Sstt.Printer.params
     val pp : Format.formatter -> t -> unit
+    val pp' : Sstt.Subst.t -> Format.formatter -> t -> unit
     val pp_raw : Format.formatter -> t -> unit
 
     val any : t

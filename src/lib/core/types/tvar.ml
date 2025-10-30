@@ -199,8 +199,9 @@ module TVOp = struct
     s
 
   let pp_typ_short fmt t =
-    let t = Subst.apply (vars t |> shorten_names) t in
-    Ty.pp fmt t
+    Ty.pp' (vars t |> shorten_names) fmt t
+  let pp_typ_subst s fmt t =
+    Ty.pp' s fmt t
 
   let clean_subst' ~pos ~neg mono ts =
     vars_with_polarity' ts |>

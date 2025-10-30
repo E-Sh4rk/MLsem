@@ -1,11 +1,17 @@
+
 let pparams_abs = ref []
 let aliases = ref []
+let paliases = ref []
+let max_paliases = ref 5
 
 module Ty = struct
   type t = Sstt.Ty.t
 
   let register str ty =
-    aliases := (ty,str)::!aliases
+    let aliases' = !aliases
+    |> List.filter (fun (_,str') -> String.equal str str' |> not)
+    |> List.filter (fun (ty',_) -> Sstt.Ty.equiv ty ty' |> not) in
+    aliases := (ty,str)::aliases'
 
   let pparams =
     [
@@ -16,14 +22,60 @@ module Ty = struct
       Sstt.Extensions.Chars.printer_params
     ] |> Sstt.Printer.merge_params
   let pparams_ext = ref []
-  let printer_params () =
-    let pparams' = { Sstt.Printer.empty_params with aliases = !aliases } in
+  let printer_params' s =
+    let paliases =
+      !paliases |> List.map (fun (ty, (str,holes)) ->
+          let ty = Sstt.Subst.apply s ty in
+          let replace acc (str,v) =
+            Str.global_replace (Str.regexp str)
+              (Sstt.Subst.find s v |> Format.asprintf "%a" Sstt.Printer.print_ty') acc
+          in
+          let str = List.fold_left replace str holes in
+          ty, str
+        )
+    in
+    let pparams' = { Sstt.Printer.empty_params with aliases=(!aliases)@paliases } in
     [ pparams ; pparams' ]@(!pparams_abs)@(!pparams_ext) |> Sstt.Printer.merge_params
+  let printer_params () = printer_params' Sstt.Subst.identity
 
   let add_printer_param p = pparams_ext := p::!pparams_ext
 
   let pp fmt ty = Sstt.Printer.print_ty (printer_params ()) fmt ty
+  let pp' s fmt ty = Sstt.Printer.print_ty (printer_params' s) fmt (Sstt.Subst.apply s ty)
   let pp_raw = Sstt.Printer.print_ty'
+
+  let register_parametrized name ps ty =
+    let module StrMap = Map.Make(String) in
+    try
+      if !max_paliases <= 0 then raise Exit ;
+      let paliases' = !paliases
+      |> List.filter (fun (ty',_) -> Sstt.Ty.equiv ty ty' |> not)
+      |> List.take (!max_paliases-1) in
+      let sep,prio,_ = Sstt.Prec.varop_info Sstt.Prec.Tuple in
+      let hmap = ref StrMap.empty in
+      let id = ref 0 in
+      let new_var v =
+        let name = "{{"^(string_of_int !id)^"}}" in
+        id := !id+1 ;
+        hmap := StrMap.add name v !hmap ;
+        name
+      in
+      let pp_param fmt ty =
+        let t = Sstt.Printer.get (printer_params ()) ty in
+        if List.is_empty t.defs |> not then raise Exit ; (* TODO: improve *)
+        let d = t.main |> Sstt.Printer.map_descr (fun d ->
+            match d.op with
+            | Sstt.Printer.Var v -> Sstt.Printer.Var (Sstt.Var.mk (new_var v))
+            | o -> o
+          )
+        in
+        Sstt.Printer.print_descr_ctx prio Sstt.Prec.NoAssoc fmt d
+      in
+      let str = Format.asprintf "%s(%a)" name (Mlsem_utils.Utils.pp_seq pp_param sep) ps in
+      paliases := (ty, (str, StrMap.bindings !hmap))::paliases'
+    with Exit -> ()
+  let reset_parametrized () = paliases := []
+  let set_max_parametrized i = max_paliases := i ; paliases := List.take i !paliases
 
   let any = Sstt.Ty.any
   let empty = Sstt.Ty.empty

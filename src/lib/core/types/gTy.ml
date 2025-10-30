@@ -68,19 +68,21 @@ let equiv = test2 Ty.equiv
 let simplify = map Ty.simplify
 let normalize = map Ty.normalize
 
-let pp fmt t =
+let pp' s fmt t =
+  let pp = TVOp.pp_typ_subst s in
   if t.eq then
-    Format.fprintf fmt "%a" Ty.pp t.lb
+    Format.fprintf fmt "%a" pp t.lb
   else
     let lb,ub = Ty.is_empty t.lb, Ty.is_any t.ub in
     if lb && ub then
       Format.fprintf fmt "#"
     else if lb then
-      Format.fprintf fmt "#(%a)" Ty.pp t.ub
+      Format.fprintf fmt "#(%a)" pp t.ub
     else if ub then
-      Format.fprintf fmt "(%a) | #" Ty.pp t.lb
+      Format.fprintf fmt "(%a) | #" pp t.lb
     else
-      Format.fprintf fmt "(%a) | #(%a)" Ty.pp t.lb Ty.pp t.ub
+      Format.fprintf fmt "(%a) | #(%a)" pp t.lb pp t.ub
+let pp fmt t = pp' Subst.identity fmt t
 
 let mk_gradual lb ub =
   assert (Ty.leq lb ub) ;

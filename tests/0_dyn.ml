@@ -3,6 +3,7 @@ val (-) : (int, int) -> int
 val ( * ) : (int, int) -> int
 val (/) : (int, int) -> int
 val (%) : (int, int) -> int
+val (@) : (['a*], ['b*]) -> ['a* 'b*]
 
 val (<) : (int, int) -> bool
 val (<=) : (int, int) -> bool
@@ -559,15 +560,13 @@ let call_f (o:objF('a)) =
 
 (* ========= COMPLEX RECURSIVE FUNCTIONS ========= *)
 
-val concat : ['a*] -> ['b*] -> ['a* 'b*]
-let concat (x:['a*]) (y:['b*]) =
-   if x is [] then y else (hd x)::(concat (tl x) y)
-
-let flatten_ocaml (x:[['a*]*])  =
-  if x is [] then [] else concat (hd x) (flatten_ocaml (tl x))
-
-let reverse (l:[['a*]*]) =
-  if l is [] then [] else concat (reverse (tl l)) [hd l]
+type tree('a) = [ ('a\[any*] | tree('a))* ]
+let deep_flatten (l : tree('a)) =
+  match l with
+  | [] -> []
+  | (x & :list)::y -> (deep_flatten x) @ (deep_flatten y)
+  | x::y -> x::(deep_flatten y)
+  end
 
 type expr = ("const", (0..)) | ("add", (expr, expr)) | ("uminus", expr)
 
@@ -577,14 +576,6 @@ let eval (e:expr) =
   | (:"uminus", e) -> 0 - (eval e)
   | (:"const", x) -> x
   end
-
-let mapi_aux (i:int) f (l:['a*]) =
-  match l with
-  | [] -> []
-  | x::ll -> let r = f i x in r::(mapi_aux (i+1) f ll)
-  end
-
-let mapi f l = mapi_aux 0 f l
 
 let rec_and_imp arr k i n =
   if k < n do arr[k]<- (i+k) ; rec_and_imp arr (k+1) i n end

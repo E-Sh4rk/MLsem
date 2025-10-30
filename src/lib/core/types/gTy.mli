@@ -35,3 +35,4 @@ val simplify : t -> t
 val normalize : t -> t
 
 val pp : Format.formatter -> t -> unit
+val pp' : Subst.t -> Format.formatter -> t -> unit

@@ -58,6 +58,9 @@ let rev_append l1 l2 =
   | x::l -> rev_append l (x::l2)
   end
 
+let rev l =
+  if l is [] then [] else (rev (tl l))@[hd l]
+
 let flatten l =
   match l with
   | [] -> []
@@ -91,13 +94,5 @@ let fold_right f acc l =
   | [] -> acc
   | x::ll -> f x (fold_right f acc ll)
   end
-
-(* type tree('a) = [ ('a\[any*] | tree('a))* ]
-let deep_flatten (l : tree('a)) =
-  match l with
-  | [] -> []
-  | (x & :list)::y -> (deep_flatten x) @ (deep_flatten y)
-  | x::y -> x::(deep_flatten y)
-  end *)
 
 #infer_overload = true

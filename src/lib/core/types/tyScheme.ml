@@ -36,17 +36,17 @@ let top_instance (tvs,t) =
 let simplify (tvs,ty) = (tvs, GTy.simplify ty)
 let normalize (tvs,ty) = (tvs, GTy.normalize ty)
 let norm_and_simpl ts = ts |> normalize |> simplify
-let pp fmt (tvs, ty) =
+let pp' s fmt (tvs, ty) =
   if TVarSet.is_empty tvs
-  then Format.fprintf fmt "%a" GTy.pp ty
+  then Format.fprintf fmt "%a" (GTy.pp' s) ty
   else
+    let tvs = TVarSet.destruct tvs
+    |> List.concat_map (fun v -> Subst.find s v |> TVOp.vars |> TVarSet.destruct)
+    |> TVarSet.construct
+    in
     Format.fprintf fmt "∀%a. %a"
-      (Utils.pp_seq TVar.pp ",") (TVarSet.destruct tvs) GTy.pp ty
+      (Utils.pp_seq TVar.pp ",") (TVarSet.destruct tvs) (GTy.pp' s) ty
 let pp_short fmt (tvs, ty) =
   let s = TVOp.shorten_names tvs in
-  let ty = GTy.substitute s ty in
-  let tvs = TVarSet.destruct tvs
-    |> List.map (fun v -> Subst.find s v |> TVOp.vars |> TVarSet.destruct |> List.hd)
-    |> TVarSet.construct
-  in
-  pp fmt (tvs,ty)
+  pp' s fmt (tvs,ty)
+let pp fmt t = pp' Subst.identity fmt t

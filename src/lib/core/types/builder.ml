@@ -128,7 +128,9 @@ module Builder' = struct
             | None -> None
             | Some (ty, ps) when List.length ps = List.length args ->
                 let s = List.combine ps args |> Subst.construct in
-                Some (Subst.apply s ty)
+                let res = Subst.apply s ty in
+                if List.is_empty ps |> not then Ty.register_parametrized name args res ;
+                Some res
             | Some _ -> None
         let get_abstract_type tenv name otys =
             match StrMap.find_opt name tenv.abs with
@@ -276,7 +278,7 @@ module Builder' = struct
             let (res, _) = derecurse_types tenv venv defs in
             let aliases = List.fold_left
                 (fun aliases (name, params, typ) ->
-                    if params = [] then Ty.register name typ ;
+                    if List.is_empty params then Ty.register name typ ;
                     StrMap.add name (typ, params) aliases
                 )
                 tenv.aliases res
