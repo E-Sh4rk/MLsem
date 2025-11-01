@@ -42,7 +42,9 @@ module Ty = struct
 
   let pp fmt ty = Sstt.Printer.print_ty (printer_params ()) fmt ty
   let pp' s fmt ty = Sstt.Printer.print_ty (printer_params' s) fmt (Sstt.Subst.apply s ty)
-  let pp_raw = Sstt.Printer.print_ty'
+  let pp_raw fmt ty =
+    let t = Sstt.Printer.get ~inline:true Sstt.Printer.empty_params ty in
+    Sstt.Printer.print fmt t
 
   let register_parametrized name ps ty =
     let module StrMap = Map.Make(String) in
