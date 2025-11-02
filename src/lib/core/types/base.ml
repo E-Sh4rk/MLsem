@@ -19,13 +19,6 @@ module PEnv = struct
 
   type _ Effect.t += Update: t -> unit Effect.t
   type _ Effect.t += Get: t Effect.t
-  let sequential_handler (t:t) f a =
-    let open Effect.Deep in
-    let t = ref t in
-    match f a with
-    | x -> x, !t
-    | effect Get, k -> continue k !t
-    | effect Update penv', k -> t := penv' ; continue k ()
 
   let add_printer_param p = pparams := Sstt.Printer.merge_params [!pparams ; p]
   let printer_params' s =
@@ -64,6 +57,14 @@ module PEnv = struct
     let paliases = List.fold_left add_palias penv1.paliases penv2.paliases in
     { aliases ; paliases }
   let merge' penvs = List.fold_left merge empty penvs
+
+  let sequential_handler (t:t) f a =
+    let open Effect.Deep in
+    let t = ref t in
+    match f a with
+    | x -> x, !t
+    | effect Get, k -> continue k !t
+    | effect Update t', k -> t := merge !t t' ; continue k ()
 
   let register str ty =
     perform (Update { empty with aliases=[ty,str] })
