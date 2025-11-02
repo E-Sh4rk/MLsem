@@ -4,6 +4,7 @@ module PEnv : sig
     type t (* Printing environment *)
     type _ Effect.t += Update: t -> unit Effect.t
     type _ Effect.t += Get: t Effect.t
+    val sequential_handler : t -> ('a -> 'b) -> 'a -> 'b * t
 
     val empty : t
     val merge : t -> t -> t

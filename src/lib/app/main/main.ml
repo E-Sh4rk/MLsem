@@ -226,16 +226,9 @@ let treat (benv,varm,senv,env) (annot, elem) =
       Some (Format.asprintf "type inferred: %a" TyScheme.pp_short ty),
       retrieve_time time)
 
-let naive_penv_handler (penv:PEnv.t) f a = (* TODO: optimize aliases by tracking dependencies *)
-  let open Effect.Deep in
-  let penv = ref penv in
-  match f a with
-  | x -> x, !penv
-  | effect PEnv.Get, k -> continue k !penv
-  | effect PEnv.Update penv', k -> penv := penv' ; continue k ()
-
 let treat (benv,varm,senv,env,penv) e =
-  let ((benv,varm,senv,env),r), penv = naive_penv_handler penv (treat (benv,varm,senv,env)) e in
+  (* TODO: optimize aliases by tracking dependencies *)
+  let ((benv,varm,senv,env),r), penv = PEnv.sequential_handler penv (treat (benv,varm,senv,env)) e in
   (benv,varm,senv,env,penv),r
 
 let treat_sig envs (annot,elem) =
