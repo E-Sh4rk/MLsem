@@ -1,4 +1,5 @@
 open Mlsem_common
+open Mlsem_app
 open Mlsem_app.Main
 open Mlsem_utils
 open Yojson.Safe
@@ -87,7 +88,7 @@ let () =
         let time = Unix.gettimeofday () in
         List.rev !input_files |> List.iter (fun fn ->
             Format.printf "@.@{<bold>===== Processing %s =====@}@." fn ;
-            Recording.clear () ;
+            Recording.clear () ; Config.restore_all () ;
             match parse (`File fn) with
             | PSuccess program ->
                 let time0 = Unix.gettimeofday () in

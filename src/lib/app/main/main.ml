@@ -188,12 +188,12 @@ let treat (benv,varm,senv,env) (annot, elem) =
       end
     | PAst.Command (str, c) ->
       begin match str, c with
-      | "value_restriction", Bool b -> Mlsem_system.Config.value_restriction := b
+      | "value_restriction", Bool b -> Config.value_restriction := b
       | "type_narrowing", Bool b -> Config.type_narrowing := b
       | "allow_implicit_downcast", Bool b -> Config.allow_implicit_downcast := b
-      | "infer_overload", Bool b -> Mlsem_system.Config.infer_overload := b
-      | "no_empty_param", Bool b -> Mlsem_system.Config.no_empty_param := b
-      | "no_abstract_inter", Bool b -> Mlsem_system.Config.no_abstract_inter := b
+      | "infer_overload", Bool b -> Config.infer_overload := b
+      | "no_empty_param", Bool b -> Config.no_empty_param := b
+      | "no_abstract_inter", Bool b -> Config.no_abstract_inter := b
       | _ -> failwith ("Invalid command "^str)
       end ;
       (benv,varm,senv,env), TDone
@@ -255,13 +255,11 @@ let treat_all_sigs envs elts =
   aux envs elts
 
 let builtin_functions = []
-
 let initial_varm =
   builtin_functions |> List.fold_left (fun varm (name, _) ->
     let var = MVariable.create Immut (Some name) in
     NameMap.add name var varm
   ) PAst.empty_name_var_map
-
 let initial_env =
   builtin_functions |> List.fold_left (fun env (name, t) ->
     let var = NameMap.find name initial_varm in
@@ -269,11 +267,8 @@ let initial_env =
   ) Env.empty
 
 let initial_senv = VarMap.empty
-
 let initial_benv = empty_benv
-
 let initial_penv = PEnv.empty
-
 let initial_envs = initial_benv, initial_varm, initial_senv, initial_env, initial_penv
 
 type parsing_result =

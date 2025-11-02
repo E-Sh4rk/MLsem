@@ -93,11 +93,11 @@ let or_ = fun (x,y) -> not_ (and_ (not_ x, not_ y))
 
 (* ===== Type narrowing ===== *)
 
+#type_narrowing = true
+
 val strlen : string -> int
 val add : int -> int -> int
 val add1 : int -> int
-
-#type_narrowing = true
 
 let impossible_branch = fun x ->
   if x is int then add1 x else (42 3)
@@ -305,6 +305,3 @@ let implicit14 = fun input ->
     else if is_int(fst extra) is true then
         add (strlen input) (fst extra)
     else 0
-
-#infer_overload = true
-#type_narrowing = true

@@ -1,4 +1,5 @@
 open Mlsem_common
+open Mlsem_app
 open Mlsem_app.Main
 open Js_of_ocaml
 open Yojson.Basic
@@ -73,6 +74,7 @@ let notify_res callback res =
   )
 
 let typecheck code callback =
+  Config.restore_all () ;
   let res =
     try (
       match parse (`String (Js.to_string code)) with

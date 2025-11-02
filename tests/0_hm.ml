@@ -178,5 +178,3 @@ let map_stub map f lst =
   else (f (hd lst))::(map f (tl lst))
 
 let map' x = fixpoint map_stub x
-
-#infer_overload = true

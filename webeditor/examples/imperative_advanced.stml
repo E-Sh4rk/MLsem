@@ -1,6 +1,4 @@
 
-# value_restriction = true
-
 val (+) : (int, int) -> int
 val (-) : (int, int) -> int
 val ( * ) : (int, int) -> int

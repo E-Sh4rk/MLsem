@@ -1,6 +1,4 @@
 
-# value_restriction = false
-
 val (+) : (int, int) -> int
 val (-) : (int, int) -> int
 val ( * ) : (int, int) -> int
@@ -14,23 +12,23 @@ let fixpoint = fun f ->
      f ( fun  v -> ( x x v ))
    in delta delta
 
-val succ : int->int
+val succ : int -> int
 
 let fact_stub fact n =
   if n is 0 then 1 else (fact (n-1))*n
 
-let fact = fixpoint fact_stub
+let fact n = fixpoint fact_stub n
 
 let length_stub length lst =
   if lst is [] then 0 else succ (length (tl lst))
 
-let length = fixpoint length_stub
+let length lst = fixpoint length_stub lst
 
 let map_stub map f lst =
   if lst is [] then []
   else (f (hd lst))::(map f (tl lst))
 
-let map = fixpoint map_stub
+let map f lst = fixpoint map_stub f lst
 
 (* === Pattern Matching and Type Narrowing === *)
 
@@ -70,10 +68,10 @@ let filtermap (f, l) =
     end
   end
 
-let mapi_aux (i:int) f (l:['a*]) =
+let mapi_aux i f (l:['a*]) =
   match l with
   | [] -> []
   | x::ll -> let r = f i x in r::(mapi_aux (i+1) f ll)
   end
 
-let mapi = mapi_aux 0
+let mapi f l = mapi_aux 0 f l
