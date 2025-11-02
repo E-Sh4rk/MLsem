@@ -9,35 +9,20 @@ let pparams = ref (
     ] |> Sstt.Printer.merge_params
   )
 
-module Ty = struct
-  type t = Sstt.Ty.t
+open Effect
+
+module PEnv = struct
   type gstring (* gap string *) = string (* name *)
                                 * (string * Sstt.Var.t) list (* gaps (type variables) *)
-  type penv = { aliases: (t * string) list ;
-               paliases: (t * gstring) list }
+  type t = { aliases: (Sstt.Ty.t * string) list ;
+             paliases: (Sstt.Ty.t * gstring) list }
 
-  let empty_penv = { aliases = [] ; paliases = [] }
-  let merge_penvs penv1 penv2 =
-    let add_alias a (ty, str) =
-      let a = a
-      |> List.filter (fun (_,str') -> String.equal str str' |> not)
-      |> List.filter (fun (ty',_) -> Sstt.Ty.equiv ty ty' |> not)
-      in
-      (ty,str)::a
-    in
-    let add_palias pa (ty, gstr) =
-      let pa = pa |> List.filter (fun (ty',_) -> Sstt.Ty.equiv ty ty' |> not) in
-      (ty, gstr)::pa
-    in
-    let aliases = List.fold_left add_alias penv1.aliases penv2.aliases in
-    let paliases = List.fold_left add_palias penv1.paliases penv2.paliases in
-    { aliases ; paliases }
-  let merge_penvs' penvs = List.fold_left merge_penvs empty_penv penvs
-  let register penv str ty =
-    let penv' = { empty_penv with aliases=[ty,str] } in
-    merge_penvs penv penv'
-  
-  let printer_params' penv s =
+  type _ Effect.t += Update: t -> unit Effect.t
+  type _ Effect.t += Get: t Effect.t
+
+  let add_printer_param p = pparams := Sstt.Printer.merge_params [!pparams ; p]
+  let printer_params' s =
+    let penv = perform Get in
     let paliases =
       penv.paliases |> List.map (fun (ty, (str,holes)) ->
           let ty = Sstt.Subst.apply s ty in
@@ -52,19 +37,31 @@ module Ty = struct
     let aliases = penv.aliases in
     let pparams' = { Sstt.Printer.empty_params with aliases=aliases@paliases } in
     Sstt.Printer.merge_params [ !pparams ; pparams' ]
-  let printer_params penv = printer_params' penv Sstt.Subst.identity
+  let printer_params () = printer_params' Sstt.Subst.identity
 
-  let add_printer_param p = pparams := Sstt.Printer.merge_params [!pparams ; p]
+  let empty = { aliases = [] ; paliases = [] }
 
-  let pp penv fmt ty = Sstt.Printer.print_ty (printer_params penv) fmt ty
-  let pp' penv s fmt ty =
-    Sstt.Printer.print_ty (printer_params' penv s) fmt (Sstt.Subst.apply s ty)
-  let pp_na fmt ty = pp empty_penv fmt ty
-  let pp_raw fmt ty =
-    let t = Sstt.Printer.get ~inline:true Sstt.Printer.empty_params ty in
-    Sstt.Printer.print fmt t
+  let merge penv1 penv2 =
+    let add_alias a (ty, str) =
+      let a = a
+      |> List.filter (fun (_,str') -> String.equal str str' |> not)
+      |> List.filter (fun (ty',_) -> Sstt.Ty.equiv ty ty' |> not)
+      in
+      (ty,str)::a
+    in
+    let add_palias pa (ty, gstr) =
+      let pa = pa |> List.filter (fun (ty',_) -> Sstt.Ty.equiv ty ty' |> not) in
+      (ty, gstr)::pa
+    in
+    let aliases = List.fold_left add_alias penv1.aliases penv2.aliases in
+    let paliases = List.fold_left add_palias penv1.paliases penv2.paliases in
+    { aliases ; paliases }
+  let merge' penvs = List.fold_left merge empty penvs
 
-  let register_parametrized penv name ps ty =
+  let register str ty =
+    perform (Update { empty with aliases=[ty,str] })
+
+  let register_parametrized name ps ty =
     let module StrMap = Map.Make(String) in
     try
       let sep,prio,_ = Sstt.Prec.varop_info Sstt.Prec.Tuple in
@@ -76,8 +73,9 @@ module Ty = struct
         hmap := StrMap.add name v !hmap ;
         name
       in
+      let pparam = printer_params () in
       let pp_param fmt ty =
-        let t = Sstt.Printer.get ~inline:true (printer_params penv) ty in
+        let t = Sstt.Printer.get ~inline:true pparam ty in
         if List.is_empty t.defs |> not then raise Exit ;
         let d = t.main |> Sstt.Printer.map_descr (fun d ->
             match d.op with
@@ -88,9 +86,19 @@ module Ty = struct
         Sstt.Printer.print_descr_ctx prio Sstt.Prec.NoAssoc fmt d
       in
       let str = Format.asprintf "%s(%a)" name (Mlsem_utils.Utils.pp_seq pp_param sep) ps in
-      let penv' = { empty_penv with paliases=[ty, (str, StrMap.bindings !hmap)] } in
-      merge_penvs penv penv'
-    with Exit -> penv
+      perform (Update { empty with paliases=[ty, (str, StrMap.bindings !hmap)] })
+    with Exit -> ()
+end
+
+module Ty = struct
+  type t = Sstt.Ty.t
+  
+  let pp fmt ty = Sstt.Printer.print_ty (PEnv.printer_params ()) fmt ty
+  let pp' s fmt ty =
+    Sstt.Printer.print_ty (PEnv.printer_params' s) fmt (Sstt.Subst.apply s ty)
+  let pp_raw fmt ty =
+    let t = Sstt.Printer.get ~inline:true Sstt.Printer.empty_params ty in
+    Sstt.Printer.print fmt t
   let any = Sstt.Ty.any
   let empty = Sstt.Ty.empty
 
@@ -102,7 +110,7 @@ module Ty = struct
   let char = Sstt.Extensions.Chars.any
   let unit =
     let ty = Sstt.Descr.mk_tuple [] |> Sstt.Ty.mk_descr in
-    add_printer_param { Sstt.Printer.empty_params with aliases=[ty, "()"] } ; ty
+    PEnv.add_printer_param { Sstt.Printer.empty_params with aliases=[ty, "()"] } ; ty
   let string = Sstt.Extensions.Strings.any
 
   let interval i1 i2 =
@@ -157,7 +165,7 @@ module Abstract = struct
     let vs = List.init n (fun _ -> Sstt.Extensions.Abstracts.Inv) in
     let tag = Sstt.Extensions.Abstracts.define name vs in
     let printer = Sstt.Extensions.Abstracts.printer_params tag in
-    Ty.add_printer_param printer ; tag
+    PEnv.add_printer_param printer ; tag
   let arity = Sstt.Extensions.Abstracts.arity
   let mk = Sstt.Extensions.Abstracts.mk
   let any = Sstt.Extensions.Abstracts.mk_any
