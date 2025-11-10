@@ -434,24 +434,7 @@ let filter_imp_test =
   push arr "abc" ;
   arr
 
-(* ========= INFERENCE OF NON-OVERLOADED TYPES, HEURISTICS ========= *)
-
-# infer_overload = false
-
-let eval2 e =
-  match e with
-  | (:"add", (e1, e2)) -> (eval2 e1) + (eval2 e2)
-  | (:"uminus", e) -> 0 - (eval2 e)
-  | (:"const", x) -> x
-  end
-
-let map_noannot2 f lst =
-  match lst with
-  | [] -> []
-  | a::lst -> (f a)::(map_noannot2 f lst)
-  end
-
-# infer_overload = true
+(* ========= ALTERNATIVES ========= *)
 
 val f1 : int -> int
 val f2 : bool -> bool
