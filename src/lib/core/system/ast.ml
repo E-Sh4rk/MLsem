@@ -8,12 +8,12 @@ let pp_ccustom fmt cc = Format.fprintf fmt "%s" cc.cname
 type check = Check | CheckStatic | NoCheck
 [@@deriving show]
 type projection =
-| Pi of int * int | Field of string | Hd | Tl | PiTag of Tag.t
-| PCustom of pcustom
+| Pi of int * int | Field of string | FieldOpt of string
+| Hd | Tl | PiTag of Tag.t | PCustom of pcustom
 [@@deriving show]
 type constructor =
 | Tuple of int | Cons | Rec of (string * bool) list * bool | Tag of Tag.t | Enum of Enum.t 
-| RecUpd of string | RecDel of string | Join of int | Meet of int
+| RecUpd of string | RecDel of string | Join of int | Meet of int | Ternary of Ty.t
 | Ignore of Ty.t (* Should not contain type vars *) | CCustom of ccustom
 [@@deriving show]
 type e =

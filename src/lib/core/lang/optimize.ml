@@ -10,7 +10,7 @@ let eval_order_of_constructor c =
   | SA.Rec _ -> !Config.record_eval_order
   | SA.RecUpd _ -> !Config.recupd_eval_order
   | SA.Tag _ | SA.Enum _ | SA.RecDel _ -> Config.LeftToRight
-  | SA.Meet _ | SA.Join _ | SA.Ignore _ -> Config.UnknownOrder
+  | SA.Meet _ | SA.Join _ | SA.Ternary _ | SA.Ignore _ -> Config.UnknownOrder
   | SA.CCustom c ->
     begin match Hashtbl.find_opt Config.ccustom_eval_order c.cname with
     | None -> Config.UnknownOrder

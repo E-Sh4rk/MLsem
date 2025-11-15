@@ -134,10 +134,8 @@ module REnv = struct
   let conj lst = List.fold_left cap empty lst
 
   let neg t =
-    bindings t |> List.filter_map (fun (v,ty) ->
-      let nty = Ty.neg ty in
-      if Ty.is_empty nty then None else Some (singleton v nty)
-    )
+    bindings t |> List.map
+      (fun (v,ty) -> Ty.neg ty |> singleton v)
 
   let cup_approx (m1, s1) (m2, s2) =
     (VarMap.merge (fun _ t1 t2 -> match t1, t2 with
@@ -152,7 +150,10 @@ module REnv = struct
     | [] -> raise (Invalid_argument "Argument cannot be the empty list.")
     | hd::tl -> List.fold_left cup_approx hd tl
 
-  let neg_approx t = try Some (neg t |> disj_approx) with Invalid_argument _ -> None
+  let neg_approx t =
+    match neg t with
+    | [] -> None
+    | lst -> Some (disj_approx lst)
 end
 
 module REnvSet = struct

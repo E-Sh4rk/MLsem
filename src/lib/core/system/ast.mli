@@ -5,11 +5,11 @@ type pcustom = { pname: string ; pdom: Ty.t -> Ty.t ; proj: Ty.t -> Ty.t ; pgen:
 type ccustom = { cname: string ; cdom: Ty.t -> Ty.t list list ; cons: Ty.t list -> Ty.t ; cgen: bool }
 type check = Check | CheckStatic | NoCheck
 type projection =
-| Pi of int * int | Field of string | Hd | Tl | PiTag of Tag.t
-| PCustom of pcustom
+| Pi of int * int | Field of string | FieldOpt of string
+| Hd | Tl | PiTag of Tag.t | PCustom of pcustom
 type constructor =
 | Tuple of int | Cons | Rec of (string * bool) list * bool | Tag of Tag.t | Enum of Enum.t 
-| RecUpd of string | RecDel of string | Join of int | Meet of int
+| RecUpd of string | RecDel of string | Join of int | Meet of int | Ternary of Ty.t
 | Ignore of Ty.t (* Should not contain type vars *) | CCustom of ccustom
 type e =
 | Value of GTy.t

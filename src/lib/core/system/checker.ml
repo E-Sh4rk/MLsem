@@ -7,8 +7,8 @@ open Ast
 
 let domain_of_proj p ty =
   match p with
-  | Field label ->
-    Record.mk true [label, (false, ty)]
+  | Field label -> Record.mk true [label, (false, ty)]
+  | FieldOpt label -> Record.mk true [label, (true, ty)]
   | Pi(n,i) ->
     if i >= n then Ty.empty
     else Tuple.mk (List.init n (fun k -> if k=i then ty else Ty.any))
@@ -22,7 +22,7 @@ let domain_of_proj p ty =
 
 let proj p ty =
   match p with
-  | Field label -> Record.proj ty label
+  | Field label | FieldOpt label -> Record.proj ty label
   | Pi (n,i) -> Tuple.proj n i ty
   | Hd -> Lst.proj ty |> fst
   | Tl -> Lst.proj ty |> snd
@@ -39,6 +39,7 @@ let domains_of_construct (c:Ast.constructor) ty =
     Tuple.dnf n ty
     |> List.filter (fun b -> Ty.leq (Tuple.mk b) ty)
   | Join n | Meet n -> [List.init n (fun _ -> ty)]
+  | Ternary _ -> [ [ Ty.any ; ty ; ty ] ]
   | Ignore ty' when Ty.leq ty' ty -> [ [Ty.any] ]
   | Ignore _ -> []
   | Cons ->
@@ -78,6 +79,10 @@ let construct (c:Ast.constructor) tys =
   | Tuple n, tys when List.length tys = n -> Tuple.mk tys
   | Join n, tys when List.length tys = n -> Ty.disj tys
   | Meet n, tys when List.length tys = n -> Ty.conj tys
+  | Ternary tau, [t;t1;t2] ->
+    if Ty.leq t tau then t1
+    else if Ty.leq t (Ty.neg tau) then t2
+    else Ty.cup t1 t2
   | Ignore ty, [_] -> ty
   | Cons, [t1 ; t2] -> Lst.cons t1 t2
   | Rec (labels, opened), tys when List.length labels = List.length tys ->
@@ -101,12 +106,12 @@ let untypeable id msg = raise (Untypeable { eid=id ; title=msg ; descr=None })
 
 let proj_is_gen p =
   match p with
-  | Pi _ | Field _ | Hd | Tl | PiTag _ -> true
+  | Pi _ | Field _ | FieldOpt _ | Hd | Tl | PiTag _ -> true
   | PCustom c -> c.pgen
 let constr_is_gen c =
   match c with
   | Tuple _ | Cons | Rec _ | Tag _ | Enum _
-  | RecUpd _ | RecDel _ | Join _ | Meet _ -> true
+  | RecUpd _ | RecDel _ | Join _ | Meet _  | Ternary _ -> true
   | Ignore _ -> false
   | CCustom c -> c.cgen
 let rec is_gen (_,e) =
