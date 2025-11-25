@@ -147,7 +147,9 @@ let rec infer cache env renvs annot (id, e) =
     let (tvs,_) = Env.find v env |> TyScheme.get in
     let s = TVCache.get' cache.tvcache id tvs in
     retry_with (nc (Annot.AVar s))
-  | Var _, Infer -> Fail
+  | Var v, Infer ->
+    log "unbound variable" (fun fmt -> Format.fprintf fmt "name: %a" Variable.pp v) ;
+    Fail
   | Constructor (_, es), Infer -> retry_with (AConstruct (List.map (fun _ -> Infer) es))
   | Constructor (c, es), AConstruct annots ->
     begin match infer_seq' cache env renvs (List.combine annots es) with
