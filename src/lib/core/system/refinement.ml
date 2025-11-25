@@ -26,53 +26,48 @@ let is_empty renv =
 
 let sufficient_refinements env e t =
   let rec aux env (_,e) t =
-    if Ty.is_any t then [REnv.empty]
-    else
-      let renvs = match e with
-      | Lambda _ -> []
-      | LambdaRec _ -> []
-      | Var v -> [REnv.singleton v t]
-      | Constructor (c, es) ->
-        Checker.domains_of_construct c t |> List.concat_map
-          (fun ts -> List.map2 (fun e t -> aux env e t) es ts |> combine')
-      | TypeCoerce (_, s, _) when Ty.leq (GTy.lb s) t -> [REnv.empty]
-      | Value s when Ty.leq (GTy.lb s) t -> [REnv.empty]
-      | Value _ | TypeCoerce _ -> []
-      | Projection (p, e) -> aux env e (Checker.domain_of_proj p t)
-      | TypeCast (e, _, _) -> aux env e t
-      | App ((_, Var v), e) when Env.mem v env ->
-        let alpha = TVar.mk KInfer None in
-        let (mono, ty) = Env.find v env |> TyScheme.get_fresh in
-        let mono = TVarSet.union mono (vars t) in
-        begin match Arrow.dnf (GTy.lb ty) with
-        | [] -> []
-        | [arrows] ->
-          let t1 = Arrow.of_dnf [arrows] in
-          let res = tallying mono [ (t1, Arrow.mk (TVar.typ alpha) t) ] in
-          res |> List.concat_map (fun sol ->
-              let targ = Subst.find sol alpha |> top_instance mono in
-              if TVarSet.subset (vars targ) mono |> not then [] else aux env e targ
-            )
-        | _ -> []
-        end
-      | App _ -> []
-      | Ite (e, s, e1, e2) ->
-        let r1 = combine (aux env e s) (aux env e1 t) in
-        let r2 = combine (aux env e (Ty.neg s)) (aux env e2 t) in
-        r1@r2
-      | Alt (e1, e2) -> (aux env e1 t)@(aux env e2 t)
-      | Let (_, v, e1, e2) ->
-        aux (Env.add v (typeof env e1) env) e2 t
-        |> List.concat_map (fun renv ->
-            if REnv.mem v renv
-            then
-              let renv, t = REnv.rm v renv, REnv.find v renv in
-              let renvs = aux env e1 t in
-              List.map (REnv.cap renv) renvs
-            else [renv]
+    let renvs = match e with
+    | Lambda _ -> []
+    | LambdaRec _ -> []
+    | Var v -> [REnv.singleton v t]
+    | Constructor (c, es) ->
+      Checker.domains_of_construct c t |> List.concat_map
+        (fun ts -> List.map2 (fun e t -> aux env e t) es ts |> combine')
+    | TypeCoerce (_, s, _) when Ty.leq (GTy.lb s) t -> [REnv.empty]
+    | Value s when Ty.leq (GTy.lb s) t -> [REnv.empty]
+    | Value _ | TypeCoerce _ -> []
+    | Projection (p, e) -> aux env e (Checker.domain_of_proj p t)
+    | TypeCast (e, _, _) -> aux env e t
+    | App ((_, Var v), e) when Env.mem v env ->
+      let alpha = TVar.mk KInfer None in
+      let (mono, ty) = Env.find v env |> TyScheme.get_fresh in
+      let mono = TVarSet.union mono (vars t) in
+      begin match Arrow.dnf (GTy.lb ty) with
+      | [] -> []
+      | [arrows] ->
+        let t1 = Arrow.of_dnf [arrows] in
+        let res = tallying mono [ (t1, Arrow.mk (TVar.typ alpha) t) ] in
+        res |> List.concat_map (fun sol ->
+            let targ = Subst.find sol alpha |> top_instance mono in
+            if TVarSet.subset (vars targ) mono |> not then [] else aux env e targ
           )
-      in
-      renvs |> List.filter (fun renv -> is_empty renv |> not)
+      | _ -> []
+      end
+    | App _ -> []
+    | Ite (e, s, e1, e2) ->
+      let r1 = combine (aux env e s) (aux env e1 t) in
+      let r2 = combine (aux env e (Ty.neg s)) (aux env e2 t) in
+      r1@r2
+    | Alt (e1, e2) -> (aux env e1 t)@(aux env e2 t)
+    | Let (_, v, e1, e2) ->
+      aux (Env.add v (typeof env e1) env) e2 t
+      |> List.concat_map (fun renv ->
+          let renv, t = REnv.rm v renv, REnv.find' v renv in
+          let renvs = aux env e1 t in
+          List.map (REnv.cap renv) renvs
+        )
+    in
+    renvs |> List.filter (fun renv -> is_empty renv |> not)
   in
   aux env e t
 
