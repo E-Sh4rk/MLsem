@@ -18,7 +18,7 @@
 (package
  (name mlsem-types)
  (synopsis "Type bindings for MLsem")
- (depends (ocaml (>= 5.3.0)) dune (sstt (>= 0.1.0)) zarith)
+ (depends (ocaml (>= 5.3.0)) dune (sstt (>= 0.1.0)) zarith yojson)
 )
 
 (package

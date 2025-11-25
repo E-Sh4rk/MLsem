@@ -2,7 +2,6 @@ open Mlsem_common
 open Mlsem_app
 open Mlsem_app.Main
 open Mlsem_utils
-open Yojson.Safe
 open Mlsem_types
 
 let severity_to_str s =
@@ -41,30 +40,6 @@ let treat_res (acc, res) =
         acc, false
     | TDone -> acc, true
 
-let save_recorded file =
-    let ty_to_string ty = `String (Format.asprintf "%a" Ty.pp_raw ty) in
-    let tallys = Recording.tally_calls () in
-    let instances = tallys |> List.map (fun (r:Recording.tally_call) ->
-        let s = TVOp.shorten_names (TVarSet.construct r.vars) in
-        let ty_to_string ty = Subst.apply s ty |> ty_to_string in
-        let to_str = List.map (fun v -> TVar.typ v |> ty_to_string) in
-        let vars, mono = to_str r.vars, to_str r.mono in
-        let cs = r.constraints |> List.map (fun (s,t) ->
-            `List  [ty_to_string s ; ty_to_string t]
-            )
-        in
-        `Assoc [ ("vars", `List vars) ; ("mono", `List mono) ; ("constr", `List cs) ]
-    ) in
-    let file = (Filename.remove_extension file)^".json" in
-    let oc = open_out file in
-    try
-        pretty_to_channel oc (`List instances) ;
-        close_out oc
-    with e ->
-        close_out_noerr oc;
-        raise e
-    (* to_file ~suf:"" file (`List instances) *)
-
 (* Command line *)
 let usage_msg = "mlsem [-record] <file1> [<file2>] ..."
 let record = ref false
@@ -97,7 +72,7 @@ let () =
                     ) envs program |> ignore ;
                 let time1 = Unix.gettimeofday () in
                 Format.printf "@{<bold;green>Total time: %.02fs@}@." (time1 -. time0) ;
-                if !record then save_recorded fn
+                if !record then Recording.save_to_file fn (Recording.tally_calls ())
             | PFailure (pos, msg) ->
                 Format.printf "@{<bold;red>%s: %s@}@." (Position.string_of_pos pos) msg
         ) ;
