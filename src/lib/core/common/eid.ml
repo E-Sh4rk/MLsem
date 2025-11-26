@@ -18,5 +18,6 @@ let refresh parent =
 let loc eid =
   match Hashtbl.find_opt eid_locs eid with
   | None -> Position.dummy
-  | Some p -> p     
+  | Some p -> p
+let equal, compare, hash = Int.equal, Int.compare, Int.hash
 let pp fmt t = Format.fprintf fmt "%i" t

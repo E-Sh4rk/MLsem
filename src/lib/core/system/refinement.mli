@@ -2,7 +2,7 @@ open Mlsem_common
 open Mlsem_types
 
 val refine : Env.t -> Ast.t -> Ty.t -> REnv.t
-val refinement_envs : Env.t -> Ast.t -> REnvSet.t
+val refinement_envs : ?extra_checks:(Eid.t * Ty.t) list -> Env.t -> Ast.t -> REnvSet.t
 val partition : Ty.t list -> Ty.t list
 
 module Partitioner : sig

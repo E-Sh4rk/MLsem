@@ -88,7 +88,9 @@ let refine env e t =
   in
   aux base_renv renvs
 
-let refinement_envs env e =
+let refinement_envs ?(extra_checks=[]) env e =
+  let extra = Hashtbl.create 10 in
+  extra_checks |> List.iter (fun (eid, ty) -> Hashtbl.add extra eid ty) ;
   let res = ref REnvSet.empty in
   let add_refinement env e t =
     res := REnvSet.add !res (refine env e t)
@@ -96,7 +98,9 @@ let refinement_envs env e =
   let rec aux_lambda env (d,v,e) =
     let t = TyScheme.mk_mono d in
     aux (Env.add v t env) e
-  and aux env (_,e) : unit =
+  and aux env (id,e) : unit =
+    let extra = Hashtbl.find_all extra id in
+    extra |> List.iter (fun ty -> add_refinement env (id,e) ty) ;
     match e with
     | Value _ | Var _ -> ()
     | Constructor (_, es) -> es |> List.iter (aux env)
