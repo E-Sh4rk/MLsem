@@ -30,19 +30,19 @@ end
 
 module IAnnot : sig
   type coverage = (Eid.t * Ty.t) option * REnv.t
-  type branch = BType of t | BSkip | BInfer
+  type branch = BType of bool (* explored *) * t | BSkip
   and inter_branch = { coverage: coverage option ; ann: t }
   and inter = inter_branch list
   and part = (Ty.t * t) list
   and t =
   | A of Annot.t
-  | Infer
   | Untyp
+  | AVar of (MVarSet.t -> Subst.t)
   | AConstruct of t list
   | ALet of t * part
-  | AApp of t * t
-  | AOp of Subst.t * t
-  | AProj of t
+  | AApp of t * t * Ty.t (* result *)
+  | AOp of (MVarSet.t -> Subst.t) * t * Ty.t (* result *)
+  | AProj of t * Ty.t (* result *)
   | ACast of t
   | ACoerce of GTy.t * t
   | AIte of t * branch * branch

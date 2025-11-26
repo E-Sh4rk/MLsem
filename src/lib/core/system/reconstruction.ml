@@ -6,13 +6,57 @@ open Ast
 open Caching
 open Mlsem_utils
 
+(* ===== Initial Annot ===== *)
+
+let rec initial renv (_, e) =
+  let new_renaming () =
+    let s = ref Subst.identity in
+    fun dom ->
+      let dom' = Subst.domain !s in
+      let dom = MVarSet.diff dom dom' in
+      let s' = TVOp.refresh ~kind:KInfer dom in
+      s := Subst.combine !s s' ; !s
+  in
+  let new_result () =
+    TVar.mk KInfer None |> TVar.typ
+  in
+  let open IAnnot in
+  match e with
+  | Value ty -> A (AValue ty |> Annot.nc)
+  | Var _ -> AVar (new_renaming ())
+  | Constructor (_,es) -> AConstruct (List.map (initial renv) es)
+  | Lambda (dom, _, e) -> ALambda (dom, initial renv e)
+  | LambdaRec lst -> ALambdaRec (lst |> List.map (fun (dom, _, e) -> dom, initial renv e))
+  | Ite (e, _, e1, e2) ->
+    AIte (initial renv e, BType (false, initial renv e1), BType (false, initial renv e2))
+  | App (e1, e2) -> AApp (initial renv e1, initial renv e2, new_result ())
+  | Operation (_, e) -> AOp (new_renaming (), initial renv e, new_result ())
+  | Projection (_, e) -> AProj (initial renv e, new_result ())
+  | TypeCast (e, _, _) -> ACast (initial renv e)
+  | TypeCoerce (e, ty, _) -> ACoerce (ty, initial renv e)
+  | Alt (e1, e2) -> AAlt (Some (initial renv e1), Some (initial renv e2))
+  | Let (suggs, v, e1, e2) ->
+    let a1 = initial renv e1 in
+    let tys = Refinement.Partitioner.partition_for renv v suggs in
+    let parts = tys |> List.map (fun ty ->
+        let renv = Refinement.Partitioner.filter_compatible renv v ty in
+        (ty, initial renv e2)
+      ) in
+    ALet (a1, parts)
+
+let initial renv e =
+  let renv = Refinement.Partitioner.from_renvset renv in
+  initial renv e
+
+(* ===== Annotation Reconstruction ===== *)
+
 type ('a,'b) result =
 | Ok of 'a * GTy.t
 | Fail
 | Subst of (Subst.t * Ty.t) list * 'b * 'b * (Eid.t * REnv.t)
 
 type log = { eid: Eid.t ; title: string ; descr: Format.formatter -> unit }
-type cache = { dom : Domain.t ; tvcache : TVCache.t ; logs : log list ref }
+type cache = { dom : Domain.t ; logs : log list ref }
 
 (* Auxiliary *)
 
@@ -149,21 +193,20 @@ let rec seq (f : 'b -> 'c -> ('a,'b) result) (c : 'a->'b) (lst:('b*'c) list)
 
 let nc a = IAnnot.A (Annot.nc a)
 
-let rec infer cache env renvs annot (id, e) =
+let rec refine cache env annot (id, e) =
   let open IAnnot in
   let log msg descr =
     let log = { eid=id ; title=msg ; descr } in
     cache.logs := log::!(cache.logs)
   in
-  let retry_with a = infer cache env renvs a (id, e) in
+  let retry_with a = refine cache env a (id, e) in
   let to_i =
-    (function Annot.BSkip -> IAnnot.BSkip | Annot.BType a -> IAnnot.BType (A a)) in
+    (function Annot.BSkip -> IAnnot.BSkip | Annot.BType a -> IAnnot.BType (true, A a)) in
   let empty_cov = (id, REnv.empty) in
-  let app t1 t2 =
+  let app res t1 t2 =
     let t1, t2 = GTy.lb t1, GTy.lb t2 in
-    let tv = TVCache.get1 cache.tvcache id TVCache.res_tvar in
-    let arrow = Arrow.mk t2 (TVar.typ tv) in
-    let ss = tallying_simpl env (TVar.typ tv) [(t1, arrow)] in
+    let arrow = Arrow.mk t2 res in
+    let ss = tallying_simpl env res [(t1, arrow)] in
     let ss = if !Config.infer_overload || Ty.is_empty t2 then ss else
       ss |> List.filter (fun (s, _) -> Subst.apply s t2 |> Ty.non_empty)
     in
@@ -172,23 +215,18 @@ let rec infer cache env renvs annot (id, e) =
       ) ;
     ss
   in
-  let fresh_subst ts =
-    let (tvs,_) = TyScheme.get ts in
-    TVCache.get' cache.tvcache id tvs
-  in
   match e, annot with
   | _, A a -> Ok (a, Checker.typeof env a (id, e))
   | _, Untyp -> Fail
-  | Value ty, Infer -> retry_with (nc (Annot.AValue ty))
-  | Var v, Infer when Env.mem v env ->
-    let s = Env.find v env |> fresh_subst in
+  | Var v, AVar f when Env.mem v env ->
+    let tvs, _ = Env.find v env |> TyScheme.get in
+    let s = f tvs in
     retry_with (nc (Annot.AVar s))
-  | Var v, Infer ->
+  | Var v, AVar _ ->
     log "unbound variable" (fun fmt -> Format.fprintf fmt "name: %a" Variable.pp v) ;
     Fail
-  | Constructor (_, es), Infer -> retry_with (AConstruct (List.map (fun _ -> Infer) es))
   | Constructor (c, es), AConstruct annots ->
-    begin match infer_seq' cache env renvs (List.combine annots es) with
+    begin match refine_seq' cache env (List.combine annots es) with
     | OneFail -> Fail
     | OneSubst (ss, a, a',r) -> Subst (ss,AConstruct a,AConstruct a',r)
     | AllOk (annots,tys) ->
@@ -205,24 +243,21 @@ let rec infer cache env renvs annot (id, e) =
         ) ;
       Subst (ss, nc (Annot.AConstruct annots), Untyp, empty_cov)
     end
-  | Lambda (d,_,_), Infer -> retry_with (ALambda (d, Infer))
   | Lambda (_,v,e'), ALambda (ty, annot') ->
     let env' = Env.add v (TyScheme.mk_mono ty) env in
-    begin match infer' { cache with dom=Domain.empty } env' renvs annot' e' with
+    begin match refine' { cache with dom=Domain.empty } env' annot' e' with
     | Ok (annot', _) -> retry_with (nc (Annot.ALambda (ty, annot')))
     | Subst (ss,a,a',(eid,r)) ->
       Subst (ss,ALambda (ty, a),ALambda (ty, a'),(eid,REnv.add v (GTy.lb ty) r))
     | Fail -> Fail
     end
-  | LambdaRec lst, Infer ->
-    retry_with (ALambdaRec (List.map (fun (ty,_,_) -> ty, Infer) lst))
   | LambdaRec lst, ALambdaRec anns ->
     let lst = List.combine lst anns in
     let env' = lst |> List.fold_left
       (fun env ((_,v,_),(ty,_)) -> Env.add v (TyScheme.mk_mono ty) env) env in
     let tys = List.map fst anns in
     let aes = List.map (fun ((_,_,e),(_,a)) -> a,e) lst in
-    begin match infer_seq' { cache with dom=Domain.empty } env' renvs aes with
+    begin match refine_seq' { cache with dom=Domain.empty } env' aes with
     | OneFail -> Fail
     | OneSubst (ss, a, a',(eid,r)) ->
       let r = lst |> List.fold_left
@@ -238,18 +273,17 @@ let rec infer cache env renvs annot (id, e) =
         ) ;
       Subst (ss, ok_ann, Untyp, empty_cov)
     end
-  | Ite _, Infer -> retry_with (AIte (Infer, BInfer, BInfer))
   | Ite (e0,tau,e1,e2), AIte (a0,a1,a2) ->
-    begin match infer' cache env renvs a0 e0 with
+    begin match refine' cache env a0 e0 with
     | Fail -> Fail
     | Subst (ss,a,a',r) -> Subst (ss,AIte (a,a1,a2),AIte (a',a1,a2),r)
     | Ok (a0, s) ->
-      begin match infer_b' cache env renvs a1 e1 s tau with
+      begin match refine_b' cache env a1 e1 s tau with
       | Fail -> Fail
       | Subst (ss, a1, a1',r) ->
         Subst (ss, AIte(A a0,a1,a2), AIte(A a0,a1',a2),r)
       | Ok (a1,_) ->
-        begin match infer_b' cache env renvs a2 e2 s (Ty.neg tau) with
+        begin match refine_b' cache env a2 e2 s (Ty.neg tau) with
         | Fail -> Fail
         | Subst (ss, a2, a2',r) ->
           Subst (ss, AIte(A a0,to_i a1,a2), AIte(A a0,to_i a1,a2'),r)
@@ -257,80 +291,71 @@ let rec infer cache env renvs annot (id, e) =
         end  
       end
     end
-  | Alt _, Infer -> retry_with (AAlt (Some Infer, Some Infer))
   | Alt _, AAlt (None, None) -> Fail
   | Alt _, AAlt (Some (A a1), None) -> retry_with (nc (Annot.AAlt(Some a1,None)))
   | Alt _, AAlt (None, Some (A a2)) -> retry_with (nc (Annot.AAlt(None,Some a2)))
   | Alt _, AAlt (Some (A a1), Some (A a2)) -> retry_with (nc (Annot.AAlt(Some a1,Some a2)))
   | Alt (_, e2), AAlt ((None | Some (A _) as a1), Some a2) ->
-    begin match infer' cache env renvs a2 e2 with
+    begin match refine' cache env a2 e2 with
     | Ok (a2, _) -> retry_with (AAlt (a1, Some (A a2)))
     | Subst (ss,a2,a2',r) -> Subst (ss,AAlt (a1,Some a2),AAlt (a1,Some a2'),r)
     | Fail -> retry_with (AAlt (a1, None))
     end
   | Alt (e1, _), AAlt (Some a1, a2) ->
-    begin match infer' cache env renvs a1 e1 with
+    begin match refine' cache env a1 e1 with
     | Ok (a1, _) -> retry_with (AAlt (Some (A a1), a2))
     | Subst (ss,a1,a1',r) -> Subst (ss,AAlt (Some a1,a2),AAlt (Some a1',a2),r)
     | Fail -> retry_with (AAlt (None, a2))
     end
-  | App _, Infer -> retry_with (AApp (Infer, Infer))
-  | App (e1, e2), AApp (a1,a2) ->
-    begin match infer_seq' cache env renvs [(a1,e1);(a2,e2)] with
+  | App (e1, e2), AApp (a1,a2,res) ->
+    begin match refine_seq' cache env [(a1,e1);(a2,e2)] with
     | OneFail -> Fail
     | OneSubst (ss, [a1;a2], [a1';a2'],r) ->
-      Subst (ss,AApp(a1,a2),AApp(a1',a2'),r)
+      Subst (ss,AApp(a1,a2,res),AApp(a1',a2',res),r)
     | AllOk ([a1;a2],[t1;t2]) ->
-      let ss = app t1 t2 in
+      let ss = app res t1 t2 in
       Subst (ss, nc (Annot.AApp(a1,a2)), Untyp, empty_cov)
     | _ -> assert false
     end
-  | Operation (o, _), Infer ->
-    retry_with (AOp (Checker.fun_of_operation o |> fresh_subst, Infer))
-  | Operation (o,e'), AOp (s,annot') ->
-    begin match infer' cache env renvs annot' e' with
+  | Operation (o,e'), AOp (f,annot',res) ->
+    begin match refine' cache env annot' e' with
     | Ok (annot', t') ->
-      let t = Checker.fun_of_operation o |> TyScheme.get |> snd |> GTy.substitute s in
-      let ss = app t t' in
+      let tvs, t = Checker.fun_of_operation o |> TyScheme.get in
+      let s = f tvs in
+      let t = GTy.substitute s t in
+      let ss = app res t t' in
       Subst (ss, nc (Annot.AOp(s,annot')), Untyp, empty_cov)
-    | Subst (ss,a,a',r) -> Subst (ss,AOp (s,a),AOp (s,a'),r)
+    | Subst (ss,a,a',r) -> Subst (ss,AOp (f,a,res),AOp (f,a',res),r)
     | Fail -> Fail
     end
-  | Projection _, Infer -> retry_with (AProj Infer)
-  | Projection (p,e'), AProj annot' ->
-    begin match infer' cache env renvs annot' e' with
+  | Projection (p,e'), AProj (annot',res) ->
+    begin match refine' cache env annot' e' with
     | Ok (annot', s) ->
-      let tv = TVCache.get1 cache.tvcache id TVCache.res_tvar in
-      let ty = Checker.domain_of_proj p (TVar.typ tv) in
+      let ty = Checker.domain_of_proj p res in
       let s = GTy.lb s in
-      let ss = tallying_simpl env (TVar.typ tv) [(s, ty)] in
+      let ss = tallying_simpl env res [(s, ty)] in
       log "untypeable projection" (fun fmt ->
         Format.fprintf fmt "argument: %a" Ty.pp s
         ) ;
       Subst (ss, nc (Annot.AProj annot'), Untyp, empty_cov)
-    | Subst (ss,a,a',r) -> Subst (ss,AProj a,AProj a',r)
+    | Subst (ss,a,a',r) -> Subst (ss,AProj (a,res),AProj (a',res),r)
     | Fail -> Fail
     end
-  | Let (suggs,v,_,_), Infer ->
-    let tys = Refinement.Partitioner.partition_for renvs v suggs in
-    retry_with (ALet (Infer, List.map (fun ty -> (ty, Infer)) tys))
   | Let (_,v,e1,e2), ALet(annot1,parts) ->
-    begin match infer' cache env renvs annot1 e1 with
+    begin match refine' cache env annot1 e1 with
     | Fail -> Fail
     | Subst (ss,a,a',r) -> Subst (ss,ALet (a,parts),ALet (a',parts),r)
     | Ok (annot1, s) ->
       let tvs, s = Checker.generalize ~e:e1 env s |> TyScheme.get in
       let parts = parts |> List.filter (fun (t,_) -> Ty.disjoint (GTy.ub s) t |> not) in
-      begin match infer_part_seq' cache env renvs e2 v (tvs,s) parts with
+      begin match refine_part_seq' cache env e2 v (tvs,s) parts with
       | OneFail -> Fail
       | OneSubst (ss,p,p',r) -> Subst (ss,ALet(A annot1,p),ALet(A annot1,p'),r)
       | AllOk (p,_) -> retry_with (nc (Annot.ALet (annot1, p)))
       end
     end
-  | TypeCast _, Infer -> retry_with (ACast Infer)
-  | TypeCoerce (_,t, _), Infer -> retry_with (ACoerce (t,Infer))
   | TypeCast (e', t, c), ACast annot' ->
-    begin match infer' cache env renvs annot' e' with
+    begin match refine' cache env annot' e' with
     | Ok (annot', s) ->
       let cs = match c with
         | Check -> [GTy.ub s, t] | CheckStatic -> [GTy.lb s, t] | NoCheck -> [] in
@@ -346,7 +371,7 @@ let rec infer cache env renvs annot (id, e) =
     | Fail -> Fail
     end
   | TypeCoerce (e', _, c), ACoerce (t,annot') ->
-    begin match infer' cache env renvs annot' e' with
+    begin match refine' cache env annot' e' with
     | Ok (annot', s) ->
       let lbc, ubc = (GTy.lb s, GTy.lb t), (GTy.ub s, GTy.ub t) in
       let cs = match c with
@@ -374,7 +399,7 @@ let rec infer cache env renvs annot (id, e) =
         in
         if useless then aux dom lst
         else
-          begin match infer' {cache with dom} env renvs ann (id,e) with
+          begin match refine' {cache with dom} env ann (id,e) with
           | Fail -> aux dom lst
           | Subst (ss,a,a',r) ->
             let a, a' = { coverage ; ann=a }, { coverage ; ann=a' } in
@@ -397,12 +422,12 @@ let rec infer cache env renvs annot (id, e) =
   | e, a ->
     Format.printf "e:@.%a@.@.a:@.%a@.@." Ast.pp_e e IAnnot.pp a ;
     assert false
-and infer' cache env renvs annot e =
+and refine' cache env annot e =
   let tvars = Env.tvars env in
   let subst_disjoint s =
     MVarSet.inter (Subst.domain s) tvars |> MVarSet.is_empty
   in
-  match infer cache env renvs annot e with
+  match refine cache env annot e with
   | Ok (a, ty) -> Ok (a, ty)
   | Fail -> Fail
   | Subst (ss, a1, a2, (eid,r)) when ss |> List.map fst |> List.for_all subst_disjoint ->
@@ -417,42 +442,40 @@ and infer' cache env renvs annot e =
       { IAnnot.coverage=(Some coverage) ; ann }
       ) in
     let annot = IAnnot.AInter (branches@default) in
-    infer' cache env renvs annot e
+    refine' cache env annot e
   | Subst (ss, a1, a2, r) -> Subst (ss, a1, a2, r)
-and infer_b' cache env renvs bannot e s tau =
-  let retry_with bannot = infer_b' cache env renvs bannot e s tau in
+and refine_b' cache env bannot e s tau =
+  let retry_with bannot = refine_b' cache env bannot e s tau in
   let empty_cov = (fst e, REnv.empty) in
   match bannot with
-  | IAnnot.BInfer when !Config.infer_overload ->
+  | IAnnot.BType (false, annot) when !Config.infer_overload ->
     let ss = tallying_simpl env Ty.empty [(GTy.ub s,Ty.neg tau)] in
-    Subst (ss, IAnnot.BSkip, IAnnot.BType Infer, empty_cov)
-  | IAnnot.BInfer when Ty.disjoint (GTy.ub s) tau -> retry_with (IAnnot.BSkip)
-  | IAnnot.BInfer -> retry_with (IAnnot.BType Infer)
+    Subst (ss, IAnnot.BSkip, IAnnot.BType (true, annot), empty_cov)
+  | IAnnot.BType (false, _) when Ty.disjoint (GTy.ub s) tau -> retry_with (IAnnot.BSkip)
+  | IAnnot.BType (false, annot) -> retry_with (IAnnot.BType (true, annot))
   | IAnnot.BSkip -> Ok (Annot.BSkip, GTy.empty)
-  | IAnnot.BType annot ->
-    begin match infer' cache env renvs annot e with
+  | IAnnot.BType (true, annot) ->
+    begin match refine' cache env annot e with
     | Ok (a, ty) -> Ok (Annot.BType a, ty)
-    | Subst (ss,a1,a2,r) -> Subst (ss,IAnnot.BType a1,IAnnot.BType a2,r)
+    | Subst (ss,a1,a2,r) -> Subst (ss,IAnnot.BType (true, a1),IAnnot.BType (true, a2),r)
     | Fail -> Fail
     end
-and infer_part' cache env renvs e v (tvs, s) (si,annot) =
+and refine_part' cache env e v (tvs, s) (si,annot) =
   let t = TyScheme.mk tvs (GTy.cap s (GTy.mk si)) in
   let env = Env.add v t env in
-  let renvs = Refinement.Partitioner.filter_compatible renvs v si in
-  match infer' cache env renvs annot e with
+  match refine' cache env annot e with
   | Fail -> Fail
   | Subst (ss,a,a',r) -> Subst (ss,(si,a),(si,a'),r)
   | Ok (a,ty) -> Ok ((si,a),ty)
-and infer_seq' cache env renvs lst = seq (infer' cache env renvs) (fun a -> A a) lst
-and infer_part_seq' cache env renvs e v s lst =
-  seq (fun a () -> infer_part' cache env renvs e v s a)
+and refine_seq' cache env lst = seq (refine' cache env) (fun a -> A a) lst
+and refine_part_seq' cache env e v s lst =
+  seq (fun a () -> refine_part' cache env e v s a)
     (fun (si,annot) -> (si, A annot))
     (lst |> List.map (fun a -> (a,())))
 
-let infer env renvs e =
-  let renvs = Refinement.Partitioner.from_renvset renvs in
-  let cache = { dom = Domain.empty ; tvcache = TVCache.empty () ; logs = ref [] } in
-  match infer' cache env renvs IAnnot.Infer e with
+let refine env iannot e =
+  let cache = { dom = Domain.empty ; logs = ref [] } in
+  match refine' cache env iannot e with
   | Fail ->
     begin match !(cache.logs) with
     | [] ->
@@ -466,3 +489,5 @@ let infer env renvs e =
     end
   | Subst _ -> failwith "Top-level environment should not contain an unresolved type variable."
   | Ok (a,_) -> a
+
+let infer env renv e = refine env (initial renv e) e 

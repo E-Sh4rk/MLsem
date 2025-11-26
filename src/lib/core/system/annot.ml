@@ -57,7 +57,7 @@ end
 module IAnnot = struct
   type coverage = (Eid.t * Ty.t) option * REnv.t
   [@@deriving show]
-  type branch = BType of t | BSkip | BInfer
+  type branch = BType of bool (* explored *) * t | BSkip
   [@@deriving show]
   and inter_branch = { coverage: coverage option ; ann: t }
   [@@deriving show]
@@ -67,13 +67,13 @@ module IAnnot = struct
   [@@deriving show]
   and t =
   | A of Annot.t
-  | Infer
   | Untyp
+  | AVar of (MVarSet.t -> Subst.t)
   | AConstruct of t list
   | ALet of t * part
-  | AApp of t * t
-  | AOp of Subst.t * t
-  | AProj of t
+  | AApp of t * t * Ty.t (* result *)
+  | AOp of (MVarSet.t -> Subst.t) * t * Ty.t (* result *)
+  | AProj of t * Ty.t (* result *)
   | ACast of t
   | ACoerce of GTy.t * t
   | AIte of t * branch * branch
@@ -84,17 +84,16 @@ module IAnnot = struct
   [@@deriving show]
 
   let substitute s =
-    let comp s' = Subst.compose s s' |> Subst.restrict (Subst.domain s') in
     let rec aux t =
       match t with
       | A a -> A (Annot.substitute s a)
-      | Infer -> Infer
       | Untyp -> Untyp
+      | AVar f -> AVar f
       | AConstruct ts -> AConstruct (List.map aux ts)
       | ALet (t, ps) -> ALet (aux t, List.map (fun (ty, t) -> Subst.apply s ty, aux t) ps)
-      | AApp (t1, t2) -> AApp (aux t1, aux t2)
-      | AOp (s', t) -> AOp (comp s', aux t)
-      | AProj t -> AProj (aux t)
+      | AApp (t1, t2, ty) -> AApp (aux t1, aux t2, Subst.apply s ty)
+      | AOp (f, t, ty) -> AOp (f, aux t, Subst.apply s ty)
+      | AProj (t, ty) -> AProj (aux t, Subst.apply s ty)
       | ACast t -> ACast (aux t)
       | ACoerce (ty, t) -> ACoerce (GTy.substitute s ty, aux t)
       | AIte (t,b1,b2) -> AIte (aux t, aux_b b1, aux_b b2)
@@ -104,8 +103,8 @@ module IAnnot = struct
       | AInter bs -> AInter (List.map aux_ib bs)
     and aux_b b =
       match b with
-      | BType t -> BType (aux t)
-      | BInfer -> BInfer | BSkip -> BSkip
+      | BType (b,t) -> BType (b,aux t)
+      | BSkip -> BSkip
     and aux_ib { coverage ; ann } =
       let aux_coverage (o,renv) =
         let o = o |> Option.map (fun (eid,ty) -> (eid, Subst.apply s ty)) in
