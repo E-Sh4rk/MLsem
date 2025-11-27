@@ -58,6 +58,12 @@ module Subst = Sstt.Subst
 
 (** @canonical Mlsem_types.TVOp *)
 module TVOp : sig
+    type fields_ctx
+    val get_fields_ctx : RVarSet.t -> Ty.t list -> fields_ctx
+    val decorrelate_fields : fields_ctx -> Ty.t -> Ty.t
+    val recombine_fields : fields_ctx -> Ty.t -> Ty.t
+    val recombine_fields' : fields_ctx -> Subst.t -> Subst.t
+
     val vars : Ty.t -> MVarSet.t
     val vars' : Ty.t list -> MVarSet.t
     val top_vars : Ty.t -> MVarSet.t

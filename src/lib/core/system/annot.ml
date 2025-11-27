@@ -28,7 +28,7 @@ module Annot = struct
   [@@deriving show]
 
   let substitute s t =
-    let comp s' = Subst.compose s s' |> Subst.restrict (Subst.domain s') in
+    let comp s' = Subst.compose_restr s s' in
     let rec aux t =
       let ann = match t.ann with
       | AValue t -> AValue (GTy.substitute s t)

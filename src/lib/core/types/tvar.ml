@@ -111,6 +111,12 @@ module MVarSet = Sstt.MixVarSet
 module Subst = Sstt.Subst
 
 module TVOp = struct
+  type fields_ctx = Sstt.Tallying.fields_ctx
+  let get_fields_ctx = Sstt.Tallying.get_fields_ctx
+  let decorrelate_fields = Sstt.Tallying.decorrelate_fields
+  let recombine_fields = Sstt.Tallying.recombine_fields
+  let recombine_fields' = Sstt.Tallying.recombine_fields'
+
   let vars = Sstt.Ty.all_vars
   let vars' ts = List.map vars ts |> List.fold_left MVarSet.union MVarSet.empty
   let top_vars = Sstt.Ty.all_vars_toplevel
