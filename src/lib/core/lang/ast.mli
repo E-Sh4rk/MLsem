@@ -44,7 +44,7 @@ type e =
     The type system will not check that the variable is assigned before use. *)
 | Let of Ty.t list * Variable.t * t * t
 (** The first parameter is a suggested type decomposition *)
-| TypeCast of t * Ty.t * SA.check
+| TypeCast of t * GTy.t * SA.check
 | TypeCoerce of t * GTy.t * SA.check
 | VarAssign of Variable.t * t
 (** The variable provided must be mutable (cf. {!MVariable.create}) *)

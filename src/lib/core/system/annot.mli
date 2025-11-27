@@ -13,7 +13,7 @@ module Annot : sig
   | AApp of t * t
   | AOp of Subst.t * t
   | AProj of t
-  | ACast of t
+  | ACast of GTy.t * t
   | ACoerce of GTy.t * t
   | AIte of t * branch * branch
   | ALambda of GTy.t * t
@@ -43,7 +43,7 @@ module IAnnot : sig
   | AApp of t * t * Ty.t (* result *)
   | AOp of (MVarSet.t -> Subst.t) * t * Ty.t (* result *)
   | AProj of t * Ty.t (* result *)
-  | ACast of t
+  | ACast of GTy.t * t
   | ACoerce of GTy.t * t
   | AIte of t * branch * branch
   | ALambda of GTy.t * t

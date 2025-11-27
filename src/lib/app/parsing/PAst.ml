@@ -45,7 +45,7 @@ and ('a, 'typ, 'enu, 'tag, 'v) ast =
 | Projection of projection * ('a, 'typ, 'enu, 'tag, 'v) t
 | Record of (string * ('a, 'typ, 'enu, 'tag, 'v) t) list
 | RecordUpdate of ('a, 'typ, 'enu, 'tag, 'v) t * string * ('a, 'typ, 'enu, 'tag, 'v) t option
-| TypeCast of ('a, 'typ, 'enu, 'tag, 'v) t * 'typ * check
+| TypeCast of ('a, 'typ, 'enu, 'tag, 'v) t * 'typ option * check
 | TypeCoerce of ('a, 'typ, 'enu, 'tag, 'v) t * 'typ option * check
 | VarAssign of 'v * ('a, 'typ, 'enu, 'tag, 'v) t
 | PatMatch of ('a, 'typ, 'enu, 'tag, 'v) t * (('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'enu, 'tag, 'v) t) list
@@ -149,10 +149,10 @@ let parser_expr_to_expr benv env e =
         | Record lst -> Record (List.map (fun (str, e) -> str, aux env e) lst)
         | RecordUpdate (e1, l, e2) ->
             RecordUpdate (aux env e1, l, Option.map (aux env) e2)
-        | TypeCast (e, ty, c) ->
+        | TypeCast (e, Some ty, c) ->
             let ty = aux_ty ty in
-            if is_test_type ty then TypeCast (aux env e, ty, c)
-            else raise (SymbolError ("type constraint should be a test type"))
+            TypeCast (aux env e, Some ty, c)
+        | TypeCast (e, None, c) -> TypeCast (aux env e, None, c)
         | TypeCoerce (e, Some ty, c) ->
             let ty = aux_ty ty in
             TypeCoerce (aux env e, Some ty, c)

@@ -26,7 +26,7 @@ type e =
 | Operation of operation * t
 | Projection of projection * t
 | Let of (Ty.t list) * Variable.t * t * t
-| TypeCast of t * Ty.t * check
+| TypeCast of t * GTy.t * check
 | TypeCoerce of t * GTy.t * check
 | Alt of t * t
 and t = Eid.t * e

@@ -65,7 +65,9 @@ let expr_to_ast t =
     | RecordUpdate (e, lbl, Some e') ->
       let id = Position.join (fst e |> Eid.loc) (fst e' |> Eid.loc) |> Eid.unique_with_pos in
       Operation (RecUpd lbl, (id, Constructor (Tuple 2, [aux e ; aux e'])))
-    | TypeCast (e, ty, c) -> TypeCast (aux e, ty, c)
+    | TypeCast (e, tyo, c) ->
+      let ty = match tyo with None -> GTy.dyn | Some ty -> GTy.mk ty in
+      TypeCast (aux e, ty, c)
     | TypeCoerce (e, tyo, c) ->
       let ty = match tyo with None -> GTy.dyn | Some ty -> GTy.mk ty in
       TypeCoerce (aux e, ty, c)

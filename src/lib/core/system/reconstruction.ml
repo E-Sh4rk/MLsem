@@ -31,7 +31,7 @@ let rec initial renv (_, e) =
   | App (e1, e2) -> AApp (initial renv e1, initial renv e2, new_result ())
   | Operation (_, e) -> AOp (new_renaming (), initial renv e, new_result ())
   | Projection (_, e) -> AProj (initial renv e, new_result ())
-  | TypeCast (e, _, _) -> ACast (initial renv e)
+  | TypeCast (e, ty, _) -> ACast (ty, initial renv e)
   | TypeCoerce (e, ty, _) -> ACoerce (ty, initial renv e)
   | Alt (e1, e2) -> AAlt (Some (initial renv e1), Some (initial renv e2))
   | Let (suggs, v, e1, e2) ->
@@ -361,20 +361,21 @@ let rec refine cache env annot (id, e) =
       | AllOk (p,_) -> retry_with (nc (Annot.ALet (annot1, p)))
       end
     end
-  | TypeCast (e', t, c), ACast annot' ->
+  | TypeCast (e', _, c), ACast (t,annot') ->
     begin match refine' cache env annot' e' with
     | Ok (annot', s) ->
+      let lbc, ubc = (GTy.lb s, GTy.lb t), (GTy.ub s, GTy.ub t) in
       let cs = match c with
-        | Check -> [GTy.ub s, t] | CheckStatic -> [GTy.lb s, t] | NoCheck -> [] in
-      let ss = tallying_simpl env (GTy.lb s |> Ty.cap t) cs in
+        | Check -> [lbc;ubc] | CheckStatic -> [lbc] | NoCheck -> [] in
+      let ss = tallying_simpl env (GTy.lb (GTy.cap t s)) cs in
       log "untypeable cast" (fun fmt ->
         if c = Check then
-          Format.fprintf fmt "expected: %a\ngiven: %a" Ty.pp t GTy.pp s
+          Format.fprintf fmt "expected: %a\ngiven: %a" GTy.pp t GTy.pp s
         else if c = CheckStatic then
-          Format.fprintf fmt "expected: %a\ngiven: %a" Ty.pp t Ty.pp (GTy.lb s)
+          Format.fprintf fmt "expected: %a\ngiven: %a" Ty.pp (GTy.lb t) Ty.pp (GTy.lb s)
         ) ;
-      Subst (ss, nc (Annot.ACast(annot')), Untyp, empty_cov)
-    | Subst (ss,a,a',r) -> Subst (ss,ACast a,ACast a',r)
+      Subst (ss, nc (Annot.ACast(t,annot')), Untyp, empty_cov)
+    | Subst (ss,a,a',r) -> Subst (ss,ACast (t,a),ACast (t,a'),r)
     | Fail -> Fail
     end
   | TypeCoerce (e', _, c), ACoerce (t,annot') ->

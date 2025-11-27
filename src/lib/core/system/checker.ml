@@ -215,12 +215,12 @@ let rec typeof' env annot (id,e) =
       List.map aux annots2 |> GTy.disj
     else
       untypeable id ("Partition does not cover the type of "^(Variable.show v)^".")
-  | TypeCast (e, ty, c), ACast annot ->
+  | TypeCast (e, _, c), ACast (ty, annot) ->
     let t = typeof env annot e in
-    if (c = Check && GTy.leq t (GTy.mk ty))
-    || (c = CheckStatic && Ty.leq (GTy.lb t) ty)
+    if (c = Check && GTy.leq t ty)
+    || (c = CheckStatic && Ty.leq (GTy.lb t) (GTy.lb ty))
     || (c = NoCheck)
-    then GTy.cap t (GTy.mk ty)
+    then GTy.cap t ty
     else untypeable id "Type constraint not satisfied."
   | TypeCoerce (e, _, c), ACoerce (ty, annot) ->
     let t = typeof env annot e in

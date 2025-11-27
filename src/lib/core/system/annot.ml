@@ -16,7 +16,7 @@ module Annot = struct
   | AApp of t * t
   | AOp of Subst.t * t
   | AProj of t
-  | ACast of t
+  | ACast of GTy.t * t
   | ACoerce of GTy.t * t
   | AIte of t * branch * branch
   | ALambda of GTy.t * t
@@ -38,7 +38,7 @@ module Annot = struct
       | AApp (t1, t2) -> AApp (aux t1, aux t2)
       | AOp (s', t) -> AOp (comp s', aux t)
       | AProj t -> AProj (aux t)
-      | ACast t -> ACast (aux t)
+      | ACast (ty, t) -> ACast (GTy.substitute s ty, aux t)
       | ACoerce (ty, t) -> ACoerce (GTy.substitute s ty, aux t)
       | AIte (t,b1,b2) -> AIte (aux t, aux_b b1, aux_b b2)
       | ALambda (ty, t) -> ALambda (GTy.substitute s ty, aux t)
@@ -74,7 +74,7 @@ module IAnnot = struct
   | AApp of t * t * Ty.t (* result *)
   | AOp of (MVarSet.t -> Subst.t) * t * Ty.t (* result *)
   | AProj of t * Ty.t (* result *)
-  | ACast of t
+  | ACast of GTy.t * t
   | ACoerce of GTy.t * t
   | AIte of t * branch * branch
   | ALambda of GTy.t * t
@@ -94,7 +94,7 @@ module IAnnot = struct
       | AApp (t1, t2, ty) -> AApp (aux t1, aux t2, Subst.apply s ty)
       | AOp (f, t, ty) -> AOp (f, aux t, Subst.apply s ty)
       | AProj (t, ty) -> AProj (aux t, Subst.apply s ty)
-      | ACast t -> ACast (aux t)
+      | ACast (ty, t) -> ACast (GTy.substitute s ty, aux t)
       | ACoerce (ty, t) -> ACoerce (GTy.substitute s ty, aux t)
       | AIte (t,b1,b2) -> AIte (aux t, aux_b b1, aux_b b2)
       | ALambda (ty, t) -> ALambda (GTy.substitute s ty, aux t)

@@ -249,9 +249,8 @@ atomic_term:
   let annot = annot $startpos $endpos in
   annot (Ite (t,ty,annot (Const (Bool true)),annot (Const (Bool false))))
   }
-| LPAREN t=term c=cast ty=typ RPAREN { annot $startpos $endpos (TypeCast (t,ty,c)) }
-| LPAREN t=term c=coerce ty=typ RPAREN { annot $startpos $endpos (TypeCoerce (t,Some ty,c)) }
-| LPAREN t=term c=coerce HASHTAG RPAREN { annot $startpos $endpos (TypeCoerce (t,None,c)) }
+| LPAREN t=term c=cast ty=typ_or_dyn RPAREN { annot $startpos $endpos (TypeCast (t,ty,c)) }
+| LPAREN t=term c=coerce ty=typ_or_dyn RPAREN { annot $startpos $endpos (TypeCoerce (t,ty,c)) }
 | LBRACE fs=separated_list(SEMICOLON, field_term) RBRACE { annot $startpos $endpos (Record fs) }
 | LBRACE br=atomic_term WITH fs=separated_list(SEMICOLON, field_term) RBRACE
 { record_update $startpos $endpos br fs }
@@ -259,6 +258,10 @@ atomic_term:
 { list_of_elts $startpos $endpos lst }
 | LBRACKET t1=term OR ts=separated_nonempty_list(OR, term) RBRACKET
 { alts $startpos $endpos (t1::ts) }
+
+%inline typ_or_dyn:
+  ty=typ { Some ty }
+| HASHTAG { None }
 
 %inline cast:
   COLON { Check } | CAST_STATIC { CheckStatic } | CAST_NOCHECK { NoCheck }

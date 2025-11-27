@@ -223,7 +223,8 @@
             <li>type casts, e.g. <kbd> (x : bool)</kbd>.
             Two other cast operators are available: <kbd>(x :! int)</kbd>
             will not check the dynamic part statically, and <kbd>(x :!! int)</kbd>
-            will not check the dynamic part nor the static part.</li>
+            will not check the dynamic part nor the static part.
+            You can write <kdb>#</kdb> as target type for a cast to the dynamic type.</li>
             <li>type coercions, e.g. <kbd>(42 :> int)</kbd> which
             can be used locally to coerce the type of an expression into
             a supertype. Similarly to casts, the variants <kbd>(x :>! int)</kbd> and <kbd>(x :>!! int)</kbd>
@@ -257,7 +258,7 @@
 
         </code>
         <p>Patterns are essentially types with capture variables. For instance, the following expression</p>
-            <code>
+        <code>
             match y with
             | :[ int* ] -> false
             | ( x & :bool, :int ) | x = false -> x

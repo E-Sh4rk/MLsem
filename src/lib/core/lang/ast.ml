@@ -36,7 +36,7 @@ type e =
 | Projection of SA.projection * t
 | Declare of Variable.t * t
 | Let of Ty.t list * Variable.t * t * t
-| TypeCast of t * Ty.t * SA.check
+| TypeCast of t * GTy.t * SA.check
 | TypeCoerce of t * GTy.t * SA.check
 | VarAssign of Variable.t * t
 | Loop of t

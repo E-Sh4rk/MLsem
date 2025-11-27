@@ -46,7 +46,7 @@ and ('a, 'typ, 'enu, 'tag, 'v) ast =
 | Projection of projection * ('a, 'typ, 'enu, 'tag, 'v) t
 | Record of (string * ('a, 'typ, 'enu, 'tag, 'v) t) list
 | RecordUpdate of ('a, 'typ, 'enu, 'tag, 'v) t * string * ('a, 'typ, 'enu, 'tag, 'v) t option
-| TypeCast of ('a, 'typ, 'enu, 'tag, 'v) t * 'typ * check
+| TypeCast of ('a, 'typ, 'enu, 'tag, 'v) t * 'typ option * check
 | TypeCoerce of ('a, 'typ, 'enu, 'tag, 'v) t * 'typ option * check
 | VarAssign of 'v * ('a, 'typ, 'enu, 'tag, 'v) t
 | PatMatch of ('a, 'typ, 'enu, 'tag, 'v) t * (('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'enu, 'tag, 'v) t) list
