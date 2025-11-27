@@ -58,6 +58,7 @@ let sufficient_refinements env e t =
     | App _ -> []
     | Operation (o, e) -> app (Checker.fun_of_operation o) e
     | Ite (e, s, e1, e2) ->
+      let s = GTy.lb s in
       let r1 = combine (aux env e s) (aux env e1 t) in
       let r2 = combine (aux env e (Ty.neg s)) (aux env e2 t) in
       r1@r2
@@ -112,6 +113,7 @@ let refinement_envs ?(extra_checks=[]) env e =
     | Lambda (d, v, e) -> aux_lambda env (d,v,e)
     | LambdaRec lst -> lst |> List.iter (aux_lambda env)
     | Ite (e, tau, e1, e2) ->
+      let tau = GTy.lb tau in
       if fv e1 |> VarSet.is_empty |> not then add_refinement env e tau ;
       if fv e2 |> VarSet.is_empty |> not then add_refinement env e (Ty.neg tau) ;
       aux env e ; aux env e1 ; aux env e2

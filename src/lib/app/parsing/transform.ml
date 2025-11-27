@@ -50,7 +50,7 @@ let expr_to_ast t =
         List.fold_left (fun e (x,x',_,_) -> rename_fv x x' e) (aux e) lst
       in
       LambdaRec (List.map aux lst)
-    | Ite (e,t,e1,e2) -> Ite (aux e, t, aux e1, aux e2)
+    | Ite (e,t,e1,e2) -> Ite (aux e, GTy.mk t, aux e1, aux e2)
     | App (e1,e2) -> App (aux e1, aux e2)
     | Let ((_,x), e1, e2) ->
       let e1, e2 = aux e1, aux e2 in
@@ -77,8 +77,8 @@ let expr_to_ast t =
         let e = aux e in (* e must be transformed before the pattern in case of a suggest *)
         (aux_pat pat, e)
         ) pats)
-    | Cond (e,t,e1,e2) -> If (aux e, t, aux e1, Option.map aux e2)
-    | While (e,t,e1) -> While (aux e, t, aux e1)
+    | Cond (e,t,e1,e2) -> If (aux e, GTy.mk t, aux e1, Option.map aux e2)
+    | While (e,t,e1) -> While (aux e, GTy.mk t, aux e1)
     | Seq (e1, e2) -> Seq (aux e1, aux e2)
     | Alt (e1, e2) -> Alt (aux e1, aux e2)
     | Return e -> Return (aux e)

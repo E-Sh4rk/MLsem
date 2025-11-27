@@ -174,10 +174,10 @@ let rec typeof' env annot (id,e) =
     if List.for_all (fun (ty, ty') -> Ty.leq (GTy.lb ty) (GTy.lb ty')) tys
     then tys |> List.map fst |> GTy.mapl Tuple.mk
     else untypeable id ("Invalid recursive lambda.")
-  | Ite (e, tau, e1, e2), AIte (annot, b1, b2) ->
+  | Ite (e, _, e1, e2), AIte (annot, tau, b1, b2) ->
     let s = typeof env annot e in
     let t1 = typeof_b env b1 e1 s tau in
-    let t2 = typeof_b env b2 e2 s (Ty.neg tau) in
+    let t2 = typeof_b env b2 e2 s (GTy.neg tau) in
     GTy.cup t1 t2
   | Alt _, AAlt (None, None) ->
     untypeable id ("At least one side of a Alt expr must be typeable.")
@@ -245,7 +245,7 @@ and typeof_b env bannot (id,e) s tau =
   match bannot with
   | BType annot -> typeof env annot (id,e)
   | BSkip ->
-    if Ty.disjoint (GTy.ub s) tau |> not
+    if GTy.disjoint s tau |> not
     then untypeable id "Branch is reachable and must be typed." ;
     GTy.empty
 and typeof_def env annot e =

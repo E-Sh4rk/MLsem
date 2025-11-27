@@ -59,7 +59,7 @@ let rec def_of_var_pat pat v e =
   | POr (p1, p2) ->
     let tys1, e1 = def_of_var_pat p1 v e in
     let tys2, e2 = def_of_var_pat p2 v e in
-    let case = Ite (e, type_of_pat p1, e1, e2) in
+    let case = Ite (e, type_of_pat p1 |> GTy.mk, e1, e2) in
     tys1@tys2, (Eid.unique (), case)
   | PConstructor (c, ps) ->
     let i = List.find_index (fun p -> vars_of_pat p |> VarSet.mem v) ps |> Option.get in
@@ -77,7 +77,7 @@ let encode_pattern_matching e pats =
   in
   let add_branch acc (t, e) =
     let p1, p2 = Eid.loc (fst e), Eid.loc (fst acc) in
-    (Eid.unique_with_pos (Position.join p1 p2), Ite ((Eid.unique (), Var x), t, e, acc))
+    (Eid.unique_with_pos (Position.join p1 p2), Ite ((Eid.unique (), Var x), GTy.mk t, e, acc))
   in
   let pats = pats |> List.map (fun (pat, e) ->
     (type_of_pat pat, body_of_pat pat e)) |> List.rev in

@@ -29,7 +29,7 @@ type e =
 | Constructor of SA.constructor * t list
 | Lambda of Ty.t list * GTy.t * Variable.t * t
 | LambdaRec of (GTy.t * Variable.t * t) list
-| Ite of t * Ty.t * t * t
+| Ite of t * GTy.t * t * t
 | PatMatch of t * (pattern * t) list
 | App of t * t
 | Operation of SA.operation * t
@@ -45,8 +45,8 @@ type e =
 | Alt of t * t
 | Block of blockid * t
 | Ret of blockid * t option
-| If of t * Ty.t * t * t option
-| While of t * Ty.t * t
+| If of t * GTy.t * t * t option
+| While of t * GTy.t * t
 | Return of t
 | Break
 [@@deriving show]

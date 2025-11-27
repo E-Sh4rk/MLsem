@@ -53,17 +53,18 @@ let fv t =
   if t.eq then TVOp.vars t.lb else MVarSet.union (TVOp.vars t.lb) (TVOp.vars t.ub)
 let substitute s = map (Subst.apply s)
 
-let test f t =
-  if t.eq then f t.lb else (f t.lb) && (f t.ub)
+(* let test f t =
+  if t.eq then f t.lb else (f t.lb) && (f t.ub) *)
 let test2 f t1 t2 =
   if t1.eq && t2.eq then
     f t1.lb t2.lb
   else
     (f t1.lb t2.lb) && (f t1.ub t2.ub)
-let is_empty = test Ty.is_empty
-let is_any = test Ty.is_any
+let is_empty { ub ; _ } = Ty.is_empty ub
+let is_any { lb ; _ } = Ty.is_any lb
 let leq = test2 Ty.leq
 let equiv = test2 Ty.equiv
+let disjoint { ub=ub1 ; _ } { ub=ub2 ; _ } = Ty.disjoint ub1 ub2
 
 let simplify = map Ty.simplify
 let normalize = map Ty.normalize
@@ -85,5 +86,6 @@ let pp' s fmt t =
 let pp fmt t = pp' Subst.identity fmt t
 
 let mk_gradual lb ub =
-  assert (Ty.leq lb ub) ;
+  if Ty.leq lb ub |> not
+  then raise (Invalid_argument "Upper bound must be larger than lower bound") ;
   mk_gradual lb ub

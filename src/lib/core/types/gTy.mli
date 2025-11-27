@@ -30,6 +30,7 @@ val is_empty : t -> bool
 val is_any : t -> bool
 val leq : t -> t -> bool
 val equiv : t -> t -> bool
+val disjoint : t -> t -> bool
 
 val simplify : t -> t
 val normalize : t -> t

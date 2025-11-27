@@ -18,7 +18,7 @@ module Annot = struct
   | AProj of t
   | ACast of GTy.t * t
   | ACoerce of GTy.t * t
-  | AIte of t * branch * branch
+  | AIte of t * GTy.t * branch * branch
   | ALambda of GTy.t * t
   | ALambdaRec of (GTy.t * t) list
   | AAlt of t option * t option
@@ -40,7 +40,7 @@ module Annot = struct
       | AProj t -> AProj (aux t)
       | ACast (ty, t) -> ACast (GTy.substitute s ty, aux t)
       | ACoerce (ty, t) -> ACoerce (GTy.substitute s ty, aux t)
-      | AIte (t,b1,b2) -> AIte (aux t, aux_b b1, aux_b b2)
+      | AIte (t,ty,b1,b2) -> AIte (aux t, GTy.substitute s ty, aux_b b1, aux_b b2)
       | ALambda (ty, t) -> ALambda (GTy.substitute s ty, aux t)
       | ALambdaRec lst -> ALambdaRec (List.map (fun (ty,t) -> (GTy.substitute s ty, aux t)) lst)
       | AAlt (t1, t2) -> AAlt (Option.map aux t1, Option.map aux t2)
@@ -76,7 +76,7 @@ module IAnnot = struct
   | AProj of t * Ty.t (* result *)
   | ACast of GTy.t * t
   | ACoerce of GTy.t * t
-  | AIte of t * branch * branch
+  | AIte of t * GTy.t * branch * branch
   | ALambda of GTy.t * t
   | ALambdaRec of (GTy.t * t) list
   | AAlt of t option * t option
@@ -96,7 +96,7 @@ module IAnnot = struct
       | AProj (t, ty) -> AProj (aux t, Subst.apply s ty)
       | ACast (ty, t) -> ACast (GTy.substitute s ty, aux t)
       | ACoerce (ty, t) -> ACoerce (GTy.substitute s ty, aux t)
-      | AIte (t,b1,b2) -> AIte (aux t, aux_b b1, aux_b b2)
+      | AIte (t,ty,b1,b2) -> AIte (aux t, GTy.substitute s ty, aux_b b1, aux_b b2)
       | ALambda (ty, t) -> ALambda (GTy.substitute s ty, aux t)
       | ALambdaRec lst -> ALambdaRec (List.map (fun (ty,t) -> (GTy.substitute s ty, aux t)) lst)
       | AAlt (t1, t2) -> AAlt (Option.map aux t1, Option.map aux t2)

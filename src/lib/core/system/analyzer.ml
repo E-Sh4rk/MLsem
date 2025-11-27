@@ -18,7 +18,7 @@ let rec iter_ann f (id,e) a =
     | Projection (_, e), AProj a | TypeCast (e, _, _), ACast (_, a)
     | TypeCoerce (e, _, _), ACoerce (_, a) | Lambda (_, _, e), ALambda (_, a)
     | Operation (_, e), AOp (_, a) -> [(e,a)]
-    | Ite (e, _, e1, e2), AIte (a, b1, b2) ->
+    | Ite (e, _, e1, e2), AIte (a, _, b1, b2) ->
       (e,a)::([(e1,b1);(e2,b2)] |> List.filter_map (fun (e,b) ->
         match b with Annot.BSkip -> None | BType a -> Some (e,a)))
     | LambdaRec lst, ALambdaRec anns when List.length lst = List.length anns ->

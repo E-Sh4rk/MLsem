@@ -26,8 +26,8 @@ let rec initial renv (_, e) =
   | Constructor (_,es) -> AConstruct (List.map (initial renv) es)
   | Lambda (dom, _, e) -> ALambda (dom, initial renv e)
   | LambdaRec lst -> ALambdaRec (lst |> List.map (fun (dom, _, e) -> dom, initial renv e))
-  | Ite (e, _, e1, e2) ->
-    AIte (initial renv e, BType (false, initial renv e1), BType (false, initial renv e2))
+  | Ite (e, tau, e1, e2) ->
+    AIte (initial renv e, tau, BType (false, initial renv e1), BType (false, initial renv e2))
   | App (e1, e2) -> AApp (initial renv e1, initial renv e2, new_result ())
   | Operation (_, e) -> AOp (new_renaming (), initial renv e, new_result ())
   | Projection (_, e) -> AProj (initial renv e, new_result ())
@@ -280,21 +280,21 @@ let rec refine cache env annot (id, e) =
         ) ;
       Subst (ss, ok_ann, Untyp, empty_cov)
     end
-  | Ite (e0,tau,e1,e2), AIte (a0,a1,a2) ->
+  | Ite (e0,_,e1,e2), AIte (a0,tau,a1,a2) ->
     begin match refine' cache env a0 e0 with
     | Fail -> Fail
-    | Subst (ss,a,a',r) -> Subst (ss,AIte (a,a1,a2),AIte (a',a1,a2),r)
+    | Subst (ss,a,a',r) -> Subst (ss,AIte (a,tau,a1,a2),AIte (a',tau,a1,a2),r)
     | Ok (a0, s) ->
       begin match refine_b' cache env a1 e1 s tau with
       | Fail -> Fail
       | Subst (ss, a1, a1',r) ->
-        Subst (ss, AIte(A a0,a1,a2), AIte(A a0,a1',a2),r)
+        Subst (ss, AIte(A a0,tau,a1,a2), AIte(A a0,tau,a1',a2),r)
       | Ok (a1,_) ->
-        begin match refine_b' cache env a2 e2 s (Ty.neg tau) with
+        begin match refine_b' cache env a2 e2 s (GTy.neg tau) with
         | Fail -> Fail
         | Subst (ss, a2, a2',r) ->
-          Subst (ss, AIte(A a0,to_i a1,a2), AIte(A a0,to_i a1,a2'),r)
-        | Ok (a2,_) -> retry_with (nc (Annot.AIte(a0,a1,a2)))
+          Subst (ss, AIte(A a0,tau,to_i a1,a2), AIte(A a0,tau,to_i a1,a2'),r)
+        | Ok (a2,_) -> retry_with (nc (Annot.AIte(a0,tau,a1,a2)))
         end  
       end
     end
@@ -457,9 +457,9 @@ and refine_b' cache env bannot e s tau =
   let empty_cov = (fst e, REnv.empty) in
   match bannot with
   | IAnnot.BType (false, annot) when !Config.infer_overload ->
-    let ss = tallying_simpl env Ty.empty [(GTy.ub s,Ty.neg tau)] in
+    let ss = tallying_simpl env Ty.empty [(GTy.ub s, GTy.ub (GTy.neg tau))] in
     Subst (ss, IAnnot.BSkip, IAnnot.BType (true, annot), empty_cov)
-  | IAnnot.BType (false, _) when Ty.disjoint (GTy.ub s) tau -> retry_with (IAnnot.BSkip)
+  | IAnnot.BType (false, _) when GTy.disjoint s tau -> retry_with (IAnnot.BSkip)
   | IAnnot.BType (false, annot) -> retry_with (IAnnot.BType (true, annot))
   | IAnnot.BSkip -> Ok (Annot.BSkip, GTy.empty)
   | IAnnot.BType (true, annot) ->

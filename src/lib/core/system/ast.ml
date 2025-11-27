@@ -28,7 +28,7 @@ type e =
 | Constructor of constructor * t list
 | Lambda of GTy.t * Variable.t * t
 | LambdaRec of (GTy.t * Variable.t * t) list
-| Ite of t * Ty.t * t * t
+| Ite of t * GTy.t * t * t
 | App of t * t
 | Operation of operation * t
 | Projection of projection * t
