@@ -35,9 +35,11 @@ let domains_of_construct (c:Ast.constructor) ty =
     Tuple.dnf n ty
     |> List.filter (fun b -> Ty.leq (Tuple.mk b) ty)
   | Join n | Meet n -> [List.init n (fun _ -> ty)]
+  | Negate when Ty.is_any ty -> [ [Ty.any] ]
+  | Negate -> [ ]
   | Ternary _ -> [ [ Ty.any ; ty ; ty ] ]
   | Ignore ty' when Ty.leq ty' ty -> [ [Ty.any] ]
-  | Ignore _ -> []
+  | Ignore _ -> [ ]
   | Cons ->
     Lst.dnf ty
     |> List.filter (fun (a,b) -> Ty.leq (Lst.cons a b) ty)
@@ -62,6 +64,7 @@ let construct (c:Ast.constructor) tys =
   | Tuple n, tys when List.length tys = n -> Tuple.mk tys
   | Join n, tys when List.length tys = n -> Ty.disj tys
   | Meet n, tys when List.length tys = n -> Ty.conj tys
+  | Negate, [ty] -> Ty.neg ty
   | Ternary tau, [t;t1;t2] ->
     if Ty.leq t tau then t1
     else if Ty.leq t (Ty.neg tau) then t2
@@ -105,7 +108,7 @@ let proj_is_gen p =
 let constr_is_gen c =
   match c with
   | Tuple _ | Cons | Rec _ | Tag _ | Enum _
-  | Join _ | Meet _  | Ternary _ -> true
+  | Join _ | Meet _  | Negate | Ternary _ -> true
   | Ignore _ -> false
   | CCustom c -> c.cgen
 let op_is_gen o =
