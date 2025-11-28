@@ -149,7 +149,7 @@ let tallying_simpl mono tvars res cs =
   (* Format.printf "with tvars=%a@." (Utils.pp_list TVar.pp)
     (TVarSet.destruct tvars) ; *)
   (* Format.printf "with env=%a@." Env.pp env ; *)
-  tallying_decorrelated mono cs
+  tallying_fields mono cs
   |> List.concat_map (abstract_factors tvars)
   |> List.map (minimize_new_tvars (MVarSet.union mono tvars))
   |> List.map (fun s -> s, Subst.apply s res)
@@ -167,7 +167,7 @@ let tallying_simpl mono tvars res cs =
 let tallying_simpl env res cs =
   let mono = MVarSet.of_set (TVar.all_vars KNoInfer) (RVar.all_vars KNoInfer) in
   let tvars = Env.tvars env in
-  let fc = TVOp.get_fields_ctx (MVarSet.proj2 mono) (cs |> List.concat_map (fun (a,b) -> [a;b])) in
+  let fc = TVOp.get_field_ctx (MVarSet.proj2 mono) (cs |> List.concat_map (fun (a,b) -> [a;b])) in
   let tvars = MVarSet.elements2 tvars |> List.fold_left
     (fun acc rv -> MVarSet.union acc (TVOp.fvars_associated_with fc rv |> MVarSet.of_set2)) tvars in
   cs |> List.map (fun (a,b) -> (TVOp.decorrelate_fields fc a, TVOp.decorrelate_fields fc b))

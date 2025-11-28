@@ -111,8 +111,8 @@ module MVarSet = Sstt.MixVarSet
 module Subst = Sstt.Subst
 
 module TVOp = struct
-  type fields_ctx = Sstt.Tallying.fields_ctx
-  let get_fields_ctx = Sstt.Tallying.get_fields_ctx
+  type field_ctx = Sstt.Tallying.field_ctx
+  let get_field_ctx = Sstt.Tallying.get_field_ctx
   let decorrelate_fields = Sstt.Tallying.decorrelate_fields
   let recombine_fields = Sstt.Tallying.recombine_fields
   let recombine_fields' = Sstt.Tallying.recombine_fields'
@@ -244,13 +244,13 @@ module TVOp = struct
     clean' ~pos1 ~neg1 ~pos2 ~neg2 mono [t] |> List.hd
 
   let bot_instance mono ty =
-    let fc = get_fields_ctx (MVarSet.proj2 mono) [ty] in
+    let fc = get_field_ctx (MVarSet.proj2 mono) [ty] in
     decorrelate_fields fc ty
     |> clean ~pos1:Ty.empty ~neg1:Ty.any ~pos2:Row.empty ~neg2:Row.any mono
     |> recombine_fields fc
 
   let top_instance mono ty =
-    let fc = get_fields_ctx (MVarSet.proj2 mono) [ty] in
+    let fc = get_field_ctx (MVarSet.proj2 mono) [ty] in
     decorrelate_fields fc ty
     |> clean ~pos1:Ty.any ~neg1:Ty.empty ~pos2:Row.any ~neg2:Row.empty mono
     |> recombine_fields fc
@@ -258,9 +258,9 @@ module TVOp = struct
   let tallying mono cs =
     Recording_internal.record mono cs ;
     Sstt.Tallying.tally mono cs
-  let tallying_decorrelated mono cs =
+  let tallying_fields mono cs =
     Recording_internal.record mono cs ;
-    Sstt.Tallying.tally_decorrelated mono cs
+    Sstt.Tallying.tally_fields mono cs
   let decompose mono t1 t2 =
     Sstt.Tallying.decompose mono t1 t2
 
