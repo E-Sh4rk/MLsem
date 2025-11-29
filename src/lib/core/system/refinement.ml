@@ -6,14 +6,13 @@ open Mlsem_utils
 
 let rec typeof env (_,e) =
   match e with
-  | Var v when Env.mem v env -> Env.find v env
+  | TypeCoerce (_, ty, _) -> ty
   (* The cases below are necessary because of pattern matching encoding *)
-  | Projection (p, e) ->
-    let _, ty = typeof env e |> TyScheme.get in
-    TyScheme.mk_mono (GTy.map (Checker.proj p) ty)
-  | TypeCast (e, _, _) -> typeof env e
-  | TypeCoerce (_, ty, _) -> TyScheme.mk_mono ty
-  | _ -> TyScheme.mk_mono GTy.any
+  | Var v when Env.mem v env -> Env.find v env |> TyScheme.get_fresh |> snd
+  | Projection (p, e) -> GTy.map (Checker.proj p) (typeof env e )
+  | TypeCast (e, ty, _) -> GTy.cap (typeof env e) ty
+  | _ -> GTy.any
+let typeof_def env e = Checker.generalize ~e env (typeof env e)
 
 let combine rs1 rs2 =
   Utils.carthesian_prod rs1 rs2
@@ -64,7 +63,7 @@ let sufficient_refinements env e t =
       r1@r2
     | Alt (e1, e2) -> (aux env e1 t)@(aux env e2 t)
     | Let (_, v, e1, e2) ->
-      aux (Env.add v (typeof env e1) env) e2 t
+      aux (Env.add v (typeof_def env e1) env) e2 t
       |> List.concat_map (fun renv ->
           let renv, t = REnv.rm v renv, REnv.find' v renv in
           let renvs = aux env e1 t in
@@ -81,7 +80,7 @@ let refine env e t =
   let rec aux renv renvs =
     let renvs = renvs |> List.map (fun renv' ->
       renv' |> REnv.filter (fun v ty ->
-        let ty' = Env.find v env |> TyScheme.get |> snd |> GTy.lb in
+        let ty' = Env.find v env |> TyScheme.get_fresh |> snd |> GTy.lb in
         let ty'' = REnv.find' v renv in
         Ty.leq (Ty.cap ty' ty'') ty |> not
       )
@@ -92,7 +91,8 @@ let refine env e t =
   in
   aux base_renv renvs
 
-let refinement_envs ?(extra_checks=[]) env e =
+let refinement_envs
+  ?(extra_checks=[]) ?(refine_on_typecases=true) ?(refine_on_casts=false) env e =
   let extra = Hashtbl.create 10 in
   extra_checks |> List.iter (fun (eid, ty) -> Hashtbl.add extra eid ty) ;
   let res = ref REnvSet.empty in
@@ -108,18 +108,22 @@ let refinement_envs ?(extra_checks=[]) env e =
     match e with
     | Value _ | Var _ -> ()
     | Constructor (_, es) -> es |> List.iter (aux env)
-    | Projection (_, e) | TypeCast (e, _, _) | TypeCoerce (e, _, _)
-    | Operation (_, e) -> aux env e
+    | Projection (_, e) | TypeCoerce (e, _, _) | Operation (_, e) -> aux env e
     | Lambda (d, v, e) -> aux_lambda env (d,v,e)
     | LambdaRec lst -> lst |> List.iter (aux_lambda env)
+    | TypeCast (e, tau, _) ->
+      if refine_on_casts then add_refinement env e (GTy.lb tau) ;
+      aux env e
     | Ite (e, tau, e1, e2) ->
-      let tau = GTy.lb tau in
-      if fv e1 |> VarSet.is_empty |> not then add_refinement env e tau ;
-      if fv e2 |> VarSet.is_empty |> not then add_refinement env e (Ty.neg tau) ;
+      if refine_on_typecases then begin
+        let tau = GTy.lb tau in
+        if fv e1 |> VarSet.is_empty |> not then add_refinement env e tau ;
+        if fv e2 |> VarSet.is_empty |> not then add_refinement env e (Ty.neg tau)
+      end ;
       aux env e ; aux env e1 ; aux env e2
     | App (e1, e2) | Alt (e1, e2) -> aux env e1 ; aux env e2
     | Let (_, v, e1, e2) ->
-      aux env e1 ; aux (Env.add v (typeof env e1) env) e2 ;
+      aux env e1 ; aux (Env.add v (typeof_def env e1) env) e2 ;
       let res' =
         REnvSet.elements !res |> List.map (fun renv ->
           if REnv.mem v renv
