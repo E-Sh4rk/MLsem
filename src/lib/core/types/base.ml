@@ -260,7 +260,7 @@ module Record = struct
   let mk opened bindings =
     let bindings = bindings |>
       List.map (fun (str, (opt,ty)) -> (to_label str, (ty, opt))) |>
-      Sstt.LabelMap.of_list in
+      Sstt.Records.Atom.LabelMap.of_list in
     { Sstt.Records.Atom.opened ; bindings }
     |> Sstt.Descr.mk_record |> Sstt.Ty.mk_descr
 
@@ -273,14 +273,14 @@ module Record = struct
     t |> Sstt.Ty.get_descr |> Sstt.Descr.get_records
     |> Sstt.Op.Records.as_union |> List.map (fun a ->
       let opened = a.Sstt.Records.Atom.opened in
-      let bindings = a.bindings |> Sstt.LabelMap.bindings |>
+      let bindings = a.bindings |> Sstt.Records.Atom.LabelMap.bindings |>
         List.map (fun (lbl, (ty,opt)) -> (from_label lbl, (opt,ty))) in
       bindings, opened
     )
   let of_dnf lst =
     let lst = lst |> List.map (fun (bs, opened) ->
       let bindings = bs |>
-        List.map (fun (str, (opt,ty)) -> (to_label str, (ty, opt))) |> Sstt.LabelMap.of_list
+        List.map (fun (str, (opt,ty)) -> (to_label str, (ty, opt))) |> Sstt.Records.Atom.LabelMap.of_list
       in
       { Sstt.Records.Atom.opened ; bindings }
       )

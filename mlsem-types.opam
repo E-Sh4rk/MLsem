@@ -11,6 +11,7 @@ depends: [
   "dune" {>= "3.17"}
   "sstt" {>= "0.1.0"}
   "zarith"
+  "yojson"
   "odoc" {with-doc}
 ]
 build: [
