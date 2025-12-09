@@ -61,6 +61,7 @@ module TVOp : sig
     val vars : Ty.t -> MVarSet.t
     val vars' : Ty.t list -> MVarSet.t
     val top_vars : Ty.t -> MVarSet.t
+    val strict_vars : Ty.t -> MVarSet.t
     val vars_of_kind : kind -> Ty.t -> MVarSet.t
     val polarity1 : TVar.t -> Ty.t -> [ `Both | `Neg | `Pos | `None ]
     val polarity2 : RVar.t -> Ty.t -> [ `Both | `Neg | `Pos | `None ]

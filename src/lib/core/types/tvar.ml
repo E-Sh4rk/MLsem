@@ -124,6 +124,12 @@ module TVOp = struct
   let vars = Sstt.Ty.all_vars
   let vars' ts = List.map vars ts |> List.fold_left MVarSet.union MVarSet.empty
   let top_vars = Sstt.Ty.all_vars_toplevel
+  let strict_vars t =
+    let res = ref MVarSet.empty in
+    let _ = Sstt.Ty.def t |> Sstt.VDescr.map_nodes (fun ty ->
+      res := MVarSet.union !res (Sstt.Ty.all_vars ty) ; ty
+    ) in
+    !res
   let vars_of_kind kind t =
     MVarSet.filter (TVar.has_kind kind) (RVar.has_kind kind) (vars t)
   let vpol = Sstt.Var.mk "__pol__" |> Sstt.Ty.mk_var

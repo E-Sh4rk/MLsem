@@ -96,7 +96,7 @@ let abstract_factors tvars sol =
     [sol]
 
 let substitute_similar_vars1 mono v t =
-  let vs = MVarSet.diff (top_vars t) (MVarSet.add1 v mono) in
+  let vs = MVarSet.diff (top_vars t) (MVarSet.union (strict_vars t) (MVarSet.add1 v mono)) in
   let nt = vars_with_polarity1 t |> List.filter_map (fun (v', k) ->
     if MVarSet.mem1 v' vs then
     match k with
