@@ -118,7 +118,7 @@ let to_system_ast t =
     let e = match e with
     | Exc -> SA.Value (GTy.mk Ty.empty)
     | Void -> SA.Value (GTy.mk !Config.void_ty)
-    | Voidify e -> SA.Constructor (SA.Ignore !Config.void_ty, [aux e])
+    | Voidify e -> SA.TypeCoerce (aux e, !Config.void_ty |> GTy.mk, SA.NoCheck)
     | Value t -> SA.Value t
     | Var v ->
       if MVariable.is_mutable v then

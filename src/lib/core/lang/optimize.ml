@@ -9,7 +9,7 @@ let eval_order_of_constructor c =
   | SA.Cons -> !Config.cons_eval_order
   | SA.Rec _ -> !Config.record_eval_order
   | SA.Tag _ | SA.Enum _ -> Config.LeftToRight
-  | SA.Meet _ | SA.Join _ | SA.Negate | SA.Ternary _ | SA.Ignore _ -> Config.UnknownOrder
+  | SA.Meet _ | SA.Join _ | SA.Negate | SA.Ternary _ -> Config.UnknownOrder
   | SA.CCustom c ->
     begin match Hashtbl.find_opt Config.ccustom_eval_order c.cname with
     | None -> Config.UnknownOrder
@@ -258,7 +258,7 @@ let rec clean_unused_assigns e =
     | VarAssign (v, e) when VarSet.mem v (VarSet.union cv rv) ->
       let rv = VarSet.remove v rv in
       let e, rv = aux cv rv e in (id, VarAssign (v, e)), rv
-    | VarAssign (_, e) -> let e, rv = aux cv rv e in (id, Voidify e), rv
+    | VarAssign (_, e) -> let e, rv = aux cv rv e in (Eid.unique (), Voidify e), rv
     | Loop e ->
       let rv = VarSet.union rv (read_vars e) in
       let e, rv = aux cv rv e in
@@ -301,14 +301,6 @@ let rec clean_unused_assigns e =
   aux
     (VarSet.union (captured_vars e) (fv e (* Global vars *)))
     VarSet.empty e |> fst
-
-(* let clean_unused_assigns e =
-  let f rv (id, e) =
-    match e with
-    | VarAssign (v, e) when VarSet.mem v rv |> not -> id, Voidify e
-    | e -> id, e
-  in
-  map (f (read_vars e)) e *)
 
 let clean_unused_defs e =
   let f (id,e) =

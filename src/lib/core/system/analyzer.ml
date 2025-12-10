@@ -40,7 +40,10 @@ let analyze e a =
   let msg m = res := m::!res in
   let aux e a =
     Hashtbl.replace visited (fst e) () ;
-    let msg s t d = msg { eid=fst e ; severity=s ; title=t ; descr=Some d } in
+    let msg s t d =
+      if Eid.show_notices (fst e)
+      then msg { eid=fst e ; severity=s ; title=t ; descr=Some d }
+    in
     match snd e, a.Annot.ann with
     | TypeCoerce (_, _, c), ACoerce (ty, a) ->
       let s = tyof a in
@@ -58,16 +61,11 @@ let analyze e a =
   List.rev !res
 
 let get_unreachable e =
-  (* Expressions with an unknown pos may be residuals of
-     the program transformations and encoding *)
-  let has_unknown_position (id,_) =
-    Eid.loc id = Position.dummy
-  in
   let res = ref [] in
   let msg m = res := m::!res in
   let aux e =
     let msg s t = msg { eid=fst e ; severity=s ; title=t ; descr=None } in
-    if Hashtbl.mem visited (fst e) || has_unknown_position e then true
+    if Hashtbl.mem visited (fst e) || not (Eid.show_notices (fst e)) then true
     else (msg Warning "Unreachable code" ; false)
   in
   iter' aux e ;

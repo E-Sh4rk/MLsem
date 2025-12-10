@@ -38,8 +38,6 @@ let domains_of_construct (c:Ast.constructor) ty =
   | Negate when Ty.is_any ty -> [ [Ty.any] ]
   | Negate -> [ ]
   | Ternary _ -> [ [ Ty.any ; ty ; ty ] ]
-  | Ignore ty' when Ty.leq ty' ty -> [ [Ty.any] ]
-  | Ignore _ -> [ ]
   | Cons ->
     Lst.dnf ty
     |> List.filter (fun (a,b) -> Ty.leq (Lst.cons a b) ty)
@@ -69,7 +67,6 @@ let construct (c:Ast.constructor) tys =
     if Ty.leq t tau then t1
     else if Ty.leq t (Ty.neg tau) then t2
     else Ty.cup t1 t2
-  | Ignore ty, [_] -> ty
   | Cons, [t1 ; t2] -> Lst.cons t1 t2
   | Rec (labels, opened), tys when List.length labels = List.length tys ->
     let mk = if opened then Record.mk_open else Record.mk_closed in
@@ -109,7 +106,6 @@ let constr_is_gen c =
   match c with
   | Tuple _ | Cons | Rec _ | Tag _ | Enum _
   | Join _ | Meet _  | Negate | Ternary _ -> true
-  | Ignore _ -> false
   | CCustom c -> c.cgen
 let op_is_gen o =
   match o with

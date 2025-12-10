@@ -1,23 +1,26 @@
 
 type t = int
 let dummy = 0
-let unique =
+let unique_id =
     let last_id = ref 0 in
     fun () -> (
         last_id := !last_id + 1 ;
         !last_id
     )
-let eid_locs = Hashtbl.create 1000
+
+type info = { loc : Position.t ; show_notices : bool }
+let eid_infos = Hashtbl.create 1000
 let unique_with_pos pos =
-  let eid = unique () in
-  Hashtbl.add eid_locs eid pos ; eid
+  let eid = unique_id () in
+  Hashtbl.add eid_infos eid { loc=pos ; show_notices=true } ; eid
+let unique () =
+  let eid = unique_id () in
+  Hashtbl.add eid_infos eid { loc=Position.dummy ; show_notices=false } ; eid
 let refresh parent =
-  match Hashtbl.find_opt eid_locs parent with
-  | None -> unique ()
-  | Some pos -> unique_with_pos pos
-let loc eid =
-  match Hashtbl.find_opt eid_locs eid with
-  | None -> Position.dummy
-  | Some p -> p
+  let info = Hashtbl.find eid_infos parent in
+  let eid = unique_id () in
+  Hashtbl.add eid_infos eid info ; eid
+let loc eid = (Hashtbl.find eid_infos eid).loc
+let show_notices eid = (Hashtbl.find eid_infos eid).show_notices
 let equal, compare, hash = Int.equal, Int.compare, Int.hash
 let pp fmt t = Format.fprintf fmt "%i" t

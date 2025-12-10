@@ -101,23 +101,22 @@ let eliminate_pattern_matching e =
 
 let eliminate_if_while_break_return e =
   let aux (id,e) =
-    let e = match e with
+    match e with
     | Lambda (tys, ty, v, e) ->
-      let block = Eid.refresh id, Block (BFun, e) in
-      Lambda (tys, ty, v, block)
+      let block = Eid.unique (), Block (BFun, e) in
+      id, Lambda (tys, ty, v, block)
     | If (e,t,e1,e2) ->
       let e2 = match e2 with None -> Eid.unique (), Exc | Some e2 -> e2 in
-      let body = Eid.refresh id, Ite (e, t, e1, e2) in
-      Voidify body
+      let body = id, Ite (e, t, e1, e2) in
+      Eid.unique (), Voidify body
     | While (e,t,e1) ->
-      let body = Eid.refresh id, Ite (e, t, e1, (Eid.unique (), Exc)) in
-      let block = Eid.refresh id, Block (BLoop, body) in
-      let block = Eid.refresh id, Voidify block in
-      Loop block
-    | Break -> Ret (BLoop, None)
-    | Return e -> Ret (BFun, Some e)
-    | e -> e
-    in (id, e)
+      let body = id, Ite (e, t, e1, (Eid.unique (), Exc)) in
+      let block = Eid.unique (), Block (BLoop, body) in
+      let block = Eid.unique (), Voidify block in
+      Eid.unique (), Loop block
+    | Break -> id, Ret (BLoop, None)
+    | Return e -> id, Ret (BFun, Some e)
+    | e -> id, e
   in
   map aux e
 
@@ -205,7 +204,7 @@ let rec elim_ret_args bid (id,e) =
   then
     let v = MVariable.create MVariable.Mut None in
     let body = Eid.refresh id, VarAssign (v, treat_rets bid v (id,e)) in
-    let body = Eid.refresh id, Seq ((Eid.refresh id, Voidify body), (Eid.unique (), Var v)) in
+    let body = Eid.refresh id, Seq ((Eid.unique (), Voidify body), (Eid.unique (), Var v)) in
     Eid.refresh id, Declare (v, body)
   else id, e
 and treat_rets bid v e =

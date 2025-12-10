@@ -10,7 +10,7 @@ type projection =
 | Hd | Tl | PiTag of Tag.t | PCustom of pcustom
 type constructor =
 | Tuple of int | Cons | Rec of string list * bool | Tag of Tag.t | Enum of Enum.t 
-| Join of int | Meet of int | Negate | Ternary of Ty.t | Ignore of Ty.t (* Should not contain type vars *)
+| Join of int | Meet of int | Negate | Ternary of Ty.t (* Should not contain type vars *)
 | CCustom of ccustom
 type operation =
 | RecUpd of string | RecDel of string
