@@ -143,7 +143,7 @@ module Ty = struct
   let equiv = Sstt.Ty.equiv
 
   let normalize = Sstt.Ty.factorize
-  let simplify = Sstt.Transform.simplify
+  let simplify ty = Sstt.Transform.simplify ty
 end
 
 module FTy = struct
