@@ -263,7 +263,7 @@ atomic_term:
 { list_of_elts $startpos $endpos lst }
 | LBRACKET t1=term OR ts=separated_nonempty_list(OR, term) RBRACKET
 { alts $startpos $endpos (t1::ts) }
-| str=EXT { M.parse_expr_ext str }
+| str=EXT { M.parse_expr_ext (Position.lex_join $startpos $endpos) str }
 
 %inline typ_or_dyn:
   ty=typ { Some ty }
