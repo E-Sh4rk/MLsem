@@ -107,7 +107,7 @@
 %token<Z.t> LINT
 %token<bool> LBOOL
 %token<char> LCHAR
-%token<string> EXT_TY
+%token<string> EXT
 %token<string> LSTRING
 %token<string> INFIX PREFIX INDEXED OPID
 
@@ -263,6 +263,7 @@ atomic_term:
 { list_of_elts $startpos $endpos lst }
 | LBRACKET t1=term OR ts=separated_nonempty_list(OR, term) RBRACKET
 { alts $startpos $endpos (t1::ts) }
+| str=EXT { M.parse_expr_ext str }
 
 %inline typ_or_dyn:
   ty=typ { Some ty }
@@ -363,7 +364,7 @@ atomic_typ:
 | LPAREN t=typ RPAREN { t }
 | LBRACE fs=separated_list(SEMICOLON, typ_field) tail=optional_tail RBRACE { TRecord (fs,tail) }
 | LBRACKET re=typ_re RBRACKET { TSList re }
-| str=EXT_TY { TExt (M.parse_ext str) }
+| str=EXT { TExt (M.parse_ty_ext str) }
 
 %inline optional_tail:
 | DOUBLESEMICOLON ty=typ { ty }

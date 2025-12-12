@@ -39,6 +39,8 @@ and ('a, 'typ, 'enu, 'tag, 'v) ast =
 | Tuple of ('a, 'typ, 'enu, 'tag, 'v) t list
 | Cons of ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
 | Projection of projection * ('a, 'typ, 'enu, 'tag, 'v) t
+| Constructor of constructor * ('a, 'typ, 'enu, 'tag, 'v) t list
+| Operation of operation * ('a, 'typ, 'enu, 'tag, 'v) t
 | Record of (string * ('a, 'typ, 'enu, 'tag, 'v) t) list
 | RecordUpdate of ('a, 'typ, 'enu, 'tag, 'v) t * string * ('a, 'typ, 'enu, 'tag, 'v) t option
 | TypeCast of ('a, 'typ, 'enu, 'tag, 'v) t * 'typ option * check
@@ -175,6 +177,8 @@ module ParserExpr(B:Builder'.B) = struct
             | Tuple es -> Tuple (List.map (aux env) es)
             | Cons (e1, e2) -> Cons (aux env e1, aux env e2)
             | Projection (p, e) -> Projection (p, aux env e)
+            | Constructor (c, es) -> Constructor (c, List.map (aux env) es)
+            | Operation (o, e) -> Operation (o, aux env e)
             | Record lst -> Record (List.map (fun (str, e) -> str, aux env e) lst)
             | RecordUpdate (e1, l, e2) ->
                 RecordUpdate (aux env e1, l, Option.map (aux env) e2)
@@ -284,5 +288,6 @@ end
 module type ParserExt = sig
   module B : Mlsem_types.Builder'.B
   module E : ParserExpr with type texpr=B.type_expr and type benv=B.benv
-  val parse_ext : string -> B.ext
+  val parse_ty_ext : string -> B.ext
+  val parse_expr_ext : string -> E.pexpr
 end

@@ -59,6 +59,8 @@ let expr_to_ast t =
     | Tuple es -> Constructor (Tuple (List.length es), List.map aux es)
     | Cons (e1, e2) -> Constructor (Cons, [aux e1 ; aux e2])
     | Projection (p, e) -> Projection (p, aux e)
+    | Constructor (c, es) -> Constructor (c, List.map aux es)
+    | Operation (o, e) -> Operation (o, aux e)
     | Record lst ->
       Constructor (Rec (List.map fst lst, false), List.map snd lst |> List.map aux)
     | RecordUpdate (e, lbl, None) -> Operation (RecDel lbl, aux e)

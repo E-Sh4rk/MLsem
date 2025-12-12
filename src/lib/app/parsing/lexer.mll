@@ -64,7 +64,7 @@ rule token = parse
 | "abstract"  { ABSTRACT }
 | "#"     { HASHTAG }
 | "(*"    { comment 0 lexbuf }
-| "%("    { read_ty_ext (Buffer.create 17) 0 lexbuf }
+| "%("    { read_ext (Buffer.create 17) 0 lexbuf }
 | "->"    { ARROW }
 | "&"     { AND }
 | "|"     { OR }
@@ -168,25 +168,25 @@ and read_string buf = parse
 | _ { raise (LexerError ("Illegal string character: " ^ Lexing.lexeme lexbuf)) }
 | eof { raise (LexerError ("String is not terminated")) }
 
-and read_ty_ext buf depth = parse
+and read_ext buf depth = parse
 | newline {
   Buffer.add_string buf (Lexing.lexeme lexbuf);
-  enter_newline lexbuf |> read_ty_ext buf depth }
+  enter_newline lexbuf |> read_ext buf depth }
 | ")%" {
-  if depth = 0 then EXT_TY (Buffer.contents buf)
+  if depth = 0 then EXT (Buffer.contents buf)
   else begin
     Buffer.add_string buf (Lexing.lexeme lexbuf);
-    read_ty_ext buf (depth - 1) lexbuf
+    read_ext buf (depth - 1) lexbuf
   end
 }
 | "%(" {
   Buffer.add_string buf (Lexing.lexeme lexbuf);
-  read_ty_ext buf (depth + 1) lexbuf
+  read_ext buf (depth + 1) lexbuf
 }
 | eof { raise (LexerError ("Type is not terminated")) }
 | _
   { Buffer.add_string buf (Lexing.lexeme lexbuf);
-    read_ty_ext buf depth lexbuf
+    read_ext buf depth lexbuf
   }
 
 {

@@ -322,6 +322,7 @@ end
 module PNoExt : PAst.ParserExt = struct
   module B = Mlsem_types.Builder
   module E = PAst.ParserExpr(B)
-  let parse_ext _ = failwith "Type extensions are not available."
+  let parse_ty_ext _ = failwith "Type extensions are not available."
+  let parse_expr_ext _ = failwith "Expression extensions are not available."
 end
 module NoExt = Make(PNoExt)

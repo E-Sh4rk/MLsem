@@ -39,6 +39,8 @@ and ('a, 'typ, 'enu, 'tag, 'v) ast =
 | Tuple of ('a, 'typ, 'enu, 'tag, 'v) t list
 | Cons of ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
 | Projection of projection * ('a, 'typ, 'enu, 'tag, 'v) t
+| Constructor of constructor * ('a, 'typ, 'enu, 'tag, 'v) t list
+| Operation of operation * ('a, 'typ, 'enu, 'tag, 'v) t
 | Record of (string * ('a, 'typ, 'enu, 'tag, 'v) t) list
 | RecordUpdate of ('a, 'typ, 'enu, 'tag, 'v) t * string * ('a, 'typ, 'enu, 'tag, 'v) t option
 | TypeCast of ('a, 'typ, 'enu, 'tag, 'v) t * 'typ option * check
@@ -87,5 +89,6 @@ module ParserExpr(B:Builder'.B) : ParserExpr with type texpr=B.type_expr and typ
 module type ParserExt = sig
   module B : Mlsem_types.Builder'.B
   module E : ParserExpr with type texpr=B.type_expr and type benv=B.benv
-  val parse_ext : string -> B.ext
+  val parse_ty_ext : string -> B.ext
+  val parse_expr_ext : string -> E.pexpr
 end
