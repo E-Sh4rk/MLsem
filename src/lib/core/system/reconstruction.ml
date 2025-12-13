@@ -37,10 +37,10 @@ let rec initial renv (_, e) =
   | Let (suggs, v, e1, e2) ->
     let a1 = initial renv e1 in
     let tys = Refinement.Partitioner.partition_for renv v suggs in
-    let parts = tys |> List.map (fun ty ->
+    let parts = tys |> List.map (fun ty -> ty, (fun () ->
         let renv = Refinement.Partitioner.filter_compatible renv v ty in
-        (ty, initial renv e2)
-      ) in
+        initial renv e2
+      ) |> LazyIAnnot.mk_lazy) in
     ALet (a1, parts)
 
 let initial renv e =
@@ -470,14 +470,16 @@ and refine_b' cache env bannot e s tau =
 and refine_part' cache env e v (tvs, s) (si,annot) =
   let t = TyScheme.mk tvs (GTy.cap s (GTy.mk si)) in
   let env = Env.add v t env in
-  match refine' cache env annot e with
+  match refine' cache env (LazyIAnnot.get annot) e with
   | Fail -> Fail
-  | Subst (ss,a,a',r) -> Subst (ss,(si,a),(si,a'),r)
+  | Subst (ss,a,a',r) ->
+    let a, a' = LazyIAnnot.mk a, LazyIAnnot.mk a' in
+    Subst (ss,(si,a),(si,a'),r)
   | Ok (a,ty) -> Ok ((si,a),ty)
 and refine_seq' cache env lst = seq (refine' cache env) (fun a -> A a) lst
 and refine_part_seq' cache env e v s lst =
   seq (fun a () -> refine_part' cache env e v s a)
-    (fun (si,annot) -> (si, A annot))
+    (fun (si,annot) -> (si, IAnnot.A annot |> LazyIAnnot.mk))
     (lst |> List.map (fun a -> (a,())))
 
 let refine env iannot e =

@@ -28,12 +28,12 @@ module Annot : sig
   val pp_a : Format.formatter -> a -> unit
 end
 
-module IAnnot : sig
+module rec IAnnot : sig
   type coverage = (Eid.t * Ty.t) option * REnv.t
   type branch = BMaybe of t | BType of t | BSkip
   and inter_branch = { coverage: coverage option ; ann: t }
   and inter = inter_branch list
-  and part = (Ty.t * t) list
+  and part = (Ty.t * LazyIAnnot.t) list
   and t =
   | A of Annot.t
   | Untyp
@@ -54,6 +54,14 @@ module IAnnot : sig
   val substitute : Subst.t -> t -> t
   val pp : Format.formatter -> t -> unit
   val pp_coverage : Format.formatter -> coverage -> unit
+end
+and LazyIAnnot : sig
+  type t
+  val get : t -> IAnnot.t
+  val mk_lazy : (unit -> IAnnot.t) -> t
+  val mk : IAnnot.t -> t
+  val substitute : Subst.t -> t -> t
+  val pp : Format.formatter -> t -> unit
 end
 
 module Domain : sig
