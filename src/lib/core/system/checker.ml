@@ -208,7 +208,9 @@ let rec typeof' env annot (id,e) =
       else
         untypeable id ("Partition of "^(Variable.show v)^" contains generalized variables.")
     in
-    if Ty.leq (GTy.ub s) (List.map fst annots2 |> Ty.disj) then
+    (* if Ty.leq (GTy.ub s) (List.map fst annots2 |> Ty.disj) then *)
+    if Ty.diff (GTy.ub s) (List.map fst annots2 |> Ty.disj)
+                |> !Config.normalization_fun |> Ty.is_empty then
       List.map aux annots2 |> GTy.disj
     else
       untypeable id ("Partition does not cover the type of "^(Variable.show v)^".")

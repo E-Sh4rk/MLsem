@@ -150,6 +150,7 @@ and LazyIAnnot : sig
   val get : t -> IAnnot.t
   val mk_lazy : (unit -> IAnnot.t) -> t
   val mk : IAnnot.t -> t
+  val is_concrete : t -> bool
   val substitute : Subst.t -> t -> t
   val pp : Format.formatter -> t -> unit
 end = struct
@@ -173,6 +174,8 @@ end = struct
   let mk ann : t = ref { ann=ref (Concrete ann) ; ss=[] }
   let substitute s (t:t) : t =
     ref { ann=(!t).ann ; ss=s::(!t).ss }
+  let is_concrete (t:t) =
+    match !(!t.ann) with Concrete _ -> true | Potential _ -> false
   let pp fmt (t:t) =
     match !(!t.ann) with
     | Concrete t -> IAnnot.pp fmt t

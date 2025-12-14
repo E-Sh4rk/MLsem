@@ -353,7 +353,12 @@ let rec refine cache env annot (id, e) =
     | Subst (ss,a,a',r) -> Subst (ss,ALet (a,parts),ALet (a',parts),r)
     | Ok (annot1, s) ->
       let tvs, s = Checker.generalize ~e:e1 env s |> TyScheme.get in
-      let parts = parts |> List.filter (fun (t,_) -> Ty.disjoint (GTy.ub s) t |> not) in
+      (* let parts = parts |> List.filter (fun (t,_) -> Ty.disjoint (GTy.ub s) t |> not) in *)
+      let first_time = parts |> List.for_all (fun (_,t) -> LazyIAnnot.is_concrete t |> not) in
+      let parts = if first_time
+        then parts |> List.filter (fun (t,_) ->
+          Ty.cap (GTy.ub s) t |> !Config.normalization_fun |> Ty.non_empty)
+        else parts in
       begin match refine_part_seq' cache env e2 v (tvs,s) parts with
       | OneFail -> Fail
       | OneSubst (ss,p,p',r) -> Subst (ss,ALet(A annot1,p),ALet(A annot1,p'),r)

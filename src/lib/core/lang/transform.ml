@@ -85,6 +85,7 @@ let encode_pattern_matching e pats =
   | [] -> assert false
   | (_, e')::pats -> List.fold_left add_branch e' pats
   in
+  (* TODO: update encoding (no more typecast but an untypeable else) *)
   let e = (Eid.refresh (fst e), TypeCast (e, GTy.mk (Ty.disj ts), SA.CheckStatic)) in
   Let (ts, x, e, body)
 

@@ -60,6 +60,7 @@ and LazyIAnnot : sig
   val get : t -> IAnnot.t
   val mk_lazy : (unit -> IAnnot.t) -> t
   val mk : IAnnot.t -> t
+  val is_concrete : t -> bool
   val substitute : Subst.t -> t -> t
   val pp : Format.formatter -> t -> unit
 end

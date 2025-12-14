@@ -215,7 +215,17 @@ module Abstract = struct
     ) in
     construct (pos, comps)
   let trans_vdescr f = Sstt.VDescr.map (trans_descr f)
-  let transform f = Sstt.Transform.transform (trans_vdescr f)
+  let transform f ty =
+    let open Sstt in
+    let has_abs = ref false in
+    let _ = ty |> Ty.nodes |> List.map (fun ty ->
+      Ty.def ty |> VDescr.map (fun d ->
+        let (tags,_) = Descr.get_tags d |> Tags.components in
+        if List.exists (fun tc -> TagComp.tag tc |> Extensions.Abstracts.is_abstract) tags
+        then has_abs := true ;
+        d
+      )) in
+    if !has_abs then Transform.transform (trans_vdescr f) ty else ty
 end
 
 module Tuple = struct
