@@ -81,7 +81,7 @@ module PEnv = struct
     in
     let pparam = printer_params () in
     let pp_param fmt ty =
-      let t = Sstt.Printer.get ~inline:true pparam ty in
+      let t = Sstt.Printer.get ~factorize:false pparam ty in
       let rename_vars (d:Sstt.Printer.descr) =
         match d.op with
         | Sstt.Printer.Var v -> Sstt.Printer.Var (Sstt.Var.mk (new_var v))
@@ -105,7 +105,7 @@ module Ty = struct
   let pp' s fmt ty =
     Sstt.Printer.print_ty (PEnv.printer_params' s) fmt (Sstt.Subst.apply s ty)
   let pp_raw fmt ty =
-    let t = Sstt.Printer.get ~inline:true Sstt.Printer.empty_params ty in
+    let t = Sstt.Printer.get ~factorize:false Sstt.Printer.empty_params ty in
     Sstt.Printer.print fmt t
   let any = Sstt.Ty.any
   let empty = Sstt.Ty.empty
