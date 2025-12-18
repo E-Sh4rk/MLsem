@@ -143,7 +143,7 @@ module Ty = struct
   let equiv = Sstt.Ty.equiv
 
   let normalize = Sstt.Ty.factorize
-  let simplify = Sstt.Transform.simplify
+  let simplify ty = Sstt.Transform.simplify ty
 end
 
 module Enum = struct
@@ -198,14 +198,16 @@ module Abstract = struct
   let trans_tags f t = Sstt.Tags.map (trans_tagcomp f) t
   let trans_descr f d =
     let open Sstt.Descr in
-    d |> components |> List.map (function
+    let (pos, comps) = destruct d in
+    let comps = comps |> List.map (function
       | Intervals i -> Intervals i
       | Enums e -> Enums e
       | Tags t -> Tags (trans_tags f t)
       | Arrows a -> Arrows a
       | Tuples t -> Tuples t
       | Records r -> Records r
-    ) |> of_components
+    ) in
+    construct (pos, comps)
   let trans_vdescr f = Sstt.VDescr.map (trans_descr f)
   let transform f = Sstt.Transform.transform (trans_vdescr f)
 end

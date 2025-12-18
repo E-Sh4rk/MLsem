@@ -319,7 +319,7 @@ module Builder' = struct
                     Sstt.Ty.def t |> Sstt.VDescr.dnf |> List.iter (fun (ps,ns,d) ->
                         if ps <> [] || ns <> [] then raise NotTestType ;
                         let open Sstt.Descr in
-                        components d |> List.iter (function
+                        components d |> fst |> List.iter (function
                             | Enums _ | Intervals _ | Tuples _ | Records _ -> ()
                             | Tags t ->
                                 Tags.destruct t |> snd |> List.iter (fun comp ->
