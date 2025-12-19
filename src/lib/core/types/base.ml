@@ -277,10 +277,11 @@ module Record = struct
       Hashtbl.add labelmap str lbl ; lbl
   let from_label lbl = Sstt.Label.name lbl
 
+  module LabelMap = Sstt.Op.Records.Atom.LabelMap
   let mk tail bindings =
     let bindings = bindings |>
       List.map (fun (str, (ty, opt)) -> (to_label str, (ty, opt))) |>
-      Sstt.LabelMap.of_list in
+      LabelMap.of_list in
     { Sstt.Op.Records.Atom.tail ; bindings } |> Sstt.Op.Records.of_atom
     |> Sstt.Descr.mk_records |> Sstt.Ty.mk_descr
   let mk_open = mk (Ty.any, true)
@@ -301,14 +302,14 @@ module Record = struct
   let dnf t =
     t |> Sstt.Ty.get_descr |> Sstt.Descr.get_records
     |> Sstt.Op.Records.as_union |> List.map (fun a ->
-      let bindings = a.Sstt.Op.Records.Atom.bindings |> Sstt.LabelMap.bindings |>
+      let bindings = a.Sstt.Op.Records.Atom.bindings |> LabelMap.bindings |>
         List.map (fun (lbl, (ty,opt)) -> (from_label lbl, (ty,opt))) in
       bindings, a.tail
     )
   let of_dnf lst =
     let lst = lst |> List.map (fun (bs, tail) ->
         let bindings = bs |>
-          List.map (fun (str, (ty,opt)) -> (to_label str, (ty,opt))) |> Sstt.LabelMap.of_list
+          List.map (fun (str, (ty,opt)) -> (to_label str, (ty,opt))) |> LabelMap.of_list
         in
         { Sstt.Op.Records.Atom.tail ; bindings }
       )
