@@ -157,6 +157,7 @@ end
 
 module Tag = struct
   type t = Sstt.Tag.t
+  let tag t = t
   let pp = Sstt.Tag.pp
   let compare = Sstt.Tag.compare
   let define = Sstt.Tag.mk

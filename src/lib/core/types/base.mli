@@ -82,6 +82,7 @@ module Tag : sig
     val any : Ty.t
     val mk : t -> Ty.t -> Ty.t
     val proj : t -> Ty.t -> Ty.t
+    val tag : t -> Sstt.Tag.t
 end
 
 (** @canonical Mlsem_types.Abstract *)
