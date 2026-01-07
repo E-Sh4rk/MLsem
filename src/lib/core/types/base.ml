@@ -94,7 +94,7 @@ module PEnv = struct
         let t = t |> Sstt.Printer.map rename_vars in
         Format.fprintf fmt "(%a)" Sstt.Printer.print t
     in
-    let str = Format.asprintf "%s(%a)" name (Mlsem_utils.Utils.pp_seq pp_param sep) ps in
+    let str = Format.asprintf "%s(%a)" name (Sstt.Prec.print_seq pp_param sep) ps in
     perform (Update { empty with paliases=[ty, (str, StrMap.bindings !hmap)] })
 end
 
