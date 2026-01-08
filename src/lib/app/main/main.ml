@@ -186,7 +186,7 @@ let treat (benv,varm,senv,env) (annot, elem) =
         (r.Mlsem_system.Analyzer.severity, Eid.loc r.eid, r.title, r.descr)
       ) in
       let senv = List.fold_left (fun senv (v,_) -> VarMap.remove v senv) senv tys2 in
-      let tys = tys1@tys2 |> List.map (fun (v, ty) -> v, Format.asprintf "%a" TyScheme.pp_short ty) in
+      let tys = tys1@tys2 |> List.map (fun (v, ty) -> v, Format.asprintf "@[<hov>%a@]" TyScheme.pp_short ty) in
       (!benv,varm,senv,env), TSuccess (tys,msg,retrieve_time time)
     | P.E.SigDef (name, mut, tyo) ->
       check_not_defined varm name ;
@@ -256,7 +256,7 @@ let treat (benv,varm,senv,env) (annot, elem) =
   | UnresolvedType (var,ty) ->
     (benv,varm,senv,env), TFailure (Some var, Variable.get_location var,
       "the type inferred is not fully resolved",
-      Some (Format.asprintf "type inferred: %a" TyScheme.pp_short ty),
+      Some (Format.asprintf "type inferred: @[<hov>%a@]" TyScheme.pp_short ty),
       retrieve_time time)
 
 let treat (benv,varm,senv,env,penv) e =
