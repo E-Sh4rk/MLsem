@@ -2,7 +2,24 @@
 
 Our test corpuses are in the directory `tests`.
 Each corpus uses the extension `.ml` because the syntax is close to OCaml's syntax,
-but it is not valid OCaml code. 
+but it is not valid OCaml code.
+
+## Documentation
+
+The core of MLsem is located in `src/lib/core/`:
+- `types/*`: bindings for set-theoretic types (constructors, subtyping, tallying, etc.)
+- `common/*`: auxiliary definitions (type environment, variable, etc.)
+- `system/*`: functional core language (module `Ast`), type system (module `Checker`), and reconstruction algorithm (module `Reconstruction`)
+- `lang/*`: full language (module `Ast`), minimal imperative language (module `MAst`) and program transformations into the functional core language
+
+Documentation can be accessed [here](https://e-sh4rk.github.io/MLsem/doc/).
+It can also be generated from source:
+
+```
+make doc
+```
+
+This will generate the documentation in `webeditor/doc/`.
 
 ## Building and running the native version
 
@@ -31,17 +48,6 @@ python3 -m http.server 8080
 
 MLsem should then be accessible from your web browser: http://localhost:8080/  
 You can load examples by pressing F2 or accessing the contextual menu (right click).
-
-## Documentation
-
-Documentation can be accessed [here](https://e-sh4rk.github.io/MLsem/doc/).
-It can also be generated from source:
-
-```
-make doc
-```
-
-This will generate the documentation in `webeditor/doc/`.
 
 ## License
 
