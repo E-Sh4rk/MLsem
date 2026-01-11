@@ -1,0 +1,159 @@
+
+type bool = true | false ;;
+type unit = () ;;
+
+"any1" bool <= any ;;
+"any2" any <= bool ;;
+"empty1" bool <= empty ;;
+"empty2" empty <= bool ;;
+"atom1" true <= false ;;
+"atom2" true <= bool ;;
+
+"tags1" tag(true,false) | tag(false,true) ;;
+"tags2" tag1(true,false) | tag2(false,true) ;;
+"tags3" tag(empty) <= empty ;;
+"tags4" x where x=tag(x&tag(x))|42;;
+"tags5" ~tag(bool);;
+"tags6" ~tag1(bool) & ~tag2(int);;
+
+"tuple1" (bool,int) <= (int,bool) ;;
+"tuple2" (false,true) <= (bool,bool) ;;
+"tuple3" (bool,int) <= tuple ;;
+"tuple4" tuple <= (bool,int) ;;
+"tuple5" (bool,true) <= (true,true)|(false,true) ;;
+"tuple6" (bool,bool) <= (true,true)|(false,false) ;;
+
+"tuples1" (bool,true,int) <= tuple ;;
+"tuples2" tuple <= (int,bool,bool) ;;
+"tuples3" (int,bool,int) <= (int,true,int)|(int,false,int) ;;
+"tuples4" (int,bool,int) <= (int,true,int)|(int,true,int) ;;
+"tuples5" (bool,bool,int) <= (true,true,int)|(false,false,int) ;;
+"tuples6" (int,bool,bool,int) <= (int,true,true,int)|(int,false,false,int) ;;
+"tuples7" (int,bool) \ (int,true) ;;
+
+"record1" { } <= { ..} ;;
+"record2" { ..} <= { } ;;
+"record3" { l1 : any } & { l1 : any ; l2 : any ..} <= empty ;;
+"record4" { l1 : any ..} & { l1 : any ; l2 : any ..} <= empty ;;
+"record5" { l1 : bool ; l2 : true } <= { l1 : true ; l2 : true ..} | { l1 : false ; l2 : true } ;;
+"record6" { l1 : true ; l2 : true ..} | { l1 : false ; l2 : true } <= { l1 : bool ; l2 : true ..} ;;
+"record7" { l1:42 } <= { ;; int } ;;
+"record8" { l1:42 } <= { ;; int? } ;;
+"record9" { l1:42 ;; int? } <= { l1:42 ; l2:73 ..} ;;
+"record10" { l1:42 ;; int? } <= { l1:42 ..} ;;
+"record11" { ;; `r } [ `r : { a:int } ; 'b : 42 ] ;;
+"record12" { b:'b ;; `r } [ `r : { a:int } ; 'b : 42 ] ;;
+"record13" { b:'b ; a : 73 ;; `r } [ `r : { a:int } ; 'b : 42 ] ;;
+"record14" { b:'b ; a : 73 ;; `r } [ `r : { a:int ;; `s } ; 'b : 42 ] ;;
+"record15" { l:42 ;; X } where X = { l:42 ;; X } ;;
+"record16" { l:42 ;; X|int } where X = { l:42 ;; X|int } ;;
+"record17" { ;; 41|42 } <= { ;; 41 } | { ;; 42 } ;;
+"record18" { l1 : bool ; l2 : int ..} \ { l1 : true ; l2 : int ..} ;;
+"record19" { l1 : bool ; l2 : int ..} \ { l1 : true ; l2 : int } ;;
+"record20" { l1 : bool ; l2 : int } \ { l1 : true ; l2 : int ..} ;;
+
+"arrow1" bool -> bool <= false -> false ;;
+"arrow2" bool -> true <= bool -> bool ;;
+"arrow3" bool -> false <= false -> false ;;
+"arrow_inter1" (true -> true) & (false -> false) <= bool -> bool ;;
+"arrow_inter2" (true -> true) & (false -> true) <= bool -> bool ;;
+"arrow_inter3" (true -> true) & (false -> true) <= bool -> false ;;
+"arrow_inter4" bool -> bool <= (true -> true) & (false -> false) ;;
+
+"rec1" X where X = (X -> any) | bool <= Y where Y = (Y -> any) | bool ;;
+"rec2" (bool -> any) <= Y where Y = (Y -> any) | bool ;;
+"rec3" (X -> any) | true where X = (X -> any) | bool <= Y where Y = (Y -> any) | true ;;
+"rec4" X where X = X -> any <= empty -> any ;;
+"rec5" empty -> any <= X where X = X -> any ;;
+
+"list1" X where X = (bool, X) | nil <= (true, (false, nil)) ;;
+"list2" (true, (false, nil)) <= X where X = (bool, X) | nil ;;
+"list3" (true, (int, nil)) <= X where X = (bool, X) | nil ;;
+"list4" (true, (false, true)) <= X where X = (bool, X) | nil ;;
+
+"var1" 'x & 'y <= 'x ;;
+"var2" 'z & 'y <= 'x ;;
+"var3" 'x & ~'x ;;
+"var4" 'x | ~'x ;;
+"var5" 'x & int | 'x \ int ;;
+
+"print1" (int -> bool -> true) & (empty -> any) | (any -> any) ;;
+"print2" (true,true) | (false, false) ;;
+"print3" { l1 : true ; l2 : true ..} | { l1 : false ; l2 : true } ;;
+"print4" list | int where list=(any,list)|nil ;;
+"print5" (int -> int) -> (bool -> bool) ;;
+"print6" 'a | 'b & ('a,'b) ;;
+"print7" ~true ;;
+"print8" ~(any -> bool) ;;
+"print9" ~((any -> bool) & (true -> false)) ;;
+"print10" ~((true, false) | (false, true)) ;;
+"print11" 'x [ 'x: bool ; 'y: nil ] ;;
+"print13" 'x [ 'x: 'y ; 'y: nil ] ;;
+"print14" ('y, ('x, lst)) where lst=('x,lst)|nil [ 'x : bool ; 'y : nil ] ;;
+"print15" tuple\(any,any) ;;
+"print16" ~(40..44) ;;
+"print17" ~tag(42) ;;
+"print18" ('a->'b)&('c->'d)&~('e->'f)&~('g->'h) ;;
+"print19" tag\sometag(unit) ;;
+"print20" ~(int|bool|unit) ;;
+
+"tally1" [ 'x <= 'y ] ;;
+"tally2" [ 'X <= 'y ] ;;
+"tally3" [ 'x <= 'Y ] ;;
+"tally4" [ 'X <= 'Y ] ;;
+"tally5" [ 'X -> 'Y <= 'x -> 'y ] ;;
+"tally6" [ 'X -> 'Y <= 'Z -> bool ] ;;
+"tally7" [ ('X, 'Y) <= ('x, 'y) ] ;;
+"tally8" [ ('X, 'Y, 'Z) <= ('x, 'y, 'z) ] ;;
+"tally9" [ ('A -> 'B, 'Y) <= ('x, 'y) ] ;;
+"tally10" [ ('A -> 'B, 'Y) <= ('a -> 'b, 'y) ] ;;
+"tally11" [ ('X -> 'Y, 'X -> 'Y) <= ('a -> 'b, 'b -> 'a) ] ;;
+"tally12" [ ('X, ~'X) <= ('A, 'B) ] ;;
+"tally13" [ { l : 'X ..} <= { l : 'Y } ] ;;
+"tally14" [ { l : 'X } <= { l : 'Y ..} ] ;;
+"tally15" [ 'X, 'Y = int, bool ];;
+"tally16" [ 'X -> 'Y <= 'A -> 'B ] ;;
+
+"tally_row1" [ { ;; `R } <= { ;; `S } ] ;;
+"tally_row2" [ { ;; `R } <= { ;; `s } ] ;;
+"tally_row3" [ { ;; `r } <= { ;; `S } ] ;;
+"tally_row4" [ { ;; `r } <= { ;; `s } ] ;;
+"tally_row5" [ { a: any ;; `R } >= { a:42 ; b:73 } ] ;;
+"tally_row6" [ { a: any ;; `R } -> { a: empty? ;; `R } <= { a:42 ; b:73 } -> 'X ] ;;
+"tally_row7" [ { ;; `R } -> { a: empty? ;; `R } <= { a:42 ; b:73 } -> 'X ] ;;
+"tally_row8" [ ({ ;; `R }, 'A) -> { a: 'A ;; `R } <= ( { a:42 ; b:73 }, 73 ) -> 'X ] ;;
+
+"app1" int -> bool -> int 42 bool ;;
+"app2" int -> bool -> int bool 42 ;;
+"app3" (int -> true -> (..5)) & ((0..) -> bool -> (-5..)) 42 true ;;
+"app4" (any -> any) empty ;;
+"app5" (~string -> false) & (string -> true) any;;
+
+define tagcov(<=) ; taginv() ; tagor(|) ; tagorex(||) ; tagand(&) ; tagandex(&&) ;;
+
+"exttags1" [ tagcov('X1) | taginv('X2) <= tagcov('Y1) | taginv('Y2) ] ;;
+"exttags2" [ tagand('X1) & tagand('X2) <= tagand('Y1 & 'Y2) ] ;;
+"exttags3" [ tagcov('X1) & tagcov('X2) <= tagcov('Y1 & 'Y2) ] ;;
+"exttags4" [ tagor('X1) | tagor('X2) >= tagor('Y1 | 'Y2) ] ;;
+"exttags5" [ tagcov('X1) | tagcov('X2) >= tagcov('Y1 | 'Y2) ] ;;
+"exttags6" tagandex(42) \ tagandex(43) ;;
+"exttags7" ~tagorex(any) ;;
+
+type adhoc_id = (int|bool -> int|bool)&(0 -> 0)&(1 -> 1)&(2 -> 2)&(3 -> 3)&(4 -> 4)&(5 -> 5)&(6 -> 6)&(7 -> 7)&(8 -> 8)&(9 -> 9)&
+        (10 -> 10)&(11 -> 11)&(12 -> 12)&(13 -> 13)&(14 -> 14)&(15 -> 15)&(16 -> 16)&(17 -> 17)&(18 -> 18)&(19 -> 19)&
+        (20 -> 20)&(21 -> 21)&(22 -> 22)&(23 -> 23)&(24 -> 24)&(25 -> 25)&(26 -> 26)&(27 -> 27)&(28 -> 28)&(29 -> 29)&
+        (30 -> 30)&(31 -> 31)&(32 -> 32)&(33 -> 33)&(34 -> 34)&(35 -> 35)&(36 -> 36)&(37 -> 37)&(38 -> 38)&(39 -> 39)&
+        (40 -> 40)&(41 -> 41)&(42 -> 42)&(43 -> 43)&(44 -> 44)&(45 -> 45)&(46 -> 46)&(47 -> 47)&(48 -> 48)&(49 -> 49)&(int -> int) ;;
+"perf1" adhoc_id <= (15..34) -> (15..34) ;;
+"perf2" adhoc_id (15..34) ;;
+"perf3" [adhoc_id <= (15..34) -> 'X] ;;
+
+type disjoint_pairs =
+        ('x00, 00) | ('x01, 01) | ('x02, 02) | ('x03, 03) | ('x04, 04) | ('x05, 05) | ('x06, 06) | ('x07, 07) | ('x08, 08) | ('x09, 09) |
+        ('x10, 10) | ('x11, 11) | ('x12, 12) | ('x13, 13) | ('x14, 14) | ('x15, 15) | ('x16, 16) | ('x17, 17) | ('x18, 18) | ('x19, 19) |
+        ('x20, 20) | ('x21, 21) | ('x22, 22) | ('x23, 23) | ('x24, 24) | ('x25, 25) | ('x26, 26) | ('x27, 27) | ('x28, 28) | ('x29, 29) |
+        ('x30, 30) | ('x31, 31) | ('x32, 32) | ('x33, 33) | ('x34, 34) | ('x35, 35) | ('x36, 36) | ('x37, 37) | ('x38, 38) | ('x39, 39) |
+        ('x40, 40) | ('x41, 41) | ('x42, 42) | ('x43, 43) | ('x44, 44) | ('x45, 45) | ('x46, 46) | ('x47, 47) | ('x48, 48) | ('x49, 49) ;;
+
+"perf4" ('x25, 25) <= disjoint_pairs ;;
+"perf5" [('X, 25) <= disjoint_pairs] ;;

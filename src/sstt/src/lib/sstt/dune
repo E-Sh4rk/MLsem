@@ -1,0 +1,7 @@
+(library
+ (name sstt)
+ (public_name sstt)
+ (libraries sstt_utils zarith))
+
+(include_subdirs unqualified)
+

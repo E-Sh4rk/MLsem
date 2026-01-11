@@ -1,0 +1,117 @@
+open Base
+open Sigs
+open Sstt_utils
+
+module Atom(N:Node) = struct
+  type node = N.t
+  type t = Tag.t * node
+  let tag (tag,_) = tag
+  let map_nodes f (t,n) = t, f n
+  let direct_nodes (_,n) = [n]
+  let simplify t = t
+  let is_empty (_,n) = N.is_empty n
+  let equal (t1,n1) (t2,n2) =
+    Tag.equal t1 t2 && N.equal n1 n2
+  let compare (t1,n1) (t2,n2) =
+    Tag.compare t1 t2 |> ccmp
+      N.compare n1 n2
+  let hash (t, n) = Hash.mix (Tag.hash t) (N.hash n)
+end
+
+module MakeC(N:Node) = struct
+  module Atom = Atom(N)
+  module Bdd = Bdd.Make(Atom)(Bdd.BoolLeaf)
+  module Index = Tag
+
+  type t = Tag.t * Bdd.t
+  type node = N.t
+
+  let hash (tag, t) = Hash.mix (Tag.hash tag) (Bdd.hash t)
+  let any n = n, Bdd.any
+  let empty n = n, Bdd.empty
+
+  let mk a = Atom.tag a, Bdd.singleton a
+
+  let tag (tag,_) = tag
+  let index = tag
+
+  let check_tag tag tag' =
+    if Tag.equal tag tag' |> not then invalid_arg "Heterogeneous tags."
+
+  let cap (tag1, t1) (tag2, t2) = check_tag tag1 tag2 ; tag1, Bdd.cap t1 t2
+  let cup (tag1, t1) (tag2, t2) = check_tag tag1 tag2 ; tag1, Bdd.cup t1 t2
+  let neg (tag, t) = tag, Bdd.neg t
+  let diff (tag1, t1) (tag2, t2) = check_tag tag1 tag2 ; tag1, Bdd.diff t1 t2
+
+  let line_emptiness_checks tag (ps,ns) =
+    let equiv, merge_ps, merge_ns, extremum =
+      match Tag.properties tag with
+      | NoProperty -> true, false, false, false
+      | Monotonic { preserves_cap ; preserves_cup ; preserves_extremum } ->
+        false, preserves_cap, preserves_cup, preserves_extremum && (not preserves_cap || not preserves_cup)
+    in
+    let ps, ns = List.map snd ps, List.map snd ns in
+    let ps, p =
+      if merge_ps then begin
+        let p = N.conj ps in
+        [p], if extremum then [p] else []
+      end else ps, []
+    in
+    let ns, n =
+      if merge_ns then
+        let n = N.disj ns in
+        [n], if extremum then [N.neg n] else []
+      else ns, []
+    in
+    p@n@(cartesian_product ps ns |> List.map (fun (p, n) ->
+        let leq_test = N.diff p n in
+        if equiv then
+          let geq_test = N.diff n p in
+          N.cup leq_test geq_test
+        else
+          leq_test
+      ))
+  let is_clause_empty tag (ps,ns) =
+    line_emptiness_checks tag (ps,ns) |> List.exists N.is_empty
+  let is_clause_empty tag (ps,ns,b) =
+    not b || is_clause_empty tag (ps,ns)
+  let is_empty (tag,bdd) = bdd |> Bdd.for_all_lines (is_clause_empty tag)
+
+  let leq tag t1 t2 = is_empty (tag, Bdd.diff t1 t2)
+  let equiv tag t1 t2 = leq tag t1 t2 && leq tag t2 t1
+
+  let dnf_funs tag =
+    let module Comp = struct
+      type atom = Atom.t
+      let atom_is_valid (t,_) = Tag.equal t tag
+      let leq t1 t2 = leq tag (Bdd.of_dnf t1) (Bdd.of_dnf t2)
+    end in
+    let module Dnf = Dnf.LMake(Comp) in
+    Dnf.export, Dnf.import, Dnf.simplify
+
+  let dnf (tag, bdd) =
+    let (export,_,simplify) = dnf_funs tag in
+    N.with_own_cache (fun bdd -> Bdd.dnf bdd |> export |> simplify) bdd
+  let of_dnf tag dnf =
+    let (_,import,_) = dnf_funs tag in
+    N.with_own_cache (fun dnf -> tag, import dnf |> Bdd.of_dnf) dnf
+
+  let direct_nodes (_,t) = Bdd.atoms t |> List.concat_map Atom.direct_nodes
+  let map_nodes f (tag,t) = tag, Bdd.map_nodes (Atom.map_nodes f) t
+  let map f (tag,t) = tag, Bdd.map_nodes f t
+
+  let simplify ((tag,t) as n) = 
+    let t' = Bdd.simplify (equiv tag) t in
+    if t == t' then n else (tag, t')
+
+  let equal (_,t1) (_,t2) = Bdd.equal t1 t2
+  let compare (_,t1) (_,t2) = Bdd.compare t1 t2
+end
+
+module Make(N:Node) = struct
+  module Comp = MakeC(N)
+  include Indexed.Make(Comp)
+
+  let mk_comp p = mk p
+  let mk a = mk (Comp.mk a)
+end
