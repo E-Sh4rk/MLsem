@@ -8,19 +8,13 @@
 
 (generate_opam_files true)
 
-(authors
- "Mickael Laurent"
- "Kim Nguyen"
-)
+(authors "anonymized")
 
-(maintainers
- "Mickael Laurent"
- "Kim Nguyen"
-)
+(maintainers "anonymized")
 
-(homepage "https://github.com/E-Sh4rk/sstt")
+(homepage "https://anonymized")
 
-(bug_reports "https://github.com/E-Sh4rk/sstt/issues")
+(bug_reports "https://anonymized")
 
 (license "MIT")
 

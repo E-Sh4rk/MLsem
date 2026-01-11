@@ -5,13 +5,13 @@
 
 (generate_opam_files true)
 
-(authors "Mickael Laurent")
+(authors "anonymized")
 
-(maintainers "Mickael Laurent")
+(maintainers "anonymized")
 
-(homepage "https://github.com/E-Sh4rk/MLsem")
+(homepage "https://anonymized")
 
-(bug_reports "https://github.com/E-Sh4rk/MLsem/issues")
+(bug_reports "https://anonymized")
 
 (license "MIT")
 

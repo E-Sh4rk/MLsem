@@ -16,7 +16,7 @@ The core of MLsem is located in `src/lib/core/`:
 - `system/*`: functional core language (module `Ast`), type system (module `Checker`), and reconstruction algorithm (module `Reconstruction`)
 - `lang/*`: full language (module `Ast`), minimal imperative language (module `MAst`) and program transformations into the functional core language
 
-Documentation can be accessed [here](https://e-sh4rk.github.io/MLsem/doc/).
+Documentation can be accessed [here](anonymized).
 It can also be generated from source:
 
 ```
@@ -54,7 +54,7 @@ type-check the definitions in the directory `tests`.
 ## Testing the Wasm version
 
 The WebAssembly version is about 10x slower than the native version, but can be tested directly in the web browser with an interface based on [Monaco Editor](https://microsoft.github.io/monaco-editor/).  
-It can be directly tested online [here](https://e-sh4rk.github.io/MLsem/) or built from sources:
+It can be directly tested online [here](anonymized) or built from sources:
 
 ```
 make wasm
