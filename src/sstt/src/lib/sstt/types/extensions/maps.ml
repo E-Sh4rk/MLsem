@@ -1,0 +1,83 @@
+open Core
+
+type 't field = { dom: 't ; codom: 't }
+type 't t = ('t field list * 't field list) list
+
+let tag = Tag.mk "map"
+
+let add_tag ty = (tag, ty) |> Descr.mk_tag |> Ty.mk_descr
+let proj_tag ty = ty |> Ty.get_descr |> Descr.get_tags |> Tags.get tag
+                  |> Op.TagComp.as_atom |> snd
+
+let mk (ps, ns) =
+  let ps = ps |> List.map (fun f -> f.dom, f.codom) in
+  let ns = ns |> List.map (fun f -> f.dom, f.codom) in
+  let dnf = [ (Ty.any, Ty.any)::ps, ns ] in
+  Arrows.of_dnf dnf |> Descr.mk_arrows |> Ty.mk_descr |> add_tag
+let mk' fields = mk (fields, [])
+let any = mk' []
+let any_p = proj_tag any
+
+let extract_dnf pty =
+  if Ty.vars_toplevel pty |> VarSet.is_empty then
+    pty |> Ty.get_descr |> Descr.get_arrows |> Arrows.dnf
+    |> List.map (fun (ps, ns) ->
+      let ps = ps |> List.filter_map (fun (s,t) ->
+          if Ty.is_any t then None
+          else Some { dom=s ; codom=t })
+      in
+      let ns = ns |> List.map (fun (s,t) -> { dom=s ; codom=t }) in
+      ps, ns
+    )
+  else
+    invalid_arg "Malformed map type"
+
+let destruct ty = proj_tag ty |> extract_dnf
+
+let map f l =
+  let ff t = { dom = f t.dom; codom = f t.codom } in
+  List.map (fun (ps, ns) -> List.map ff ps, List.map ff ns) l
+
+let to_t ctx comp =
+  try
+    let (_, pty) = Op.TagComp.as_atom comp in
+    if Ty.leq pty any_p |> not then raise Exit ;
+    let l = extract_dnf pty in
+    Some (map ctx.Printer.build l)
+  with _ -> None
+let proj ~dom t =
+  let arr = proj_tag t |> Ty.get_descr |> Descr.get_arrows in
+  Op.Arrows.apply arr dom
+
+let merge t {dom ; codom} =
+  let merge_line (ps,_) =
+    let ps = ps |> List.concat_map (fun (fdom, fcodom) ->
+        if Ty.leq codom fcodom
+        then [(fdom, fcodom)]
+        else
+          let arr1 = (Ty.cap fdom dom, Ty.cup fcodom codom) in
+          let arr2 = (Ty.diff fdom dom, fcodom) in
+          [arr1;arr2]
+      ) in
+    (ps,[])
+  in
+  let dnf = proj_tag t |> Ty.get_descr |> Descr.get_arrows |> Arrows.dnf in
+  let dnf = List.map merge_line dnf in
+  Arrows.of_dnf dnf |> Descr.mk_arrows |> Ty.mk_descr |> add_tag
+
+open Prec
+
+let print prec assoc fmt t =
+  let print_field fmt (pos, f) =
+    let arr = if pos then "=>" else "~>" in
+    Format.fprintf fmt "%a %s %a" Printer.print_descr f.dom arr Printer.print_descr f.codom
+  in
+  let print_line _prec _assoc fmt (ps, ns) =
+    let ps, ns = List.map (fun d -> true, d) ps, List.map (fun d -> false, d) ns in
+    Format.fprintf fmt "{{ %a }}"
+      (print_seq print_field " ; ") (ps@ns)
+  in
+  print_cup print_line prec assoc fmt t
+
+let printer_builder = Printer.builder ~to_t ~map ~print
+let printer_params = Printer.{ aliases = []; extensions = [(tag, printer_builder)]}

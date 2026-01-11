@@ -4,6 +4,10 @@ Our test corpuses are in the directory `tests`.
 Each corpus uses the extension `.ml` because the syntax is close to OCaml's syntax,
 but it is not valid OCaml code.
 
+## Notes for the reviewers
+
+The easiest way to test the prototype is to follow the `Testing the Wasm version (prebuilt)` section. The only requirement is Python 3, in order to be able to start a local http web server.
+
 ## Documentation
 
 The core of MLsem is located in `src/lib/core/`:
@@ -21,6 +25,18 @@ make doc
 ```
 
 This will generate the documentation in `webeditor/doc/`.
+
+## Testing the Wasm version (prebuilt)
+
+The WebAssembly version is slower than the native version, but can be tested directly in the web browser with an interface based on [Monaco Editor](https://microsoft.github.io/monaco-editor/).  
+
+```
+cd webeditor
+python3 -m http.server 8080
+```
+
+MLsem should then be accessible from your web browser: http://localhost:8080/  
+You can load examples by pressing F2 or accessing the contextual menu (right click).
 
 ## Building and running the native version
 

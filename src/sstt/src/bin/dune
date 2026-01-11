@@ -1,0 +1,58 @@
+(executable
+ (name native)
+ (public_name sstt)
+ (package sstt-bin)
+ (libraries sstt_repl unix)
+ (modes
+  (best exe))
+ (modules native))
+
+(executable
+ (name benchmark)
+ (public_name sstt-bench)
+ (package sstt-bin)
+ (libraries sstt_repl unix yojson)
+ (modes
+  (best exe))
+ (modules benchmark))
+
+(library
+ (name web)
+ (wrapped false)
+ (libraries sstt_repl)
+ (preprocess
+  (pps js_of_ocaml-ppx))
+ (modules web))
+
+(executable
+ (name js)
+ (libraries web zarith_js)
+ (modes js)
+ (modules js))
+
+(executable
+ (name wasm)
+ (libraries web zarith_wasm)
+ (modes wasm)
+ (modules wasm))
+
+(env
+ (_
+  (js_of_ocaml
+   (flags
+    (:standard --effects=cps))
+   (compilation_mode whole_program)
+   (build_runtime_flags
+    (:standard --effects=cps)))
+  (wasm_of_ocaml
+   (flags
+    (:standard --effects=cps))
+   (compilation_mode whole_program)
+   (build_runtime_flags
+    (:standard --effects=cps)))
+  ; TODO: --effects=jspi fails with an illegal cast
+  ))
+
+; (env
+;  (dev
+;    (flags (:standard -warn-error -A))))
