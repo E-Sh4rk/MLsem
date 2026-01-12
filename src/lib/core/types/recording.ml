@@ -11,7 +11,7 @@ let clear () = tally_calls := []
 let tally_calls () = List.rev !tally_calls
 
 let save_to_file file tallys =
-    let ty_to_string ty = `String (Format.asprintf "%a" Ty.pp_raw ty) in
+    let ty_to_string ty = `String (Format.asprintf "@[<h>%a@]" Ty.pp_raw ty) in
     let instances = tallys |> List.map (fun (r:tally_call) ->
         let s = TVOp.shorten_names (MVarSet.of_list r.vars1 r.vars2) in
         let ty_to_string ty = Subst.apply s ty |> ty_to_string in

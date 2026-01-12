@@ -217,7 +217,7 @@ let rec refine cache env annot (id, e) =
       ss |> List.filter (fun (s, _) -> Subst.apply s t2 |> Ty.non_empty)
     in
     log "untypeable application" (fun fmt ->
-      Format.fprintf fmt "function: %a\nargument: %a" Ty.pp t1 Ty.pp t2
+      Format.fprintf fmt "function: @[<h>%a@]@.argument: @[<h>%a@]" Ty.pp t1 Ty.pp t2
       ) ;
     ss
   in
@@ -243,7 +243,7 @@ let rec refine cache env annot (id, e) =
         tallying_simpl env (Checker.construct c tys) (List.combine tys doms)
       ) in
       log "untypeable constructor" (fun fmt ->
-        Format.fprintf fmt "expected: %a\ngiven: %a"
+        Format.fprintf fmt "expected: @[<h>%a@]@.given: @[<h>%a@]"
           (Utils.pp_seq (Utils.pp_seq Ty.pp " ; ") " ;; ") doms
           (Utils.pp_seq Ty.pp " ; ") tys
         ) ;
@@ -341,7 +341,7 @@ let rec refine cache env annot (id, e) =
       let s = GTy.lb s in
       let ss = tallying_simpl env res [(s, ty)] in
       log "untypeable projection" (fun fmt ->
-        Format.fprintf fmt "argument: %a" Ty.pp s
+        Format.fprintf fmt "argument: @[<h>%a@]" Ty.pp s
         ) ;
       Subst (ss, nc (Annot.AProj annot'), Untyp, empty_cov)
     | Subst (ss,a,a',r) -> Subst (ss,AProj (a,res),AProj (a',res),r)
@@ -371,9 +371,9 @@ let rec refine cache env annot (id, e) =
       let ss = tallying_simpl env (GTy.lb (GTy.cap t s)) cs in
       log "untypeable cast" (fun fmt ->
         if c = Check then
-          Format.fprintf fmt "expected: %a\ngiven: %a" GTy.pp t GTy.pp s
+          Format.fprintf fmt "expected: @[<h>%a@]@.given: @[<h>%a@]" GTy.pp t GTy.pp s
         else if c = CheckStatic then
-          Format.fprintf fmt "expected: %a\ngiven: %a" Ty.pp (GTy.lb t) Ty.pp (GTy.lb s)
+          Format.fprintf fmt "expected: @[<h>%a@]@.given: @[<h>%a@]" Ty.pp (GTy.lb t) Ty.pp (GTy.lb s)
         ) ;
       Subst (ss, nc (Annot.ACast(t,annot')), Untyp, empty_cov)
     | Subst (ss,a,a',r) -> Subst (ss,ACast (t,a),ACast (t,a'),r)
@@ -388,9 +388,9 @@ let rec refine cache env annot (id, e) =
       let ss = tallying_simpl env (GTy.lb t) cs in
       log "untypeable coercion" (fun fmt ->
         if c = Check then
-          Format.fprintf fmt "expected: %a\ngiven: %a" GTy.pp t GTy.pp s
+          Format.fprintf fmt "expected: @[<h>%a@]@.given: @[<h>%a@]" GTy.pp t GTy.pp s
         else if c = CheckStatic then
-          Format.fprintf fmt "expected: %a\ngiven: %a" Ty.pp (GTy.lb t) Ty.pp (GTy.lb s)
+          Format.fprintf fmt "expected: @[<h>%a@]@.given: @[<h>%a@]" Ty.pp (GTy.lb t) Ty.pp (GTy.lb s)
         ) ;
       Subst (ss, nc (Annot.ACoerce(t,annot')), Untyp, empty_cov)
     | Subst (ss,a,a',r) -> Subst (ss,ACoerce (t,a),ACoerce (t,a'),r)
