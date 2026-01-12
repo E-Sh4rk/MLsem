@@ -22,5 +22,9 @@
     {
         "name": "Row Polymorphism",
         "path": "records.stml"
+    },
+    {
+        "name": "OOPSLA",
+        "path": "oopsla.stml"
     }
 ]
