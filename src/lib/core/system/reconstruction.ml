@@ -37,6 +37,7 @@ let rec initial renv (_, e) =
   | Let (suggs, v, e1, e2) ->
     let a1 = initial renv e1 in
     let tys = Refinement.Partitioner.partition_for renv v suggs in
+    (* Format.printf "Part for %a: %a@." Variable.pp v (Utils.pp_list Ty.pp) tys ; *)
     let parts = tys |> List.map (fun ty -> ty, Some ((fun () ->
         let renv = Refinement.Partitioner.filter_compatible renv v ty in
         initial renv e2

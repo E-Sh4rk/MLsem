@@ -143,7 +143,7 @@ let partition ts =
     if Ty.is_empty s then t else s
   in
   let rec aux t =
-    if t |> !Config.normalization_fun |> Ty.is_empty then []
+    if Ty.is_empty t then []
     else
       let s = List.fold_left cap_if_nonempty t ts in
       s::(aux (Ty.diff t s))
@@ -180,7 +180,7 @@ module Partitioner = struct
     let tys = t |> List.filter_map (fun renv ->
       if REnv.mem v renv then Some (REnv.find v renv) else None
     ) |> partition |> List.concat_map isolate_conjuncts in
-    extra@tys |> partition
+    extra@tys |> partition |> List.filter (fun t -> !Config.normalization_fun t |> Ty.non_empty)
     (* |> (fun tys -> Format.printf "Partition for %a: %a@." Variable.pp v
       (Utils.pp_list Ty.pp) tys ; tys) *)
 end
