@@ -217,15 +217,18 @@ module Abstract = struct
   let trans_vdescr f = Sstt.VDescr.map (trans_descr f)
   let transform f ty =
     let open Sstt in
-    let has_abs = ref false in
+    try
     let _ = ty |> Ty.nodes |> List.map (fun ty ->
       Ty.def ty |> VDescr.map (fun d ->
         let (tags,_) = Descr.get_tags d |> Tags.components in
-        if List.exists (fun tc -> TagComp.tag tc |> Extensions.Abstracts.is_abstract) tags
-        then has_abs := true ;
+        List.map (fun tc ->
+          if TagComp.tag tc |> Extensions.Abstracts.is_abstract
+          then TagComp.map (fun _ -> raise Exit) tc |> ignore ;
+          tc) tags |> ignore ;
         d
       )) in
-    if !has_abs then Transform.transform (trans_vdescr f) ty else ty
+    ty
+  with Exit -> Transform.transform (trans_vdescr f) ty
 end
 
 module Tuple = struct
