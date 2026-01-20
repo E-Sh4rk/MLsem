@@ -456,11 +456,14 @@ and refine_b' cache env bannot e s tau =
   let retry_with bannot = refine_b' cache env bannot e s tau in
   let empty_cov = (fst e, REnv.empty) in
   match bannot with
-  | IAnnot.BMaybe annot when !Config.infer_overload ->
-    let ss = tallying_simpl env Ty.empty [(GTy.lb s, GTy.lb ntau) ; (GTy.ub s, GTy.ub ntau)] in
-    Subst (ss, IAnnot.BSkip, IAnnot.BType annot, empty_cov)
-  | IAnnot.BMaybe _ when GTy.leq s ntau -> retry_with (IAnnot.BSkip)
-  | IAnnot.BMaybe annot -> retry_with (IAnnot.BType annot)
+  | IAnnot.BMaybe annot ->
+    let norm_s = GTy.map !Config.normalization_fun s in
+    if !Config.infer_overload then
+      let ss = tallying_simpl env Ty.empty [(GTy.lb norm_s, GTy.lb ntau) ; (GTy.ub norm_s, GTy.ub ntau)] in
+      Subst (ss, IAnnot.BSkip, IAnnot.BType annot, empty_cov)
+    else if GTy.leq norm_s ntau then
+      retry_with (IAnnot.BSkip)
+    else retry_with (IAnnot.BType annot)
   | IAnnot.BSkip -> Ok (Annot.BSkip, GTy.empty)
   | IAnnot.BType (annot) ->
     begin match refine' cache env annot e with

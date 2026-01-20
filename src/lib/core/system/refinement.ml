@@ -180,7 +180,7 @@ module Partitioner = struct
     let tys = t |> List.filter_map (fun renv ->
       if REnv.mem v renv then Some (REnv.find v renv) else None
     ) |> partition |> List.concat_map isolate_conjuncts in
-    extra@tys |> partition |> List.filter (fun t -> !Config.normalization_fun t |> Ty.non_empty)
+    extra@tys |> partition
     (* |> (fun tys -> Format.printf "Partition for %a: %a@." Variable.pp v
       (Utils.pp_list Ty.pp) tys ; tys) *)
 end
