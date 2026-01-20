@@ -171,6 +171,7 @@ module Tag = struct
     Sstt.Ty.get_descr ty |> Sstt.Descr.get_tags |> Sstt.Tags.get tag
     |> Sstt.Op.TagComp.as_atom |> snd
   let any = Sstt.Tags.any |> Sstt.Descr.mk_tags |> Sstt.Ty.mk_descr
+  let tag t = t
 end
 
 module Abstract = struct
