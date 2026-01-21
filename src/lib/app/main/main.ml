@@ -64,13 +64,14 @@ let sigs_of_ty mono ty =
 let infer var env e =
   let annot =
     (* Format.printf "@.@.%a@.@." Mlsem_system.Ast.pp e ; *)
+    let narrowing = !Config.type_narrowing in
     let r =
-      if !Config.type_narrowing
+      if narrowing <> NoNarrowing
       then Mlsem_system.Refinement.refinements env e
       else Mlsem_system.Refinement.Refinements.empty
     in
     (* REnvSet.elements r |> List.iter (fun renv -> Format.printf "Renv: %a@." REnv.pp renv) ; *)
-    try Mlsem_system.Reconstruction.infer env r e with
+    try Mlsem_system.Reconstruction.infer ~direct_narrowing:(narrowing = DirectNarrowing) env r e with
     | Mlsem_system.Checker.Untypeable err ->
       (* Format.printf "@.@.%a@.@." Mlsem_system.Ast.pp e ; *)
       raise (Untypeable (var, err))
@@ -220,7 +221,11 @@ let treat (benv,varm,senv,env) (annot, elem) =
     | P.E.Command (str, c) ->
       begin match str, c with
       | "value_restriction", Bool b -> Config.value_restriction := b
-      | "type_narrowing", Bool b -> Config.type_narrowing := b
+      | "type_narrowing", Bool true | "type_narrowing", String "partition"
+      -> Config.type_narrowing := PartitionNarrowing
+      | "type_narrowing", Bool false | "type_narrowing", String "no"
+      -> Config.type_narrowing := NoNarrowing
+      | "type_narrowing", String "direct" -> Config.type_narrowing := DirectNarrowing
       | "allow_implicit_downcast", Bool b -> Config.allow_implicit_downcast := b
       | "infer_overload", Bool b -> Config.infer_overload := b
       | "no_empty_param", Bool b ->
