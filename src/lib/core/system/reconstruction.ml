@@ -7,7 +7,7 @@ open Mlsem_utils
 
 (* ===== Initial Annot ===== *)
 
-let rec initial r (_, e) =
+let initial ?(direct_narrowing=false) refinements e =
   let new_renaming () =
     let s = ref Subst.identity in
     fun dom ->
@@ -19,38 +19,47 @@ let rec initial r (_, e) =
   let new_result () =
     TVar.mk KInfer None |> TVar.typ
   in
-  let open IAnnot in
-  let ann = match e with
-  | Value ty -> Either.left (Annot.AValue ty)
-  | Var _ -> Either.right (AVar (new_renaming ()))
-  | Constructor (_,es) -> AConstruct (List.map (initial r) es) |> Either.right
-  | Lambda (dom, _, e) -> ALambda (dom, initial r e) |> Either.right
-  | LambdaRec lst ->
-    ALambdaRec (lst |> List.map (fun (dom, _, e) -> dom, initial r e)) |> Either.right
-  | Ite (e, tau, e1, e2) ->
-    AIte (initial r e, tau, BMaybe (initial r e1), BMaybe (initial r e2)) |> Either.right
-  | App (e1, e2) -> AApp (initial r e1, initial r e2, new_result ()) |> Either.right
-  | Operation (_, e) -> AOp (new_renaming (), initial r e, new_result ()) |> Either.right
-  | Projection (_, e) -> AProj (initial r e, new_result ()) |> Either.right
-  | TypeCast (e, ty, _) -> ACast (ty, initial r e) |> Either.right
-  | TypeCoerce (e, ty, _) -> ACoerce (ty, initial r e) |> Either.right
-  | Alt (e1, e2) -> AAlt (Some (initial r e1), Some (initial r e2)) |> Either.right
-  | Let (suggs, v, e1, e2) ->
-    let a1 = initial r e1 in
-    let tys = Refinement.Partitioner.partition_for r v suggs in
-    (* Format.printf "Part for %a: %a@." Variable.pp v (Utils.pp_list Ty.pp) tys ; *)
-    let parts = tys |> List.map (fun ty -> ty, Some ((fun () ->
-        let r = Refinement.Partitioner.filter_compatible r v ty in
-        initial r e2
-      ) |> LazyIAnnot.mk_lazy)) in
-    ALet (a1, parts) |> Either.right
+  let r =
+    if direct_narrowing
+    then Refinement.Partitioner.from_refinements (Refinement.Refinements.empty)
+    else Refinement.Partitioner.from_refinements refinements
   in
-  match ann with
-  | Left a -> A (Annot.nc REnv.empty a) (* TODO *)
-  | Right ann -> I { ann ; refinement=REnv.empty } (* TODO *)
-
-let initial r e =
-  let r = Refinement.Partitioner.from_refinements r in
+  let rec initial r (eid, e) =
+    let open IAnnot in
+    let ann = match e with
+    | Value ty -> Either.left (Annot.AValue ty)
+    | Var _ -> Either.right (AVar (new_renaming ()))
+    | Constructor (_,es) -> AConstruct (List.map (initial r) es) |> Either.right
+    | Lambda (dom, _, e) -> ALambda (dom, initial r e) |> Either.right
+    | LambdaRec lst ->
+      ALambdaRec (lst |> List.map (fun (dom, _, e) -> dom, initial r e)) |> Either.right
+    | Ite (e, tau, e1, e2) ->
+      AIte (initial r e, tau, BMaybe (initial r e1), BMaybe (initial r e2)) |> Either.right
+    | App (e1, e2) -> AApp (initial r e1, initial r e2, new_result ()) |> Either.right
+    | Operation (_, e) -> AOp (new_renaming (), initial r e, new_result ()) |> Either.right
+    | Projection (_, e) -> AProj (initial r e, new_result ()) |> Either.right
+    | TypeCast (e, ty, _) -> ACast (ty, initial r e) |> Either.right
+    | TypeCoerce (e, ty, _) -> ACoerce (ty, initial r e) |> Either.right
+    | Alt (e1, e2) -> AAlt (Some (initial r e1), Some (initial r e2)) |> Either.right
+    | Let (suggs, v, e1, e2) ->
+      let a1 = initial r e1 in
+      let tys = Refinement.Partitioner.partition_for r v suggs in
+      (* Format.printf "Part for %a: %a@." Variable.pp v (Utils.pp_list Ty.pp) tys ; *)
+      let parts = tys |> List.map (fun ty -> ty, Some ((fun () ->
+          let r = Refinement.Partitioner.filter_compatible r v ty in
+          initial r e2
+        ) |> LazyIAnnot.mk_lazy)) in
+      ALet (a1, parts) |> Either.right
+    in
+    let refinement =
+      if direct_narrowing
+      then Refinement.Refinements.get refinements eid
+      else REnv.empty
+    in
+    match ann with
+    | Left a -> A (Annot.nc refinement a)
+    | Right ann -> I { ann ; refinement }
+  in
   initial r e
 
 (* ===== Annotation Reconstruction ===== *)
@@ -518,4 +527,4 @@ let refine env iannot e =
   | Subst _ -> failwith "Top-level environment should not contain an unresolved type variable."
   | Ok (a,_) -> a
 
-let infer env r e = refine env (initial r e) e 
+let infer ?(direct_narrowing=false) env r e = refine env (initial ~direct_narrowing r e) e
