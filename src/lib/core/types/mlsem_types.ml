@@ -8,7 +8,7 @@ module TVarSet = Tvar.TVarSet
 module RVar = Tvar.RVar
 module RVarSet = Tvar.RVarSet
 module MVarSet = Tvar.MVarSet
-type kind = Tvar.kind
+type kind = Tvar.kind = KNoInfer | KInfer | KTemporary
 module Subst = struct
   include Tvar.Subst
   let pp fmt _ = Format.fprintf fmt "_"
