@@ -17,9 +17,11 @@ let unique () =
   let eid = unique_id () in
   Hashtbl.add eid_infos eid { loc=Position.dummy ; show_notices=false } ; eid
 let refresh parent =
-  let info = Hashtbl.find eid_infos parent in
-  let eid = unique_id () in
-  Hashtbl.add eid_infos eid info ; eid
+  if Int.equal parent dummy then dummy
+  else
+    let info = Hashtbl.find eid_infos parent in
+    let eid = unique_id () in
+    Hashtbl.add eid_infos eid info ; eid
 let loc eid = (Hashtbl.find eid_infos eid).loc
 let show_notices eid = (Hashtbl.find eid_infos eid).show_notices
 let set_show_notices eid b =

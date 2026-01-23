@@ -141,6 +141,7 @@ let rec try_elim_ret ~keep_ret bid e =
   let aux' e = try_elim_ret ~keep_ret:true bid e in
   let aux_noret' e = try_elim_ret ~keep_ret:false bid e in
   let rec aux (id,e) cont =
+    let dup_cont cont = cont, cont |> Ast.map (fun (eid,t) -> (Eid.refresh eid, t)) in
     let cont' e = fill cont e in
     match e with
     (* Base cases *)
@@ -169,12 +170,15 @@ let rec try_elim_ret ~keep_ret bid e =
     | Try (e1, e2) when not (has_eliminable_ret bid e1) && not (has_eliminable_ret bid e2) ->
       (* Do not duplicate the continuation if unnecessary *)
       (id, Try (aux' e1, aux' e2)) |> cont'
-    | Try (e1, e2) -> (id, Try (aux e1 cont, aux e2 cont))
+    | Try (e1, e2) ->
+      let cont1, cont2 = dup_cont cont in
+      (id, Try (aux e1 cont1, aux e2 cont2))
     | Ite (e, tau, e1, e2) when not (has_eliminable_ret bid e1) && not (has_eliminable_ret bid e2) ->
       (* Do not duplicate the continuation if unnecessary *)
       (id, Ite (hole, tau, aux' e1, aux' e2)) |> cont' |> aux e
     | Ite (e, tau, e1, e2) ->
-      (id, Ite (hole, tau, aux e1 cont, aux e2 cont)) |> aux e
+      let cont1, cont2 = dup_cont cont in
+      (id, Ite (hole, tau, aux e1 cont1, aux e2 cont2)) |> aux e
     | Seq (e1,e2) -> (id, Seq (hole, aux e2 cont)) |> aux e1
     | Ret (bid', e) when bid'=bid && keep_ret ->
       id, Ret (bid', Option.map aux_noret' e)
