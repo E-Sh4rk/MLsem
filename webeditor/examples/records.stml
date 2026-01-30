@@ -11,6 +11,8 @@ let record_test =
   let r3 = record_delete r2 in
   (r1,r2,r3)
 
+(* Encoding of ellipsis (extra arguments) *)
+
 val any_element_from_record : { ;; 'a? } -> 'a
 
 let fun2_with_ellipsis r =
@@ -20,3 +22,19 @@ let fun2_with_ellipsis r =
 
 let fun2_with_ellipsis_test =
   fun2_with_ellipsis { l1=1 ; l2=2 ; l3=3 ; l4=4 ; l5=5 }
+
+(* Fun set-theoretic stuff with the tail *)
+
+val mix: { ;; `A } -> { ;; `B } -> { ;; `A | `B }
+
+let test_mix =
+    let r1 = { l1=42 ; l2=33 } in
+    let r2 = { l2=true ; l4=false  } in
+    mix r1 r2
+
+val merge: { ;; `A1&(empty?) | `C1&any } -> { ;; `A2&(empty?) | `C2&any } -> { ;; (`A1&`A2) | (`C1|`C2) }
+
+let test_merge =
+    let r1 = { l1=42 ; l2=33 } in
+    let r2 = { l2=true ; l4=false  } in
+    merge r1 r2
