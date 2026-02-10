@@ -29,7 +29,7 @@ js:
 	opam exec -- dune build --profile release src/bin/js.bc.js
 	cp _build/default/src/bin/js.bc.js ./webeditor/typechecker.js
 	chmod +w ./webeditor/typechecker.js
-	git describe --always --tags HEAD > ./webeditor/version.txt
+	(git describe --always --tags HEAD > ./webeditor/version.txt) || (echo "unknown" > ./webeditor/version.txt)
 	chmod +w ./webeditor/version.txt
 
 wasm:
@@ -37,7 +37,7 @@ wasm:
 	cp _build/default/src/bin/wasm.bc.wasm.js ./webeditor/typechecker.js
 	cp -r _build/default/src/bin/wasm.bc.wasm.assets ./webeditor/
 	chmod +w ./webeditor/typechecker.js ./webeditor/wasm.bc.wasm.assets ./webeditor/wasm.bc.wasm.assets/*
-	git describe --always --tags HEAD > ./webeditor/version.txt
+	(git describe --always --tags HEAD > ./webeditor/version.txt) || (echo "unknown" > ./webeditor/version.txt)
 	chmod +w ./webeditor/version.txt
 
 test:

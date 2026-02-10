@@ -41,6 +41,7 @@ The WebAssembly version is about 10x slower than the native version, but can be 
 It can be directly tested online [here](https://e-sh4rk.github.io/MLsem/) or built from sources:
 
 ```
+make web-deps
 make wasm
 cd webeditor
 python3 -m http.server 8080
