@@ -16,6 +16,7 @@ Documentation can be accessed [here](https://e-sh4rk.github.io/MLsem/doc/).
 It can also be generated from source:
 
 ```
+opam install odoc
 make doc
 ```
 
