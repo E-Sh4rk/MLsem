@@ -176,7 +176,7 @@ let tallying_simpl mono tvars res cs =
   )
   |> Utils.filter_among_others not_redundant
   |> tsort (fun (_,r1) (_,r2) -> Ty.leq r1 r2)
-  (* |> List.map (fun (s,r) -> Format.printf "%a@.%a@." Subst.pp s Ty.pp r ; s,r) *)
+  (* |> List.map (fun (s,r) -> Format.printf "%a@.%a@." Subst.pp_raw s Ty.pp r ; s,r) *)
 
 let tallying_simpl env res cs =
   let mono = MVarSet.of_set (TVar.all_vars KNoInfer) (RVar.all_vars KNoInfer) in

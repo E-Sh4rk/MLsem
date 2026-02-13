@@ -12,6 +12,7 @@ type kind = Tvar.kind = KNoInfer | KInfer | KTemporary
 module Subst = struct
   include Tvar.Subst
   let pp fmt _ = Format.fprintf fmt "_"
+  let pp_raw fmt t = Sstt.Printer.print_subst' fmt t
 end
 module TVOp = Tvar.TVOp
 

@@ -62,22 +62,21 @@ let subst_if_ann v a ty =
   | Some None -> ty
   | Some (Some ty') -> Subst.apply (Subst.singleton1 a ty') ty
 
+let a = TVar.mk KInfer None
+let mk_op v ty = subst_if_ann v a ty |> GTy.mk |> TyScheme.mk_poly
+
 let ref_uninit v =
-  let a = TVar.mk KInfer None in
   Arrow.mk Ty.unit (TVar.typ a |> mk_ref)
-  |> subst_if_ann v a
+  |> mk_op v
 
 let ref_cons v =
-  let a = TVar.mk KInfer None in
   Arrow.mk (TVar.typ a) (TVar.typ a |> mk_ref)
-  |> subst_if_ann v a
+  |> mk_op v
 
 let ref_get v =
-  let a = TVar.mk KInfer None in
   Arrow.mk (TVar.typ a |> mk_ref) (TVar.typ a)
-  |> subst_if_ann v a
+  |> mk_op v
 
 let ref_assign v =
-  let a = TVar.mk KInfer None in
   Arrow.mk (Tuple.mk [TVar.typ a |> mk_ref ; TVar.typ a]) (!Config.void_ty)
-  |> subst_if_ann v a
+  |> mk_op v
