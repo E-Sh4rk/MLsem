@@ -3,6 +3,7 @@ open Base
 (** @canonical Mlsem_types.Row *)
 module Row = Sstt.Row
 
+(** @canonical Mlsem_types.kind *)
 type kind = KNoInfer | KInfer | KTemporary
 
 module type Var = sig

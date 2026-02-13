@@ -1,14 +1,12 @@
-
 %parameter<M:PAst.ParserExt>
 
 %{
-  open M
-  open E
+  open M.E
   open Mlsem_common
   open Mlsem_system.Ast
   open Mlsem_lang.Const
-  open PAst
   open Mlsem_types.TyExpr
+  open PAst
 
   let annot sp ep e =
     (new_annot (Position.lex_join sp ep), e)
