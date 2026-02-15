@@ -75,6 +75,12 @@ let filtermap (f, l) =
         end
     end
 
+let map_noannot f lst =
+  match lst with
+  | [] -> []
+  | a::lst -> (f a)::(map_noannot f lst)
+  end
+
 (* ========================================== *)
 (* ========== Imperative functions ========== *)
 (* ========================================== *)

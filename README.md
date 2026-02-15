@@ -11,12 +11,12 @@ Alternatively, an online version hosted by Github is available [here](https://e-
 The Wasm version being significantly slower than the native one, performance should only be measured on the [native version](#building-and-running-the-native-version).
 
 All the code examples from the associated OOPSLA submission have been regrouped in the file `tests/4_oopsla.ml`. They are automatically type-checked when running the native version (results are printed in stdout). For the local Wasm version, they can be loaded by pressing F2 and choosing `OOPSLA`.
-Claims made in the paper:
+Claims made in the paper (types should be checked modulo commutativity of `&` and `|`):
 - Types inferred for `filter` (l 63) and `filter_imp` (l 105)
 - Type inferred for `neg_and_pos` (Figure 5)
 - Types inferred for the examples in Figure 6
 - All the examples from [Tobin-Hochstadt and Felleisen 2010] (both annotated and unannotated versions) typecheck (l 928)
-- Time performance: function `bal` typechecks in about 220ms (l 974), function `filtermap` typechecks in about 15ms (l 987)
+- Time performance: function `bal` typechecks in about 235ms (l 974), function `filtermap` typechecks in about 15ms (l 987), function `map_no_annot` typechecks in about 30ms (l 968).
 
 ## Documentation
 
