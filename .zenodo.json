@@ -4,7 +4,7 @@
   "description": "MLsem is an OCaml type-checking library based on set-theoretic types.",
   "creators": [
     {
-      "name": "Laurent Mickaël",
+      "name": "Mickaël Laurent",
       "affiliation": "Charles University",
       "orcid": "0000-0003-1590-2392"
     }
