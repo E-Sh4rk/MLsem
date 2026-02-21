@@ -29,5 +29,5 @@ build: [
   ]
 ]
 pin-depends: [
-  [ "sstt.0.1.0" "git+https://github.com/E-Sh4rk/sstt.git#srp" ]
+  [ "sstt.0.1.0" "git+https://github.com/E-Sh4rk/sstt.git#main" ]
 ]
