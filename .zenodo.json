@@ -1,0 +1,29 @@
+{
+  "title": "MLsem: Type-checker for Dynamic Languages",
+  "upload_type": "software",
+  "description": "MLsem is an OCaml type-checking library based on set-theoretic types.",
+  "creators": [
+    {
+      "name": "Laurent Mickaël",
+      "affiliation": "Charles University",
+      "orcid": "0000-0003-1590-2392"
+    }
+  ],
+  "license": "MIT",
+  "keywords": [
+    "OCaml",
+    "semantic subtyping",
+    "set theoretic types",
+    "dynamic languages",
+    "polymorphism",
+    "library"
+  ],
+  "access_right": "open",
+  "related_identifiers": [
+    {
+      "scheme": "url",
+      "identifier": "https://github.com/E-Sh4rk/MLsem",
+      "relation": "isSupplementTo"
+    }
+  ]
+}
