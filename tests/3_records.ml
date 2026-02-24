@@ -1,4 +1,6 @@
 
+(* Basics *)
+
 let record_delete x = ((x\l1)\l2)\l3
 let record_update x = { x with l1 = 1 ; l2=2 ; l3=3 }
 
@@ -46,3 +48,22 @@ let test_merge =
     let r1 = { l1=42 ; l2=33 } in
     let r2 = { l2=true ; l4=false  } in
     merge r1 r2
+
+let test_merge2 x =
+    let y = merge x { y=42 ; z=73 } in
+    y.x, y.y, y.z
+
+(* ===== R language encodings ===== *)
+
+val mean: { p1: [(int|Na)*] ; na_rm: true } | { p1: [int*] ; na_rm: false? } -> [int*]
+val lapply : { p1:['a*] ; p2: { p1:'a ; p2:empty? ;; `r } -> 'b ;; `r } -> ['b*]
+let test_lapply =
+  lapply { p1=[[1;2;3;4;5;6;7;8;9;10];[1;Na]] ; p2=mean ; na_rm=true }
+
+val set_b : { b:any? ;; `r } -> 'a -> { b:'a ;; `r }
+let test_r_lists =
+  let mut xs = { a=1 } in
+  xs := set_b xs 2 ;
+  let mut ys = { c=3 } in
+  let mut zs = merge xs ys in
+  zs
