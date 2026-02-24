@@ -61,9 +61,14 @@ let test_lapply =
   lapply { p1=[[1;2;3;4;5;6;7;8;9;10];[1;Na]] ; p2=mean ; na_rm=true }
 
 val set_b : { b:any? ;; `r } -> 'a -> { b:'a ;; `r }
+val set : { ;; `r } -> int -> 'a -> { ;; `r|'a }
+val get : { ;; 'a? } -> int -> 'a
+val concat: { ;; `A1&(empty?) | `C1&any } -> { ;; `A2&(empty?) | `C2&any } -> { ;; (`A1&`A2) | (`C1|`C2) }
 let test_r_lists =
   let mut xs = { a=1 } in
   xs := set_b xs 2 ;
   let mut ys = { c=3 } in
-  let mut zs = merge xs ys in
+  let mut zs = concat xs ys in
+  let mut n = get zs 2 in
+  zs := set zs 1 n ;
   zs
