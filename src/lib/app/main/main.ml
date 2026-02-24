@@ -43,6 +43,12 @@ open IO.Make(P)
 open P.B
 
 let simplify_tl ty = ty |> TyScheme.bot_instance |> TyScheme.norm_and_simpl
+let merge_tl tys =
+  let tscap t1 t2 =
+    let (tvs1, t1), (tvs2, t2) = TyScheme.get t1, TyScheme.get t2 in
+    TyScheme.mk (MVarSet.union tvs1 tvs2) (GTy.cap t1 t2)
+  in
+  List.fold_left tscap (TyScheme.mk_mono GTy.any) tys |> simplify_tl
 let sigs_of_ty mono ty =
   let rec aux ty =
     match Arrow.dnf ty with
@@ -60,7 +66,10 @@ let sigs_of_ty mono ty =
       (fun rv -> RVar.has_kind KNoInfer rv |> not)
     |> MVarSet.is_empty then
     let sigs = aux ty in
-    Some (sigs, GTy.mk ty |> TyScheme.mk_poly_except mono |> simplify_tl)
+    let ty = sigs
+    |> List.map (fun ty -> GTy.mk ty |> TyScheme.mk_poly_except mono |> simplify_tl)
+    |> merge_tl in
+    Some (sigs, ty)
   else None
 let infer var env e =
   let annot =
@@ -99,11 +108,7 @@ let type_check_with_sigs env (var,e,sigs,aty) =
     let es = List.map (fun s -> coerce c (GTy.mk s) e) sigs in
     let typs, msg = List.map (infer (Some var) env) es |> List.split in
     let msg = (List.concat msg)@(Mlsem_system.Analyzer.get_unreachable e) in
-    let tscap t1 t2 =
-      let (tvs1, t1), (tvs2, t2) = TyScheme.get t1, TyScheme.get t2 in
-      TyScheme.mk (MVarSet.union tvs1 tvs2) (GTy.cap t1 t2)
-    in
-    let typ = List.fold_left tscap (TyScheme.mk_mono GTy.any) typs |> simplify_tl in
+    let typ = merge_tl typs in
     if TyScheme.leq typ aty |> not then raise (IncompatibleType (var,typ)) ;
     check_resolved var env typ ;
     (var,typ),msg
