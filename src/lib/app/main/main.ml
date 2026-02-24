@@ -42,6 +42,7 @@ module NameMap = P.E.NameMap
 open IO.Make(P)
 open P.B
 
+let simplify_tl ty = ty |> TyScheme.bot_instance |> TyScheme.norm_and_simpl
 let sigs_of_ty mono ty =
   let rec aux ty =
     match Arrow.dnf ty with
@@ -59,7 +60,7 @@ let sigs_of_ty mono ty =
       (fun rv -> RVar.has_kind KNoInfer rv |> not)
     |> MVarSet.is_empty then
     let sigs = aux ty in
-    Some (sigs, GTy.mk ty |> TyScheme.mk_poly_except mono |> TyScheme.norm_and_simpl)
+    Some (sigs, GTy.mk ty |> TyScheme.mk_poly_except mono |> simplify_tl)
   else None
 let infer var env e =
   let annot =
@@ -76,9 +77,9 @@ let infer var env e =
       (* Format.printf "@.@.%a@.@." Mlsem_system.Ast.pp e ; *)
       raise (Untypeable (var, err))
   in
-  let ty = Mlsem_system.Checker.typeof_def env annot e |> TyScheme.norm_and_simpl in
+  let ty = Mlsem_system.Checker.typeof_def env annot e in
   let (tvs, ty) = TyScheme.get ty in
-  let ty = TyScheme.mk tvs (GTy.ub ty |> GTy.mk) in
+  let ty = TyScheme.mk tvs (GTy.ub ty |> GTy.mk) |> simplify_tl in
   let msg = Mlsem_system.Analyzer.analyze e annot in
   ty, msg
 let retrieve_time time =
@@ -102,7 +103,7 @@ let type_check_with_sigs env (var,e,sigs,aty) =
       let (tvs1, t1), (tvs2, t2) = TyScheme.get t1, TyScheme.get t2 in
       TyScheme.mk (MVarSet.union tvs1 tvs2) (GTy.cap t1 t2)
     in
-    let typ = List.fold_left tscap (TyScheme.mk_mono GTy.any) typs |> TyScheme.norm_and_simpl in
+    let typ = List.fold_left tscap (TyScheme.mk_mono GTy.any) typs |> simplify_tl in
     if TyScheme.leq typ aty |> not then raise (IncompatibleType (var,typ)) ;
     check_resolved var env typ ;
     (var,typ),msg
@@ -117,7 +118,7 @@ let type_check_recs pos env lst =
   let tvs, ty = ty |> TyScheme.get in
   let n = List.length lst in
   List.mapi (fun i (var,_) ->
-    let ty = TyScheme.mk tvs (GTy.map (Tuple.proj n i) ty) |> TyScheme.bot_instance in
+    let ty = TyScheme.mk tvs (GTy.map (Tuple.proj n i) ty) |> simplify_tl in
     check_resolved var env ty ;
     (var, ty)
   ) lst, msg
