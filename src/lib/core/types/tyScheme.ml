@@ -22,7 +22,7 @@ let substitute s (tvs, ty) =
   (tvs, GTy.substitute s ty)
 
 let leq (tvs1,ty1) (tvs2,ty2) =
-  MVarSet.subset tvs2 tvs1 &&
+  MVarSet.subset (GTy.fv ty1 |> MVarSet.inter tvs2) tvs1 &&
   GTy.leq ty1 ty2
 let equiv t1 t2 = leq t1 t2 && leq t2 t1
 let bot_instance (tvs,t) =

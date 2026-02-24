@@ -64,12 +64,8 @@ let sigs_of_ty mono ty =
     |> MVarSet.filter
       (fun tv -> TVar.has_kind KNoInfer tv |> not)
       (fun rv -> RVar.has_kind KNoInfer rv |> not)
-    |> MVarSet.is_empty then
-    let sigs = aux ty in
-    let ty = sigs
-    |> List.map (fun ty -> GTy.mk ty |> TyScheme.mk_poly_except mono |> simplify_tl)
-    |> merge_tl in
-    Some (sigs, ty)
+    |> MVarSet.is_empty
+  then Some (aux ty, GTy.mk ty |> TyScheme.mk_poly_except mono |> simplify_tl)
   else None
 let infer var env e =
   let annot =
