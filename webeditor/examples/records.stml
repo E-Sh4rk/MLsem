@@ -55,11 +55,13 @@ let test_merge2 x =
 
 (* ===== R language encodings ===== *)
 
+(* Encoding of arguments: typing lapply *)
 val mean: { p1: [(int|Na)*] ; na_rm: true } | { p1: [int*] ; na_rm: false? } -> [int*]
 val lapply : { p1:['a*] ; p2: { p1:'a ; p2:empty? ;; `r } -> 'b ;; `r } -> ['b*]
 let test_lapply =
   lapply { p1=[[1;2;3;4;5;6;7;8;9;10];[1;Na]] ; p2=mean ; na_rm=true }
 
+(* Encoding of lists *)
 val set_b : { b:any? ;; `r } -> 'a -> { b:'a ;; `r }
 val set : { ;; `r } -> int -> 'a -> { ;; `r|'a }
 val get : { ;; 'a? } -> int -> 'a
@@ -72,3 +74,13 @@ let test_r_lists =
   let mut n = get zs 2 in
   zs := set zs 1 n ;
   zs
+
+(* Encoding of classes *)
+val c1 : { c1:true ;; false }
+val c1_open : { c1:true ;; bool }
+val add_c2 : { ;; bool & `c } -> { c2:true ;; bool & `c }
+val need_exactly_c1 : { c1:true ;; false } & 'a -> 'a
+val need_c1_c2 : { c1:true ; c2:true ;; bool } & 'a -> 'a
+let test_class_ok = need_exactly_c1 c1
+let test_class_fail = need_exactly_c1 c1_open
+let test_class_ok2 = need_c1_c2 (add_c2 c1_open)
