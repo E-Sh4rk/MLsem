@@ -471,16 +471,17 @@ and refine' cache env annot e =
     refine' cache env annot e
   | Subst (ss, a1, a2, r) -> Subst (ss, a1, a2, r)
 and refine_b' cache env bannot e s tau =
-  let ntau = GTy.neg tau in
   let retry_with bannot = refine_b' cache env bannot e s tau in
   let empty_cov = (fst e, REnv.empty) in
   match bannot with
   | IAnnot.BMaybe annot ->
-    let norm_s = GTy.map !Config.normalization_fun s in
+    let ntau = GTy.neg tau in
+    let norm1 = Ty.diff (GTy.lb s) (GTy.lb ntau) |> !Config.normalization_fun in
+    let norm2 = Ty.diff (GTy.ub s) (GTy.ub ntau) |> !Config.normalization_fun in
     if !Config.infer_overload then
-      let ss = tallying_simpl env Ty.empty [(GTy.lb norm_s, GTy.lb ntau) ; (GTy.ub norm_s, GTy.ub ntau)] in
+      let ss = tallying_simpl env Ty.empty [(norm1, Ty.empty) ; (norm2, Ty.empty)] in
       Subst (ss, IAnnot.BSkip, IAnnot.BType annot, empty_cov)
-    else if GTy.leq norm_s ntau
+    else if Ty.is_empty norm1 && Ty.is_empty norm2
     then retry_with (IAnnot.BSkip)
     else retry_with (IAnnot.BType annot)
   | IAnnot.BSkip -> Ok (Annot.BSkip, GTy.empty)

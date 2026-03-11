@@ -247,7 +247,10 @@ and typeof_b env bannot (id,e) s tau =
   match bannot with
   | BType annot -> typeof env annot (id,e)
   | BSkip ->
-    if GTy.leq (GTy.map !Config.normalization_fun s) (GTy.neg tau) |> not
+    let ntau = GTy.neg tau in
+    let norm1 = Ty.diff (GTy.lb s) (GTy.lb ntau) |> !Config.normalization_fun in
+    let norm2 = Ty.diff (GTy.ub s) (GTy.ub ntau) |> !Config.normalization_fun in
+    if (Ty.is_empty norm1 && Ty.is_empty norm2) |> not
     then untypeable id "Branch is reachable and must be typed." ;
     GTy.empty
 and typeof_def env annot e =
