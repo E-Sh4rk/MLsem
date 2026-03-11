@@ -224,8 +224,7 @@ module Abstract = struct
         let (tags,_) = Descr.get_tags d |> Tags.components in
         List.map (fun tc ->
           if TagComp.tag tc |> Extensions.Abstracts.is_abstract
-          then TagComp.map (fun _ -> raise Exit) tc |> ignore ;
-          tc) tags |> ignore ;
+          then raise Exit ; tc) tags |> ignore ;
         d
       )) in
     ty
