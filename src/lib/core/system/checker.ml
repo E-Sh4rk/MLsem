@@ -94,6 +94,17 @@ let fun_of_operation o =
     Arrow.mk dom codom |> GTy.mk |> TyScheme.mk_poly
   | OCustom { ofun ; _ } -> ofun
 
+(* Auxiliary *)
+
+let is_type_test_unsat ~tau t =
+  let ntau = GTy.neg tau in
+  if GTy.non_gradual ntau && GTy.non_gradual t
+  then Ty.diff (GTy.ub t) (GTy.lb ntau) |> !Config.normalization_fun
+  else
+    let norm1 = Ty.diff (GTy.lb t) (GTy.lb ntau) |> !Config.normalization_fun in
+    let norm2 = Ty.diff (GTy.ub t) (GTy.ub ntau) |> !Config.normalization_fun in
+    Ty.cup norm1 norm2
+
 (* Expressions *)
 
 type error = { eid: Eid.t ; title: string ; descr: string option }
@@ -247,10 +258,7 @@ and typeof_b env bannot (id,e) s tau =
   match bannot with
   | BType annot -> typeof env annot (id,e)
   | BSkip ->
-    let ntau = GTy.neg tau in
-    let norm1 = Ty.diff (GTy.lb s) (GTy.lb ntau) |> !Config.normalization_fun in
-    let norm2 = Ty.diff (GTy.ub s) (GTy.ub ntau) |> !Config.normalization_fun in
-    if (Ty.is_empty norm1 && Ty.is_empty norm2) |> not
+    if is_type_test_unsat ~tau s |> Ty.is_empty |> not
     then untypeable id "Branch is reachable and must be typed." ;
     GTy.empty
 and typeof_def env annot e =

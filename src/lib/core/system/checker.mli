@@ -10,6 +10,11 @@ val construct : Ast.constructor -> Ty.t list -> Ty.t
 
 val fun_of_operation : Ast.operation -> TyScheme.t
 
+val is_type_test_unsat : tau:GTy.t -> GTy.t -> Ty.t
+(** [is_type_test_unsat ~tau ty] returns a type that is empty
+   if and only if a branch [tau] of a typecase on an expression of type [ty]
+   is unreachable *)
+
 type error = { eid: Eid.t ; title: string ; descr: string option }
 exception Untypeable of error
 
