@@ -76,6 +76,16 @@ let test_r_lists =
   zs
 
 (* Encoding of classes *)
+val data_frame : () -> { data_frame:true ;; false }
+val group_by : { ;; bool & `c } -> string -> { grouped_df:true ;; bool & `c }
+val ungroup : { grouped_df:true ;; bool & `c } -> { grouped_df:false ;; bool & `c }
+
+let test_classes =
+    let xs = data_frame () in
+    let ys = group_by xs "id" in
+    let zs = ungroup ys in
+    zs
+
 val c1 : { c1:true ;; false }
 val c1_open : { c1:true ;; bool }
 val add_c2 : { ;; bool & `c } -> { c2:true ;; bool & `c }
