@@ -25,6 +25,15 @@ record:
 clean:
 	opam exec -- dune clean
 
+lsp-build:
+	opam exec -- dune build --profile release src/bin/lsp.exe
+
+lsp-run: lsp-build
+	./_build/default/src/bin/lsp.exe
+
+lsp-dev:
+	opam exec -- dune exec src/bin/lsp.exe
+
 js:
 	opam exec -- dune build --profile release src/bin/js.bc.js
 	cp _build/default/src/bin/js.bc.js ./webeditor/typechecker.js
