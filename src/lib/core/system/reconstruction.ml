@@ -26,8 +26,8 @@ let initial ?(direct_narrowing=false) refinements e =
   in
   let rec initial r (eid, e) =
     let open IAnnot in
-    let with_nr ann = Either.right (None, ann) in
-    let with_r ann = Either.right (Some (Rid.create ()), ann) in
+    let with_nr ann = Either.right (Rid.no_result, ann) in
+    let with_r ann = Either.right (Rid.create (), ann) in
     let ann = match e with
     | Value ty -> Either.left (Annot.AValue ty)
     | Var _ -> AVar (new_renaming ()) |> with_nr
@@ -69,7 +69,7 @@ let initial ?(direct_narrowing=false) refinements e =
 type ('a,'b) result =
 | Ok of 'a * GTy.t
 | Fail
-| Subst of (Subst.t * Ty.t) list * 'b * 'b * (Rid.t option * REnv.t)
+| Subst of (Subst.t * Ty.t) list * 'b * 'b * (Rid.t * REnv.t)
 
 type log = { eid: Eid.t ; title: string ; descr: Format.formatter -> unit }
 type cache = { dom : Domain.t ; logs : log list ref }
@@ -195,7 +195,7 @@ let tallying_simpl env res cs =
 type ('a,'b) result_seq =
 | AllOk of 'a list * GTy.t list
 | OneFail
-| OneSubst of (Subst.t * Ty.t) list * 'b list * 'b list * (Rid.t option * REnv.t)
+| OneSubst of (Subst.t * Ty.t) list * 'b list * 'b list * (Rid.t * REnv.t)
 
 let rec seq (f : 'b -> 'c -> ('a,'b) result) (c : 'a->'b) (lst:('b*'c) list)
   : ('a,'b) result_seq =
@@ -451,7 +451,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
     assert false
 and refine' cache env annot e =
   let tvars = Env.tvars env in
-  let ic_norefinement ann = IAnnot.I { rid = None ; ann ; refinement=REnv.empty } in
+  let ic_norefinement ann = IAnnot.I { rid = Rid.no_result ; ann ; refinement=REnv.empty } in
   let subst_disjoint s =
     MVarSet.inter (Subst.domain s) tvars |> MVarSet.is_empty
   in
@@ -466,10 +466,7 @@ and refine' cache env annot e =
     in
     let branches = ss |> List.map (fun (s,ty) ->
       let ann = IAnnot.substitute s a1 in
-      let coverage = match rid with
-      | None -> None, REnv.substitute s r
-      | Some rid -> Some (rid, ty), REnv.substitute s r
-      in
+      let coverage = Some (rid, ty), REnv.substitute s r in
       { IAnnot.coverage=(Some coverage) ; ann }
       ) in
     let annot = IAnnot.AInter (branches@default) |> ic_norefinement in

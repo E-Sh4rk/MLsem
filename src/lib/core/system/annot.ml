@@ -57,6 +57,7 @@ end
 
 module Rid = struct
   type t = int
+  let no_result = 0
   let create =
     let i = ref 0 in
     fun () -> i := !i + 1 ; !i
@@ -87,7 +88,7 @@ module rec IAnnot : sig
   | AInter of inter
   and t =
   | A of Annot.t
-  | I of { rid: Rid.t option ; ann: a ; refinement: REnv.t }
+  | I of { rid: Rid.t ; ann: a ; refinement: REnv.t }
 
   val substitute : Subst.t -> t -> t
   val pp : Format.formatter -> t -> unit
@@ -122,7 +123,7 @@ end = struct
   [@@deriving show]
   and t =
   | A of Annot.t
-  | I of { rid: Rid.t option ; ann: a ; refinement: REnv.t }
+  | I of { rid: Rid.t ; ann: a ; refinement: REnv.t }
   [@@deriving show]
 
   let substitute s =

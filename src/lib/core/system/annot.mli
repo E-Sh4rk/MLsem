@@ -30,6 +30,7 @@ end
 
 module Rid (* Result identifier *) : sig
   type t
+  val no_result : t
   val create : unit -> t
   val equal : t -> t -> bool
   val pp : Format.formatter -> t -> unit
@@ -58,7 +59,7 @@ module rec IAnnot : sig
   | AInter of inter
   and t =
   | A of Annot.t
-  | I of { rid: Rid.t option ; ann: a ; refinement: REnv.t }
+  | I of { rid: Rid.t ; ann: a ; refinement: REnv.t }
 
   val substitute : Subst.t -> t -> t
   val pp : Format.formatter -> t -> unit
