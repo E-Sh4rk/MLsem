@@ -56,3 +56,9 @@
  (synopsis "Binaries for mlsem-app")
  (depends mlsem-app)
 )
+
+(package
+ (name mlsem-web)
+ (synopsis "Web targets for mlsem-app")
+ (depends mlsem-app js_of_ocaml js_of_ocaml-ppx js_of_ocaml-compiler wasm_of_ocaml-compiler)
+)
