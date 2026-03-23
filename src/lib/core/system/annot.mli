@@ -28,8 +28,16 @@ module Annot : sig
   val pp_a : Format.formatter -> a -> unit
 end
 
+module BId (* Branch identifier *) : sig
+  type t
+  val create : unit -> t
+  val dummy : t
+  val equal : t -> t -> bool
+  val pp : Format.formatter -> t -> unit
+end
+
 module rec IAnnot : sig
-  type coverage = (Eid.t * Ty.t) option * REnv.t
+  type coverage = (BId.t * Ty.t) option * REnv.t
   type branch = BMaybe of t | BType of t | BSkip
   and inter_branch = { coverage: coverage option ; ann: t }
   and inter = inter_branch list
@@ -51,7 +59,7 @@ module rec IAnnot : sig
   | AInter of inter
   and t =
   | A of Annot.t
-  | I of { ann: a ; refinement: REnv.t }
+  | I of { bid: BId.t ; ann: a ; refinement: REnv.t }
 
   val substitute : Subst.t -> t -> t
   val pp : Format.formatter -> t -> unit

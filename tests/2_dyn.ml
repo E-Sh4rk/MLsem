@@ -434,7 +434,7 @@ let filter_imp_test =
   push arr "abc" ;
   arr
 
-(* ========= ALTERNATIVES ========= *)
+(* ========= ALTERNATIVES / INFERENCE TRICKS ========= *)
 
 val f1 : int -> int
 val f2 : bool -> bool
@@ -446,3 +446,35 @@ val f6 : Nil -> Nil
 let test_alt a = [ f1 a | f2 a | f3 a | f4 a | f5 a | f6 a ]
 let fall = [ f1 | f2 | f3 | f4 | f5 | f6 ]
 let test_noalt a = fall a
+
+
+(* let typeof x =
+  if x is Dbl do return "dbl" end ;
+  if x is Lgl do return "lgl" end ;
+  if x is Clx do return "clx" end ;
+  if x is Chr do return "chr" end ;
+  if x is Raw do return "raw" end ;
+  if x is Int do return "int" end ;
+  if x is Lst do return "lst" end ;
+  if x is Null do return "null" end ;
+  if x is () do return "unit" end ;
+  "object" *)
+
+val typeof :
+  (() -> "unit") &
+  (~(Null | Lst | Int | Raw | Chr | Clx | Lgl | Dbl | ()) -> "object") &
+  (Dbl -> "dbl") & (Lgl -> "lgl") & (Clx -> "clx") & (Chr -> "chr") &
+  (Raw -> "raw") & (Int -> "int") & (Lst -> "lst") & (Null -> "null")
+
+val fail : empty -> any
+# type_narrowing = false
+let typeof_app x =
+  let t =
+    let y = x in
+    suggest y is Dbl or Lgl or Clx or Chr or Raw or Int or Lst or Null or () in
+    typeof y
+  in
+  match t with
+  | "int" -> return 0
+  | _ -> fail "invalid input"
+  end
