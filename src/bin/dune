@@ -7,6 +7,13 @@
   (best exe))
  (modules native))
 
+(executable
+ (name lsp)
+ (libraries mlsem_app unix yojson)
+ (modes
+  (best exe))
+ (modules lsp))
+
 (library
  (name web)
  (public_name mlsem-web)
