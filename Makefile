@@ -5,7 +5,6 @@ deps:
 	opam install . --deps-only
 
 web-deps:
-	opam install js_of_ocaml js_of_ocaml-ppx wasm_of_ocaml-compiler
 	cd webeditor ; npm ci
 
 build:
