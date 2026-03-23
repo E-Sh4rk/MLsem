@@ -26,21 +26,23 @@ let initial ?(direct_narrowing=false) refinements e =
   in
   let rec initial r (eid, e) =
     let open IAnnot in
+    let with_nr ann = Either.right (Rid.no_result, ann) in
+    let with_r ann = Either.right (Rid.create (), ann) in
     let ann = match e with
     | Value ty -> Either.left (Annot.AValue ty)
-    | Var _ -> Either.right (AVar (new_renaming ()))
-    | Constructor (_,es) -> AConstruct (List.map (initial r) es) |> Either.right
-    | Lambda (dom, _, e) -> ALambda (dom, initial r e) |> Either.right
+    | Var _ -> AVar (new_renaming ()) |> with_nr
+    | Constructor (_,es) -> AConstruct (List.map (initial r) es) |> with_r
+    | Lambda (dom, _, e) -> ALambda (dom, initial r e) |> with_nr
     | LambdaRec lst ->
-      ALambdaRec (lst |> List.map (fun (dom, _, e) -> dom, initial r e)) |> Either.right
+      ALambdaRec (lst |> List.map (fun (dom, _, e) -> dom, initial r e)) |> with_r
     | Ite (e, tau, e1, e2) ->
-      AIte (initial r e, tau, BMaybe (initial r e1), BMaybe (initial r e2)) |> Either.right
-    | App (e1, e2) -> AApp (initial r e1, initial r e2, new_result ()) |> Either.right
-    | Operation (_, e) -> AOp (new_renaming (), initial r e, new_result ()) |> Either.right
-    | Projection (_, e) -> AProj (initial r e, new_result ()) |> Either.right
-    | TypeCast (e, ty, _) -> ACast (ty, initial r e) |> Either.right
-    | TypeCoerce (e, ty, _) -> ACoerce (ty, initial r e) |> Either.right
-    | Alt (e1, e2) -> AAlt (Some (initial r e1), Some (initial r e2)) |> Either.right
+      AIte (initial r e, tau, BMaybe (initial r e1), BMaybe (initial r e2)) |> with_nr
+    | App (e1, e2) -> AApp (initial r e1, initial r e2, new_result ()) |> with_r
+    | Operation (_, e) -> AOp (new_renaming (), initial r e, new_result ()) |> with_r
+    | Projection (_, e) -> AProj (initial r e, new_result ()) |> with_r
+    | TypeCast (e, ty, _) -> ACast (ty, initial r e) |> with_r
+    | TypeCoerce (e, ty, _) -> ACoerce (ty, initial r e) |> with_r
+    | Alt (e1, e2) -> AAlt (Some (initial r e1), Some (initial r e2)) |> with_nr
     | Let (suggs, v, e1, e2) ->
       let a1 = initial r e1 in
       let tys = Refinement.Partitioner.partition_for r v suggs in
@@ -49,7 +51,7 @@ let initial ?(direct_narrowing=false) refinements e =
           let r = Refinement.Partitioner.filter_compatible r v ty in
           initial r e2
         ) |> LazyIAnnot.mk_lazy)) in
-      ALet (a1, parts) |> Either.right
+      ALet (a1, parts) |> with_nr
     in
     let refinement =
       if direct_narrowing
@@ -58,9 +60,7 @@ let initial ?(direct_narrowing=false) refinements e =
     in
     match ann with
     | Left a -> A (Annot.nc refinement a)
-    | Right ann ->
-      let bid = BId.create () in
-      I { bid ; ann ; refinement }
+    | Right (rid, ann) -> I { rid ; ann ; refinement }
   in
   initial r e
 
@@ -69,7 +69,7 @@ let initial ?(direct_narrowing=false) refinements e =
 type ('a,'b) result =
 | Ok of 'a * GTy.t
 | Fail
-| Subst of (Subst.t * Ty.t) list * 'b * 'b * (BId.t * REnv.t)
+| Subst of (Subst.t * Ty.t) list * 'b * 'b * (Rid.t * REnv.t)
 
 type log = { eid: Eid.t ; title: string ; descr: Format.formatter -> unit }
 type cache = { dom : Domain.t ; logs : log list ref }
@@ -195,7 +195,7 @@ let tallying_simpl env res cs =
 type ('a,'b) result_seq =
 | AllOk of 'a list * GTy.t list
 | OneFail
-| OneSubst of (Subst.t * Ty.t) list * 'b list * 'b list * (BId.t * REnv.t)
+| OneSubst of (Subst.t * Ty.t) list * 'b list * 'b list * (Rid.t * REnv.t)
 
 let rec seq (f : 'b -> 'c -> ('a,'b) result) (c : 'a->'b) (lst:('b*'c) list)
   : ('a,'b) result_seq =
@@ -217,8 +217,8 @@ let rec seq (f : 'b -> 'c -> ('a,'b) result) (c : 'a->'b) (lst:('b*'c) list)
 let rec refine cache env annot (id, e) =
   match annot with
   | IAnnot.A a -> Ok (a, Checker.typeof env a (id, e))
-  | IAnnot.I { bid ; ann ; refinement } -> refine_ann refinement cache env (bid, ann) (id, e)
-and refine_ann r cache env (bid, annot) (id, e) =
+  | IAnnot.I { rid ; ann ; refinement } -> refine_ann refinement cache env (rid, ann) (id, e)
+and refine_ann r cache env (rid, annot) (id, e) =
   let open IAnnot in
   let log msg descr =
     let log = { eid=id ; title=msg ; descr } in
@@ -226,9 +226,9 @@ and refine_ann r cache env (bid, annot) (id, e) =
   in
   let env = REnv.refine_env env r in
   let retry_with a = refine cache env a (id, e) in
-  let ic ann = I { bid ; ann ; refinement=r } in
+  let ic ann = I { rid ; ann ; refinement=r } in
   let ac ann = A (Annot.nc r ann) in
-  let empty_cov = (bid, REnv.empty) in
+  let empty_cov = (rid, REnv.empty) in
   let app res t1 t2 =
     let t1, t2 = GTy.lb t1, GTy.lb t2 in
     let arrow = Arrow.mk t2 res in
@@ -272,8 +272,8 @@ and refine_ann r cache env (bid, annot) (id, e) =
     let env' = Env.add v (TyScheme.mk_mono ty) env in
     begin match refine' { cache with dom=Domain.empty } env' annot' e' with
     | Ok (annot', _) -> retry_with (ac (Annot.ALambda (ty, annot')))
-    | Subst (ss,a,a',(bid,r)) ->
-      Subst (ss,ALambda(ty, a)|>ic,ALambda(ty, a')|>ic,(bid,REnv.add v (GTy.lb ty) r))
+    | Subst (ss,a,a',(rid,r)) ->
+      Subst (ss,ALambda(ty, a)|>ic,ALambda(ty, a')|>ic,(rid,REnv.add v (GTy.lb ty) r))
     | Fail -> Fail
     end
   | LambdaRec lst, ALambdaRec anns ->
@@ -284,11 +284,11 @@ and refine_ann r cache env (bid, annot) (id, e) =
     let aes = List.map (fun ((_,_,e),(_,a)) -> a,e) lst in
     begin match refine_seq' { cache with dom=Domain.empty } env' aes with
     | OneFail -> Fail
-    | OneSubst (ss, a, a',(bid,r)) ->
+    | OneSubst (ss, a, a',(rid,r)) ->
       let r = lst |> List.fold_left
         (fun r ((_,v,_),(ty,_)) -> REnv.add v (GTy.lb ty) r) r in
       Subst (ss,ALambdaRec (List.combine tys a) |> ic,
-                ALambdaRec (List.combine tys a') |> ic,(bid,r))
+                ALambdaRec (List.combine tys a') |> ic,(rid,r))
     | AllOk (annots,tys') ->
       let tys' = List.map GTy.lb tys' in
       let cs = List.combine tys' (List.map GTy.lb tys) in
@@ -304,12 +304,12 @@ and refine_ann r cache env (bid, annot) (id, e) =
     | Fail -> Fail
     | Subst (ss,a,a',r) -> Subst (ss,AIte(a,tau,a1,a2)|>ic,AIte(a',tau,a1,a2)|>ic,r)
     | Ok (a0, s) ->
-      begin match refine_b' cache env (bid, a1) e1 s tau with
+      begin match refine_b' cache env (rid, a1) e1 s tau with
       | Fail -> Fail
       | Subst (ss, a1, a1',r) ->
         Subst (ss, AIte(A a0,tau,a1,a2)|>ic, AIte(A a0,tau,a1',a2)|>ic,r)
       | Ok (a1,_) ->
-        begin match refine_b' cache env (bid, a2) e2 s (GTy.neg tau) with
+        begin match refine_b' cache env (rid, a2) e2 s (GTy.neg tau) with
         | Fail -> Fail
         | Subst (ss, a2, a2',r) ->
           let to_i = (function
@@ -451,14 +451,14 @@ and refine_ann r cache env (bid, annot) (id, e) =
     assert false
 and refine' cache env annot e =
   let tvars = Env.tvars env in
-  let ic_norefinement ann = IAnnot.I { bid = BId.dummy ; ann ; refinement=REnv.empty } in
+  let ic_norefinement ann = IAnnot.I { rid = Rid.no_result ; ann ; refinement=REnv.empty } in
   let subst_disjoint s =
     MVarSet.inter (Subst.domain s) tvars |> MVarSet.is_empty
   in
   match refine cache env annot e with
   | Ok (a, ty) -> Ok (a, ty)
   | Fail -> Fail
-  | Subst (ss, a1, a2, (bid,r)) when ss |> List.map fst |> List.for_all subst_disjoint ->
+  | Subst (ss, a1, a2, (rid,r)) when ss |> List.map fst |> List.for_all subst_disjoint ->
     let default =
       (* Don't add default branch if already covered (also important for error msg) *)
       if ss |> List.exists (fun (s,_) -> Subst.is_identity s)
@@ -466,15 +466,15 @@ and refine' cache env annot e =
     in
     let branches = ss |> List.map (fun (s,ty) ->
       let ann = IAnnot.substitute s a1 in
-      let coverage = (Some (bid, ty), REnv.substitute s r) in
+      let coverage = (Some (rid, ty), REnv.substitute s r) in
       { IAnnot.coverage=(Some coverage) ; ann }
       ) in
     let annot = IAnnot.AInter (branches@default) |> ic_norefinement in
     refine' cache env annot e
   | Subst (ss, a1, a2, r) -> Subst (ss, a1, a2, r)
-and refine_b' cache env (bid, bannot) e s tau =
-  let retry_with bannot = refine_b' cache env (bid, bannot) e s tau in
-  let empty_cov = (bid, REnv.empty) in
+and refine_b' cache env (rid, bannot) e s tau =
+  let retry_with bannot = refine_b' cache env (rid, bannot) e s tau in
+  let empty_cov = (rid, REnv.empty) in
   match bannot with
   | IAnnot.BMaybe annot ->
     let unsat = Checker.is_type_test_unsat ~tau s in
