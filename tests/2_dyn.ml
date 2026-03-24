@@ -481,7 +481,8 @@ val fail : empty -> any
 let typeof_app x =
   let t =
     let y = x in
-    suggest y is Dbl or Lgl or Clx or Chr or Raw or Int or Lst or Null or () in
+    suggest y is Dbl or Lgl or Clx or Chr or Raw or Int or Lst or Null or ()
+         or ~(Dbl | Lgl | Clx | Chr | Raw | Int | Lst | Null | ()) in
     typeof y
   in
   match t with

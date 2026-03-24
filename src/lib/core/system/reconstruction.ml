@@ -45,7 +45,7 @@ let initial ?(direct_narrowing=false) refinements e =
     | Alt (e1, e2) -> AAlt (Some (initial r e1), Some (initial r e2)) |> with_nr
     | Let (suggs, v, e1, e2) ->
       let a1 = initial r e1 in
-      let tys = Refinement.Partitioner.partition_for r v suggs in
+      let tys = Refinement.Partitioner.decomposition_for r v suggs in
       (* Format.printf "Part for %a: %a@." Variable.pp v (Utils.pp_list Ty.pp) tys ; *)
       let parts = tys |> List.map (fun ty -> ty, Some ((fun () ->
           let r = Refinement.Partitioner.filter_compatible r v ty in

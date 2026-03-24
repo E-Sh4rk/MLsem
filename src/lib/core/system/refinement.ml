@@ -160,7 +160,7 @@ let refinements
   in
   aux env e ; !res
 
-let partition ts =
+let partition dom ts =
   let cap_if_nonempty t t' =
     let s = Ty.cap t t' in
     if Ty.is_empty s then t else s
@@ -171,7 +171,7 @@ let partition ts =
       let s = List.fold_left cap_if_nonempty t ts in
       s::(aux (Ty.diff t s))
   in
-  aux Ty.any
+  aux dom
 
 module Partitioner = struct
   type t = REnv.t list
@@ -199,11 +199,15 @@ module Partitioner = struct
       (REnv.mem v renv |> not) ||
       (Ty.disjoint ty (REnv.find v renv) |> not)
     )
-  let partition_for t v extra =
+  let decomposition_for t v initial =
+    let initial = if List.is_empty initial then [Ty.any] else initial in
     let tys = t |> List.filter_map (fun renv ->
-      if REnv.mem v renv then Some (REnv.find v renv) else None
-    ) |> partition |> List.concat_map isolate_conjuncts in
-    extra@tys |> partition
+      if REnv.mem v renv then Some (REnv.find v renv) else None)
+    in
+    let part_for_dom dom =
+      tys |> partition dom |> List.concat_map isolate_conjuncts |> partition dom
+    in
+    List.concat_map part_for_dom initial
     (* |> (fun tys -> Format.printf "Partition for %a: %a@." Variable.pp v
       (Utils.pp_list Ty.pp) tys ; tys) *)
 end
