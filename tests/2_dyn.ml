@@ -220,6 +220,16 @@ let filtermap (f, l) =
     end
   end
 
+val lor : ((true,bool)->true) & ((false, false) -> (false) ) & ((false, true) -> (true) )
+val (==) : ((any,any)-> bool) & (('a, ~'a)-> false)
+
+(* val member : (('a, ['a*])-> bool) & ((any, []) -> false) & (('b,[(~'b)*]) -> false) *)
+let member (e,l) =
+match l with
+| [] -> false
+| h::t -> lor (e == h, member(e,t))
+end
+
 type objF('a) = { f : 'a? ; proto : (objF('a))? ..}
 
 let call_f (o:objF('a)) =
