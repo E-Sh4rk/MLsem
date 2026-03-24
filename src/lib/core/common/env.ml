@@ -93,7 +93,7 @@ module Make(T:T) = struct
   let pp fmt (m, _) =
     VarMap.bindings m
     |> List.iter (fun (v, ts) ->
-      Format.fprintf fmt "%a: @[<h>%a@]@." Variable.pp v T.pp ts
+      Format.fprintf fmt "%a: @[<h>%a@]@;" Variable.pp v T.pp ts
     )
 
   let show = Format.asprintf "%a" pp
