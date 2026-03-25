@@ -489,3 +489,22 @@ let typeof_app x =
   | "int" -> return 0
   | _ -> fail "invalid input"
   end
+
+val typeof1 : (() -> "unit")
+val typeof2 : (~(Null | Lst | Int | Raw | Chr | Clx | Lgl | Dbl | ()) -> "object")
+val typeof3 : (Dbl -> "dbl")
+val typeof4 : (Lgl -> "lgl")
+val typeof5 : (Clx -> "clx")
+val typeof6 : (Chr -> "chr")
+val typeof7 : (Raw -> "raw")
+val typeof8 : (Int -> "int")
+val typeof9 : (Lst -> "lst")
+val typeof10 : (Null -> "null")
+val to_bool : (true -> true) & (false -> false)
+let typeof_app' x =
+  let t = [ typeof1 x | typeof2 x | typeof3 x | typeof4 x |
+            typeof5 x | typeof6 x | typeof7 x | typeof8 x |
+            typeof9 x | typeof10 x ] in
+  if to_bool (if t is "int" then true else false)
+  then return 0
+  else fail "invalid input"
