@@ -35,10 +35,10 @@ let rec typeof env (_,e) =
 let typeof_def env e = Checker.generalize ~e env (typeof env e)
 
 let combine rs1 rs2 =
-  Utils.carthesian_prod rs1 rs2
+  Utils.cartesian_prod rs1 rs2
   |> List.map (fun (r1, r2) -> REnv.cap r1 r2)
 let combine' rss =
-  Utils.carthesian_prod' rss |> List.map REnv.conj
+  Utils.cartesian_prod' rss |> List.map REnv.conj
 
 let is_empty renv =
   REnv.bindings renv |> List.exists (fun (_,ty) -> Ty.is_empty ty)

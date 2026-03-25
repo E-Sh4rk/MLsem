@@ -127,18 +127,18 @@ let rec perm lst =
   | [] -> [[]]
   | h::t -> List.concat_map (insert h) (perm t)
 
-let carthesian_prod l1 l2 =
+let cartesian_prod l1 l2 =
   l1 |> List.concat_map (fun e1 ->
     l2 |> List.map (fun e2 ->
       (e1, e2)
     )
   )
 
-let rec carthesian_prod' lst =
+let rec cartesian_prod' lst =
   match lst with
   | [] -> [[]]
   | es::lst ->
-    let tls = carthesian_prod' lst in
+    let tls = cartesian_prod' lst in
     es |> List.concat_map
       (fun e -> tls |> List.map (fun tl -> e::tl))
 
