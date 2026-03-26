@@ -57,7 +57,7 @@ end
 
 module Rid = struct
   type t = int
-  let no_result = 0
+  let dummy = 0
   let create =
     let i = ref 0 in
     fun () -> i := !i + 1 ; !i
@@ -66,7 +66,8 @@ module Rid = struct
 end
 
 module rec IAnnot : sig
-  type coverage = (Rid.t * Ty.t) option * REnv.t
+  type res = (Rid.t * Ty.t) option
+  type coverage = res * REnv.t
   type branch = BMaybe of t | BType of t | BSkip
   and inter_branch = { coverage: coverage option ; ann: t }
   and inter = inter_branch list
@@ -94,8 +95,11 @@ module rec IAnnot : sig
   val pp : Format.formatter -> t -> unit
   val pp_a : Format.formatter -> a -> unit
   val pp_coverage : Format.formatter -> coverage -> unit
+  val pp_res : Format.formatter -> res -> unit
 end = struct
-  type coverage = (Rid.t * Ty.t) option * REnv.t
+  type res = (Rid.t * Ty.t) option
+  [@@deriving show]
+  type coverage = res * REnv.t
   [@@deriving show]
   type branch = BMaybe of t | BType of t | BSkip
   [@@deriving show]

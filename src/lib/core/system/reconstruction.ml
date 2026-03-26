@@ -26,23 +26,23 @@ let initial ?(direct_narrowing=false) refinements e =
   in
   let rec initial r (eid, e) =
     let open IAnnot in
-    let with_nr ann = Either.right (Rid.no_result, ann) in
-    let with_r ann = Either.right (Rid.create (), ann) in
+    let left ann = Either.left ann in
+    let right ann = Either.right (Rid.create (), ann) in
     let ann = match e with
-    | Value ty -> Either.left (Annot.AValue ty)
-    | Var _ -> AVar (new_renaming ()) |> with_nr
-    | Constructor (_,es) -> AConstruct (List.map (initial r) es) |> with_r
-    | Lambda (dom, _, e) -> ALambda (dom, initial r e) |> with_nr
+    | Value ty -> Annot.AValue ty |> left
+    | Var _ -> AVar (new_renaming ()) |> right
+    | Constructor (_,es) -> AConstruct (List.map (initial r) es) |> right
+    | Lambda (dom, _, e) -> ALambda (dom, initial r e) |> right
     | LambdaRec lst ->
-      ALambdaRec (lst |> List.map (fun (dom, _, e) -> dom, initial r e)) |> with_r
+      ALambdaRec (lst |> List.map (fun (dom, _, e) -> dom, initial r e)) |> right
     | Ite (e, tau, e1, e2) ->
-      AIte (initial r e, tau, BMaybe (initial r e1), BMaybe (initial r e2)) |> with_nr
-    | App (e1, e2) -> AApp (initial r e1, initial r e2, new_result ()) |> with_r
-    | Operation (_, e) -> AOp (new_renaming (), initial r e, new_result ()) |> with_r
-    | Projection (_, e) -> AProj (initial r e, new_result ()) |> with_r
-    | TypeCast (e, ty, _) -> ACast (ty, initial r e) |> with_r
-    | TypeCoerce (e, ty, _) -> ACoerce (ty, initial r e) |> with_r
-    | Alt (e1, e2) -> AAlt (Some (initial r e1), Some (initial r e2)) |> with_nr
+      AIte (initial r e, tau, BMaybe (initial r e1), BMaybe (initial r e2)) |> right
+    | App (e1, e2) -> AApp (initial r e1, initial r e2, new_result ()) |> right
+    | Operation (_, e) -> AOp (new_renaming (), initial r e, new_result ()) |> right
+    | Projection (_, e) -> AProj (initial r e, new_result ()) |> right
+    | TypeCast (e, ty, _) -> ACast (ty, initial r e) |> right
+    | TypeCoerce (e, ty, _) -> ACoerce (ty, initial r e) |> right
+    | Alt (e1, e2) -> AAlt (Some (initial r e1), Some (initial r e2)) |> right
     | Let (suggs, v, e1, e2) ->
       let a1 = initial r e1 in
       let tys = Refinement.Partitioner.decomposition_for r v suggs in
@@ -51,7 +51,7 @@ let initial ?(direct_narrowing=false) refinements e =
           let r = Refinement.Partitioner.filter_compatible r v ty in
           initial r e2
         ) |> LazyIAnnot.mk_lazy)) in
-      ALet (a1, parts) |> with_nr
+      ALet (a1, parts) |> right
     in
     let refinement =
       if direct_narrowing
@@ -69,7 +69,7 @@ let initial ?(direct_narrowing=false) refinements e =
 type ('a,'b) result =
 | Ok of 'a * GTy.t
 | Fail
-| Subst of (Subst.t * Ty.t) list * 'b * 'b * (Rid.t * REnv.t)
+| Subst of (Subst.t * IAnnot.res) list * 'b * 'b * REnv.t
 
 type log = { eid: Eid.t ; title: string ; descr: Format.formatter -> unit }
 type cache = { dom : Domain.t ; logs : log list ref }
@@ -195,7 +195,7 @@ let tallying_simpl env res cs =
 type ('a,'b) result_seq =
 | AllOk of 'a list * GTy.t list
 | OneFail
-| OneSubst of (Subst.t * Ty.t) list * 'b list * 'b list * (Rid.t * REnv.t)
+| OneSubst of (Subst.t * IAnnot.res) list * 'b list * 'b list * REnv.t
 
 let rec seq (f : 'b -> 'c -> ('a,'b) result) (c : 'a->'b) (lst:('b*'c) list)
   : ('a,'b) result_seq =
@@ -226,9 +226,9 @@ and refine_ann r cache env (rid, annot) (id, e) =
   in
   let env = REnv.refine_env env r in
   let retry_with a = refine cache env a (id, e) in
+  let with_res ss = ss |> List.map (fun (s,t) -> (s, Some (rid, t))) in
   let ic ann = I { rid ; ann ; refinement=r } in
   let ac ann = A (Annot.nc r ann) in
-  let empty_cov = (rid, REnv.empty) in
   let app res t1 t2 =
     let t1, t2 = GTy.lb t1, GTy.lb t2 in
     let arrow = Arrow.mk t2 res in
@@ -266,14 +266,14 @@ and refine_ann r cache env (rid, annot) (id, e) =
           (Utils.pp_seq (Utils.pp_seq Ty.pp " ; ") " ;; ") doms
           (Utils.pp_seq Ty.pp " ; ") tys
         ) ;
-      Subst (ss, Annot.AConstruct annots |> ac, ic Untyp, empty_cov)
+      Subst (with_res ss, Annot.AConstruct annots |> ac, ic Untyp, REnv.empty)
     end
   | Lambda (_,v,e'), ALambda (ty, annot') ->
     let env' = Env.add v (TyScheme.mk_mono ty) env in
     begin match refine' { cache with dom=Domain.empty } env' annot' e' with
     | Ok (annot', _) -> retry_with (ac (Annot.ALambda (ty, annot')))
-    | Subst (ss,a,a',(rid,r)) ->
-      Subst (ss,ALambda(ty, a)|>ic,ALambda(ty, a')|>ic,(rid,REnv.add v (GTy.lb ty) r))
+    | Subst (ss,a,a',r) ->
+      Subst (ss,ALambda(ty, a)|>ic,ALambda(ty, a')|>ic,REnv.add v (GTy.lb ty) r)
     | Fail -> Fail
     end
   | LambdaRec lst, ALambdaRec anns ->
@@ -284,11 +284,11 @@ and refine_ann r cache env (rid, annot) (id, e) =
     let aes = List.map (fun ((_,_,e),(_,a)) -> a,e) lst in
     begin match refine_seq' { cache with dom=Domain.empty } env' aes with
     | OneFail -> Fail
-    | OneSubst (ss, a, a',(rid,r)) ->
+    | OneSubst (ss, a, a',r) ->
       let r = lst |> List.fold_left
         (fun r ((_,v,_),(ty,_)) -> REnv.add v (GTy.lb ty) r) r in
       Subst (ss,ALambdaRec (List.combine tys a) |> ic,
-                ALambdaRec (List.combine tys a') |> ic,(rid,r))
+                ALambdaRec (List.combine tys a') |> ic,r)
     | AllOk (annots,tys') ->
       let tys' = List.map GTy.lb tys' in
       let cs = List.combine tys' (List.map GTy.lb tys) in
@@ -297,7 +297,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
       log "untypeable recursive function" (fun fmt ->
         Format.fprintf fmt "cannot unify the body with self"
         ) ;
-      Subst (ss, ok_ann, ic Untyp, empty_cov)
+      Subst (with_res ss, ok_ann, ic Untyp, REnv.empty)
     end
   | Ite (e0,_,e1,e2), AIte (a0,tau,a1,a2) ->
     begin match refine' cache env a0 e0 with
@@ -342,7 +342,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
       Subst (ss,AApp(a1,a2,res)|>ic,AApp(a1',a2',res)|>ic,r)
     | AllOk ([a1;a2],[t1;t2]) ->
       let ss = app res t1 t2 in
-      Subst (ss, ac (Annot.AApp(a1,a2,res)), ic Untyp, empty_cov)
+      Subst (with_res ss, ac (Annot.AApp(a1,a2,res)), ic Untyp, REnv.empty)
     | _ -> assert false
     end
   | Operation (o,e'), AOp (f,annot',res) ->
@@ -352,7 +352,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
       let s = f tvs in
       let t = GTy.substitute s t in
       let ss = app res t t' in
-      Subst (ss, ac (Annot.AOp(s,annot',res)), ic Untyp, empty_cov)
+      Subst (with_res ss, ac (Annot.AOp(s,annot',res)), ic Untyp, REnv.empty)
     | Subst (ss,a,a',r) -> Subst (ss,AOp (f,a,res)|>ic,AOp (f,a',res)|>ic,r)
     | Fail -> Fail
     end
@@ -365,7 +365,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
       log "untypeable projection" (fun fmt ->
         Format.fprintf fmt "argument: @[<h>%a@]" Ty.pp s
         ) ;
-      Subst (ss, ac (Annot.AProj annot'), ic Untyp, empty_cov)
+      Subst (with_res ss, ac (Annot.AProj annot'), ic Untyp, REnv.empty)
     | Subst (ss,a,a',r) -> Subst (ss,AProj (a,res)|>ic,AProj (a',res)|>ic,r)
     | Fail -> Fail
     end
@@ -394,7 +394,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
         else if c = CheckStatic then
           Format.fprintf fmt "expected: @[<h>%a@]@.given: @[<h>%a@]" Ty.pp (GTy.lb t) Ty.pp (GTy.lb s)
         ) ;
-      Subst (ss, ac (Annot.ACast(t,annot')), ic Untyp, empty_cov)
+      Subst (with_res ss, ac (Annot.ACast(t,annot')), ic Untyp, REnv.empty)
     | Subst (ss,a,a',r) -> Subst (ss,ACast (t,a)|>ic,ACast (t,a')|>ic,r)
     | Fail -> Fail
     end
@@ -411,7 +411,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
         else if c = CheckStatic then
           Format.fprintf fmt "expected: @[<h>%a@]@.given: @[<h>%a@]" Ty.pp (GTy.lb t) Ty.pp (GTy.lb s)
         ) ;
-      Subst (ss, ac (Annot.ACoerce(t,annot')), ic Untyp, empty_cov)
+      Subst (with_res ss, ac (Annot.ACoerce(t,annot')), ic Untyp, REnv.empty)
     | Subst (ss,a,a',r) -> Subst (ss,ACoerce (t,a)|>ic,ACoerce (t,a')|>ic,r)
     | Fail -> Fail
     end
@@ -451,36 +451,36 @@ and refine_ann r cache env (rid, annot) (id, e) =
     assert false
 and refine' cache env annot e =
   let tvars = Env.tvars env in
-  let ic_norefinement ann = IAnnot.I { rid = Rid.no_result ; ann ; refinement=REnv.empty } in
+  let ic_norefinement ann = IAnnot.I { rid = Rid.dummy ; ann ; refinement=REnv.empty } in
   let subst_disjoint s =
     MVarSet.inter (Subst.domain s) tvars |> MVarSet.is_empty
   in
   match refine cache env annot e with
   | Ok (a, ty) -> Ok (a, ty)
   | Fail -> Fail
-  | Subst (ss, a1, a2, (rid,r)) when ss |> List.map fst |> List.for_all subst_disjoint ->
+  | Subst (ss, a1, a2, r) when ss |> List.map fst |> List.for_all subst_disjoint ->
     let default =
       (* Don't add default branch if already covered (also important for error msg) *)
       if ss |> List.exists (fun (s,_) -> Subst.is_identity s)
       then [] else [{ IAnnot.coverage=(Some (None, r)) ; ann=a2 }]
     in
-    let branches = ss |> List.map (fun (s,ty) ->
+    let branches = ss |> List.map (fun (s,res) ->
       let ann = IAnnot.substitute s a1 in
-      let coverage = Some (rid, ty), REnv.substitute s r in
+      let coverage = res, REnv.substitute s r in
       { IAnnot.coverage=(Some coverage) ; ann }
       ) in
     let annot = IAnnot.AInter (branches@default) |> ic_norefinement in
     refine' cache env annot e
   | Subst (ss, a1, a2, r) -> Subst (ss, a1, a2, r)
 and refine_b' cache env (rid, bannot) e s tau =
+  let with_no_res ss = ss |> List.map (fun (s,_) -> (s, None)) in
   let retry_with bannot = refine_b' cache env (rid, bannot) e s tau in
-  let empty_cov = (rid, REnv.empty) in
   match bannot with
   | IAnnot.BMaybe annot ->
     let unsat = Checker.is_type_test_unsat ~tau s in
     if !Config.infer_overload then
       let ss = tallying_simpl env Ty.empty [(unsat, Ty.empty)] in
-      Subst (ss, IAnnot.BSkip, IAnnot.BType annot, empty_cov)
+      Subst (with_no_res ss, IAnnot.BSkip, IAnnot.BType annot, REnv.empty)
     else if Ty.is_empty unsat
     then retry_with (IAnnot.BSkip)
     else retry_with (IAnnot.BType annot)
