@@ -25,7 +25,7 @@ let proj_of_patconstr c i =
 
 let type_of_patconstr c args =
   let constr = constr_of_patconstr c in
-  Mlsem_system.Checker.construct constr args
+  Mlsem_system.Ast.construct constr args
 
 let rec type_of_pat pat =
   match pat with

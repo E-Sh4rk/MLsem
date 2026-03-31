@@ -116,6 +116,97 @@ let apply_subst s e =
   in
   map aux e
 
+(* Projections and constructors *)
+
+let domain_of_proj p ty =
+  match p with
+  | PiField label -> Record.mk_open [label, (ty, false)]
+  | PiFieldOpt label -> Record.mk_open [label, (ty, true)]
+  | Pi(n,i) ->
+    if i >= n then Ty.empty
+    else Tuple.mk (List.init n (fun k -> if k=i then ty else Ty.any))
+  | Hd ->
+    Lst.cons ty Lst.any
+  | Tl ->
+    Lst.cons Ty.any ty
+  | PiTag tag ->
+    Tag.mk tag ty
+  | PCustom r -> r.pdom ty
+
+let proj p ty =
+  match p with
+  | PiField label | PiFieldOpt label -> Record.proj ty label
+  | Pi (n,i) -> Tuple.proj n i ty
+  | Hd -> Lst.proj ty |> fst
+  | Tl -> Lst.proj ty |> snd
+  | PiTag tag -> Tag.proj tag ty
+  | PCustom r -> r.proj ty
+
+let domains_of_construct (c:constructor) ty =
+  match c with
+  | Tuple n ->
+    Tuple.dnf n ty
+    |> List.filter (fun b -> Ty.leq (Tuple.mk b) ty)
+  | Join n | Meet n -> [List.init n (fun _ -> ty)]
+  | Negate when Ty.is_any ty -> [ [Ty.any] ]
+  | Negate -> [ ]
+  | Normalize when Ty.is_any ty -> [ [Ty.any] ]
+  | Normalize -> [ ]
+  | Ternary _ -> [ [ Ty.any ; ty ; ty ] ]
+  | Cons ->
+    Lst.dnf ty
+    |> List.filter (fun (a,b) -> Ty.leq (Lst.cons a b) ty)
+    |> List.map (fun (t1,t2) -> [t1;t2])
+  | Rec (labels, opened) ->
+    let mk = if opened then Record.mk_open else Record.mk_closed in
+    Ty.cap ty (mk (List.map (fun lbl -> (lbl, (Ty.any,false))) labels))
+    |> Record.dnf
+    |> List.filter_map (fun (bindings,tail) ->
+      let ty' = Record.mk tail bindings in
+      if Ty.leq ty' ty
+      then Some (List.map (fun lbl -> Record.proj ty' lbl) labels)
+      else None
+    )
+  | Tag tag -> [ [ Tag.proj tag ty ] ]
+  | Enum e when Ty.leq (Enum.typ e) ty -> [ [] ]
+  | Enum _ -> [ ]
+  | CCustom r -> r.cdom ty
+
+let construct (c:constructor) tys =
+  match c, tys with
+  | Tuple n, tys when List.length tys = n -> Tuple.mk tys
+  | Join n, tys when List.length tys = n -> Ty.disj tys
+  | Meet n, tys when List.length tys = n -> Ty.conj tys
+  | Negate, [ty] -> Ty.neg ty
+  | Normalize, [ty] -> !Config.normalization_fun ty
+  | Ternary tau, [t;t1;t2] ->
+    if Ty.leq t tau then t1
+    else if Ty.leq t (Ty.neg tau) then t2
+    else Ty.cup t1 t2
+  | Cons, [t1 ; t2] -> Lst.cons t1 t2
+  | Rec (labels, opened), tys when List.length labels = List.length tys ->
+    let mk = if opened then Record.mk_open else Record.mk_closed in
+    let bindings = List.map2 (fun lbl ty -> (lbl, (ty,false))) labels tys in
+    mk bindings
+  | Tag tag, [t] -> Tag.mk tag t
+  | Enum enum, [] -> Enum.typ enum
+  | CCustom r, tys -> r.cons tys
+  | _ -> raise (Invalid_argument "Invalid arity for constructor.")
+
+let rv = RVar.mk KNoInfer None
+let tv = TVar.mk KNoInfer None
+let fun_of_operation o =
+  match o with
+  | RecUpd lbl ->
+    let dom1, dom2 = Record.mk' (RVar.fty rv) [], TVar.typ tv in
+    let codom = Record.mk' (RVar.fty rv) [(lbl, FTy.of_oty (TVar.typ tv, false))] in
+    Arrow.mk (Tuple.mk [dom1;dom2]) codom |> GTy.mk |> TyScheme.mk_poly
+  | RecDel lbl ->
+    let dom = Record.mk' (RVar.fty rv) [] in
+    let codom = Record.mk' (RVar.fty rv) [(lbl, FTy.of_oty (Ty.empty, true))] in
+    Arrow.mk dom codom |> GTy.mk |> TyScheme.mk_poly
+  | OCustom { ofun ; _ } -> ofun
+
 let coerce c ty (id,t) =
   let mono = GTy.fv ty |> MVarSet.filter (TVar.has_kind KNoInfer) (RVar.has_kind KNoInfer) in
   let cs = ref Subst.identity in
@@ -127,14 +218,26 @@ let coerce c ty (id,t) =
         [(GTy.lb ty1, GTy.lb ty2) ; (GTy.lb ty2, GTy.lb ty1) ;
         (GTy.ub ty1, GTy.ub ty2) ; (GTy.ub ty2, GTy.ub ty1)]
       with
-      | [] -> raise Exit
-      | s'::_ -> cs := Subst.compose s' s
+      | [s'] -> cs := Subst.compose s' s
+      | _ -> raise Exit
     in
     try match t with
     | Let (tys, v, e1, e2) ->
       id, Let (tys, v, e1, aux ty e2)
     | Ite (e, tau, e1, e2) ->
       id, Ite (e, tau, aux ty e1, aux ty e2)
+    | Projection (p, e) ->
+      id, Projection (p, aux (GTy.map (domain_of_proj p) ty) e)
+    | Constructor (c, es) ->
+      let domains_of_construct ty =
+        match domains_of_construct c ty with
+        | [doms] -> doms
+        | _ -> raise Exit
+      in
+      let tys_lb = domains_of_construct (GTy.lb ty) in
+      let tys_ub = domains_of_construct (GTy.ub ty) in
+      let tys = List.map2 GTy.mk_gradual tys_lb tys_ub in
+      id, Constructor (c, List.map2 aux tys es)
     | Lambda (da,v,e) ->
       let d = GTy.map Arrow.domain ty in
       let cd = GTy.map2 Arrow.apply ty d in

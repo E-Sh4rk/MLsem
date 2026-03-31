@@ -39,8 +39,6 @@ val fv : t -> VarSet.t
 val vars : t -> VarSet.t
 val apply_subst : Subst.t -> t -> t
 
-val coerce : check -> GTy.t -> t -> t
-
 val pp : Format.formatter -> t -> unit
 val pp_e : Format.formatter -> e -> unit
 val pp_check : Format.formatter -> check -> unit
@@ -49,3 +47,14 @@ val pp_constructor : Format.formatter -> constructor -> unit
 val pp_operation : Format.formatter -> operation -> unit
 val pp_pcustom : Format.formatter -> pcustom -> unit
 val pp_ccustom : Format.formatter -> ccustom -> unit
+
+
+val domain_of_proj : projection -> Ty.t -> Ty.t
+val proj : projection -> Ty.t -> Ty.t
+
+val domains_of_construct : constructor -> Ty.t -> Ty.t list list
+val construct : constructor -> Ty.t list -> Ty.t
+
+val fun_of_operation : operation -> TyScheme.t
+
+val coerce : check -> GTy.t -> t -> t

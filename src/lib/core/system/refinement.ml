@@ -29,7 +29,7 @@ let rec typeof env (_,e) =
   | TypeCoerce (_, ty, _) -> ty
   (* The cases below are necessary because of pattern matching encoding *)
   | Var v when Env.mem v env -> Env.find v env |> TyScheme.get_fresh |> snd
-  | Projection (p, e) -> GTy.map (Checker.proj p) (typeof env e )
+  | Projection (p, e) -> GTy.map (Ast.proj p) (typeof env e )
   | TypeCast (e, ty, _) -> GTy.cap (typeof env e) ty
   | _ -> GTy.any
 let typeof_def env e = Checker.generalize ~e env (typeof env e)
@@ -66,16 +66,16 @@ let sufficient_refinements env e t =
     | LambdaRec _ -> []
     | Var v -> [REnv.singleton v t]
     | Constructor (c, es) ->
-      Checker.domains_of_construct c t |> List.concat_map
+      Ast.domains_of_construct c t |> List.concat_map
         (fun ts -> List.map2 (fun e t -> aux env e t) es ts |> combine')
     | TypeCoerce (_, s, _) when Ty.leq (GTy.lb s) t -> [REnv.empty]
     | Value s when Ty.leq (GTy.lb s) t -> [REnv.empty]
     | Value _ | TypeCoerce _ -> []
-    | Projection (p, e) -> aux env e (Checker.domain_of_proj p t)
+    | Projection (p, e) -> aux env e (Ast.domain_of_proj p t)
     | TypeCast (e, _, _) -> aux env e t
     | App ((_, Var v), e) when Env.mem v env -> app (Env.find v env) e
     | App _ -> []
-    | Operation (o, e) -> app (Checker.fun_of_operation o) e
+    | Operation (o, e) -> app (Ast.fun_of_operation o) e
     | Ite (e, s, e1, e2) ->
       let s = GTy.lb s in
       let r1 = combine (aux env e s) (aux env e1 t) in

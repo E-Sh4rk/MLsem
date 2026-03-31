@@ -255,11 +255,11 @@ and refine_ann r cache env (rid, annot) (id, e) =
     | OneFail -> Fail
     | OneSubst (ss, a, a',r) -> Subst (ss,AConstruct a |> ic,AConstruct a' |> ic,r)
     | AllOk (annots,tys) ->
-      let doms = Checker.domains_of_construct c Ty.any in
+      let doms = Ast.domains_of_construct c Ty.any in
       let tys = List.map GTy.lb tys in
       let ss =
         doms |> List.concat_map (fun doms ->
-        tallying_simpl env (Checker.construct c tys) (List.combine tys doms)
+        tallying_simpl env (Ast.construct c tys) (List.combine tys doms)
       ) in
       log "untypeable constructor" (fun fmt ->
         Format.fprintf fmt "expected: @[<h>%a@]@.given: @[<h>%a@]"
@@ -348,7 +348,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
   | Operation (o,e'), AOp (f,annot',res) ->
     begin match refine' cache env annot' e' with
     | Ok (annot', t') ->
-      let tvs, t = Checker.fun_of_operation o |> TyScheme.get in
+      let tvs, t = Ast.fun_of_operation o |> TyScheme.get in
       let s = f tvs in
       let t = GTy.substitute s t in
       let ss = app res t t' in
@@ -359,7 +359,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
   | Projection (p,e'), AProj (annot',res) ->
     begin match refine' cache env annot' e' with
     | Ok (annot', s) ->
-      let ty = Checker.domain_of_proj p res in
+      let ty = Ast.domain_of_proj p res in
       let s = GTy.lb s in
       let ss = tallying_simpl env res [(s, ty)] in
       log "untypeable projection" (fun fmt ->
