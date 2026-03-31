@@ -211,6 +211,7 @@ let coerce c ty (id,t) =
   let mono = GTy.fv ty |> MVarSet.filter (TVar.has_kind KNoInfer) (RVar.has_kind KNoInfer) in
   let cs = ref Subst.identity in
   let rec aux ty (id,t) =
+    let ok = ref true in
     let unify ty1 ty2 =
       let s = !cs in
       let ty1, ty2 = GTy.substitute s ty1, GTy.substitute s ty2 in
@@ -219,15 +220,12 @@ let coerce c ty (id,t) =
         (GTy.ub ty1, GTy.ub ty2) ; (GTy.ub ty2, GTy.ub ty1)]
       with
       | [s'] -> cs := Subst.compose s' s
-      | _ -> raise Exit
+      | _ -> ok := false
     in
-    try match t with
-    | Let (tys, v, e1, e2) ->
-      id, Let (tys, v, e1, aux ty e2)
-    | Ite (e, tau, e1, e2) ->
-      id, Ite (e, tau, aux ty e1, aux ty e2)
-    | Projection (p, e) ->
-      id, Projection (p, aux (GTy.map (domain_of_proj p) ty) e)
+    try let t = match t with
+    | Let (tys, v, e1, e2) -> Let (tys, v, e1, aux ty e2)
+    | Ite (e, tau, e1, e2) -> Ite (e, tau, aux ty e1, aux ty e2)
+    | Projection (p, e) -> Projection (p, aux (GTy.map (domain_of_proj p) ty) e)
     | Constructor (c, es) ->
       let domains_of_construct ty =
         match domains_of_construct c ty with
@@ -237,20 +235,21 @@ let coerce c ty (id,t) =
       let tys_lb = domains_of_construct (GTy.lb ty) in
       let tys_ub = domains_of_construct (GTy.ub ty) in
       let tys = List.map2 GTy.mk_gradual tys_lb tys_ub in
-      id, Constructor (c, List.map2 aux tys es)
+      Constructor (c, List.map2 aux tys es)
     | Lambda (da,v,e) ->
       let d = GTy.map Arrow.domain ty in
       let cd = GTy.map2 Arrow.apply ty d in
       if GTy.equiv ty (GTy.map2 Arrow.mk d cd) |> not then raise Exit ;
-      unify d da ; id, Lambda (d, v, aux cd e)
+      unify d da ; Lambda (d, v, aux cd e)
     | LambdaRec lst ->
       let n = List.length lst in
       let tys = List.mapi (fun i _ -> GTy.map (Tuple.proj n i) ty) lst in
       if GTy.equiv ty (GTy.mapl Tuple.mk tys) |> not then raise Exit ;
-      id, LambdaRec (List.combine lst tys |>
+      LambdaRec (List.combine lst tys |>
           List.map (fun ((tya,v,e), ty) -> unify ty tya ; (ty,v,aux ty e))
         )
     | _ -> raise Exit
+    in if !ok then id, t else raise Exit
     with Exit -> Eid.refresh id, TypeCoerce ((id,t), ty, c)
   in
   let res = aux ty (id,t) in
