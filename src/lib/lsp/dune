@@ -1,0 +1,3 @@
+(library
+ (name mlsem_lsp)
+ (libraries lsp jsonrpc yojson))

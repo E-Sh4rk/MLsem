@@ -9,7 +9,7 @@
 
 (executable
  (name lsp)
- (libraries mlsem_app unix yojson lsp)
+ (libraries mlsem_lsp)
  (modes
   (best exe))
  (modules lsp))
