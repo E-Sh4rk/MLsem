@@ -49,7 +49,7 @@ let sufficient_refinements env e t =
       let alpha = TVar.mk KInfer None in
       let (mono, ty) = TyScheme.get_fresh t1 in
       let mono = MVarSet.union mono (vars t) in
-      begin match Arrow.dnf (GTy.lb ty) with
+      begin match Arrow.dnf (GTy.ub ty) with
       | [] -> []
       | [arrows] ->
         let t1 = Arrow.of_dnf [arrows] in
@@ -68,8 +68,8 @@ let sufficient_refinements env e t =
     | Constructor (c, es) ->
       Ast.domains_of_construct c t |> List.concat_map
         (fun ts -> List.map2 (fun e t -> aux env e t) es ts |> combine')
-    | TypeCoerce (_, s, _) when Ty.leq (GTy.lb s) t -> [REnv.empty]
-    | Value s when Ty.leq (GTy.lb s) t -> [REnv.empty]
+    | TypeCoerce (_, s, _) when Ty.leq (GTy.ub s) t -> [REnv.empty]
+    | Value s when Ty.leq (GTy.ub s) t -> [REnv.empty]
     | Value _ | TypeCoerce _ -> []
     | Projection (p, e) -> aux env e (Ast.domain_of_proj p t)
     | TypeCast (e, _, _) -> aux env e t
@@ -77,9 +77,8 @@ let sufficient_refinements env e t =
     | App _ -> []
     | Operation (o, e) -> app (Ast.fun_of_operation o) e
     | Ite (e, s, e1, e2) ->
-      let s = GTy.lb s in
-      let r1 = combine (aux env e s) (aux env e1 t) in
-      let r2 = combine (aux env e (Ty.neg s)) (aux env e2 t) in
+      let r1 = combine (aux env e (GTy.ub s)) (aux env e1 t) in
+      let r2 = combine (aux env e (GTy.neg s |> GTy.ub)) (aux env e2 t) in
       r1@r2
     | Alt (e1, e2) -> (aux env e1 t)@(aux env e2 t)
     | Let (_, v, e1, e2) ->
@@ -100,7 +99,7 @@ let refine env e t =
   let rec aux renv renvs =
     let renvs = renvs |> List.map (fun renv' ->
       renv' |> REnv.filter (fun v ty ->
-        let ty' = Env.find v env |> TyScheme.get_fresh |> snd |> GTy.lb in
+        let ty' = Env.find v env |> TyScheme.get_fresh |> snd |> GTy.ub in
         let ty'' = REnv.find' v renv in
         Ty.leq (Ty.cap ty' ty'') ty |> not
       )
@@ -135,13 +134,12 @@ let refinements
     | Lambda (d, v, e) -> aux_lambda env (d,v,e)
     | LambdaRec lst -> lst |> List.iter (aux_lambda env)
     | TypeCast (e, tau, _) ->
-      if refine_on_casts then add_anonymous_refinement env e (GTy.lb tau) ;
+      if refine_on_casts then add_anonymous_refinement env e (GTy.ub tau) ;
       aux env e
     | Ite (e, tau, e1, e2) ->
       if refine_on_typecases then begin
-        let tau = GTy.lb tau in
-        if fv e1 |> VarSet.is_empty |> not then add_refinement (fst e1) env e tau ;
-        if fv e2 |> VarSet.is_empty |> not then add_refinement (fst e2) env e (Ty.neg tau)
+        if fv e1 |> VarSet.is_empty |> not then add_refinement (fst e1) env e (GTy.ub tau) ;
+        if fv e2 |> VarSet.is_empty |> not then add_refinement (fst e2) env e (GTy.neg tau |> GTy.ub)
       end ;
       aux env e ; aux env e1 ; aux env e2
     | App (e1, e2) | Alt (e1, e2) -> aux env e1 ; aux env e2
