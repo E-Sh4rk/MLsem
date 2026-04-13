@@ -2,14 +2,6 @@ open Mlsem_common
 open Mlsem_types
 open Annot
 
-val domain_of_proj : Ast.projection -> Ty.t -> Ty.t
-val proj : Ast.projection -> Ty.t -> Ty.t
-
-val domains_of_construct : Ast.constructor -> Ty.t -> Ty.t list list
-val construct : Ast.constructor -> Ty.t list -> Ty.t
-
-val fun_of_operation : Ast.operation -> TyScheme.t
-
 val is_type_test_unsat : tau:GTy.t -> GTy.t -> Ty.t
 (** [is_type_test_unsat ~tau ty] returns a type that is empty
    if and only if a branch [tau] of a typecase on an expression of type [ty]

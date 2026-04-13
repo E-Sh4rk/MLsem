@@ -17,8 +17,8 @@ BASE_DIR="_bench"
 mkdir -p "$BASE_DIR"
 
 compare_output () {
-    cat "$1" | grep -vi "total time" | sed -e 's/[(][0-9a-zA-Z. ]*[)]$//g' | head -n -2 > "$BASE_DIR"/t1.tmp
-    cat "$2" | grep -vi "total time" | sed -e 's/[(][0-9a-zA-Z. ]*[)]$//g' | head -n -2 > "$BASE_DIR"/t2.tmp
+    cat "$1" > "$BASE_DIR"/t1.tmp
+    cat "$2" > "$BASE_DIR"/t2.tmp
     diff -q "$BASE_DIR"/t1.tmp "$BASE_DIR"/t2.tmp >/dev/null 2>&1
     R=$?
     if [ "$R" -ne 0 ]
@@ -32,17 +32,17 @@ compare_output () {
 if [ "$1" = "perf" ]
 then
     dune build src/bin/native.exe
-    perf record --call-graph=dwarf -- _build/default/src/bin/native.exe tests/*.ml >/dev/null 2>&1
+    perf record --call-graph=dwarf -- _build/default/src/bin/native.exe -notime tests/*.ml >/dev/null 2>&1
 elif [ "$1" = "report" ]
 then
     perf report
 elif [ "$1" = "ref" ]
 then
-    dune exec src/bin/native.exe tests/*.ml  > "$BASE_DIR"/timing.ref
+    dune exec -- src/bin/native.exe -notime tests/*.ml  > "$BASE_DIR"/timing.ref
     exit 0
 elif [ "$1" = "diff" ]
 then
-     dune exec --display=quiet -- src/bin/native.exe tests/*.ml > "$BASE_DIR"/timing.tmp
+     dune exec --display=quiet -- src/bin/native.exe -notime tests/*.ml > "$BASE_DIR"/timing.tmp
      compare_output "$BASE_DIR"/timing.ref "$BASE_DIR"/timing.tmp || exit 1
      exit 0
 elif [ "$1" = "time" ]
@@ -52,7 +52,6 @@ then
     do
         echo -n Run "$i ... "
         dune exec --display=quiet -- src/bin/native.exe tests/*.ml > "$BASE_DIR"/timing.tmp
-        compare_output "$BASE_DIR"/timing.ref "$BASE_DIR"/timing.tmp || exit 1
         T=`cat "$BASE_DIR"/timing.tmp | grep 'Cumulated total time' | grep -o '[0-9]\+[.][0-9]\+'`
         echo "$T"
         SUM_T=`echo "$T" "$SUM_T" + 2 k p | dc`

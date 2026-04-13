@@ -29,16 +29,16 @@ let rec typeof env (_,e) =
   | TypeCoerce (_, ty, _) -> ty
   (* The cases below are necessary because of pattern matching encoding *)
   | Var v when Env.mem v env -> Env.find v env |> TyScheme.get_fresh |> snd
-  | Projection (p, e) -> GTy.map (Checker.proj p) (typeof env e )
+  | Projection (p, e) -> GTy.map (Ast.proj p) (typeof env e )
   | TypeCast (e, ty, _) -> GTy.cap (typeof env e) ty
   | _ -> GTy.any
 let typeof_def env e = Checker.generalize ~e env (typeof env e)
 
 let combine rs1 rs2 =
-  Utils.carthesian_prod rs1 rs2
+  Utils.cartesian_prod rs1 rs2
   |> List.map (fun (r1, r2) -> REnv.cap r1 r2)
 let combine' rss =
-  Utils.carthesian_prod' rss |> List.map REnv.conj
+  Utils.cartesian_prod' rss |> List.map REnv.conj
 
 let is_empty renv =
   REnv.bindings renv |> List.exists (fun (_,ty) -> Ty.is_empty ty)
@@ -49,7 +49,7 @@ let sufficient_refinements env e t =
       let alpha = TVar.mk KInfer None in
       let (mono, ty) = TyScheme.get_fresh t1 in
       let mono = MVarSet.union mono (vars t) in
-      begin match Arrow.dnf (GTy.lb ty) with
+      begin match Arrow.dnf (GTy.ub ty) with
       | [] -> []
       | [arrows] ->
         let t1 = Arrow.of_dnf [arrows] in
@@ -66,20 +66,19 @@ let sufficient_refinements env e t =
     | LambdaRec _ -> []
     | Var v -> [REnv.singleton v t]
     | Constructor (c, es) ->
-      Checker.domains_of_construct c t |> List.concat_map
+      Ast.domains_of_construct c t |> List.concat_map
         (fun ts -> List.map2 (fun e t -> aux env e t) es ts |> combine')
-    | TypeCoerce (_, s, _) when Ty.leq (GTy.lb s) t -> [REnv.empty]
-    | Value s when Ty.leq (GTy.lb s) t -> [REnv.empty]
+    | TypeCoerce (_, s, _) when Ty.leq (GTy.ub s) t -> [REnv.empty]
+    | Value s when Ty.leq (GTy.ub s) t -> [REnv.empty]
     | Value _ | TypeCoerce _ -> []
-    | Projection (p, e) -> aux env e (Checker.domain_of_proj p t)
+    | Projection (p, e) -> aux env e (Ast.domain_of_proj p t)
     | TypeCast (e, _, _) -> aux env e t
     | App ((_, Var v), e) when Env.mem v env -> app (Env.find v env) e
     | App _ -> []
-    | Operation (o, e) -> app (Checker.fun_of_operation o) e
+    | Operation (o, e) -> app (Ast.fun_of_operation o) e
     | Ite (e, s, e1, e2) ->
-      let s = GTy.lb s in
-      let r1 = combine (aux env e s) (aux env e1 t) in
-      let r2 = combine (aux env e (Ty.neg s)) (aux env e2 t) in
+      let r1 = combine (aux env e (GTy.ub s)) (aux env e1 t) in
+      let r2 = combine (aux env e (GTy.neg s |> GTy.ub)) (aux env e2 t) in
       r1@r2
     | Alt (e1, e2) -> (aux env e1 t)@(aux env e2 t)
     | Let (_, v, e1, e2) ->
@@ -100,7 +99,7 @@ let refine env e t =
   let rec aux renv renvs =
     let renvs = renvs |> List.map (fun renv' ->
       renv' |> REnv.filter (fun v ty ->
-        let ty' = Env.find v env |> TyScheme.get_fresh |> snd |> GTy.lb in
+        let ty' = Env.find v env |> TyScheme.get_fresh |> snd |> GTy.ub in
         let ty'' = REnv.find' v renv in
         Ty.leq (Ty.cap ty' ty'') ty |> not
       )
@@ -135,13 +134,12 @@ let refinements
     | Lambda (d, v, e) -> aux_lambda env (d,v,e)
     | LambdaRec lst -> lst |> List.iter (aux_lambda env)
     | TypeCast (e, tau, _) ->
-      if refine_on_casts then add_anonymous_refinement env e (GTy.lb tau) ;
+      if refine_on_casts then add_anonymous_refinement env e (GTy.ub tau) ;
       aux env e
     | Ite (e, tau, e1, e2) ->
       if refine_on_typecases then begin
-        let tau = GTy.lb tau in
-        if fv e1 |> VarSet.is_empty |> not then add_refinement (fst e1) env e tau ;
-        if fv e2 |> VarSet.is_empty |> not then add_refinement (fst e2) env e (Ty.neg tau)
+        if fv e1 |> VarSet.is_empty |> not then add_refinement (fst e1) env e (GTy.ub tau) ;
+        if fv e2 |> VarSet.is_empty |> not then add_refinement (fst e2) env e (GTy.neg tau |> GTy.ub)
       end ;
       aux env e ; aux env e1 ; aux env e2
     | App (e1, e2) | Alt (e1, e2) -> aux env e1 ; aux env e2
@@ -160,7 +158,7 @@ let refinements
   in
   aux env e ; !res
 
-let partition ts =
+let partition dom ts =
   let cap_if_nonempty t t' =
     let s = Ty.cap t t' in
     if Ty.is_empty s then t else s
@@ -171,7 +169,7 @@ let partition ts =
       let s = List.fold_left cap_if_nonempty t ts in
       s::(aux (Ty.diff t s))
   in
-  aux Ty.any
+  aux dom
 
 module Partitioner = struct
   type t = REnv.t list
@@ -199,11 +197,15 @@ module Partitioner = struct
       (REnv.mem v renv |> not) ||
       (Ty.disjoint ty (REnv.find v renv) |> not)
     )
-  let partition_for t v extra =
+  let decomposition_for t v initial =
+    let initial = if List.is_empty initial then [Ty.any] else initial in
     let tys = t |> List.filter_map (fun renv ->
-      if REnv.mem v renv then Some (REnv.find v renv) else None
-    ) |> partition |> List.concat_map isolate_conjuncts in
-    extra@tys |> partition
+      if REnv.mem v renv then Some (REnv.find v renv) else None)
+    in
+    let part_for_dom dom =
+      tys |> partition dom |> List.concat_map isolate_conjuncts |> partition dom
+    in
+    List.concat_map part_for_dom initial
     (* |> (fun tys -> Format.printf "Partition for %a: %a@." Variable.pp v
       (Utils.pp_list Ty.pp) tys ; tys) *)
 end

@@ -271,14 +271,24 @@ end
 module Record = struct
   type oty = Ty.t*bool
 
-  let labelmap = Hashtbl.create 256
+  let labels = Hashtbl.create 256
+  let names = Hashtbl.create 256
   let to_label str =
-    match Hashtbl.find_opt labelmap str with
+    match Hashtbl.find_opt labels str with
     | Some lbl -> lbl
     | None ->
       let lbl = Sstt.Label.mk str in
-      Hashtbl.add labelmap str lbl ; lbl
-  let from_label lbl = Sstt.Label.name lbl
+      Hashtbl.add labels str lbl ; Hashtbl.add names lbl str ; lbl
+  let next_id =
+    let last = ref 0 in
+    fun () ->
+      last := !last+1 ; "__reserved"^(string_of_int !last)
+  let from_label lbl =
+    match Hashtbl.find_opt names lbl with
+    | Some str -> str
+    | None ->
+      let str = next_id () in
+      Hashtbl.add labels str lbl ; Hashtbl.add names lbl str ; str
 
   module LabelMap = Sstt.Op.Records.Atom.LabelMap
   let mk tail bindings =

@@ -29,5 +29,5 @@ module Partitioner : sig
   type t
   val from_refinements : Refinements.t -> t
   val filter_compatible : t -> Variable.t -> Ty.t -> t
-  val partition_for : t -> Variable.t -> Ty.t list -> Ty.t list
+  val decomposition_for : t -> Variable.t -> Ty.t list -> Ty.t list
 end

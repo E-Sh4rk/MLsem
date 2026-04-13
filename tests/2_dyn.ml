@@ -220,6 +220,16 @@ let filtermap (f, l) =
     end
   end
 
+val lor : ((true,bool)->true) & ((false, false) -> (false) ) & ((false, true) -> (true) )
+val (==) : ((any,any)-> bool) & (('a, ~'a)-> false)
+
+(* val member : (('a, ['a*])-> bool) & ((any, []) -> false) & (('b,[(~'b)*]) -> false) *)
+let member (e,l) =
+match l with
+| [] -> false
+| h::t -> lor (e == h, member(e,t))
+end
+
 type objF('a) = { f : 'a? ; proto : (objF('a))? ..}
 
 let call_f (o:objF('a)) =
@@ -434,7 +444,7 @@ let filter_imp_test =
   push arr "abc" ;
   arr
 
-(* ========= ALTERNATIVES ========= *)
+(* ========= ALTERNATIVES / INFERENCE TRICKS ========= *)
 
 val f1 : int -> int
 val f2 : bool -> bool
@@ -446,3 +456,55 @@ val f6 : Nil -> Nil
 let test_alt a = [ f1 a | f2 a | f3 a | f4 a | f5 a | f6 a ]
 let fall = [ f1 | f2 | f3 | f4 | f5 | f6 ]
 let test_noalt a = fall a
+
+
+(* let typeof x =
+  if x is Dbl do return "dbl" end ;
+  if x is Lgl do return "lgl" end ;
+  if x is Clx do return "clx" end ;
+  if x is Chr do return "chr" end ;
+  if x is Raw do return "raw" end ;
+  if x is Int do return "int" end ;
+  if x is Lst do return "lst" end ;
+  if x is Null do return "null" end ;
+  if x is () do return "unit" end ;
+  "object" *)
+
+val typeof :
+  (() -> "unit") &
+  (~(Null | Lst | Int | Raw | Chr | Clx | Lgl | Dbl | ()) -> "object") &
+  (Dbl -> "dbl") & (Lgl -> "lgl") & (Clx -> "clx") & (Chr -> "chr") &
+  (Raw -> "raw") & (Int -> "int") & (Lst -> "lst") & (Null -> "null")
+
+val fail : empty -> any
+# type_narrowing = false
+let typeof_app x =
+  let t =
+    let y = x in
+    suggest y is Dbl or Lgl or Clx or Chr or Raw or Int or Lst or Null or ()
+         or ~(Dbl | Lgl | Clx | Chr | Raw | Int | Lst | Null | ()) in
+    typeof y
+  in
+  match t with
+  | "int" -> return 0
+  | _ -> fail "invalid input"
+  end
+
+val typeof1 : (() -> "unit")
+val typeof2 : (~(Null | Lst | Int | Raw | Chr | Clx | Lgl | Dbl | ()) -> "object")
+val typeof3 : (Dbl -> "dbl")
+val typeof4 : (Lgl -> "lgl")
+val typeof5 : (Clx -> "clx")
+val typeof6 : (Chr -> "chr")
+val typeof7 : (Raw -> "raw")
+val typeof8 : (Int -> "int")
+val typeof9 : (Lst -> "lst")
+val typeof10 : (Null -> "null")
+val to_bool : (true -> true) & (false -> false)
+let typeof_app' x =
+  let t = [ typeof1 x | typeof2 x | typeof3 x | typeof4 x |
+            typeof5 x | typeof6 x | typeof7 x | typeof8 x |
+            typeof9 x | typeof10 x ] in
+  if to_bool (if t is "int" then true else false)
+  then return 0
+  else fail "invalid input"

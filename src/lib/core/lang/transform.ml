@@ -25,7 +25,7 @@ let proj_of_patconstr c i =
 
 let type_of_patconstr c args =
   let constr = constr_of_patconstr c in
-  Mlsem_system.Checker.construct constr args
+  Mlsem_system.Ast.construct constr args
 
 let rec type_of_pat pat =
   match pat with
@@ -68,6 +68,8 @@ let rec def_of_var_pat pat v e =
 let encode_pattern_matching e pats =
   let x = MVariable.create Immut None in
   let ts = pats |> List.map fst |> List.map type_of_pat in
+  let dom, ts = List.fold_left (fun (dom,res) ty -> (Ty.diff dom ty, (Ty.cap dom ty)::res)) (Ty.any,[]) ts in
+  let ts = List.rev (dom::ts) in
   let body_of_pat pat e =
     let add_def acc v =
       let tys,d = def_of_var_pat pat v (Eid.unique (), Var x) in
