@@ -6,8 +6,8 @@ module PrinterCfg : sig
     val set_bool_printer : (int -> Sstt.Prec.assoc -> Format.formatter -> Bools.t -> unit) -> unit
     val set_float_printer : (int -> Sstt.Prec.assoc -> Format.formatter -> Floats.t -> unit) -> unit
     val set_string_printer : (int -> Sstt.Prec.assoc -> Format.formatter -> Strings.t -> unit) -> unit
-    val set_lists_printer : (int -> Sstt.Prec.assoc -> Format.formatter -> Lists.t -> unit) -> unit
-    val set_chars_printer : (int -> Sstt.Prec.assoc -> Format.formatter -> Chars.t -> unit) -> unit
+    val set_list_printer : (int -> Sstt.Prec.assoc -> Format.formatter -> Lists.t -> unit) -> unit
+    val set_char_printer : (int -> Sstt.Prec.assoc -> Format.formatter -> Chars.t -> unit) -> unit
     val set_abstract_printer :
         (Sstt.Tag.t -> int -> Sstt.Prec.assoc -> Format.formatter -> descr Abstracts.t -> unit) -> unit
     val set_unit_printer : string -> unit

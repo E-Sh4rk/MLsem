@@ -19,8 +19,8 @@ module PrinterCfg = struct
     let set_bool_printer f = bool_pp := f
     let set_float_printer f = float_pp := f
     let set_string_printer f = string_pp := f
-    let set_lists_printer f = lists_pp := f
-    let set_chars_printer f = chars_pp := f
+    let set_list_printer f = lists_pp := f
+    let set_char_printer f = chars_pp := f
     let set_abstract_printer f = abstract_pp := f
     let set_unit_printer f = unit_pp := f
     let set_descr_printer f = descr_pp := f
