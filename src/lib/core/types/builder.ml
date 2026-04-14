@@ -162,6 +162,7 @@ module Builder' = struct
                 let t = Tag.define name in
                 t, { tenv with tags=StrMap.add name t tenv.tags }
 
+        let equations_max = 20
         let derecurse_types env defs =
             let hashtbl_of x =
                 let h = Hashtbl.create 16 in
@@ -171,7 +172,7 @@ module Builder' = struct
             let venv, rvenv = hashtbl_of env.vtenv.tv, hashtbl_of env.vtenv.rv in
             let tenv = ref env.tenv in
             let henv = Hashtbl.create 16 in
-            let eqs = ref [] in
+            let eqs, n = ref [], ref 0 in
             let rec derecurse_types defs =
                 List.iter (fun (name, params, def) ->
                     Hashtbl.add henv name (def, params, [])) defs ;
@@ -186,6 +187,9 @@ module Builder' = struct
                                 let v = TVar.mk KTemporary None in
                                 Hashtbl.replace henv name (def, params, (args, v)::lst);
                                 let local = List.combine params args |> List.to_seq |> StrMap.of_seq in
+                                n := !n+1 ;
+                                if !n > equations_max then
+                                    raise (TypeDefinitionError ("Maximum number of equations exceeded: is the type regular?")) ;
                                 let t = aux local def in
                                 eqs := (v,t)::!eqs ;
                                 Some v
@@ -295,7 +299,10 @@ module Builder' = struct
                 res
             in
             let res = derecurse_types defs in
-            let tys = Sstt.Ty.of_eqs !eqs |> VarMap.of_list in
+            let tys =
+                try Sstt.Ty.of_eqs !eqs |> VarMap.of_list
+                with Invalid_argument str -> raise (TypeDefinitionError str)
+            in
             let res = res |> List.map (fun (n,p,node) -> (n,p,VarMap.find node tys)) in
             let vtenv, rvenv, tenv = map_of venv, map_of rvenv, !tenv in
             res, { tenv ; vtenv={ tv=vtenv ; rv=rvenv } }
