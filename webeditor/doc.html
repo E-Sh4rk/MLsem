@@ -224,11 +224,11 @@
             Two other cast operators are available: <kbd>(x :! int)</kbd>
             will not check the dynamic part statically, and <kbd>(x :!! int)</kbd>
             will not check the dynamic part nor the static part.
-            You can write <kdb>#</kdb> as target type for a cast to the dynamic type.</li>
+            You can write <kdb>dyn</kdb> as target type for a cast to the dynamic type.</li>
             <li>type coercions, e.g. <kbd>(42 :> int)</kbd> which
             can be used locally to coerce the type of an expression into
             a supertype. Similarly to casts, the variants <kbd>(x :>! int)</kbd> and <kbd>(x :>!! int)</kbd>
-            are also available. You can write <kdb>#</kdb> as target type for a coercion to the dynamic type.</li>
+            are also available. You can write <kdb>dyn</kdb> as target type for a coercion to the dynamic type.</li>
             <li>constructors for products, lists and records</li>
             <li>anonymous functions</li>
             <li>local let binding (defined using either a variable or a <a href="#pattern">pattern</a>)</li>

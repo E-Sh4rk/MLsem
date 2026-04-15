@@ -63,6 +63,7 @@ module Var(V:Sstt.NamedIdentifier)(VS:Set.S with type elt=V.t)(P:sig val prefix:
     (fun () ->
       last := !last + 1 ; !last)
 
+  (* TODO: make it possible to change the prefix *)
   let mk kind name =
     let id = unique_id () in
     let norm_name = (match kind with

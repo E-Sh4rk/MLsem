@@ -74,15 +74,9 @@ let pp' s fmt t =
   if t.eq then
     Format.fprintf fmt "%a" pp t.lb
   else
-    let lb,ub = Ty.is_empty t.lb, Ty.is_any t.ub in
-    if lb && ub then
-      Format.fprintf fmt "#"
-    else if lb then
-      Format.fprintf fmt "#(%a)" pp t.ub
-    else if ub then
-      Format.fprintf fmt "(%a) | #" pp t.lb
-    else
-      Format.fprintf fmt "(%a) | #(%a)" pp t.lb pp t.ub
+    let dynv = Sstt.Var.mk (Format.asprintf "%a" PrinterCfg.print_dyn ()) in
+    let ty = Ty.cap (Sstt.Ty.mk_var dynv) t.ub |> Ty.cup t.lb in
+    Format.fprintf fmt "%a" pp ty
 let pp fmt t = pp' Subst.identity fmt t
 
 let mk_gradual lb ub =

@@ -11,6 +11,7 @@ module PrinterCfg = struct
     let chars_pp = ref Chars.print
     let abstract_pp = ref Abstracts.print
     let unit_pp = ref "()"
+    let dyn_pp = ref "dyn"
     let descr_pp = ref print_descr_ctx
     let pp = ref print
     let abstract_types : Sstt.Tag.t list ref = ref []
@@ -23,6 +24,7 @@ module PrinterCfg = struct
     let set_char_printer f = chars_pp := f
     let set_abstract_printer f = abstract_pp := f
     let set_unit_printer f = unit_pp := f
+    let set_dyn_printer f = dyn_pp := f
     let set_descr_printer f = descr_pp := f
     let set_printer f = pp := f
     let add_abstract_type t = abstract_types := t::!abstract_types
@@ -43,6 +45,7 @@ module PrinterCfg = struct
     let print_descr_ctx i a fmt d = !descr_pp i a fmt d
     let print_descr fmt d = print_descr_ctx Sstt.Prec.min_prec Sstt.Prec.NoAssoc fmt d
     let print fmt t = !pp fmt t
+    let print_dyn fmt () = Format.fprintf fmt "%s" !dyn_pp
 end
 
 module PEnv = struct

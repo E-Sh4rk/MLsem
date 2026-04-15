@@ -63,6 +63,7 @@ rule token = parse
 | "suggest"   { SUGGEST }
 | "abstract"  { ABSTRACT }
 | "#"     { HASHTAG }
+| "dyn"   { DYN }
 | "(*"    { comment 0 lexbuf }
 | "%("    { read_ext (Buffer.create 17) 0 lexbuf }
 | "->"    { ARROW }

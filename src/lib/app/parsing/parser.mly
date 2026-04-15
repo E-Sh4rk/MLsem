@@ -93,7 +93,7 @@
 %token LPAREN RPAREN IRPAREN EQUAL COMMA CONS COLON ASSIGN
 %token COERCE COERCE_STATIC COERCE_NOCHECK CAST_STATIC CAST_NOCHECK
 %token INTERROGATION_MARK EXCLAMATION_MARK
-%token ARROW AND OR NEG DIFF
+%token ARROW AND OR NEG DIFF DYN
 %token TIMES PLUS MINUS DIV
 %token LBRACE RBRACE DOUBLEPOINT MATCH WITH END POINT LT GT
 %token AND_KW OR_KW
@@ -141,7 +141,7 @@ unique_term: t=terms EOF { t }
 element:
 | LET ds=separated_nonempty_list(AND_KW, tl_let) { annot $symbolstartpos $endpos (Definitions ds) }
 | VAL m=mut id=generalized_identifier COLON ty=typ { annot $symbolstartpos $endpos (SigDef (id, m, Some ty)) }
-| VAL m=mut id=generalized_identifier | VAL m=mut id=generalized_identifier COLON HASHTAG
+| VAL m=mut id=generalized_identifier | VAL m=mut id=generalized_identifier COLON DYN
 { annot $symbolstartpos $endpos (SigDef (id, m, None)) }
 | TYPE ts=separated_nonempty_list(AND_KW, param_type_def) { annot $symbolstartpos $endpos (Types ts) }
 | ABSTRACT TYPE name=ID params=abs_params { annot $symbolstartpos $endpos (AbsType (name, params)) }
@@ -265,7 +265,7 @@ atomic_term:
 
 %inline typ_or_dyn:
   ty=typ { Some ty }
-| HASHTAG { None }
+| DYN { None }
 
 %inline cast:
   COLON { Check } | CAST_STATIC { CheckStatic } | CAST_NOCHECK { NoCheck }
