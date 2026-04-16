@@ -253,22 +253,23 @@ module Abstract = struct
     ) in
     construct (pos, comps)
   let trans_vdescr f = Sstt.VDescr.map (trans_descr f)
-  let top_transform f ty =
+  let exit_on_abstract ty =
     let open Sstt in
-    Ty.def ty |> trans_vdescr f |> Ty.of_def
-  let transform f ty =
-    let open Sstt in
-    try
-    let _ = ty |> Ty.nodes |> List.map (fun ty ->
-      Ty.def ty |> VDescr.map (fun d ->
+    Ty.def ty |> VDescr.map (fun d ->
         let (tags,_) = Descr.get_tags d |> Tags.components in
         List.map (fun tc ->
           if TagComp.tag tc |> Extensions.Abstracts.is_abstract
           then raise Exit ; tc) tags |> ignore ;
         d
-      )) in
-    ty
-  with Exit -> Transform.transform (trans_vdescr f) ty
+      ) |> ignore
+  let top_transform f ty =
+    let open Sstt in
+    try exit_on_abstract ty ; ty
+    with Exit -> Ty.def ty |> trans_vdescr f |> Ty.of_def
+  let transform f ty =
+    let open Sstt in
+    try ty |> Ty.nodes |> List.iter exit_on_abstract ; ty
+    with Exit -> Transform.transform (trans_vdescr f) ty
 end
 
 module Tuple = struct
