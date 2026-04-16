@@ -184,9 +184,9 @@ module Partitioner = struct
     let comps = comps |> List.map (fun cp -> Tuple.recompose ([cp], false)) in
     comps
   let isolate_record_conjuncts t =
-    Record.dnf t |>
+    Record.dnf' t |>
     List.filter (function [], _ -> false | _, _ -> true) |>
-    List.map (fun atom -> Record.of_dnf [atom])
+    List.map (fun atom -> Record.of_dnf' [atom])
   let isolate_conjuncts t =
     (* Necessary because of pattern matching encoding for uncurrified functions *)
     t::(isolate_tuple_conjuncts t)@(isolate_record_conjuncts t)

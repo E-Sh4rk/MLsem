@@ -17,10 +17,10 @@ module TyExpr = struct
         | Star of 'ext regexp | Plus of 'ext regexp | Option of 'ext regexp
 
     and 'ext t =
+        (* Type constructors *)
         | TVar of kind * string
         | TRowVar of kind * string
         | TBase of base
-        | TCustom of string
         | TApp of  string * 'ext t list
         | TEnum of string
         | TTag of string * 'ext t
@@ -29,12 +29,17 @@ module TyExpr = struct
         | TSList of 'ext regexp
         | TCons of 'ext t * 'ext t
         | TArrow of 'ext t * 'ext t
+        | TOption of 'ext t
+        (* Type connectives *)
+        | TCustom of string
         | TCup of 'ext t * 'ext t
         | TCap of 'ext t * 'ext t
         | TDiff of 'ext t * 'ext t
         | TNeg of 'ext t
-        | TOption of 'ext t
         | TWhere of 'ext t * (string * string list * 'ext t) list
+        (* Type operators (may inspect their parameters!) *)
+        | TRecUpd of 'ext t * (string * 'ext t) list
+        (* Custom extensions *)
         | TExt of 'ext
 end
 
@@ -261,6 +266,19 @@ module Builder' = struct
                         | ("", [], n)::_ -> TVar.typ n
                         | _ -> assert false
                         end
+                    | TRecUpd (t, bindings) ->
+                        let t = aux lcl t in
+                        let bindings = bindings |> List.map
+                            (fun (lbl,f) -> lbl, aux_field lcl f)
+                        in
+                        Record.dnf' t |> List.map (fun (bindings',tl') ->
+                            let bindings' =
+                                List.fold_left (fun acc (str, f) ->
+                                    let acc = List.remove_assoc str acc in
+                                    (str,f)::acc
+                                ) bindings' bindings in
+                            bindings', tl'
+                        ) |> Record.of_dnf'
                     | TExt ext -> E.to_typ (aux lcl) ext
                 and aux_field lcl t =
                     let open TyExpr in
