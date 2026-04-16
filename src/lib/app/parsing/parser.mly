@@ -361,6 +361,7 @@ atomic_typ:
 | LPAREN RPAREN { TBase TUnit }
 | LPAREN t=typ RPAREN { t }
 | LBRACE fs=separated_list(SEMICOLON, typ_field) tail=optional_tail RBRACE { TRecord (fs,tail) }
+| LBRACE br=typ WITH fs=separated_list(SEMICOLON, typ_field) RBRACE { TRecUpd (br, fs) }
 | LBRACKET re=typ_re RBRACKET { TSList re }
 | str=EXT { TExt (M.parse_ty_ext str) }
 

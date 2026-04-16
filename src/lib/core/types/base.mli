@@ -174,7 +174,9 @@ module Record : sig
     val any_with : string -> Ty.t
     val any_without : string -> Ty.t
     val dnf : Ty.t -> ((string * oty) list * oty) list
+    val dnf' : Ty.t -> ((string * FTy.t) list * FTy.t) list
     val of_dnf : ((string * oty) list * oty) list -> Ty.t
+    val of_dnf' : ((string * FTy.t) list * FTy.t) list -> Ty.t
     val proj : Ty.t -> string -> Ty.t
     val merge : Ty.t -> Ty.t -> Ty.t
     val remove_field : Ty.t -> string -> Ty.t

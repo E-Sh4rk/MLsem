@@ -15,10 +15,10 @@ module TyExpr : sig
         | Star of 'ext regexp | Plus of 'ext regexp | Option of 'ext regexp
 
     and 'ext t =
+        (* Type constructors *)
         | TVar of kind * string
         | TRowVar of kind * string
         | TBase of base
-        | TCustom of string
         | TApp of  string * 'ext t list
         | TEnum of string
         | TTag of string * 'ext t
@@ -27,12 +27,17 @@ module TyExpr : sig
         | TSList of 'ext regexp
         | TCons of 'ext t * 'ext t
         | TArrow of 'ext t * 'ext t
+        | TOption of 'ext t
+        (* Type connectives *)
+        | TCustom of string
         | TCup of 'ext t * 'ext t
         | TCap of 'ext t * 'ext t
         | TDiff of 'ext t * 'ext t
         | TNeg of 'ext t
-        | TOption of 'ext t
         | TWhere of 'ext t * (string * string list * 'ext t) list
+        (* Type operators (may inspect their parameters!) *)
+        | TRecUpd of 'ext t * (string * 'ext t) list
+        (* Custom extensions *)
         | TExt of 'ext
 end
 
