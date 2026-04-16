@@ -40,7 +40,8 @@ module PrinterCfg = struct
         !abstract_types |> List.map (fun t ->
           t, builder ~to_t:Abstracts.to_t ~map:Abstracts.map ~print:(!abstract_pp t)) in
       let units = Sstt.Descr.mk_tuple [] |> Sstt.Ty.mk_descr, !unit_pp in
-      { extensions=[bools;floats;strings;lists;chars]@abstracts ; aliases=[units] }
+      { extensions=[bools;floats;strings;lists;chars]@abstracts ; aliases=[units] }::!extra_params
+      |> merge_params
 
     let print_descr_ctx i a fmt d = !descr_pp i a fmt d
     let print_descr fmt d = print_descr_ctx Sstt.Prec.min_prec Sstt.Prec.NoAssoc fmt d
