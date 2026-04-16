@@ -253,6 +253,9 @@ module Abstract = struct
     ) in
     construct (pos, comps)
   let trans_vdescr f = Sstt.VDescr.map (trans_descr f)
+  let top_transform f ty =
+    let open Sstt in
+    Ty.def ty |> trans_vdescr f |> Ty.of_def
   let transform f ty =
     let open Sstt in
     try

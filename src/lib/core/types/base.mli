@@ -135,6 +135,10 @@ module Abstract : sig
     val any : t -> Ty.t
     val mk : t -> Ty.t list -> Ty.t
     val dnf : t -> Ty.t -> (Ty.t list) list list
+    val top_transform :
+        (t * (Ty.t list list * Ty.t list list) list
+          -> (Ty.t list list * Ty.t list list) list)
+        -> Ty.t -> Ty.t
     val transform :
         (t * (Ty.t list list * Ty.t list list) list
           -> (Ty.t list list * Ty.t list list) list)

@@ -97,7 +97,7 @@ let abstract_factors v ty =
         res := (Ty.cap ps ns)::(!res) ; false
     )
   in
-  let remaining = Abstract.transform aux factor in
+  let remaining = Abstract.top_transform aux factor in
   match !res with
   | [] -> [ Subst.identity ]
   | res -> (remaining::res) |> List.map (fun ty -> Subst.singleton1 v ty)
