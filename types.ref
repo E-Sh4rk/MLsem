@@ -1,0 +1,306 @@
+
+===== Processing tests/0_hm.ml =====
+length_aux: int -> [ any* ] -> int
+length: [ any* ] -> int
+hd': ∀'a. [ !('a any*)? ] -> 'a
+hd_safe: ∀'a. [ 'a any* ] -> 'a
+tl': ∀'a. [] | (any::('a & [ any* ])) -> 'a & [ any* ]
+tl_safe: ∀'a. (any::('a & [ any* ])) -> 'a & [ any* ]
+nth_aux: ∀'a. [ 'a* ] -> int -> 'a
+nth: ∀'a. [ 'a* ] -> int -> 'a
+append: ∀'a,'b,'c. ([ 'b* ] -> ('a & ('b::x1) | 'c & 'a & [ any* ] -> 'b::x1) | ('a
+& ('b::x1) | 'c & 'a & [ any* ] -> 'a & ('b::x1) | 'c & 'a & [ any* ])) & ([ 
+] -> 'a -> 'a) where x1 = ('b::x1) | 'c & [ any* ]
+@: ∀'a,'b,'c. (([ 'b* ], 'a & ('b::x1) | 'c & 'a & [ any* ]) -> ('b::x1) | 'c
+& 'a & [ any* ]) & (([  ], 'a) -> 'a) where x1 = ('b::x1) | 'c & [ any* ]
+rev_append: ∀'a,'b,'c. ([ 'b* ] -> x1 -> ('b::x1) | 'c) & ([  ] -> ('a & [ any* ] ->
+empty) | ('a -> 'a)) where x1 = ('b::x1) | 'c & 'a & [ any* ]
+rev: ∀'a. [ !('a | 'a 'a+)? ] -> [ !('a | 'a 'a+)? ]
+flatten: ∀'a. ([ [ 'a* ]* ] -> [ 'a* ]) & ([ [  ]* ] -> [  ])
+concat: ∀'a. [ [ 'a* ]* ] -> [ 'a* ]
+map: ∀'a,'b. ('a -> 'b) -> [ 'a* ] -> [ 'b* ]
+mapi_aux: ∀'a,'b. int -> (int -> 'a -> 'b) -> [ 'a* ] -> [ 'b* ]
+mapi: ∀'a,'b. (int -> 'a -> 'b) -> [ 'a* ] -> [ 'b* ]
+fold_left: ∀'a,'b. ('a -> 'b -> 'a) -> [ 'b* ] -> 'a -> 'a
+fold_right: ∀'a,'b. ('b -> 'a -> 'a) -> 'a -> [ 'b* ] -> 'a
+height: x1 -> int where x1 = Nil | Node(x1, Key, any, x1, int)
+create: ∀'a,'b,'c,'d. 'd & (Nil | Node(x1)) -> 'c -> 'b -> 'a & (Nil | Node(x1)) ->
+Node('d & (Nil | Node(x1)), 'c, 'b, 'a & (Nil | Node(x1)), int) where x1 =
+Nil | Node(x1), Key, any, Nil | Node(x1), int
+bal: ∀'a. t('a) -> Key -> 'a -> t('a) -> t('a)
+fixpoint: ∀'a,'b,'c. (('a -> 'c) -> 'b & ('a -> 'c)) -> 'b
+fact_stub: (int -> int) -> int -> int
+fact': int -> int
+length_stub: ∀'a. ('a & [ any* ] -> int) -> [] | (any::('a & [ any* ])) -> int
+length': [ any* ] -> int
+map_stub: ∀'a,'b,'c,'d,'e. ('a & ('c -> 'b) -> 'e & [ any* ] -> 'd & [ any* ]) -> 'a
+& ('c -> 'b) -> [] | ('c::('e & [ any* ])) -> [] | ('b::('d & [ any* ]))
+map': ∀'a,'b. ('b -> 'a) -> [ 'b* ] -> [ 'a* ]
+
+===== Processing tests/1_union_inter.ml =====
+f': any -> (-1..24)
+test': (10..15) -> (-1..24)
+succ': any -> (0..25)
+test2': (5..15) -> (0..25)
+f: int | string -> int
+test: (10..15) -> int
+succ: (2 -> 3) & (3 -> 4) & (4 -> 5) & (5 -> 6) & (6 -> 7) & (7 -> 8) & (8 -> 9) &
+(9 -> 10) & (10 -> 11) & (11 -> 12) & (12 -> 13) & (13 -> 14) & (14 -> 15) &
+(15 -> 16) & (16 -> 17) & (17 -> 18) & (18 -> 19) & (19 -> 20) & (20 -> 21) &
+(21 -> 22) & (22 -> 23) & (23 -> 24) & (24 -> 25) & (1 -> 2) & (~(0..24) ->
+0) & (0 -> 1)
+test2: (5..15) -> (10..20)
+to_bool: (float -> bool) & (int \ 0 | true | ('\001'-'\255') | string \ "" -> true) &
+(0 | false | '\000' | "" -> false)
+and_: ((true, true) -> true) & ((any, ~true) | (~true, any) -> false)
+&&: ((int | bool | char | float | string, int | bool | char | float | string) ->
+bool) & ((int \ 0 | true | ('\001'-'\255') | string \ "", int \ 0 | true |
+('\001'-'\255') | string \ "") -> true) & ((int | bool | char | float |
+string, 0 | false | '\000' | "") | (0 | false | '\000' | "", int | bool |
+char | float | string) -> false)
+and1: false
+and2: false
+and3: true
+and4: bool
+and5: true
+not_: (~true -> true) & (true -> false)
+or_: ((~true, ~true) -> false) & ((any, true) | (true, any) -> true)
+impossible_branch: int -> int
+[Warning] File "tests/1_union_inter.ml", line 103, characters 32-36 Unreachable code
+impossible_branch2: (any -> int -> int) & (int -> any -> int)
+switch1: ∀'a,'b,'c,'d. (('b -> 'c) -> true -> 'b -> 'a -> 'c) & (('a -> 'd) -> ~true
+-> 'b -> 'a -> 'd)
+switch2: ∀'a,'b,'c,'d. (true -> ('b -> 'c) -> 'b -> 'a -> 'c) & (~true -> ('a -> 'd)
+-> 'b -> 'a -> 'd)
+typeof: (bool -> "Boolean") & (~(int | bool | char | [  ] | string | ()) -> "Object")
+& ([  ] | () -> "[]") & (string -> "String") & (char -> "Character") & (int
+-> "Number")
+typeof_patterns: (~(int | bool | char | [  ] | string | ()) -> "Object") & ([  ] | () -> "[]")
+& (string -> "String") & (char -> "Character") & (int -> "Number") & (bool ->
+"Boolean")
+land: (true -> true -> true) & (~true -> any -> false) & (any -> ~true -> false)
+lor: (~true -> ~true -> false) & (any -> true -> true) & (true -> any -> true)
+lnot: (~true -> true) & (true -> false)
+tautology: any -> any -> true
+tautology_ann: any -> any -> true
+test_many_params_ann1: any -> any -> any -> any -> any -> any -> false | (int, bool, int, bool, int,
+bool)
+test_many_params_ann2: ∀'a,'b,'c,'d,'e,'f. 'f -> 'e -> 'd -> 'c -> 'b -> 'a -> false | ('f & int,
+'e & bool, 'd & int, 'c & bool, 'b & int, 'a & bool)
+test_many_params: ∀'a,'b,'c,'d,'e,'f. ('f & int -> ('e & bool -> ('d & int -> ('c & bool ->
+('b & int -> ('a & bool -> ('f & int, 'e & bool, 'd & int, 'c & bool, 'b &
+int, 'a & bool)) & ('a \ bool -> false)) & ('b \ int -> 'a -> false)) & ('c \
+bool -> 'b -> 'a -> false)) & ('d \ int -> 'c -> 'b -> 'a -> false)) & ('e \
+bool -> 'd -> 'c -> 'b -> 'a -> false)) & ('f \ int -> 'e -> 'd -> 'c -> 'b
+-> 'a -> false)
+match_pair: any -> any -> false | (int, bool)
+type_narrowing_fail: untypeable application
+File "tests/1_union_inter.ml", line 160, characters 21-31
+function: int -> int
+argument: any
+type_narrowing_ok: (any -> any) -> any -> int
+type_narrowing2_ok: ∀'a. ('a -> false) & (any -> any) -> any -> ~'a | 42
+type_narrowing2_ok': ∀'a. (('a -> false) & (any -> any), any) -> ~'a | 42
+not_exhaustive_patmatch: untypeable cast
+File "tests/1_union_inter.ml", line 173, characters 8-9
+expected: empty
+given: (..41) | (43..72) | (74..)
+is_string: (string -> true) & (~string -> false)
+is_int: (int -> true) & (~int -> false)
+example1: any -> int
+implicit1: (int -> int) & (~int -> 0)
+example2: int | string -> int
+implicit2: int | string -> int
+example3: any -> false | (~false, ~false)
+implicit3: ∀'a. ('a \ false -> ('a \ false, 'a \ false)) & ('a & false -> false)
+example4: any -> int | 'A' | string
+implicit4: ∀'a. ('a & int -> 'a & int) & ('a & string -> 'a & string) & ('a \ (int |
+string) -> 'A')
+example5: any -> any -> int
+implicit5: (~int -> any -> 0) & (any -> (~string -> 0) & (any -> int))
+example6_invalid: untypeable application
+File "tests/1_union_inter.ml", line 227, characters 26-34
+function: string -> int
+argument: int
+example6: (string -> any -> int) & (int -> string -> int)
+implicit6: (int | string -> string -> int) & (string -> any -> int)
+example7: any -> any -> int
+implicit7: (~int -> any -> 0) & (any -> (~string -> 0) & (any -> int))
+example8: any -> bool
+implicit8: (~(int | string) -> false) & (int | string -> true)
+example9: any -> int
+implicit9: (~(int | string) -> 0) & (any -> int)
+example10: tuple2 -> int
+implicit10: (tuple2 -> int) & ((~int, any) -> 7)
+example11: tuple2 -> No | int
+implicit11: ((int, int) -> int) & ((~int, any) | (any, ~int) -> No)
+example12: tuple2 -> bool
+implicit12: ((~int, any) -> false) & ((int, any) -> true)
+example13: any -> any -> (1..3)
+implicit13: (int -> (string -> 1) & (~string -> 2)) & (~int -> any -> 3)
+example14: int | string -> tuple2 -> int
+implicit14: (int | string -> (tuple2 -> int) & ((~int, any) -> 0)) & (~int -> (~int, any)
+-> 0)
+
+===== Processing tests/2_dyn.ml =====
+valint: untypeable coercion
+File "tests/2_dyn.ml", line 16, characters 13-17
+expected: int
+given: true
+valint: int
+test_sig: untypeable coercion
+File "tests/2_dyn.ml", line 20, characters 20-21
+expected: bool | 'a
+given: int | 'a
+test_sig: ∀'a. bool | 'a -> int | 'a -> (bool | 'a, int | 'a)
+test_sig_overloaded: (bool -> bool) & (int -> int)
+test_annot: ∀'a. bool | 'a -> int | 'a -> (bool | 'a, int | 'a)
+proj_a: ∀'a. A('a) -> 'a
+proj_ab: ∀'a,'b. (A('a) -> 'a) & (B('b) -> 'b)
+proj_a_test: ∀'a. 'a -> 'a
+proj_ab_test: ∀'a,'b. 'b -> 'a -> ('b, 'a)
+map_clist: ∀'a,'b. ('a -> 'b) -> clist('a) -> x1 where x1 = Nil | Cons('b, x1)
+record_ab_open: ∀'a,'b. { a : 'b ; b : 'a ..} -> { a : 'b ; b : 'a }
+record_ab: ∀'a,'b. { a : 'b ; b : 'a } -> { a : 'b ; b : 'a }
+ref_42: ref(int)
+ref_42_unresolved: the type inferred is not fully resolved
+File "tests/2_dyn.ml", line 59, characters 0-30
+type inferred: ref(42 | 'I1996)
+mutate_ref: ∀'a. 42 | 'a -> 42 | 'a
+is_ref: (ref -> true) & (~ref -> false)
+is_not_ref: (~ref -> true) & (ref -> false)
+test_dict: ∀'a,'b. false | "key" | 'a -> (dict(false | "key" | 'a, 0 | 42 | 'b), 0 |
+42 | 'b)
+filter_arr: ∀'a,'b,'c. ('b -> ~true) & ('a -> any) -> array('b | 'a) -> array('a \ 'b |
+'c)
+test_arr: ∀'a,'b. bool | 'a -> array('a & int | 'b)
+test_double_array: 42
+arr_dict_assign: ∀'a,'b. dict((0..1) | 'b, 'a) | array('a) -> ()
+nested: ∀'a. any -> 'a -> 'a
+swap: ∀'a,'b. ('a -> 'a -> dict('a, 'b) -> ()) & (int -> 'a & int -> array('b) ->
+())
+test: ∀'a,'b. ('b & 'a, any) -> ('a, 'b & 'a)
+and_js: ∀'a,'b. ('b & falsy -> 'a -> 'b & falsy) & ('b & truthy -> 'a -> 'a)
+not_js: (falsy -> 1) & (truthy -> 0)
+or_js: ∀'a,'b. ('b & truthy -> 'a -> 'b & truthy) & ('b & falsy -> 'a -> 'a)
+identity_js: ∀'a. 'a -> 'a
+and_pair: ∀'a,'b. ('b & falsy -> 'a -> 'b & falsy) & ('b & int & ~0 -> 'a -> ('a,
+int))
+test_pair: (int \ 0, any) | (int, int) -> int
+ifthenelse: ∀'a,'b. (tt('a, 'b) -> tt('a, 'b)) & (ff('a, 'b) -> ff('a, 'b))
+test1_patterns: ∀'a. ('a, any) -> 'a
+test2_patterns: ∀'a,'b. ('b, 'a) -> ('b, 'a)
+test3_patterns: ∀'a,'b. 'b -> 'a -> ('a, 'b)
+fact: int -> int
+map: ∀'a,'b. ('a -> 'b) -> [ 'a* ] -> [ 'b* ]
+map_noannot: ∀'a,'b. (('a -> 'b) -> ([ 'a+ ] -> [ 'b+ ]) & ([ 'a ] -> [ 'b ]) & ([  ] ->
+[  ])) & (any -> [  ] -> [  ])
+foo: any -> empty
+bar: any -> empty
+filter: ∀'a,'b. ('b -> ~true) & ('a -> any) -> [ ('b | 'a)* ] -> [ ('a \ 'b)* ]
+filter2: ∀'a,'b. ('b -> ~true) & ('a -> any) -> [ ('b | 'a)* ] -> [ ('a \ 'b)* ]
+filter_noannot: ∀'a. (('a -> any) -> ([ 'a ] -> [ 'a? ]) & ([ 'a+ ] -> [ 'a* ]) & ([  ] ->
+[  ])) & (('a -> true) -> ([ 'a+ ] -> [ 'a+ ]) & ([  ] -> [  ])) & (('a ->
+~true) -> [ 'a* ] -> [  ]) & (any -> [  ] -> [  ])
+filtermap: ∀'a,'b. (('b -> false | (true, 'a), [ 'b* ]) -> [ 'a* ]) & (('b -> bool |
+(true, 'a), [ 'b* ]) -> [ ('b | 'a)* ])
+member: ∀'a. (('a, [ (~'a)+ ]) | (any, [  ]) -> false) & ((any, [ any+ ]) -> bool)
+call_f: ∀'a. objF('a) -> () | 'a
+deep_flatten: ∀'a. tree('a) -> [ ('a \ [ any* ])* ]
+eval: expr -> int
+rec_and_imp: ∀'a,'b. dict(int | 'a, int | 'b) | array(int | 'b) -> int -> int -> int ->
+()
+interval: ∀'a. int -> int -> array(int | 'a)
+test_reflect: any -> any
+test_reflect_ann: int -> int
+[Notice] File "tests/2_dyn.ml", line 273, characters 25-34 Unchecked dynamic coercion
+expected: int
+given: any
+gradual1: any -> int | bool
+gradual2: any -> int | bool
+gradual3: any -> any
+gradual4: any -> int | bool | [ 42 any* ]
+gradual4_ann: any -> int | bool
+[Notice] File "tests/2_dyn.ml", line 306, characters 9-14 Unchecked dynamic coercion
+expected: int | bool
+given: [ 42 any* ]
+typeof_cf: (() -> "unit") & (~(int | bool | char | string | ()) -> "object") & (string
+-> "string") & (bool -> "bool") & (int -> "int") & (char -> "char")
+break_return_cf: ∀'a. ('a \ (0 | false) -> 'a \ (0 | false)) & ('a & (0 | false) -> ())
+weird_return: (true -> 69) & (~true -> (42, 69))
+mx: 42
+mut_invalid: untypeable application
+File "tests/2_dyn.ml", line 332, characters 2-12
+function: (ref(int), int) -> ()
+argument: ref(int), true
+mut_valid: 69
+my: dyn
+read_mut: any
+read_mut_cast: bool
+[Notice] File "tests/2_dyn.ml", line 339, characters 20-33 Unchecked dynamic coercion
+expected: bool
+given: any
+write_mut: ()
+mut_narrowing: Nil | int
+mut_seq1: 42
+mut_seq2: Nil
+mut_and_return: any -> int | false
+neg_and_pos: ∀'a. ('a & Nil -> 'a & Nil) & (int -> (int, int))
+neg_and_pos_ann: Nil | int -> Nil | (int, int)
+order: Nil | (Nil | int, Nil | int) -> Nil | int | (int, int)
+loop_tricky_narrowing: int -> (any, int)
+loop_invalid: untypeable application
+File "tests/2_dyn.ml", line 411, characters 4-14
+function: (ref('I2806), 'I2806) -> ()
+argument: ref(int), false
+loop_valid: ∀'a. (false | 'a -> false | 'a) & ('a \ int -> 'a)
+filter_imp: ∀'a,'b,'c. ('b -> false) & ('a -> bool) -> array('b | 'a) -> array('a \ 'b
+| 'c)
+filter_imp_test: array(13 | 42 | "abc")
+test_alt: (Nil -> Nil) & (() -> ()) & (char -> char) & (string -> string) & (bool ->
+bool) & (int -> int)
+fall: (Nil -> Nil) & (() -> ()) & (char -> char) & (string -> string) & (bool ->
+bool) & (int -> int)
+test_noalt: (Nil -> Nil) & (() -> ()) & (char -> char) & (string -> string) & (bool ->
+bool) & (int -> int)
+typeof_app: Int -> 0
+[Warning] File "tests/2_dyn.ml", line 490, characters 9--28 Unreachable code
+typeof_app': Int -> 0
+[Warning] File "tests/2_dyn.ml", line 510, characters 7-27 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 508, characters 43-48 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 505, characters 10-156 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 506, characters 36-45 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 506, characters 24-33 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 506, characters 12-21 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 505, characters 48-57 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 505, characters 36-45 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 505, characters 24-33 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 505, characters 12-21 Unreachable code
+
+===== Processing tests/3_records.ml =====
+record_delete: ∀`a. { l1 : any? ; l2 : any? ; l3 : any? ;; `a } -> { l1 : empty? ; l2 :
+empty? ; l3 : empty? ;; `a }
+record_update: ∀`a. { l1 : any? ; l2 : any? ; l3 : any? ;; `a } -> { l1 : 1 ; l2 : 2 ;
+l3 : 3 ;; `a }
+record_delete_ann: ∀`a. { l1 : any? ; l2 : any? ; l3 : any? ;; `a } -> { l1 : empty? ; l2 :
+empty? ; l3 : empty? ;; `a }
+record_update_ann: ∀`a. { l1 : any? ; l2 : any? ; l3 : any? ;; `a } -> { l1 : 1 ; l2 : 2 ;
+l3 : 3 ;; `a }
+record_test: { l3 : 33 ; l4 : 44 }, { l1 : 1 ; l2 : 2 ; l3 : 3 ; l4 : 44 }, { l4 : 44 }
+extract_ellipsis_test: 73 | bool, bool, true
+fun2_with_ellipsis: ∀'a,'b,'c,`a. { l1 : 'a ; l2 : 'b ;; `a & 'c? } -> ('a, 'b, { l1 : empty? ;
+l2 : empty? ;; `a & 'c? }, 'c)
+fun2_with_ellipsis_test: 1, 2, { l3 : 3 ; l4 : 4 ; l5 : 5 }, (3..5)
+test_mix: { l1 : 42? ; l2 : 33 | true ; l4 : false? }
+test_merge: { l1 : 42 ; l2 : 33 | true ; l4 : false }
+test_merge2: ∀'a,'b,'c. { y : (42 | 'b)? ; z : (73 | 'c)? ; x : 'a ..} -> ('a, 42 | 'b,
+73 | 'c)
+test_lapply: [ [ int* ]* ]
+test_r_lists: { a : (1..3) ; b : (1..3) ; c : (1..3) ;; (1..3)? }
+test_classes: { data_frame : true ;; false }
+test_class_ok: { c1 : true ;; false }
+test_class_fail: untypeable application
+File "tests/3_records.ml", line 95, characters 22-45
+function: 'I3071 & { c1 : true ;; false } -> 'I3071
+argument: { c1 : true ;; bool }
+test_class_ok2: { c1 : true ; c2 : true ;; bool }

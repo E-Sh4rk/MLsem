@@ -44,6 +44,9 @@ jobs:
         run: |
           opam install binaryen-bin
           make deps
+      - name: Run tests
+        run: |
+          make test
 
       # Generate documentation
       - name: Install odoc

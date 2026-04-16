@@ -40,7 +40,11 @@ wasm:
 	chmod +w ./webeditor/version.txt
 
 test:
-	opam exec -- dune runtest
+	./bench.sh diff
+
+promote:
+	./bench.sh ref
+
 
 time:
 	./time.sh
