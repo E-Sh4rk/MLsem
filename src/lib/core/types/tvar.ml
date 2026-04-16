@@ -15,6 +15,7 @@ module type Var = sig
     val equal : t -> t -> bool
     val compare : t -> t -> int
     val name : t -> string
+    val prefix : t -> string
     val mk : kind -> string option -> t
     val pp : Format.formatter -> t -> unit
 end
@@ -44,7 +45,8 @@ module Var(V:Sstt.NamedIdentifier)(VS:Set.S with type elt=V.t)(P:sig val prefix:
   module VH = Hashtbl.Make(V)
 
   type vardata = {
-    kind: kind
+    kind: kind ;
+    name: string
   }
 
   let data = VH.create 100
@@ -56,7 +58,10 @@ module Var(V:Sstt.NamedIdentifier)(VS:Set.S with type elt=V.t)(P:sig val prefix:
     match Hashtbl.find_opt allvars k with None -> VS.empty | Some vs -> vs
   let equal = V.equal
   let compare = V.compare
-  let name = V.name
+  let name t =
+    try (VH.find data t).name
+    with Not_found -> invalid_arg "Variable is not found."
+  let prefix _ = P.prefix
 
   let unique_id =
     let last = ref 0 in
@@ -67,13 +72,13 @@ module Var(V:Sstt.NamedIdentifier)(VS:Set.S with type elt=V.t)(P:sig val prefix:
   let mk kind name =
     let id = unique_id () in
     let norm_name = (match kind with
-      | KNoInfer -> P.prefix^"N"
-      | KInfer -> P.prefix^"I"
-      | KTemporary -> P.prefix^"T"
+      | KNoInfer -> "N"
+      | KInfer -> "I"
+      | KTemporary -> "T"
       )^(string_of_int id) in
-    let name = match name with None -> norm_name | Some str -> P.prefix^str in
-    let var = V.mk name in
-    VH.add data var {kind} ;
+    let name = match name with None -> norm_name | Some str -> str in
+    let var = V.mk (P.prefix^name) in
+    VH.add data var {kind ; name} ;
     Hashtbl.replace allvars kind (all_vars kind |> VS.add var) ;
     var
 

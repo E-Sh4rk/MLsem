@@ -16,6 +16,7 @@ module type Var = sig
     val equal : t -> t -> bool
     val compare : t -> t -> int
     val name : t -> string
+    val prefix : t -> string
     val mk : kind -> string option -> t
     val pp : Format.formatter -> t -> unit
 end
