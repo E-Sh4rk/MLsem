@@ -268,6 +268,10 @@ module Builder' = struct
                         end
                     | TRecUpd (t, bindings) ->
                         let t = aux lcl t in
+                        if Ty.leq t Record.any |> not then
+                            raise (TypeDefinitionError "Record update applied on a non-record type.") ;
+                        if TVOp.top_vars t |> MVarSet.proj1 |> TVarSet.is_empty |> not then
+                            raise (TypeDefinitionError "Record update applied on a type variable.") ;
                         let bindings = bindings |> List.map
                             (fun (lbl,f) -> lbl, aux_field lcl f)
                         in
