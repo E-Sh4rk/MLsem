@@ -91,6 +91,9 @@ let rec typeof' env annot (id,e) =
     let env = lst |> List.fold_left
       (fun env ((_,v,_),(ty,_)) -> Env.add v (TyScheme.mk_mono ty) env) env in
     let tys = lst |> List.map (fun ((_,_,e),(ty,annot)) -> typeof env annot e, ty) in
+    (* ISSUE: uncommenting below fixes the issue (EDIT: not anymore) *)
+    (* let tys = tys |> List.map (fun (ty1,ty2) -> GTy.normalize ty1, GTy.normalize ty2) in *)
+    tys |> List.iter (fun (ty,ty') -> Format.printf "%a@.<=@.%a@.@." Ty.pp (GTy.lb ty) Ty.pp (GTy.lb ty')) ;
     if List.for_all (fun (ty, ty') -> Ty.leq (GTy.lb ty) (GTy.lb ty')) tys
     then tys |> List.map fst |> GTy.mapl Tuple.mk
     else untypeable id ("Invalid recursive lambda.")
@@ -145,9 +148,6 @@ let rec typeof' env annot (id,e) =
     else untypeable id "Type constraint not satisfied."
   | TypeCoerce (e, _, c), ACoerce (ty, annot) ->
     let t = typeof env annot e in
-    (* ISSUE: uncommenting below fixes the issue *)
-    (* let t,ty = GTy.normalize t, GTy.normalize ty in *)
-    Format.printf "%a@.<=@.%a@.@." Ty.pp (GTy.lb t) Ty.pp (GTy.lb ty) ;
     if (c = Check && GTy.leq t ty)
     || (c = CheckStatic && Ty.leq (GTy.lb t) (GTy.lb ty))
     || (c = NoCheck)
