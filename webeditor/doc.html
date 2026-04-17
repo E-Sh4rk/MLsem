@@ -161,10 +161,10 @@
                 | <var>tvar</var>
                 | <kbd>(</kbd><var>t</var><kbd>)</kbd>
     <var>b</var> ::= <kbd>()</kbd>
-        | <var>lit</var>
+        | <var>lit</var> | <kbd>true</kbd> | <kbd>false</kbd> | <kbd>unit</kbd>
         | <kbd>(</kbd><var>int</var><kbd>..</kbd><var>int</var><kbd>)</kbd> | <kbd>(..</kbd><var>int</var><kbd>)</kbd> | <kbd>(</kbd><var>int</var><kbd>..)</kbd> | <kbd>(..)</kbd>
-        | <kbd>any</kbd> | <kbd>empty</kbd> | <kbd>tuple</kbd> | <kbd>tuple</kbd><var>n</var> | <kbd>true</kbd> | <kbd>false</kbd> | <kbd>bool</kbd>
-        | <kbd>int</kbd> | <kbd>char</kbd> | <kbd>unit</kbd> | <kbd>string</kbd> | <kbd>list</kbd> | <kbd>nil</kbd>
+        | <kbd>any</kbd> | <kbd>empty</kbd> | <kbd>enum</kbd> | <kbd>tuple</kbd> | <kbd>tuple</kbd><var>n</var>| <kbd>bool</kbd>
+        | <kbd>int</kbd> | <kbd>float</kbd> | <kbd>char</kbd> | <kbd>string</kbd> | <kbd>list</kbd> | <kbd>record</kbd>
 
         </code>
         <p>Types are the usual set-theoretic types with tuple (product), arrow and record
