@@ -1,8 +1,8 @@
 #value_restriction = false
 
-type _coerce_('other, 'converted_other, 'converted_self) = {
+type _coerce_('other, 'converted_other) = {
   _name : ~(enum) ;
-  coerce: 'other -> ('converted_other , 'converted_self)
+  coerce: 'other -> 'converted_other
 ..}
 
 type rational = {
@@ -18,14 +18,14 @@ and complex = {
   coerce: any -> (complex , complex);
   plus:
      (rational -> complex)
-   & (_coerce_(complex, int, bool) -> any)
+   & (_coerce_(complex, int) -> any)
 }
 
-val magic : empty
+val f : any -> empty
 
 val a_rational : rational
 let a_rational =
-  { _name = (Dummy :> ~(Rational)); 
-    plus = (fun x -> magic) ; 
-    coerce =  (fun x -> magic)
+  { _name = Dummy ; 
+    plus = f ; 
+    coerce =  f
   }
