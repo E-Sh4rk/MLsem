@@ -255,6 +255,10 @@ let eval (e:expr) =
   | (:"const", x) -> x
   end
 
+type obj = { kind:enum }
+val obj : obj
+let obj = { kind=Book }
+
 let rec_and_imp arr k i n =
   if k < n do arr[k]<- (i+k) ; rec_and_imp arr (k+1) i n end
 

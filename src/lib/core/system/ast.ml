@@ -226,16 +226,17 @@ let coerce c ty (id,t) =
     | Let (tys, v, e1, e2) -> Let (tys, v, e1, aux ty e2)
     | Ite (e, tau, e1, e2) -> Ite (e, tau, aux ty e1, aux ty e2)
     | Projection (p, e) -> Projection (p, aux (GTy.map (domain_of_proj p) ty) e)
-    | Constructor (c, es) ->
+    | Constructor (cons, es) ->
       let domains_of_construct ty =
-        match domains_of_construct c ty with
+        match domains_of_construct cons ty with
         | [doms] -> doms
         | _ -> raise Exit
       in
       let tys_lb = domains_of_construct (GTy.lb ty) in
       let tys_ub = domains_of_construct (GTy.ub ty) in
       let tys = List.map2 GTy.mk_gradual tys_lb tys_ub in
-      Constructor (c, List.map2 aux tys es)
+      let e = Eid.refresh id, Constructor (cons, List.map2 aux tys es) in
+      TypeCoerce (e, ty, c)
     | Lambda (da,v,e) ->
       let d = GTy.map Arrow.domain ty in
       let cd = GTy.map2 Arrow.apply ty d in
