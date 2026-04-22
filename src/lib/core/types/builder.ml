@@ -39,6 +39,7 @@ module TyExpr = struct
         | TWhere of 'ext t * (string * string list * 'ext t) list
         (* Type operators (may inspect their parameters!) *)
         | TRecUpd of 'ext t * (string * 'ext t) list
+        | TRecProj of 'ext t * string
         (* Custom extensions *)
         | TExt of 'ext
 end
@@ -283,6 +284,13 @@ module Builder' = struct
                                 ) bindings' bindings in
                             bindings', tl'
                         ) |> Record.of_dnf'
+                    | TRecProj (t, lbl) ->
+                        let t = aux lcl t in
+                        if Ty.leq t Record.any |> not then
+                            raise (TypeDefinitionError "Record projection applied on a non-record type.") ;
+                        if TVOp.top_vars t |> MVarSet.proj1 |> TVarSet.is_empty |> not then
+                            raise (TypeDefinitionError "Record projection applied on a type variable.") ;
+                        Record.proj t lbl
                     | TExt ext -> E.to_typ (aux lcl) ext
                 and aux_field lcl t =
                     let open TyExpr in

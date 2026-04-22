@@ -37,6 +37,7 @@ module TyExpr : sig
         | TWhere of 'ext t * (string * string list * 'ext t) list
         (* Type operators (may inspect their parameters!) *)
         | TRecUpd of 'ext t * (string * 'ext t) list
+        | TRecProj of 'ext t * string
         (* Custom extensions *)
         | TExt of 'ext
 end

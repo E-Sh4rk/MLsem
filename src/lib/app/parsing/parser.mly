@@ -347,6 +347,7 @@ simple_typ:
 | lhs=simple_typ OR rhs=simple_typ  { TCup (lhs, rhs) }
 | lhs=simple_typ AND rhs=simple_typ { TCap (lhs, rhs) }
 | lhs=simple_typ DIFF rhs=simple_typ  { TDiff (lhs, rhs) }
+| r=atomic_typ POINT id=ID  { TRecProj (r, id) }
 
 atomic_typ:
   x=type_constant { TBase x }

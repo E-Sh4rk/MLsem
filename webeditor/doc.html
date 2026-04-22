@@ -148,7 +148,6 @@
         | <var>t</var> <kbd>::</kbd> <var>t</var>
         | <kbd>[</kbd> <var>tregex</var> <kbd>]</kbd>
         | <kbd>{</kbd> <var>id</var> <kbd>:</kbd> <var>t</var> [<kbd>?</kbd>] <kbd>;</kbd>...<kbd>;</kbd> <var>id</var> <kbd>:</kbd> <var>t</var> [<kbd>?</kbd>] [<kbd>..</kbd>]<kbd>}</kbd>
-        | <kbd>{</kbd> <var>t</var> <kbd>with</kbd> <var>id</var> <kbd>:</kbd> <var>t</var> [<kbd>?</kbd>] <kbd>;</kbd>...<kbd>;</kbd> <var>id</var> <kbd>:</kbd> <var>t</var> [<kbd>?</kbd>] <kbd>}</kbd>
         | <var>t</var> <kbd>|</kbd> <var>t</var>
         | <var>t</var> <kbd>&</kbd> <var>t</var>
         | <var>t</var> <kbd>\</kbd> <var>t</var>
@@ -183,6 +182,17 @@
             Basic types consists of <a href="#literals">literals</a> (which denote their own singleton type),
             augmented with integer interval types, and set of builtin type identifiers.
         </p>
+        <p>Some meta type operators (given below) can be used inside type expressions,
+            even though they are not type constructors. To be computed, these type operators must inspect
+            the top-level structure of the type on which they are applied:
+            when defining recursive types, one must be careful not to use these operators
+            on a type whose top-level structure is not fully determined yet.
+        </p>
+    <code>
+    <var>t</var> ::= ...
+        | <kbd>{</kbd> <var>t</var> <kbd>with</kbd> <var>id</var> <kbd>:</kbd> <var>t</var> [<kbd>?</kbd>] <kbd>;</kbd>...<kbd>;</kbd> <var>id</var> <kbd>:</kbd> <var>t</var> [<kbd>?</kbd>] <kbd>}</kbd>
+        | <var>t</var><kbd>.</kbd><var>id</var>
+    </code>
     <h2>Expressions</h2>
     <code>
         <var>e</var> ::= <var>lit</var>
@@ -198,7 +208,7 @@
             | <kbd>let</kbd> <kbd>mut</kbd> <var>id</var> [<kbd>:</kbd> <var>t</var>] <kbd>=</kbd> <var>e</var> <kbd>in</kbd> <var>e</var>
             | <kbd>let (</kbd><var>pat</var><kbd>) =</kbd> <var>e</var> <kbd>in</kbd> <var>e</var>
             | <kbd>if</kbd> <var>e</var> [<kbd>is</kbd> <var>t</var>] <kbd>then</kbd> <var>e</var> <kbd>else</kbd> <var>e</var>
-            | <kbd>fst</kbd> <var>e</var> | <kbd>snd</kbd> <var>e</var> | <kbd>hd</kbd> <var>e</var> | <kbd>tl</kbd> <var>e</var>
+            | <kbd>fst</kbd> <var>e</var> | <kbd>snd</kbd> <var>e</var> | <var>e</var><kbd>.</kbd><var>id</var> | <kbd>hd</kbd> <var>e</var> | <kbd>tl</kbd> <var>e</var>
             | <kbd>match</kbd> <var>e</var> <kbd>with</kbd> [<kbd>|</kbd>] <var>pat</var> <kbd>-></kbd> <var>e</var> <kbd>|</kbd> ... <kbd>|</kbd> <var>pat</var> <kbd>-></kbd> <var>e</var> <kbd>end</kbd>
             | <var>e</var> <kbd>;</kbd> <var>e</var>
             | <var>id</var> <kbd>:=</kbd> <var>e</var>
@@ -235,7 +245,7 @@
             <li>local let binding (defined using either a variable or a <a href="#pattern">pattern</a>)</li>
             <li>a type case. In the tested type, all occurrences of the arrow constructor are of the form <tt>empty->any</tt>.
             If the tested type is missing, it is synonymous for <tt><kbd>is</kbd> <kbd>true</kbd></tt></li>
-            <li>first and second projections for pairs</li>
+            <li>first and second projections for pairs, projections for records, head and tail projections for lists</li>
             <li>a pattern matching construct.
             <a href="#patterns">Patterns</a> follow a first match policy.</li>
             <li>a sequence</li>
