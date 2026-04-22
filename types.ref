@@ -153,7 +153,7 @@ File "tests/2_dyn.ml", line 20, characters 20-21
 expected: bool | 'a
 given: int | 'a
 test_sig: ∀'a. bool | 'a -> int | 'a -> (bool | 'a, int | 'a)
-test_sig_overloaded: (bool -> bool) & (int -> int)
+test_sig_overloaded: (int -> int) & (bool -> bool)
 test_annot: ∀'a. bool | 'a -> int | 'a -> (bool | 'a, int | 'a)
 proj_a: ∀'a. A('a) -> 'a
 proj_ab: ∀'a,'b. (A('a) -> 'a) & (B('b) -> 'b)
@@ -171,7 +171,7 @@ is_ref: (ref -> true) & (~ref -> false)
 is_not_ref: (~ref -> true) & (ref -> false)
 test_dict: ∀'a,'b. false | "key" | 'a -> (dict(false | "key" | 'a, 0 | 42 | 'b), 0 |
 42 | 'b)
-filter_arr: ∀'a,'b,'c. ('b -> ~true) & ('a -> any) -> array('b | 'a) -> array('a \ 'b |
+filter_arr: ∀'a,'b,'c. ('a -> any) & ('b -> ~true) -> array('b | 'a) -> array('a \ 'b |
 'c)
 test_arr: ∀'a,'b. bool | 'a -> array('a & int | 'b)
 test_double_array: 42
@@ -187,7 +187,7 @@ identity_js: ∀'a. 'a -> 'a
 and_pair: ∀'a,'b. ('b & falsy -> 'a -> 'b & falsy) & ('b & int & ~0 -> 'a -> ('a,
 int))
 test_pair: (int \ 0, any) | (int, int) -> int
-ifthenelse: ∀'a,'b. (tt('a, 'b) -> tt('a, 'b)) & (ff('a, 'b) -> ff('a, 'b))
+ifthenelse: ∀'a,'b. (ff('a, 'b) -> ff('a, 'b)) & (tt('a, 'b) -> tt('a, 'b))
 test1_patterns: ∀'a. ('a, any) -> 'a
 test2_patterns: ∀'a,'b. ('b, 'a) -> ('b, 'a)
 test3_patterns: ∀'a,'b. 'b -> 'a -> ('a, 'b)
@@ -197,13 +197,13 @@ map_noannot: ∀'a,'b. (('a -> 'b) -> ([ 'a+ ] -> [ 'b+ ]) & ([ 'a ] -> [ 'b ]) 
 [  ])) & (any -> [  ] -> [  ])
 foo: any -> empty
 bar: any -> empty
-filter: ∀'a,'b. ('b -> ~true) & ('a -> any) -> [ ('b | 'a)* ] -> [ ('a \ 'b)* ]
-filter2: ∀'a,'b. ('b -> ~true) & ('a -> any) -> [ ('b | 'a)* ] -> [ ('a \ 'b)* ]
+filter: ∀'a,'b. ('a -> any) & ('b -> ~true) -> [ ('b | 'a)* ] -> [ ('a \ 'b)* ]
+filter2: ∀'a,'b. ('a -> any) & ('b -> ~true) -> [ ('b | 'a)* ] -> [ ('a \ 'b)* ]
 filter_noannot: ∀'a. (('a -> any) -> ([ 'a ] -> [ 'a? ]) & ([ 'a+ ] -> [ 'a* ]) & ([  ] ->
 [  ])) & (('a -> true) -> ([ 'a+ ] -> [ 'a+ ]) & ([  ] -> [  ])) & (('a ->
 ~true) -> [ 'a* ] -> [  ]) & (any -> [  ] -> [  ])
-filtermap: ∀'a,'b. (('b -> false | (true, 'a), [ 'b* ]) -> [ 'a* ]) & (('b -> bool |
-(true, 'a), [ 'b* ]) -> [ ('b | 'a)* ])
+filtermap: ∀'a,'b. (('b -> bool | (true, 'a), [ 'b* ]) -> [ ('b | 'a)* ]) & (('b ->
+false | (true, 'a), [ 'b* ]) -> [ 'a* ])
 member: ∀'a. (('a, [ (~'a)+ ]) | (any, [  ]) -> false) & ((any, [ any+ ]) -> bool)
 call_f: ∀'a. objF('a) -> () | 'a
 deep_flatten: ∀'a. tree('a) -> [ ('a \ [ any* ])* ]
@@ -255,7 +255,7 @@ File "tests/2_dyn.ml", line 415, characters 4-14
 function: (ref('I2808), 'I2808) -> ()
 argument: ref(int), false
 loop_valid: ∀'a. (false | 'a -> false | 'a) & ('a \ int -> 'a)
-filter_imp: ∀'a,'b,'c. ('b -> false) & ('a -> bool) -> array('b | 'a) -> array('a \ 'b
+filter_imp: ∀'a,'b,'c. ('a -> bool) & ('b -> false) -> array('b | 'a) -> array('a \ 'b
 | 'c)
 filter_imp_test: array(13 | 42 | "abc")
 test_alt: (Nil -> Nil) & (() -> ()) & (char -> char) & (string -> string) & (bool ->
