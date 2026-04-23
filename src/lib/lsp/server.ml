@@ -34,10 +34,13 @@ end
 (* LSP transport handles Content-Length framing and packet encoding/decoding. *)
 module Transport = Lsp.Io.Make (Sync_io) (Chan)
 
-(* Log every packet as pretty JSON for debugging. *)
+(* Log every packet as pretty JSON. Gated by the [mlsem.server.packets] source
+   (MLSEM_LOG_PACKETS=1); when the source is silent, the thunk never runs and
+   the JSON is never built. *)
 let log_packet ~dir (packet : Packet.t) =
-  let json = packet |> Packet.yojson_of_t |> Yojson.Safe.pretty_to_string in
-  prerr_endline (Printf.sprintf "[%s] %s" dir json)
+  Log.Packet.debug (fun m ->
+      m "[%s] %s" dir
+        (packet |> Packet.yojson_of_t |> Yojson.Safe.pretty_to_string))
 
 let send packet =
   log_packet ~dir:"out" packet;
@@ -67,8 +70,8 @@ let method_not_found id =
 let handle_request ~running (req : Jsonrpc.Request.t) =
   match Lsp.Client_request.of_jsonrpc req with
   | Error err ->
-      prerr_endline ("[warn] request decode error: " ^ err);
-      send (method_not_found req.id);
+      Log.Server.warn (fun m -> m "request decode error: %s" err) ;
+      send (method_not_found req.id) ;
       running
   | Ok (Lsp.Client_request.E typed_req) ->
       (match typed_req with
@@ -89,7 +92,7 @@ let handle_request ~running (req : Jsonrpc.Request.t) =
 let handle_notification ~running (notif : Jsonrpc.Notification.t) =
   match Lsp.Client_notification.of_jsonrpc notif with
   | Error err ->
-      prerr_endline ("[warn] notification decode error: " ^ err);
+      Log.Server.warn (fun m -> m "notification decode error: %s" err) ;
       running
   | Ok Lsp.Client_notification.Exit ->
       if running then exit 1 else exit 0
@@ -121,4 +124,6 @@ let rec loop ~running =
       in
       loop ~running
 
-let run () = loop ~running:true
+let run () =
+  Log.setup () ;
+  loop ~running:true
