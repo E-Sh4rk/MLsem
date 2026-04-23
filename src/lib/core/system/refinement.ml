@@ -27,6 +27,7 @@ end
 let rec typeof env (_,e) =
   match e with
   | TypeCoerce (_, ty, _) -> ty
+  | Value gty -> gty
   (* The cases below are necessary because of pattern matching encoding *)
   | Var v when Env.mem v env -> Env.find v env |> TyScheme.get_fresh |> snd
   | Projection (p, e) -> GTy.map (Ast.proj p) (typeof env e )
@@ -99,7 +100,11 @@ let refine env e t =
   let rec aux renv renvs =
     let renvs = renvs |> List.map (fun renv' ->
       renv' |> REnv.filter (fun v ty ->
-        let ty' = Env.find v env |> TyScheme.get_fresh |> snd |> GTy.ub in
+        let ty' =
+          if Env.mem v env
+          then Env.find v env |> TyScheme.get_fresh |> snd |> GTy.ub
+          else Ty.any
+        in
         let ty'' = REnv.find' v renv in
         Ty.leq (Ty.cap ty' ty'') ty |> not
       )
@@ -121,18 +126,19 @@ let refinements
   let add_anonymous_refinement env e t =
     res := Refinements.add_anonymous !res (refine env e t)
   in
-  let rec aux_lambda env (d,v,e) =
-    let t = TyScheme.mk_mono d in
-    aux (Env.add v t env) e
-  and aux env (id,e) : unit =
+  let rec aux env (id,e) : unit =
     let extra = Hashtbl.find_all extra id in
     extra |> List.iter (fun ty -> add_anonymous_refinement env (id,e) ty) ;
     match e with
     | Value _ | Var _ -> ()
     | Constructor (_, es) -> es |> List.iter (aux env)
     | Projection (_, e) | TypeCoerce (e, _, _) | Operation (_, e) -> aux env e
-    | Lambda (d, v, e) -> aux_lambda env (d,v,e)
-    | LambdaRec lst -> lst |> List.iter (aux_lambda env)
+    | Lambda (d, v, e) -> aux (Env.add v (TyScheme.mk_mono d) env) e
+    | LambdaRec lst ->
+      let env = List.fold_left (fun env (ty,v,_) ->
+        Env.add v (TyScheme.mk_mono ty) env
+      ) env lst in
+      lst |> List.map (fun (_,_,e) -> e) |> List.iter (aux env)
     | TypeCast (e, tau, _) ->
       if refine_on_casts then add_anonymous_refinement env e (GTy.ub tau) ;
       aux env e
