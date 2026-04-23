@@ -18,16 +18,13 @@ module Chan = struct
   type input = in_channel
   type output = out_channel
 
-  let read_line ic =
-    try Some (input_line ic) with
-    | End_of_file -> None
+  let read_line ic = try Some (input_line ic) with End_of_file -> None
 
   let read_exactly ic len =
-    try Some (really_input_string ic len) with
-    | End_of_file -> None
+    try Some (really_input_string ic len) with End_of_file -> None
 
   let write oc chunks =
-    List.iter (output_string oc) chunks;
+    List.iter (output_string oc) chunks ;
     flush oc
 end
 
@@ -43,7 +40,7 @@ let log_packet ~dir (packet : Packet.t) =
         (packet |> Packet.yojson_of_t |> Yojson.Safe.pretty_to_string))
 
 let send packet =
-  log_packet ~dir:"out" packet;
+  log_packet ~dir:"out" packet ;
   Transport.write stdout packet
 
 (* Minimal initialize reply so editors can complete startup handshake. *)
@@ -51,18 +48,15 @@ let initialize_result_json () =
   let open Lsp.Types in
   let capabilities =
     ServerCapabilities.create
-      ~textDocumentSync:(`TextDocumentSyncKind TextDocumentSyncKind.Full)
-      ()
+      ~textDocumentSync:(`TextDocumentSyncKind TextDocumentSyncKind.Full) ()
   in
   let result = InitializeResult.create ~capabilities () in
   InitializeResult.yojson_of_t result
 
 let method_not_found id =
   let err =
-    Response.Error.make
-      ~code:Response.Error.Code.MethodNotFound
-      ~message:"Method not found"
-      ()
+    Response.Error.make ~code:Response.Error.Code.MethodNotFound
+      ~message:"Method not found" ()
   in
   Packet.Response (Response.error id err)
 
@@ -73,19 +67,20 @@ let handle_request ~running (req : Jsonrpc.Request.t) =
       Log.Server.warn (fun m -> m "request decode error: %s" err) ;
       send (method_not_found req.id) ;
       running
-  | Ok (Lsp.Client_request.E typed_req) ->
-      (match typed_req with
+  | Ok (Lsp.Client_request.E typed_req) -> (
+      match typed_req with
       | Lsp.Client_request.Initialize _ ->
-          send (Packet.Response (Response.ok req.id (initialize_result_json ())));
+          send
+            (Packet.Response (Response.ok req.id (initialize_result_json ()))) ;
           running
       | Lsp.Client_request.Shutdown ->
-          send (Packet.Response (Response.ok req.id `Null));
+          send (Packet.Response (Response.ok req.id `Null)) ;
           false
       | Lsp.Client_request.UnknownRequest _ ->
-          send (method_not_found req.id);
+          send (method_not_found req.id) ;
           running
       | _ ->
-          send (method_not_found req.id);
+          send (method_not_found req.id) ;
           running)
 
 (* Handle client notifications via typed LSP decoding. *)
@@ -94,17 +89,16 @@ let handle_notification ~running (notif : Jsonrpc.Notification.t) =
   | Error err ->
       Log.Server.warn (fun m -> m "notification decode error: %s" err) ;
       running
-  | Ok Lsp.Client_notification.Exit ->
-      if running then exit 1 else exit 0
+  | Ok Lsp.Client_notification.Exit -> if running then exit 1 else exit 0
   | Ok _ -> running
 
 (* Batch calls can mix requests and notifications. *)
 let rec handle_batch ~running = function
   | [] -> running
-  | (`Notification notif) :: rest ->
+  | `Notification notif :: rest ->
       let running = handle_notification ~running notif in
       handle_batch ~running rest
-  | (`Request req) :: rest ->
+  | `Request req :: rest ->
       let running = handle_request ~running req in
       handle_batch ~running rest
 
@@ -113,7 +107,7 @@ let rec loop ~running =
   match Transport.read stdin with
   | None -> ()
   | Some packet ->
-      log_packet ~dir:"in" packet;
+      log_packet ~dir:"in" packet ;
       let running =
         match packet with
         | Packet.Request req -> handle_request ~running req
