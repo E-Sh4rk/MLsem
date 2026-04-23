@@ -61,63 +61,65 @@ let method_not_found id =
   Packet.Response (Response.error id err)
 
 (* Handle client requests via typed LSP decoding. *)
-let handle_request ~running (req : Jsonrpc.Request.t) =
+let handle_request ~shutdown_received (req : Jsonrpc.Request.t) =
   match Lsp.Client_request.of_jsonrpc req with
   | Error err ->
       Log.Server.warn (fun m -> m "request decode error: %s" err) ;
       send (method_not_found req.id) ;
-      running
+      shutdown_received
   | Ok (Lsp.Client_request.E typed_req) -> (
       match typed_req with
       | Lsp.Client_request.Initialize _ ->
           send
             (Packet.Response (Response.ok req.id (initialize_result_json ()))) ;
-          running
+          shutdown_received
       | Lsp.Client_request.Shutdown ->
           send (Packet.Response (Response.ok req.id `Null)) ;
-          false
+          true
       | Lsp.Client_request.UnknownRequest _ ->
           send (method_not_found req.id) ;
-          running
+          shutdown_received
       | _ ->
           send (method_not_found req.id) ;
-          running)
+          shutdown_received)
 
 (* Handle client notifications via typed LSP decoding. *)
-let handle_notification ~running (notif : Jsonrpc.Notification.t) =
+let handle_notification ~shutdown_received (notif : Jsonrpc.Notification.t) =
   match Lsp.Client_notification.of_jsonrpc notif with
   | Error err ->
       Log.Server.warn (fun m -> m "notification decode error: %s" err) ;
-      running
-  | Ok Lsp.Client_notification.Exit -> if running then exit 1 else exit 0
-  | Ok _ -> running
+      shutdown_received
+  | Ok Lsp.Client_notification.Exit ->
+      if shutdown_received then exit 0 else exit 1
+  | Ok _ -> shutdown_received
 
 (* Batch calls can mix requests and notifications. *)
-let rec handle_batch ~running = function
-  | [] -> running
+let rec handle_batch ~shutdown_received = function
+  | [] -> shutdown_received
   | `Notification notif :: rest ->
-      let running = handle_notification ~running notif in
-      handle_batch ~running rest
+      let shutdown_received = handle_notification ~shutdown_received notif in
+      handle_batch ~shutdown_received rest
   | `Request req :: rest ->
-      let running = handle_request ~running req in
-      handle_batch ~running rest
+      let shutdown_received = handle_request ~shutdown_received req in
+      handle_batch ~shutdown_received rest
 
 (* Main server loop: read packet, log it, dispatch, repeat. *)
-let rec loop ~running =
+let rec loop ~shutdown_received =
   match Transport.read stdin with
   | None -> ()
   | Some packet ->
       log_packet ~dir:"in" packet ;
-      let running =
+      let shutdown_received =
         match packet with
-        | Packet.Request req -> handle_request ~running req
-        | Packet.Notification notif -> handle_notification ~running notif
-        | Packet.Batch_call calls -> handle_batch ~running calls
-        | Packet.Response _ -> running
-        | Packet.Batch_response _ -> running
+        | Packet.Request req -> handle_request ~shutdown_received req
+        | Packet.Notification notif ->
+            handle_notification ~shutdown_received notif
+        | Packet.Batch_call calls -> handle_batch ~shutdown_received calls
+        | Packet.Response _ -> shutdown_received
+        | Packet.Batch_response _ -> shutdown_received
       in
-      loop ~running
+      loop ~shutdown_received
 
 let run () =
   Log.setup () ;
-  loop ~running:true
+  loop ~shutdown_received:false
