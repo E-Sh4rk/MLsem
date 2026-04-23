@@ -31,6 +31,10 @@ end
 (* LSP transport handles Content-Length framing and packet encoding/decoding. *)
 module Transport = Lsp.Io.Make (Sync_io) (Chan)
 
+(* Raised to unwind the server loop with a specific process exit code.
+   Lets [run] own cleanup instead of scattering [exit] calls through the loop. *)
+exception Exit_requested of int
+
 (* Log every packet as pretty JSON. Gated by the [mlsem.server.packets] source
    (MLSEM_LOG_PACKETS=1); when the source is silent, the thunk never runs and
    the JSON is never built. *)
@@ -90,7 +94,10 @@ let handle_notification ~shutdown_received (notif : Jsonrpc.Notification.t) =
       Log.Server.warn (fun m -> m "notification decode error: %s" err) ;
       shutdown_received
   | Ok Lsp.Client_notification.Exit ->
-      if shutdown_received then exit 0 else exit 1
+      if shutdown_received then raise (Exit_requested 0)
+      else (
+        Log.Server.warn (fun m -> m "exit without prior Shutdown") ;
+        raise (Exit_requested 1))
   | Ok _ -> shutdown_received
 
 (* Batch calls can mix requests and notifications. *)
@@ -106,7 +113,11 @@ let rec handle_batch ~shutdown_received = function
 (* Main server loop: read packet, log it, dispatch, repeat. *)
 let rec loop ~shutdown_received =
   match Transport.read stdin with
-  | None -> ()
+  | None ->
+      if shutdown_received then raise (Exit_requested 0)
+      else (
+        Log.Server.err (fun m -> m "stdin closed without prior Shutdown") ;
+        raise (Exit_requested 1))
   | Some packet ->
       log_packet ~dir:"in" packet ;
       let shutdown_received =
@@ -122,4 +133,4 @@ let rec loop ~shutdown_received =
 
 let run () =
   Log.setup () ;
-  loop ~shutdown_received:false
+  try loop ~shutdown_received:false with Exit_requested code -> exit code
