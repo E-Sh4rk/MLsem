@@ -98,6 +98,9 @@ let handle_notification ~shutdown_received (notif : Jsonrpc.Notification.t) =
       else (
         Log.Server.warn (fun m -> m "exit without prior Shutdown") ;
         raise (Exit_requested 1))
+  | Ok (Lsp.Client_notification.CancelRequest _id) ->
+      Log.Server.info (fun m -> m "$/cancelRequest is not supported, dropping") ;
+      shutdown_received
   | Ok _ -> shutdown_received
 
 (* Batch calls can mix requests and notifications. *)
