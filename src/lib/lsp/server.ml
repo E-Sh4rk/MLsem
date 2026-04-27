@@ -18,10 +18,13 @@ module Chan = struct
   type input = in_channel
   type output = out_channel
 
-  let read_line ic = try Some (input_line ic) with End_of_file -> None
+  let read_line ic =
+    try Some (input_line ic) with
+    | End_of_file -> None
 
   let read_exactly ic len =
-    try Some (really_input_string ic len) with End_of_file -> None
+    try Some (really_input_string ic len) with
+    | End_of_file -> None
 
   let write oc chunks =
     List.iter (output_string oc) chunks ;
@@ -40,24 +43,18 @@ exception Exit_requested of int
    the JSON is never built. *)
 let log_packet ~dir (packet : Packet.t) =
   Log.Packet.debug (fun m ->
-      m "[%s] %s" dir
-        (packet |> Packet.yojson_of_t |> Yojson.Safe.pretty_to_string))
+    m "[%s] %s" dir (packet |> Packet.yojson_of_t |> Yojson.Safe.pretty_to_string) )
 
-let send packet =
-  log_packet ~dir:"out" packet ;
-  Transport.write stdout packet
+let send packet = log_packet ~dir:"out" packet ; Transport.write stdout packet
 
-let send_notification n =
-  send (Packet.Notification (Lsp.Server_notification.to_jsonrpc n))
+let send_notification n = send (Packet.Notification (Lsp.Server_notification.to_jsonrpc n))
 
 (* Advertise full-sync text, save notifications (with text), and CodeLens. *)
 let initialize_result_json () =
   let open Lsp.Types in
   let sync =
     (* TODO *)
-    TextDocumentSyncOptions.create
-      ~change:TextDocumentSyncKind.Full
-      ~openClose:true
+    TextDocumentSyncOptions.create ~change:TextDocumentSyncKind.Full ~openClose:true
       ~save:(`SaveOptions (SaveOptions.create ~includeText:true ()))
       ()
   in
@@ -71,8 +68,7 @@ let initialize_result_json () =
 
 let method_not_found id =
   let err =
-    Response.Error.make ~code:Response.Error.Code.MethodNotFound
-      ~message:"Method not found" ()
+    Response.Error.make ~code:Response.Error.Code.MethodNotFound ~message:"Method not found" ()
   in
   Packet.Response (Response.error id err)
 
@@ -89,8 +85,7 @@ let typecheck_and_publish uri text =
     let result = Typecheck.run text in
     Store.set uri ~text ~result ;
     let params =
-      Lsp.Types.PublishDiagnosticsParams.create ~uri
-        ~diagnostics:result.diagnostics ()
+      Lsp.Types.PublishDiagnosticsParams.create ~uri ~diagnostics:result.diagnostics ()
     in
     send_notification (Lsp.Server_notification.PublishDiagnostics params)
 
@@ -104,8 +99,7 @@ let handle_request ~shutdown_received (req : Jsonrpc.Request.t) =
   | Ok (Lsp.Client_request.E typed_req) -> (
       match typed_req with
       | Lsp.Client_request.Initialize _ ->
-          send
-            (Packet.Response (Response.ok req.id (initialize_result_json ()))) ;
+          send (Packet.Response (Response.ok req.id (initialize_result_json ()))) ;
           shutdown_received
       | Lsp.Client_request.Shutdown ->
           send (Packet.Response (Response.ok req.id `Null)) ;
@@ -121,7 +115,7 @@ let handle_request ~shutdown_received (req : Jsonrpc.Request.t) =
           shutdown_received
       | _ ->
           send (method_not_found req.id) ;
-          shutdown_received)
+          shutdown_received )
 
 (* Handle client notifications via typed LSP decoding. *)
 let handle_notification ~shutdown_received (notif : Jsonrpc.Notification.t) =
@@ -130,20 +124,20 @@ let handle_notification ~shutdown_received (notif : Jsonrpc.Notification.t) =
       Log.Server.warn (fun m -> m "notification decode error: %s" err) ;
       shutdown_received
   | Ok Lsp.Client_notification.Exit ->
-      if shutdown_received then raise (Exit_requested 0)
+      if shutdown_received then
+        raise (Exit_requested 0)
       else (
         Log.Server.warn (fun m -> m "exit without prior Shutdown") ;
-        raise (Exit_requested 1))
+        raise (Exit_requested 1) )
   | Ok (Lsp.Client_notification.CancelRequest _id) ->
       Log.Server.info (fun m -> m "$/cancelRequest is not supported, dropping") ;
       shutdown_received
   | Ok (Lsp.Client_notification.DidSaveTextDocument params) ->
       let uri = params.textDocument.uri in
-      (match params.text with
+      ( match params.text with
       | Some text -> typecheck_and_publish uri text
       | None ->
-          Log.Server.warn (fun m ->
-              m "didSave without text despite includeText:true; skipping")) ;
+          Log.Server.warn (fun m -> m "didSave without text despite includeText:true; skipping") ) ;
       shutdown_received
   | Ok (Lsp.Client_notification.TextDocumentDidClose params) ->
       Store.remove params.textDocument.uri ;
@@ -168,17 +162,17 @@ let rec handle_batch ~shutdown_received = function
 let rec loop ~shutdown_received =
   match Transport.read stdin with
   | None ->
-      if shutdown_received then raise (Exit_requested 0)
+      if shutdown_received then
+        raise (Exit_requested 0)
       else (
         Log.Server.err (fun m -> m "stdin closed without prior Shutdown") ;
-        raise (Exit_requested 1))
+        raise (Exit_requested 1) )
   | Some packet ->
       log_packet ~dir:"in" packet ;
       let shutdown_received =
         match packet with
         | Packet.Request req -> handle_request ~shutdown_received req
-        | Packet.Notification notif ->
-            handle_notification ~shutdown_received notif
+        | Packet.Notification notif -> handle_notification ~shutdown_received notif
         | Packet.Batch_call calls -> handle_batch ~shutdown_received calls
         | Packet.Response _ -> shutdown_received
         | Packet.Batch_response _ -> shutdown_received
@@ -187,4 +181,5 @@ let rec loop ~shutdown_received =
 
 let run () =
   Log.setup () ;
-  try loop ~shutdown_received:false with Exit_requested code -> exit code
+  try loop ~shutdown_received:false with
+  | Exit_requested code -> exit code
