@@ -47,12 +47,24 @@ let send packet =
   log_packet ~dir:"out" packet ;
   Transport.write stdout packet
 
-(* Minimal initialize reply so editors can complete startup handshake. *)
+let send_notification n =
+  send (Packet.Notification (Lsp.Server_notification.to_jsonrpc n))
+
+(* Advertise full-sync text, save notifications (with text), and CodeLens. *)
 let initialize_result_json () =
   let open Lsp.Types in
+  let sync =
+    (* TODO *)
+    TextDocumentSyncOptions.create
+      ~change:TextDocumentSyncKind.Full
+      ~openClose:true
+      ~save:(`SaveOptions (SaveOptions.create ~includeText:true ()))
+      ()
+  in
   let capabilities =
     ServerCapabilities.create
-      ~textDocumentSync:(`TextDocumentSyncKind TextDocumentSyncKind.Full) ()
+      ~codeLensProvider:(CodeLensOptions.create ~resolveProvider:false ())
+      ~textDocumentSync:(`TextDocumentSyncOptions sync) ()
   in
   let result = InitializeResult.create ~capabilities () in
   InitializeResult.yojson_of_t result
@@ -63,6 +75,24 @@ let method_not_found id =
       ~message:"Method not found" ()
   in
   Packet.Response (Response.error id err)
+
+(* Run the typechecker against the current document text, cache the result,
+   and emit diagnostics. Called on didOpen and didSave.
+
+   Skips the run (and the diagnostic re-publish, which the client already
+   has) when [text] matches what was last typechecked — VS Code fires
+   didSave on every Ctrl+S, including saves of unchanged buffers. *)
+let typecheck_and_publish uri text =
+  if Store.is_cached uri text then
+    Log.Server.debug (fun m -> m "skipping typecheck: content unchanged")
+  else
+    let result = Typecheck.run text in
+    Store.set uri ~text ~result ;
+    let params =
+      Lsp.Types.PublishDiagnosticsParams.create ~uri
+        ~diagnostics:result.diagnostics ()
+    in
+    send_notification (Lsp.Server_notification.PublishDiagnostics params)
 
 (* Handle client requests via typed LSP decoding. *)
 let handle_request ~shutdown_received (req : Jsonrpc.Request.t) =
@@ -80,6 +110,12 @@ let handle_request ~shutdown_received (req : Jsonrpc.Request.t) =
       | Lsp.Client_request.Shutdown ->
           send (Packet.Response (Response.ok req.id `Null)) ;
           true
+      | Lsp.Client_request.TextDocumentCodeLens params ->
+          let uri = params.textDocument.uri in
+          let lenses = (Store.result uri).code_lenses in
+          let json = Lsp.Client_request.yojson_of_result typed_req lenses in
+          send (Packet.Response (Response.ok req.id json)) ;
+          shutdown_received
       | Lsp.Client_request.UnknownRequest _ ->
           send (method_not_found req.id) ;
           shutdown_received
@@ -100,6 +136,21 @@ let handle_notification ~shutdown_received (notif : Jsonrpc.Notification.t) =
         raise (Exit_requested 1))
   | Ok (Lsp.Client_notification.CancelRequest _id) ->
       Log.Server.info (fun m -> m "$/cancelRequest is not supported, dropping") ;
+      shutdown_received
+  | Ok (Lsp.Client_notification.DidSaveTextDocument params) ->
+      let uri = params.textDocument.uri in
+      (match params.text with
+      | Some text -> typecheck_and_publish uri text
+      | None ->
+          Log.Server.warn (fun m ->
+              m "didSave without text despite includeText:true; skipping")) ;
+      shutdown_received
+  | Ok (Lsp.Client_notification.TextDocumentDidClose params) ->
+      Store.remove params.textDocument.uri ;
+      shutdown_received
+  | Ok (Lsp.Client_notification.TextDocumentDidOpen params) ->
+      let uri = params.textDocument.uri in
+      typecheck_and_publish uri params.textDocument.text ;
       shutdown_received
   | Ok _ -> shutdown_received
 
