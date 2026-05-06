@@ -10,9 +10,9 @@ let is_type_test_unsat ~tau t =
   if GTy.non_gradual ntau && GTy.non_gradual t
   then Ty.diff (GTy.ub t) (GTy.lb ntau) |> !Config.normalization_fun
   else
-    let norm1 = Ty.diff (GTy.lb t) (GTy.lb ntau) |> !Config.normalization_fun in
-    let norm2 = Ty.diff (GTy.ub t) (GTy.ub ntau) |> !Config.normalization_fun in
-    Ty.cup norm1 norm2
+    let norm1 = Ty.diff (GTy.lb t) (GTy.lb ntau) in
+    let norm2 = Ty.diff (GTy.ub t) (GTy.ub ntau) in
+    Ty.cup norm1 norm2 |> !Config.normalization_fun
 
 (* Expressions *)
 
