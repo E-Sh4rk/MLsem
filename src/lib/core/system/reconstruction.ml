@@ -451,7 +451,6 @@ and refine_ann r cache env (rid, annot) (id, e) =
     assert false
 and refine' cache env annot e =
   let tvars = Env.tvars env in
-  let ic_norefinement ann = IAnnot.I { rid = Rid.dummy ; ann ; refinement=REnv.empty } in
   let subst_disjoint s =
     MVarSet.inter (Subst.domain s) tvars |> MVarSet.is_empty
   in
@@ -469,8 +468,9 @@ and refine' cache env annot e =
       let coverage = res, REnv.substitute s r in
       { IAnnot.coverage=(Some coverage) ; ann }
       ) in
-    let annot = IAnnot.AInter (branches@default) |> ic_norefinement in
-    refine' cache env annot e
+    let ann = IAnnot.AInter (branches@default) in
+    let ann = IAnnot.I { rid = Rid.dummy ; ann ; refinement=REnv.empty } in
+    refine' cache env ann e
   | Subst (ss, a1, a2, r) -> Subst (ss, a1, a2, r)
 and refine_b' cache env (rid, bannot) e s tau =
   let with_no_res ss = ss |> List.map (fun (s,_) -> (s, None)) in
