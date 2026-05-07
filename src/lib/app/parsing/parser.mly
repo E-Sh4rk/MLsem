@@ -1,7 +1,4 @@
-%parameter<M:PAst.ParserExt>
-
 %{
-  open M.E
   open Mlsem_common
   open Mlsem_system.Ast
   open Mlsem_lang.Const
@@ -105,7 +102,6 @@
 %token<Z.t> LINT
 %token<bool> LBOOL
 %token<char> LCHAR
-%token<string> EXT
 %token<string> LSTRING
 %token<string> INFIX PREFIX INDEXED OPID
 
@@ -261,7 +257,6 @@ atomic_term:
 { list_of_elts $startpos $endpos lst }
 | LBRACKET t1=term OR ts=separated_nonempty_list(OR, term) RBRACKET
 { alts $startpos $endpos (t1::ts) }
-| str=EXT { M.parse_expr_ext (Position.lex_join $startpos $endpos) str }
 
 %inline typ_or_dyn:
   ty=typ { Some ty }
@@ -364,7 +359,6 @@ atomic_typ:
 | LBRACE fs=separated_list(SEMICOLON, typ_field) tail=optional_tail RBRACE { TRecord (fs,tail) }
 | LBRACE br=typ WITH fs=separated_list(SEMICOLON, typ_field) RBRACE { TRecUpd (br, fs) }
 | LBRACKET re=typ_re RBRACKET { TSList re }
-| str=EXT { TExt (M.parse_ty_ext str) }
 
 %inline optional_tail:
 | DOUBLESEMICOLON ty=typ { ty }

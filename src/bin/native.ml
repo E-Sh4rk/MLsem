@@ -1,6 +1,6 @@
 open Mlsem_common
 open Mlsem_app
-open Mlsem_app.Main.NoExt
+open Mlsem_app.Main
 open Mlsem_utils
 open Mlsem_types
 
