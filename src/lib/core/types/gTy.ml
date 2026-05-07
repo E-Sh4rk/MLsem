@@ -83,3 +83,27 @@ let mk_gradual lb ub =
   if Ty.leq lb ub |> not
   then raise (Invalid_argument "Upper bound must be larger than lower bound") ;
   mk_gradual lb ub
+
+module Builder = struct
+  let dynvars = ref TVarSet.empty
+  let dyn () =
+    let v = Sstt.Var.mk (Format.asprintf "%a" PrinterCfg.print_dyn ()) in
+    dynvars := TVarSet.add v !dynvars ;
+    Sstt.Ty.mk_var v
+  let dynvars_of_ty ty =
+    Sstt.Ty.vars ty |> TVarSet.inter !dynvars
+  let non_gradual ty =
+    dynvars_of_ty ty |> TVarSet.is_empty
+  let build ty =
+    let tvs = dynvars_of_ty ty in
+    let sub, slb = tvs |> TVarSet.elements |> List.map (fun v ->
+      match TVOp.polarity1 v ty with
+      | `None -> assert false
+      | `Both -> invalid_arg "Dyn occurs in an invariant position."
+      | `Pos -> (v, Ty.any), (v, Ty.empty)
+      | `Neg -> (v, Ty.empty), (v, Ty.any)
+    ) |> List.split in
+    let ub = Subst.apply (Subst.of_list1 sub) ty in
+    let lb = Subst.apply (Subst.of_list1 slb) ty in
+    mk_gradual lb ub
+end
