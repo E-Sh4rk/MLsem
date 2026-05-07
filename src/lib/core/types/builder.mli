@@ -16,6 +16,7 @@ module TyExpr : sig
 
     and t =
         (* Type constructors *)
+        | TDyn
         | TVar of kind * string
         | TRowVar of kind * string
         | TBase of base
@@ -56,6 +57,8 @@ module Builder : sig
 
     val type_expr_to_typ : benv -> TyExpr.t -> Ty.t * benv
     val type_exprs_to_typs : benv -> TyExpr.t list -> Ty.t list * benv
+    val type_expr_to_gty : benv -> TyExpr.t -> GTy.t * benv
+    val type_exprs_to_gtys : benv -> TyExpr.t list -> GTy.t list * benv
 
     val define_abstract : benv -> string -> int -> benv
     val define_aliases : benv -> (string * string list * TyExpr.t) list -> benv

@@ -94,6 +94,10 @@ module Builder = struct
     Sstt.Ty.vars ty |> TVarSet.inter !dynvars
   let non_gradual ty =
     dynvars_of_ty ty |> TVarSet.is_empty
+  let refresh ty =
+    let s = dynvars_of_ty ty |> TVarSet.elements
+    |> List.map (fun v -> v, dyn ()) |> Subst.of_list1 in
+    Subst.apply s ty
   let build ty =
     let tvs = dynvars_of_ty ty in
     let sub, slb = tvs |> TVarSet.elements |> List.map (fun v ->

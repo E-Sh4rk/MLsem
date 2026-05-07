@@ -18,6 +18,7 @@ module TyExpr = struct
 
     and t =
         (* Type constructors *)
+        | TDyn
         | TVar of kind * string
         | TRowVar of kind * string
         | TBase of base
@@ -99,9 +100,11 @@ module Builder = struct
         | Some (ty, ps) when List.length ps = List.length args ->
             let s = List.combine ps args |> Subst.of_list1 in
             let res = Subst.apply s ty in
-            if List.is_empty ps |> not then
-                PEnv.register_parametrized name args res
-            ; Some res
+            if GTy.Builder.non_gradual res then begin
+                if List.is_empty ps |> not then
+                    PEnv.register_parametrized name args res
+                ; Some res
+            end else Some (GTy.Builder.refresh res)
         | Some _ -> None
     let get_abstract_type tenv name otys =
         match StrMap.find_opt name tenv.abs with
@@ -177,6 +180,7 @@ module Builder = struct
             and aux lcl t =
                 let open TyExpr in
                 match t with
+                | TDyn -> GTy.Builder.dyn ()
                 | TVar (kind,v) ->
                     begin match StrMap.find_opt v lcl, Hashtbl.find_opt venv v with
                     | Some n, _ -> n
@@ -295,16 +299,26 @@ module Builder = struct
 
     let type_expr_to_typ env t =
         match derecurse_types env [ ("", [], t) ] with
-        | ([ "", [], t ], env) -> (t, env)
+        | ([ "", [], t ], env) when GTy.Builder.non_gradual t -> (t, env)
+        | ([ "", [], _ ], _) -> raise (TypeDefinitionError "Unexpected dyn type.")
+        | _ -> assert false
+    let type_expr_to_gty env t =
+        match derecurse_types env [ ("", [], t) ] with
+        | ([ "", [], t ], env) ->
+            begin try (GTy.Builder.build t, env) with
+            | Invalid_argument str -> raise (TypeDefinitionError str)
+            end
         | _ -> assert false
 
-    let type_exprs_to_typs env ts =
+    let chain f env ts =
         let env = ref env in
         let ts = List.map (fun t ->
-            let (t, env') = type_expr_to_typ !env t in
+            let (t, env') = f !env t in
             env := env' ; t
         ) ts in
         (ts, !env)
+    let type_exprs_to_typs = chain type_expr_to_typ
+    let type_exprs_to_gtys = chain type_expr_to_gty
 
     let define_aliases env defs =
         let (res, env) = derecurse_types env defs in
