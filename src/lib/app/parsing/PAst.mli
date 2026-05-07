@@ -25,40 +25,40 @@ type ('a, 'typ, 'tag, 'v) pattern =
 | PatRecord of (string * (('a, 'typ, 'tag, 'v) pattern)) list * bool
 | PatAssign of ('typ,'v) vdef * Const.t
 
-and ('a, 'typ, 'enu, 'tag, 'v) ast =
-| Magic of 'typ
+and ('a, 'typ, 'gty, 'enu, 'tag, 'v) ast =
+| Magic of 'gty
 | Const of Const.t
 | Var of 'v
 | Enum of 'enu
-| Tag of 'tag * ('a, 'typ, 'enu, 'tag, 'v) t
-| Suggest of 'v * 'typ list * ('a, 'typ, 'enu, 'tag, 'v) t
-| Lambda of 'v * 'typ lambda_annot * ('a, 'typ, 'enu, 'tag, 'v) t
-| LambdaRec of ('v * 'typ lambda_annot * ('a, 'typ, 'enu, 'tag, 'v) t) list
-| Ite of ('a, 'typ, 'enu, 'tag, 'v) t * 'typ * ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
-| App of ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
-| Let of ('typ,'v) vdef * ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
-| Declare of ('typ,'v) vdef * ('a, 'typ, 'enu, 'tag, 'v) t
-| Tuple of ('a, 'typ, 'enu, 'tag, 'v) t list
-| Cons of ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
-| Projection of projection * ('a, 'typ, 'enu, 'tag, 'v) t
-| Constructor of constructor * ('a, 'typ, 'enu, 'tag, 'v) t list
-| Operation of operation * ('a, 'typ, 'enu, 'tag, 'v) t
-| Record of (string * ('a, 'typ, 'enu, 'tag, 'v) t) list
-| RecordUpdate of ('a, 'typ, 'enu, 'tag, 'v) t * string * ('a, 'typ, 'enu, 'tag, 'v) t option
-| TypeCast of ('a, 'typ, 'enu, 'tag, 'v) t * 'typ option * check
-| TypeCoerce of ('a, 'typ, 'enu, 'tag, 'v) t * 'typ option * check
-| VarAssign of 'v * ('a, 'typ, 'enu, 'tag, 'v) t
-| PatMatch of ('a, 'typ, 'enu, 'tag, 'v) t * (('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'enu, 'tag, 'v) t) list
-| Cond of ('a, 'typ, 'enu, 'tag, 'v) t * 'typ * ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t option
-| While of ('a, 'typ, 'enu, 'tag, 'v) t * 'typ * ('a, 'typ, 'enu, 'tag, 'v) t
-| Seq of ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
-| Alt of ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
-| Return of ('a, 'typ, 'enu, 'tag, 'v) t
+| Tag of 'tag * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Suggest of 'v * 'typ list * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Lambda of 'v * 'gty lambda_annot * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| LambdaRec of ('v * 'gty lambda_annot * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t) list
+| Ite of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'gty * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| App of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Let of ('typ,'v) vdef * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Declare of ('typ,'v) vdef * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Tuple of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t list
+| Cons of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Projection of projection * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Constructor of constructor * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t list
+| Operation of operation * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Record of (string * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t) list
+| RecordUpdate of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * string * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t option
+| TypeCast of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'gty * check
+| TypeCoerce of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'gty * check
+| VarAssign of 'v * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| PatMatch of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * (('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t) list
+| Cond of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'gty * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t option
+| While of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'gty * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Seq of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Alt of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Return of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | Break | Continue
 
-and ('a, 'typ, 'enu, 'tag, 'v) t = 'a * ('a, 'typ, 'enu, 'tag, 'v) ast
+and ('a, 'typ, 'gty, 'enu, 'tag, 'v) t = 'a * ('a, 'typ, 'gty, 'enu, 'tag, 'v) ast
 
-type expr = (Eid.t, Ty.t, Enum.t, Tag.t, Variable.t) t
+type expr = (Eid.t, Ty.t, GTy.t, Enum.t, Tag.t, Variable.t) t
 
 (** Program AST *)
 
@@ -66,7 +66,7 @@ type varname = string
 type annotation = Eid.t Position.located
 val new_annot : Position.t -> annotation
 
-type pexpr = (annotation, TyExpr.t, string, string, varname) t
+type pexpr = (annotation, TyExpr.t, TyExpr.t, string, string, varname) t
 type pat = (annotation, TyExpr.t, string, varname) pattern
 
 module NameMap : Map.S with type key=string

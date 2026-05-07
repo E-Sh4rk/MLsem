@@ -113,7 +113,7 @@
                 feature a <a href="#type">type</a> constraint.
             </li>
             <li>a type signature for a mutable or immutable variable, composed of a simple identifier and the associated type.
-                If no type is given, the identifier will be given the dynamic type (gradual typing).
+                If no type is given, the identifier will be given the <kdb>dyn</kdb> type (gradual typing).
             </li>
         </ul>
 
@@ -155,6 +155,7 @@
         | <var>t</var> <kbd>where</kbd> <var>id</var> <var>tvar</var>* <kbd>=</kbd> <var>t</var> [<kbd>and</kbd> ...]
 
     <var>simple_type</var> ::= <var>b</var>
+                | <kbd>dyn</kbd>
                 | <var>id</var> [<kbd>(</kbd><var>t</var>, ..., <var>t</var><kbd>)</kbd>]
                 | <var>cid</var> [<kbd>(</kbd><var>t</var><kbd>)</kbd>]
                 | <var>tvar</var>
@@ -234,12 +235,11 @@
             <li>type casts, e.g. <kbd> (x : bool)</kbd>.
             Two other cast operators are available: <kbd>(x :! int)</kbd>
             will not check the dynamic part statically, and <kbd>(x :!! int)</kbd>
-            will not check the dynamic part nor the static part.
-            You can write <kdb>dyn</kdb> as target type for a cast to the dynamic type.</li>
+            will not check the dynamic part nor the static part.</li>
             <li>type coercions, e.g. <kbd>(42 :> int)</kbd> which
             can be used locally to coerce the type of an expression into
             a supertype. Similarly to casts, the variants <kbd>(x :>! int)</kbd> and <kbd>(x :>!! int)</kbd>
-            are also available. You can write <kdb>dyn</kdb> as target type for a coercion to the dynamic type.</li>
+            are also available.</li>
             <li>constructors for products, lists and records</li>
             <li>anonymous functions</li>
             <li>local let binding (defined using either a variable or a <a href="#pattern">pattern</a>)</li>

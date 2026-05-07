@@ -2,6 +2,7 @@ open Mlsem_common
 open Mlsem_types
 
 type t = Variable.t
+(* TODO: AnnotMut of GTy.t *)
 type kind = Immut | AnnotMut of Ty.t | Mut
 
 val create : kind -> string option -> t

@@ -23,46 +23,46 @@ type ('a, 'typ, 'tag, 'v) pattern =
 | PatRecord of (string * (('a, 'typ, 'tag, 'v) pattern)) list * bool
 | PatAssign of ('typ,'v) vdef * Const.t
 
-and ('a, 'typ, 'enu, 'tag, 'v) ast =
-| Magic of 'typ
+and ('a, 'typ, 'gty, 'enu, 'tag, 'v) ast =
+| Magic of 'gty
 | Const of Const.t
 | Var of 'v
 | Enum of 'enu
-| Tag of 'tag * ('a, 'typ, 'enu, 'tag, 'v) t
-| Suggest of 'v * 'typ list * ('a, 'typ, 'enu, 'tag, 'v) t
-| Lambda of 'v * 'typ lambda_annot * ('a, 'typ, 'enu, 'tag, 'v) t
-| LambdaRec of ('v * 'typ lambda_annot * ('a, 'typ, 'enu, 'tag, 'v) t) list
-| Ite of ('a, 'typ, 'enu, 'tag, 'v) t * 'typ * ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
-| App of ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
-| Let of ('typ,'v) vdef * ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
-| Declare of ('typ,'v) vdef * ('a, 'typ, 'enu, 'tag, 'v) t
-| Tuple of ('a, 'typ, 'enu, 'tag, 'v) t list
-| Cons of ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
-| Projection of projection * ('a, 'typ, 'enu, 'tag, 'v) t
-| Constructor of constructor * ('a, 'typ, 'enu, 'tag, 'v) t list
-| Operation of operation * ('a, 'typ, 'enu, 'tag, 'v) t
-| Record of (string * ('a, 'typ, 'enu, 'tag, 'v) t) list
-| RecordUpdate of ('a, 'typ, 'enu, 'tag, 'v) t * string * ('a, 'typ, 'enu, 'tag, 'v) t option
-| TypeCast of ('a, 'typ, 'enu, 'tag, 'v) t * 'typ option * check
-| TypeCoerce of ('a, 'typ, 'enu, 'tag, 'v) t * 'typ option * check
-| VarAssign of 'v * ('a, 'typ, 'enu, 'tag, 'v) t
-| PatMatch of ('a, 'typ, 'enu, 'tag, 'v) t * (('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'enu, 'tag, 'v) t) list
-| Cond of ('a, 'typ, 'enu, 'tag, 'v) t * 'typ * ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t option
-| While of ('a, 'typ, 'enu, 'tag, 'v) t * 'typ * ('a, 'typ, 'enu, 'tag, 'v) t
-| Seq of ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
-| Alt of ('a, 'typ, 'enu, 'tag, 'v) t * ('a, 'typ, 'enu, 'tag, 'v) t
-| Return of ('a, 'typ, 'enu, 'tag, 'v) t
+| Tag of 'tag * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Suggest of 'v * 'typ list * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Lambda of 'v * 'gty lambda_annot * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| LambdaRec of ('v * 'gty lambda_annot * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t) list
+| Ite of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'gty * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| App of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Let of ('typ,'v) vdef * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Declare of ('typ,'v) vdef * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Tuple of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t list
+| Cons of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Projection of projection * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Constructor of constructor * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t list
+| Operation of operation * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Record of (string * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t) list
+| RecordUpdate of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * string * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t option
+| TypeCast of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'gty * check
+| TypeCoerce of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'gty * check
+| VarAssign of 'v * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| PatMatch of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * (('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t) list
+| Cond of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'gty * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t option
+| While of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'gty * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Seq of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Alt of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Return of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | Break | Continue
 
-and ('a, 'typ, 'enu, 'tag, 'v) t = 'a * ('a, 'typ, 'enu, 'tag, 'v) ast
+and ('a, 'typ, 'gty, 'enu, 'tag, 'v) t = 'a * ('a, 'typ, 'gty, 'enu, 'tag, 'v) ast
 
-type expr = (Eid.t, Ty.t, Enum.t, Tag.t, Variable.t) t
+type expr = (Eid.t, Ty.t, GTy.t, Enum.t, Tag.t, Variable.t) t
 
 type varname = string
 type annotation = Eid.t Position.located
 let new_annot p = Position.with_pos p (Eid.unique_with_pos p)
 
-type pexpr = (annotation, TyExpr.t, string, string, varname) t
+type pexpr = (annotation, TyExpr.t, TyExpr.t, string, string, varname) t
 type pat = (annotation, TyExpr.t, string, varname) pattern
 
 module NameMap = Map.Make(String)
@@ -76,14 +76,18 @@ let to_expr benv env e =
         let ty, benv' = B.type_expr_to_typ !benv ty in
         benv := benv' ; ty
     in
+    let aux_gty ty =
+        let gty, benv' = B.type_expr_to_gty !benv ty in
+        benv := benv' ; gty
+    in
     let aux_tys tys =
         let tys, benv' = B.type_exprs_to_typs !benv tys in
         benv := benv' ; tys
     in
-    let aux_a tyo = Option.map aux_ty tyo in
+    let aux_a tyo = Option.map aux_gty tyo in
     let aux_cond t =
-        let t = aux_ty t in
-        if B.is_test_type t then t
+        let t = aux_gty t in
+        if GTy.non_gradual t && B.is_test_type (GTy.lb t) then t
         else raise (SymbolError ("typecases should use test types"))
     in
     let aux_var env str =
@@ -106,9 +110,9 @@ let to_expr benv env e =
         let tag, benv' = B.get_tag !benv str in
         benv := benv' ; tag
     in
-    let rec aux env ((eid,pos),e) =
+    let rec aux env ((eid,pos),e:pexpr) : expr =
         let e = match e with
-        | Magic t -> Magic (aux_ty t)
+        | Magic t -> Magic (aux_gty t)
         | Const c -> Const c
         | Var str -> Var (aux_var env str)
         | Enum str -> Enum (get_enum str)
@@ -152,14 +156,12 @@ let to_expr benv env e =
         | Record lst -> Record (List.map (fun (str, e) -> str, aux env e) lst)
         | RecordUpdate (e1, l, e2) ->
             RecordUpdate (aux env e1, l, Option.map (aux env) e2)
-        | TypeCast (e, Some ty, c) ->
-            let ty = aux_ty ty in
-            TypeCast (aux env e, Some ty, c)
-        | TypeCast (e, None, c) -> TypeCast (aux env e, None, c)
-        | TypeCoerce (e, Some ty, c) ->
-            let ty = aux_ty ty in
-            TypeCoerce (aux env e, Some ty, c)
-        | TypeCoerce (e, None, c) -> TypeCoerce (aux env e, None, c)
+        | TypeCast (e, ty, c) ->
+            let gty = aux_gty ty in
+            TypeCast (aux env e, gty, c)
+        | TypeCoerce (e, ty, c) ->
+            let gty = aux_gty ty in
+            TypeCoerce (aux env e, gty, c)
         | VarAssign (str, e) -> VarAssign (aux_var env str, aux env e)
         | PatMatch (e, pats) ->
             PatMatch (aux env e, List.map (aux_pat pos env) pats)

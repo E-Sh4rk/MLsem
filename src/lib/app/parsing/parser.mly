@@ -137,8 +137,7 @@ unique_term: t=terms EOF { t }
 element:
 | LET ds=separated_nonempty_list(AND_KW, tl_let) { annot $symbolstartpos $endpos (Definitions ds) }
 | VAL m=mut id=generalized_identifier COLON ty=typ { annot $symbolstartpos $endpos (SigDef (id, m, Some ty)) }
-| VAL m=mut id=generalized_identifier | VAL m=mut id=generalized_identifier COLON DYN
-{ annot $symbolstartpos $endpos (SigDef (id, m, None)) }
+| VAL m=mut id=generalized_identifier { annot $symbolstartpos $endpos (SigDef (id, m, None)) }
 | TYPE ts=separated_nonempty_list(AND_KW, param_type_def) { annot $symbolstartpos $endpos (Types ts) }
 | ABSTRACT TYPE name=ID params=abs_params { annot $symbolstartpos $endpos (AbsType (name, params)) }
 | HASHTAG cmd=ID EQUAL v=literal { annot $symbolstartpos $endpos (Command (cmd, v)) }
@@ -248,8 +247,8 @@ atomic_term:
   let annot = annot $startpos $endpos in
   annot (Ite (t,ty,annot (Const (Bool true)),annot (Const (Bool false))))
   }
-| LPAREN t=term c=cast ty=typ_or_dyn RPAREN { annot $startpos $endpos (TypeCast (t,ty,c)) }
-| LPAREN t=term c=coerce ty=typ_or_dyn RPAREN { annot $startpos $endpos (TypeCoerce (t,ty,c)) }
+| LPAREN t=term c=cast ty=typ RPAREN { annot $startpos $endpos (TypeCast (t,ty,c)) }
+| LPAREN t=term c=coerce ty=typ RPAREN { annot $startpos $endpos (TypeCoerce (t,ty,c)) }
 | LBRACE fs=separated_list(SEMICOLON, field_term) RBRACE { annot $startpos $endpos (Record fs) }
 | LBRACE br=atomic_term WITH fs=separated_list(SEMICOLON, field_term) RBRACE
 { record_update $startpos $endpos br fs }
@@ -257,10 +256,6 @@ atomic_term:
 { list_of_elts $startpos $endpos lst }
 | LBRACKET t1=term OR ts=separated_nonempty_list(OR, term) RBRACKET
 { alts $startpos $endpos (t1::ts) }
-
-%inline typ_or_dyn:
-  ty=typ { Some ty }
-| DYN { None }
 
 %inline cast:
   COLON { Check } | CAST_STATIC { CheckStatic } | CAST_NOCHECK { NoCheck }
@@ -346,6 +341,7 @@ simple_typ:
 
 atomic_typ:
   x=type_constant { TBase x }
+| DYN { TDyn }
 | s=ID { builtin_type_or_custom s }
 | s=CID { TEnum s }
 | s=PCID t=typ RPAREN { TTag (s, t) }
