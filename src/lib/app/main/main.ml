@@ -17,7 +17,7 @@ let merge_tl tys =
     TyScheme.mk (MVarSet.union tvs1 tvs2) (GTy.cap t1 t2)
   in
   List.fold_left tscap (TyScheme.mk_mono GTy.any) tys |> simplify_tl
-let sigs_of_ty mono ty =
+let sigs_of_ty ty =
   let rec aux ty =
     match Arrow.dnf ty with
     | [arrs] ->
@@ -33,7 +33,7 @@ let sigs_of_ty mono ty =
       (fun tv -> TVar.has_kind KNoInfer tv |> not)
       (fun rv -> RVar.has_kind KNoInfer rv |> not)
     |> MVarSet.is_empty
-  then Some (aux ty, GTy.mk ty |> TyScheme.mk_poly_except mono |> simplify_tl)
+  then Some (aux ty)
   else None
 let infer var env e =
   let annot =
@@ -107,7 +107,7 @@ let sigs_of_def benv varm senv env (kind,str) =
   let kind, benv = match kind with
   | PAst.Immut -> MVariable.Immut, benv | PAst.Mut -> MVariable.Mut, benv
   | PAst.AnnotMut ty ->
-    let ty, benv = type_expr_to_typ benv ty in
+    let ty, benv = type_expr_to_gty benv ty in
     MVariable.AnnotMut ty, benv
   in
   match NameMap.find_opt str varm with
@@ -118,7 +118,7 @@ let sigs_of_def benv varm senv env (kind,str) =
     begin match VarMap.find_opt v senv with
     | None -> raise (AlreadyDefined v)
     | Some sigs ->
-      if MVariable.kind_leq (MVariable.kind v) kind |> not then raise (AlreadyDefined v) ;
+      if MVariable.kind_compat kind (MVariable.kind v) |> not then raise (AlreadyDefined v) ;
       v, Some (sigs, Env.find v env), benv
     end
 
@@ -159,34 +159,24 @@ let treat (benv,varm,senv,env) (annot, elem) =
       let senv = List.fold_left (fun senv (v,_) -> VarMap.remove v senv) senv tys2 in
       let tys = tys1@tys2 |> List.map (fun (v, ty) -> v, Format.asprintf "@[<hov>%a@]" TyScheme.pp_short ty) in
       (!benv,varm,senv,env), TSuccess (tys,msg,retrieve_time time)
-    | PAst.SigDef (name, mut, tyo) ->
+    | PAst.SigDef (name, mut, ty) ->
       check_not_defined varm name ;
-      begin match tyo with
-      | None ->
-        let kind = if mut then MVariable.Mut else MVariable.Immut in
-        let v = MVariable.create kind (Some name) in
-        Variable.attach_location v (Position.position annot) ;
-        let varm = NameMap.add name v varm in
-        let senv = VarMap.add v [] senv in
-        let env = MVariable.add_to_env v (TyScheme.mk_mono GTy.dyn) env in
-        (benv,varm,senv,env), TDone
-      | Some ty ->
-        let ty, benv = type_expr_to_typ benv ty in
-        let kind = if mut then MVariable.AnnotMut ty else MVariable.Immut in
-        let v = MVariable.create kind (Some name) in
-        Variable.attach_location v (Position.position annot) ;
-        begin match sigs_of_ty (Env.tvars env) ty with
-        | None -> (benv,varm,senv,env),
-          TFailure (Some v, pos, "Invalid signature annotation.", None, 0.0)
-        | Some (sigs, ty) ->
-          try
-            let varm = NameMap.add name v varm in
-            let senv = VarMap.add v sigs senv in
-            let env = MVariable.add_to_env v ty env in
-            (benv,varm,senv,env), TDone
-          with Invalid_argument str -> (benv,varm,senv,env),
-            TFailure (Some v, pos, str, None, 0.0)
-        end
+      let ty, benv = type_expr_to_gty benv ty in
+      let kind = if mut then MVariable.AnnotMut ty else MVariable.Immut in
+      let v = MVariable.create kind (Some name) in
+      Variable.attach_location v (Position.position annot) ;
+      begin match sigs_of_ty (GTy.ub ty) with
+      | None -> (benv,varm,senv,env),
+        TFailure (Some v, pos, "Invalid signature annotation.", None, 0.0)
+      | Some sigs ->
+        try
+          let varm = NameMap.add name v varm in
+          let senv = VarMap.add v sigs senv in
+          let ty = TyScheme.mk_poly_except (Env.tvars env) ty |> simplify_tl in
+          let env = MVariable.add_to_env v ty env in
+          (benv,varm,senv,env), TDone
+        with Invalid_argument str -> (benv,varm,senv,env),
+          TFailure (Some v, pos, str, None, 0.0)
       end
     | PAst.Command (str, c) ->
       begin match str, c with

@@ -89,7 +89,7 @@
            | <kbd>abstract</kbd> <kbd>type</kbd> <var>id</var> [<kbd>(</kbd><var>tvar</var>, ..., <var>tvar</var><kbd>)</kbd>]
            | <kbd>let</kbd> <var>gid</var> <var>param</var>* <kbd>=</kbd> <var>e</var> [<kbd>and</kbd> ...]
            | <kbd>let</kbd> <kbd>mut</kbd> <var>id</var> [<kbd>:</kbd> <var>t</var>] <kbd>=</kbd> <var>e</var> [<kbd>and</kbd> ...]
-           | <kbd>val</kbd> [<kbd>mut</kbd>] <var>gid</var> [<kbd>:</kbd> <var>t</var>]
+           | <kbd>val</kbd> [<kbd>mut</kbd>] <var>gid</var> <kbd>:</kbd> <var>t</var>
 
     <var>param</var> ::= <var>id</var>
            | <kbd>(</kbd> <var>pat</var> <kbd>:</kbd> <var>t</var> <kbd>)</kbd>
@@ -112,9 +112,7 @@
                 identifiers or <a href="#patterns">patterns</a> and optionally
                 feature a <a href="#type">type</a> constraint.
             </li>
-            <li>a type signature for a mutable or immutable variable, composed of a simple identifier and the associated type.
-                If no type is given, the identifier will be given the <kdb>dyn</kdb> type (gradual typing).
-            </li>
+            <li>a type signature for a mutable or immutable variable, composed of a simple identifier and the associated type.</li>
         </ul>
 
         Note that top-level definitions are considered recursive. A definition may refer to an identifier

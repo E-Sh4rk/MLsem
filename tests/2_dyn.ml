@@ -269,7 +269,7 @@ let interval i j =
 (* ========= GRADUAL TYPING ========= *)
 
 val lnot : (true -> false) & (false -> true)
-val reflect
+val reflect : dyn
 
 let test_reflect x = reflect x
 
@@ -337,7 +337,7 @@ let mut_invalid =
 let mut_valid =
   mx := 69 ; mx
 
-val mut my
+val mut my : dyn
 let mut my = 42
 let read_mut = my
 let read_mut_cast = (my :>! bool)

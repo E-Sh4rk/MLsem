@@ -13,17 +13,17 @@ type 'typ lambda_annot = 'typ option
 type 'typ vkind = Immut | AnnotMut of 'typ | Mut
 type ('typ,'v) vdef = 'typ vkind * 'v
 
-type ('a, 'typ, 'tag, 'v) pattern =
+type ('a, 'typ, 'gty, 'tag, 'v) pattern =
 | PatType of 'typ
-| PatVar of ('typ,'v) vdef
+| PatVar of ('gty,'v) vdef
 | PatLit of Const.t
-| PatTag of 'tag * ('a, 'typ, 'tag, 'v) pattern
-| PatAnd of ('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'tag, 'v) pattern
-| PatOr of ('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'tag, 'v) pattern
-| PatTuple of ('a, 'typ, 'tag, 'v) pattern list
-| PatCons of ('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'tag, 'v) pattern
-| PatRecord of (string * (('a, 'typ, 'tag, 'v) pattern)) list * bool
-| PatAssign of ('typ,'v) vdef * Const.t
+| PatTag of 'tag * ('a, 'typ, 'gty, 'tag, 'v) pattern
+| PatAnd of ('a, 'typ, 'gty, 'tag, 'v) pattern * ('a, 'typ, 'gty, 'tag, 'v) pattern
+| PatOr of ('a, 'typ, 'gty, 'tag, 'v) pattern * ('a, 'typ, 'gty, 'tag, 'v) pattern
+| PatTuple of ('a, 'typ, 'gty, 'tag, 'v) pattern list
+| PatCons of ('a, 'typ, 'gty, 'tag, 'v) pattern * ('a, 'typ, 'gty, 'tag, 'v) pattern
+| PatRecord of (string * (('a, 'typ, 'gty, 'tag, 'v) pattern)) list * bool
+| PatAssign of ('gty,'v) vdef * Const.t
 
 and ('a, 'typ, 'gty, 'enu, 'tag, 'v) ast =
 | Magic of 'gty
@@ -36,8 +36,8 @@ and ('a, 'typ, 'gty, 'enu, 'tag, 'v) ast =
 | LambdaRec of ('v * 'gty lambda_annot * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t) list
 | Ite of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'gty * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | App of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
-| Let of ('typ,'v) vdef * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
-| Declare of ('typ,'v) vdef * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Let of ('gty,'v) vdef * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Declare of ('gty,'v) vdef * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | Tuple of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t list
 | Cons of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | Projection of projection * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
@@ -48,7 +48,7 @@ and ('a, 'typ, 'gty, 'enu, 'tag, 'v) ast =
 | TypeCast of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'gty * check
 | TypeCoerce of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'gty * check
 | VarAssign of 'v * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
-| PatMatch of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * (('a, 'typ, 'tag, 'v) pattern * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t) list
+| PatMatch of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * (('a, 'typ, 'gty, 'tag, 'v) pattern * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t) list
 | Cond of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'gty * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t option
 | While of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'gty * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | Seq of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
@@ -67,7 +67,7 @@ type annotation = Eid.t Position.located
 val new_annot : Position.t -> annotation
 
 type pexpr = (annotation, TyExpr.t, TyExpr.t, string, string, varname) t
-type pat = (annotation, TyExpr.t, string, varname) pattern
+type pat = (annotation, TyExpr.t, TyExpr.t, string, varname) pattern
 
 module NameMap : Map.S with type key=string
 type name_var_map = Variable.t NameMap.t
@@ -77,7 +77,7 @@ val to_expr : Builder.benv -> name_var_map -> pexpr -> expr * Builder.benv
 
 type element =
 | Definitions of ((TyExpr.t, string) vdef * pexpr) list
-| SigDef of string * bool (* mutable *) * TyExpr.t option
+| SigDef of string * bool (* mutable *) * TyExpr.t
 | Types of (string * string list * TyExpr.t) list
 | AbsType of string * int
 | Command of string * Const.t
