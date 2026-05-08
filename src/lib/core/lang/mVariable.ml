@@ -5,7 +5,6 @@ type t = Variable.t
 type kind = Immut | AnnotMut of GTy.t | Mut
 
 let all = Hashtbl.create 100
-let ty_of_annotmut = Ty.any (* TODO: use annoted type without putting it in a ref *)
 
 let add_to_tbl v kind =
   match kind with
@@ -54,7 +53,7 @@ let add_to_env v ty env =
     then invalid_arg "Top-level mutable variables should not contain type variables." ;
     if Ty.leq (TyScheme.get ty |> snd |> GTy.lb) (GTy.ub ty') |> not
     then invalid_arg "Top-level mutable variable has an incompatible type." ;
-    Env.add v (ty_of_annotmut |> GTy.mk |> TyScheme.mk_mono) env
+    Env.add v (TyScheme.mk_mono ty') env
 
 let a = TVar.mk KInfer None
 let alb v =
@@ -71,7 +70,7 @@ let aref v =
   match Hashtbl.find_opt all v with
   | None -> invalid_arg "Variable must be mutable."
   | Some None -> TVar.typ a |> mk_ref
-  | Some (Some _) -> ty_of_annotmut
+  | Some (Some _) -> Ty.any
 let mk_gradual lb ub = GTy.mk_gradual lb ub |> TyScheme.mk_poly
 let mk ty = GTy.mk ty |> TyScheme.mk_poly
 

@@ -233,9 +233,9 @@ mx: 42
 mut_invalid: untypeable application
 File "tests/2_dyn.ml", line 336, characters 2-12
 function: (any, int) -> ()
-argument: any, true
+argument: int, true
 mut_valid: 69
-my: any
+my: dyn
 read_mut: any
 read_mut_cast: bool
 [Notice] File "tests/2_dyn.ml", line 343, characters 20-33 Unchecked dynamic coercion
