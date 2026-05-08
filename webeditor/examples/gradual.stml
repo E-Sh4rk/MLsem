@@ -6,7 +6,7 @@ val (/) : (int, int) -> int
 val (%) : (int, int) -> int
 
 val lnot : bool -> bool
-val reflect
+val reflect : dyn
 
 let test_reflect x = reflect x
 
@@ -46,3 +46,14 @@ let gradual4_ann x =
   | y & :bool -> lnot y
   | y -> 42::y
   end
+
+val lkp : ['a*] -> 'a | Nil & dyn
+
+val test_lkp_ok : int
+let test_lkp_ok =
+    let elt = lkp [1;2;3;4;5] in
+    elt + 1
+
+let test_lkp_fail =
+    let elt = lkp [1;2;3;4;5] in
+    lnot elt

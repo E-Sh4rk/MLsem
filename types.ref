@@ -107,6 +107,7 @@ expected: empty
 given: (..41) | (43..72) | (74..)
 is_string: (string -> true) & (~string -> false)
 is_int: (int -> true) & (~int -> false)
+is_bool: (bool -> true) & (~bool -> false)
 example1: any -> int
 implicit1: (int -> int) & (~int -> 0)
 example2: int | string -> int
@@ -119,7 +120,7 @@ string) -> 'A')
 example5: any -> any -> int
 implicit5: (~int -> any -> 0) & (any -> (~string -> 0) & (any -> int))
 example6_invalid: untypeable application
-File "tests/1_union_inter.ml", line 227, characters 26-34
+File "tests/1_union_inter.ml", line 229, characters 26-34
 function: string -> int
 argument: int
 example6: (string -> any -> int) & (int -> string -> int)
@@ -141,6 +142,11 @@ implicit13: (int -> (string -> 1) & (~string -> 2)) & (~int -> any -> 3)
 example14: int | string -> tuple2 -> int
 implicit14: (int | string -> (tuple2 -> int) & ((~int, any) -> 0)) & (~int -> (~int, any)
 -> 0)
+connectives1: untypeable application
+File "tests/1_union_inter.ml", line 322, characters 59-67
+function: string -> int
+argument: int | bool
+connectives2: int | bool | string -> int
 
 ===== Processing tests/2_dyn.ml =====
 valint: untypeable coercion
@@ -165,7 +171,7 @@ record_ab: ∀'a,'b. { a : 'b ; b : 'a } -> { a : 'b ; b : 'a }
 ref_42: ref(int)
 ref_42_unresolved: the type inferred is not fully resolved
 File "tests/2_dyn.ml", line 59, characters 0-30
-type inferred: ref(42 | 'I2000)
+type inferred: ref(42 | 'I2047)
 mutate_ref: ∀'a. 42 | 'a -> 42 | 'a
 is_ref: (ref -> true) & (~ref -> false)
 is_not_ref: (~ref -> true) & (ref -> false)
@@ -225,20 +231,28 @@ gradual4_ann: any -> int | bool
 [Notice] File "tests/2_dyn.ml", line 310, characters 9-14 Unchecked dynamic coercion
 expected: int | bool
 given: [ 42 any* ]
+test_lkp_ok: int
+[Notice] File "tests/2_dyn.ml", line 318, characters 4-11 Unchecked dynamic coercion
+expected: int
+given: any
+test_lkp_fail: untypeable application
+File "tests/2_dyn.ml", line 322, characters 4-12
+function: (false -> true) & (true -> false)
+argument: (1..5)
 typeof_cf: (() -> "unit") & (~(int | bool | char | string | ()) -> "object") & (string
 -> "string") & (bool -> "bool") & (int -> "int") & (char -> "char")
 break_return_cf: ∀'a. ('a \ (0 | false) -> 'a \ (0 | false)) & ('a & (0 | false) -> ())
 weird_return: (true -> 69) & (~true -> (42, 69))
 mx: 42
 mut_invalid: untypeable application
-File "tests/2_dyn.ml", line 336, characters 2-12
+File "tests/2_dyn.ml", line 347, characters 2-12
 function: (any, int) -> ()
 argument: int, true
 mut_valid: 69
 my: dyn
 read_mut: any
 read_mut_cast: bool
-[Notice] File "tests/2_dyn.ml", line 343, characters 20-33 Unchecked dynamic coercion
+[Notice] File "tests/2_dyn.ml", line 354, characters 20-33 Unchecked dynamic coercion
 expected: bool
 given: any
 write_mut: ()
@@ -251,8 +265,8 @@ neg_and_pos_ann: Nil | int -> Nil | (int, int)
 order: Nil | (Nil | int, Nil | int) -> Nil | int | (int, int)
 loop_tricky_narrowing: int -> (any, int)
 loop_invalid: untypeable application
-File "tests/2_dyn.ml", line 415, characters 4-14
-function: (ref('I2807), 'I2807) -> ()
+File "tests/2_dyn.ml", line 426, characters 4-14
+function: (ref('I2861), 'I2861) -> ()
 argument: ref(int), false
 loop_valid: ∀'a. (false | 'a -> false | 'a) & ('a \ int -> 'a)
 filter_imp: ∀'a,'b,'c. ('a -> bool) & ('b -> false) -> array('b | 'a) -> array('a \ 'b
@@ -265,18 +279,18 @@ bool) & (int -> int)
 test_noalt: (Nil -> Nil) & (() -> ()) & (char -> char) & (string -> string) & (bool ->
 bool) & (int -> int)
 typeof_app: Int -> 0
-[Warning] File "tests/2_dyn.ml", line 494, characters 9--28 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 505, characters 9--28 Unreachable code
 typeof_app': Int -> 0
-[Warning] File "tests/2_dyn.ml", line 514, characters 7-27 Unreachable code
-[Warning] File "tests/2_dyn.ml", line 512, characters 43-48 Unreachable code
-[Warning] File "tests/2_dyn.ml", line 509, characters 10-156 Unreachable code
-[Warning] File "tests/2_dyn.ml", line 510, characters 36-45 Unreachable code
-[Warning] File "tests/2_dyn.ml", line 510, characters 24-33 Unreachable code
-[Warning] File "tests/2_dyn.ml", line 510, characters 12-21 Unreachable code
-[Warning] File "tests/2_dyn.ml", line 509, characters 48-57 Unreachable code
-[Warning] File "tests/2_dyn.ml", line 509, characters 36-45 Unreachable code
-[Warning] File "tests/2_dyn.ml", line 509, characters 24-33 Unreachable code
-[Warning] File "tests/2_dyn.ml", line 509, characters 12-21 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 525, characters 7-27 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 523, characters 43-48 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 520, characters 10-156 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 521, characters 36-45 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 521, characters 24-33 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 521, characters 12-21 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 520, characters 48-57 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 520, characters 36-45 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 520, characters 24-33 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 520, characters 12-21 Unreachable code
 
 ===== Processing tests/3_records.ml =====
 record_delete: ∀`a. { l1 : any? ; l2 : any? ; l3 : any? ;; `a } -> { l1 : empty? ; l2 :
@@ -304,6 +318,6 @@ test_classes: { data_frame : true ;; false }
 test_class_ok: { c1 : true ;; false }
 test_class_fail: untypeable application
 File "tests/3_records.ml", line 110, characters 22-45
-function: 'I3087 & { c1 : true ;; false } -> 'I3087
+function: 'I3141 & { c1 : true ;; false } -> 'I3141
 argument: { c1 : true ;; bool }
 test_class_ok2: { c1 : true ; c2 : true ;; bool }

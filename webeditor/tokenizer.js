@@ -12,7 +12,7 @@ function getTokenizer() {
 
         typeids: [
             'any', 'empty', 'tuple', 'arrow', 'record', 'atom', 'tag',
-            'int', 'char', 'float', 'string', 'list', 'bool'
+            'int', 'char', 'float', 'string', 'list', 'bool', 'dyn'
         ],
     
         operators: [

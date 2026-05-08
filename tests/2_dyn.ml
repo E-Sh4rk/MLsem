@@ -310,6 +310,17 @@ let gradual4_ann x =
   | y -> 42::y
   end
 
+val lkp : ['a*] -> 'a | Nil & dyn
+
+val test_lkp_ok : int
+let test_lkp_ok =
+    let elt = lkp [1;2;3;4;5] in
+    elt + 1
+
+let test_lkp_fail =
+    let elt = lkp [1;2;3;4;5] in
+    lnot elt
+
 (* ========= CONTROL FLOW ========= *)
 
 let typeof_cf x =
