@@ -5,7 +5,7 @@ type t = Variable.t
 type kind = Immut | AnnotMut of GTy.t | Mut
 
 let all = Hashtbl.create 100
-let ty_of_annotmut = Ty.any
+let ty_of_annotmut = Ty.any (* TODO: use annoted type without putting it in a ref *)
 
 let add_to_tbl v kind =
   match kind with
