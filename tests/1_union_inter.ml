@@ -298,7 +298,6 @@ let implicit13 =
     else if is_int x is true then 2
     else 3
 
-(* Hard one (should be typeable) *)
 let example14 = fun (input : int|string) ->
   fun (extra : (any, any)) ->
     if and_(is_int input , is_int(fst extra)) is true then
@@ -318,22 +317,6 @@ let implicit14 = fun input ->
 (* Example connectives from ifT-benchmark *)
 (* https://github.com/utahplt/ifT-benchmark *)
 
-val connectives1 : (string|int|bool) -> int
-let connectives1 x =
+val connectives : (string|int|bool) -> int
+let connectives x =
   if and_ (not_ (is_bool x), not_ (is_int x)) is true then strlen x else 0
-
-(* ===== Examples with partition type narrowing ===== *)
-
-#type_narrowing = "partition"
-
-val connectives2 : (string|int|bool) -> int
-let connectives2 x =
-  if and_ (not_ (is_bool x), not_ (is_int x)) is true then strlen x else 0
-
-let example14_2 = fun (input : int|string) ->
-  fun (extra : (any, any)) ->
-    if and_(is_int input , is_int(fst extra)) is true then
-        add input (fst extra)
-    else if is_int(fst extra) is true then
-        add (strlen input) (fst extra)
-    else 0

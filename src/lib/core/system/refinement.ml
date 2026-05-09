@@ -180,7 +180,7 @@ let partition dom ts =
 module Partitioner = struct
   type t = REnv.t list
 
-  let isolate_tuple_comp (n,lst) =
+  (* let isolate_tuple_comp (n,lst) =
     lst |>
     List.filter (function [] -> false | _ -> true) |>
     List.map (fun atom -> n, [atom])
@@ -195,7 +195,7 @@ module Partitioner = struct
     List.map (fun atom -> Record.of_dnf' [atom])
   let isolate_conjuncts t =
     (* Necessary because of pattern matching encoding for uncurrified functions *)
-    t::(isolate_tuple_conjuncts t)@(isolate_record_conjuncts t)
+    t::(isolate_tuple_conjuncts t)@(isolate_record_conjuncts t) *)
 
   let from_refinements rs = Refinements.all rs
   let filter_compatible lst v ty =
@@ -209,7 +209,7 @@ module Partitioner = struct
       if REnv.mem v renv then Some (REnv.find v renv) else None)
     in
     let part_for_dom dom =
-      tys |> partition dom |> List.concat_map isolate_conjuncts |> partition dom
+      tys |> partition dom (*|> List.concat_map isolate_conjuncts |> partition dom*)
     in
     List.concat_map part_for_dom initial
     (* |> (fun tys -> Format.printf "Partition for %a: %a@." Variable.pp v

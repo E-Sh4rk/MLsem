@@ -7,7 +7,7 @@ open Mlsem_utils
 
 (* ===== Initial Annot ===== *)
 
-let initial ?(direct_narrowing=true) refinements e =
+let initial ?(direct_narrowing=true) ?(partition_narrowing=true) refinements e =
   let new_renaming () =
     let s = ref Subst.identity in
     fun dom ->
@@ -20,9 +20,9 @@ let initial ?(direct_narrowing=true) refinements e =
     TVar.mk KInfer None |> TVar.typ
   in
   let r =
-    if direct_narrowing
-    then Refinement.Partitioner.from_refinements (Refinement.Refinements.empty)
-    else Refinement.Partitioner.from_refinements refinements
+    if partition_narrowing
+    then Refinement.Partitioner.from_refinements refinements
+    else Refinement.Partitioner.from_refinements (Refinement.Refinements.empty)
   in
   let rec initial r (eid, e) =
     let open IAnnot in
@@ -58,6 +58,7 @@ let initial ?(direct_narrowing=true) refinements e =
       then Refinement.Refinements.get refinements eid
       else REnv.empty
     in
+    (* Format.printf "Refinements:@.%a@." REnv.pp refinement ; *)
     match ann with
     | Left a -> A (Annot.nc refinement a)
     | Right (rid, ann) -> I { rid ; ann ; refinement }
@@ -528,4 +529,5 @@ let refine env iannot e =
   | Subst _ -> failwith "Top-level environment should not contain an unresolved type variable."
   | Ok (a,_) -> a
 
-let infer ?(direct_narrowing=true) env r e = refine env (initial ~direct_narrowing r e) e
+let infer ?(direct_narrowing=true) ?(partition_narrowing=true) env r e =
+  refine env (initial ~direct_narrowing ~partition_narrowing r e) e

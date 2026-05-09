@@ -45,7 +45,10 @@ let infer var env e =
       else Mlsem_system.Refinement.Refinements.empty
     in
     (* REnvSet.elements r |> List.iter (fun renv -> Format.printf "Renv: %a@." REnv.pp renv) ; *)
-    try Mlsem_system.Reconstruction.infer ~direct_narrowing:(narrowing = DirectNarrowing) env r e with
+    try Mlsem_system.Reconstruction.infer
+      ~direct_narrowing:(narrowing = DirectNarrowing || narrowing = BothNarrowing)
+      ~partition_narrowing:(narrowing = PartitionNarrowing || narrowing = BothNarrowing)
+      env r e with
     | Mlsem_system.Checker.Untypeable err ->
       (* Format.printf "@.@.%a@.@." Mlsem_system.Ast.pp e ; *)
       raise (Untypeable (var, err))
@@ -182,10 +185,11 @@ let treat (benv,varm,senv,env) (annot, elem) =
       begin match str, c with
       | "value_restriction", Bool b -> Config.value_restriction := b
       | "type_narrowing", String "partition" -> Config.type_narrowing := PartitionNarrowing
+      | "type_narrowing", String "direct" -> Config.type_narrowing := DirectNarrowing
       | "type_narrowing", Bool false | "type_narrowing", String "no"
       -> Config.type_narrowing := NoNarrowing
-      | "type_narrowing", Bool true | "type_narrowing", String "direct"
-      -> Config.type_narrowing := DirectNarrowing
+      | "type_narrowing", Bool true | "type_narrowing", String "yes"
+      -> Config.type_narrowing := BothNarrowing
       | "allow_implicit_downcast", Bool b -> Config.allow_implicit_downcast := b
       | "infer_overload", Bool b -> Config.infer_overload := b
       | "no_empty_param", Bool b ->
