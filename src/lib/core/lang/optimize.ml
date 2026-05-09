@@ -75,6 +75,16 @@ let optimize_dataflow e =
     { env with mut = VarMap.add v (v'::(get_muts env v)) env.mut }|> norm
   in
   let get_preferred_mut env v = match get_muts env v with hd::_ -> hd | [] -> v in
+  let add_local_vmut (env,ctx) v =
+    if has_immut env v then
+      let vdef = get_immut env v in
+      let vmut = MVariable.refresh (MVariable.kind v) v in
+      let env = add_mut env v vmut in
+      let ctx = fill ctx (Eid.unique (), Let ([], vmut, (Eid.unique (), Var vdef), hole)) in
+      (env,ctx)
+    else
+      (env, ctx)
+  in
   let reset_env env =
     { captured=env.captured ; mut=VarMap.empty ; immut=VarMap.empty }
   in
@@ -108,7 +118,13 @@ let optimize_dataflow e =
       (id, LambdaRec (List.map2 (fun (d,v,_) e -> d,v,e) lst es))
     | Ite (e, ty, e1, e2) ->
       let env, ctx, e = aux env e in
-      let (env1, e1), (env2, e2) = aux' env e1, aux' env e2 in
+      let narrowed_vars e =
+        read_vars e |> VarSet.filter MVariable.is_mutable |> VarSet.elements
+      in
+      let (env1, ctx1) = List.fold_left add_local_vmut (env, hole) (narrowed_vars e1) in
+      let (env2, ctx2) = List.fold_left add_local_vmut (env, hole) (narrowed_vars e2) in
+      let (env1, e1), (env2, e2) = aux' env1 e1, aux' env2 e2 in
+      let e1, e2 = fill ctx1 e1, fill ctx2 e2 in
       merge_envs' env [env1 ; env2], ctx, (id, Ite (e, ty, e1, e2))
     | App (e1, e2) ->
       let env, ctx, es = aux_order !Config.app_eval_order env [e1;e2] in
@@ -144,10 +160,8 @@ let optimize_dataflow e =
       let vimmut = MVariable.refresh MVariable.Immut v in
       let env = add_immut env v vimmut in
       let ctx = fill ctx (Eid.unique (), Let ([], vimmut, e, hole)) in
-      let vmut = MVariable.refresh (MVariable.kind v) v in
-      let env = add_mut env v vmut in
-      let ctx = fill ctx (Eid.unique (), Declare (vmut, hole)) in
       let vmuts = get_muts env v in
+      let env,ctx = add_local_vmut (env,ctx) v in
       let e = Eid.refresh id, VarAssign (v, (Eid.unique (), Var vimmut)) in
       let add_assign e v =
         Eid.refresh id, Seq (

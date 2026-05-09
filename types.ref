@@ -264,15 +264,12 @@ mut_seq1: 42
 mut_seq2: Nil
 mut_and_return: any -> int | false
 neg_and_pos: ∀'a. ('a & Nil -> 'a & Nil) & (int -> (int, int))
-neg_and_pos_ann: untypeable application
-File "tests/2_dyn.ml", line 402, characters 8-11
-function: (int, int) -> int
-argument: 0, Nil | int | 'I2396
-order: Nil | (Nil | int, Nil | int) -> Nil | int | (Nil | int, Nil | int)
+neg_and_pos_ann: Nil | int -> Nil | (int, int)
+order: Nil | (Nil | int, Nil | int) -> Nil | int | (int, int)
 loop_tricky_narrowing: int -> (any, int)
 loop_invalid: untypeable application
-File "tests/2_dyn.ml", line 427, characters 4-14
-function: (ref('I2459), 'I2459) -> ()
+File "tests/2_dyn.ml", line 426, characters 4-14
+function: (ref('I2461), 'I2461) -> ()
 argument: ref(int), false
 loop_valid: ∀'a. (false | 'a -> false | 'a) & ('a \ int -> 'a \ int)
 filter_imp: ∀'a,'b,'c. ('a -> bool) & ('b -> false) -> array('b | 'a) -> array('a \ 'b
@@ -285,18 +282,18 @@ bool) & (int -> int)
 test_noalt: (Nil -> Nil) & (() -> ()) & (char -> char) & (string -> string) & (bool ->
 bool) & (int -> int)
 typeof_app: Int -> 0
-[Warning] File "tests/2_dyn.ml", line 506, characters 9--28 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 505, characters 9--28 Unreachable code
 typeof_app': Int -> 0
-[Warning] File "tests/2_dyn.ml", line 526, characters 7-27 Unreachable code
-[Warning] File "tests/2_dyn.ml", line 524, characters 43-48 Unreachable code
-[Warning] File "tests/2_dyn.ml", line 521, characters 10-156 Unreachable code
-[Warning] File "tests/2_dyn.ml", line 522, characters 36-45 Unreachable code
-[Warning] File "tests/2_dyn.ml", line 522, characters 24-33 Unreachable code
-[Warning] File "tests/2_dyn.ml", line 522, characters 12-21 Unreachable code
-[Warning] File "tests/2_dyn.ml", line 521, characters 48-57 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 525, characters 7-27 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 523, characters 43-48 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 520, characters 10-156 Unreachable code
 [Warning] File "tests/2_dyn.ml", line 521, characters 36-45 Unreachable code
 [Warning] File "tests/2_dyn.ml", line 521, characters 24-33 Unreachable code
 [Warning] File "tests/2_dyn.ml", line 521, characters 12-21 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 520, characters 48-57 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 520, characters 36-45 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 520, characters 24-33 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 520, characters 12-21 Unreachable code
 
 ===== Processing tests/3_records.ml =====
 record_delete: ∀`a. { l1 : any? ; l2 : any? ; l3 : any? ;; `a } -> { l1 : empty? ; l2 :
@@ -324,6 +321,6 @@ test_classes: { data_frame : true ;; false }
 test_class_ok: { c1 : true ;; false }
 test_class_fail: untypeable application
 File "tests/3_records.ml", line 110, characters 22-45
-function: 'I2724 & { c1 : true ;; false } -> 'I2724
+function: 'I2726 & { c1 : true ;; false } -> 'I2726
 argument: { c1 : true ;; bool }
 test_class_ok2: { c1 : true ; c2 : true ;; bool }

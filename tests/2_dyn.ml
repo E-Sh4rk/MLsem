@@ -394,7 +394,6 @@ let neg_and_pos x =
   x := (0-x,x) ;
   return x
 
-(* TODO: fix *)
 let neg_and_pos_ann (x:int|Nil) =
   let mut x = x in
   if x is Nil do return x end ;
