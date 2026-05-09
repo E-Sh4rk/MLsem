@@ -7,7 +7,7 @@ open Mlsem_utils
 
 (* ===== Initial Annot ===== *)
 
-let initial ?(direct_narrowing=false) refinements e =
+let initial ?(direct_narrowing=true) refinements e =
   let new_renaming () =
     let s = ref Subst.identity in
     fun dom ->
@@ -528,4 +528,4 @@ let refine env iannot e =
   | Subst _ -> failwith "Top-level environment should not contain an unresolved type variable."
   | Ok (a,_) -> a
 
-let infer ?(direct_narrowing=false) env r e = refine env (initial ~direct_narrowing r e) e
+let infer ?(direct_narrowing=true) env r e = refine env (initial ~direct_narrowing r e) e

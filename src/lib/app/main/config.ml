@@ -3,7 +3,7 @@ include Mlsem_system.Config
 include Mlsem_lang.Config
 
 type narrowing = NoNarrowing | DirectNarrowing | PartitionNarrowing
-let type_narrowing = ref PartitionNarrowing
+let type_narrowing = ref DirectNarrowing
 let allow_implicit_downcast = ref true
 
 let save_all, restore_all =

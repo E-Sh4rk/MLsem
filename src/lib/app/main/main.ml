@@ -181,11 +181,11 @@ let treat (benv,varm,senv,env) (annot, elem) =
     | PAst.Command (str, c) ->
       begin match str, c with
       | "value_restriction", Bool b -> Config.value_restriction := b
-      | "type_narrowing", Bool true | "type_narrowing", String "partition"
-      -> Config.type_narrowing := PartitionNarrowing
+      | "type_narrowing", String "partition" -> Config.type_narrowing := PartitionNarrowing
       | "type_narrowing", Bool false | "type_narrowing", String "no"
       -> Config.type_narrowing := NoNarrowing
-      | "type_narrowing", String "direct" -> Config.type_narrowing := DirectNarrowing
+      | "type_narrowing", Bool true | "type_narrowing", String "direct"
+      -> Config.type_narrowing := DirectNarrowing
       | "allow_implicit_downcast", Bool b -> Config.allow_implicit_downcast := b
       | "infer_overload", Bool b -> Config.infer_overload := b
       | "no_empty_param", Bool b ->
