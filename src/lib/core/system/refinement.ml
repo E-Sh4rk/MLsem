@@ -26,12 +26,11 @@ end
 
 let rec typeof env (_,e) =
   match e with
-  | TypeCoerce (_, ty, _) -> ty
   | Value gty -> gty
-  (* The cases below are necessary because of pattern matching encoding *)
   | Var v when Env.mem v env -> Env.find v env |> TyScheme.get_fresh |> snd
   | Projection (p, e) -> GTy.map (Ast.proj p) (typeof env e )
   | TypeCast (e, ty, _) -> GTy.cap (typeof env e) ty
+  | TypeCoerce (_, ty, _) -> ty
   | _ -> GTy.any
 let typeof_def env e = Checker.generalize ~e env (typeof env e)
 

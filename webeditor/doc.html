@@ -191,6 +191,7 @@
     <var>t</var> ::= ...
         | <kbd>{</kbd> <var>t</var> <kbd>with</kbd> <var>id</var> <kbd>:</kbd> <var>t</var> [<kbd>?</kbd>] <kbd>;</kbd>...<kbd>;</kbd> <var>id</var> <kbd>:</kbd> <var>t</var> [<kbd>?</kbd>] <kbd>}</kbd>
         | <var>t</var><kbd>.</kbd><var>id</var>
+        | <var>t</var><kbd>.</kbd><var>cid</var>
     </code>
     <h2>Expressions</h2>
     <code>
@@ -207,7 +208,7 @@
             | <kbd>let</kbd> <kbd>mut</kbd> <var>id</var> [<kbd>:</kbd> <var>t</var>] <kbd>=</kbd> <var>e</var> <kbd>in</kbd> <var>e</var>
             | <kbd>let (</kbd><var>pat</var><kbd>) =</kbd> <var>e</var> <kbd>in</kbd> <var>e</var>
             | <kbd>if</kbd> <var>e</var> [<kbd>is</kbd> <var>t</var>] <kbd>then</kbd> <var>e</var> <kbd>else</kbd> <var>e</var>
-            | <kbd>fst</kbd> <var>e</var> | <kbd>snd</kbd> <var>e</var> | <var>e</var><kbd>.</kbd><var>id</var> | <kbd>hd</kbd> <var>e</var> | <kbd>tl</kbd> <var>e</var>
+            | <kbd>fst</kbd> <var>e</var> | <kbd>snd</kbd> <var>e</var> | <var>e</var><kbd>.</kbd><var>id</var> | <var>e</var><kbd>.</kbd><var>cid</var> | <kbd>hd</kbd> <var>e</var> | <kbd>tl</kbd> <var>e</var>
             | <kbd>match</kbd> <var>e</var> <kbd>with</kbd> [<kbd>|</kbd>] <var>pat</var> <kbd>-></kbd> <var>e</var> <kbd>|</kbd> ... <kbd>|</kbd> <var>pat</var> <kbd>-></kbd> <var>e</var> <kbd>end</kbd>
             | <var>e</var> <kbd>;</kbd> <var>e</var>
             | <var>id</var> <kbd>:=</kbd> <var>e</var>
@@ -243,7 +244,7 @@
             <li>local let binding (defined using either a variable or a <a href="#pattern">pattern</a>)</li>
             <li>a type case. In the tested type, all occurrences of the arrow constructor are of the form <tt>empty->any</tt>.
             If the tested type is missing, it is synonymous for <tt><kbd>is</kbd> <kbd>true</kbd></tt></li>
-            <li>first and second projections for pairs, projections for records, head and tail projections for lists</li>
+            <li>first and second projections for pairs, projections for records and tags, head and tail projections for lists</li>
             <li>a pattern matching construct.
             <a href="#patterns">Patterns</a> follow a first match policy.</li>
             <li>a sequence</li>
