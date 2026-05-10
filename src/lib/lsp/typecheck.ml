@@ -12,7 +12,7 @@
 
 open Mlsem_common
 open Mlsem_app
-open Mlsem_app.Main.NoExt
+open Mlsem_app.Main
 module LT = Lsp.Types
 
 (* A lens range over the typechecked source, expressed as a byte interval.
