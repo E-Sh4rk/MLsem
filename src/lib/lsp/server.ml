@@ -53,8 +53,10 @@ let send_notification n = send (Packet.Notification (Lsp.Server_notification.to_
 let initialize_result_json () =
   let open Lsp.Types in
   let sync =
-    (* TODO *)
-    TextDocumentSyncOptions.create ~change:TextDocumentSyncKind.Full ~openClose:true
+    (* Incremental sync: didChange events carry [range]+[text] for each
+       edit, which lets [Store.apply_change] shift cached lens offsets
+       through the edit instead of dropping them. *)
+    TextDocumentSyncOptions.create ~change:TextDocumentSyncKind.Incremental ~openClose:true
       ~save:(`SaveOptions (SaveOptions.create ~includeText:true ()))
       ()
   in
@@ -79,11 +81,14 @@ let method_not_found id =
    has) when [text] matches what was last typechecked — VS Code fires
    didSave on every Ctrl+S, including saves of unchanged buffers. *)
 let typecheck_and_publish uri text =
-  if Store.is_cached uri text then
-    Log.Server.debug (fun m -> m "skipping typecheck: content unchanged")
+  if Store.matches_typechecked_digest uri text then
+    (* Buffer matches the last typecheck — applied edits and undid them, or
+       Ctrl+S without modification. Cached lenses already correspond to this
+       text and the client still has the diagnostics. Skip the work. *)
+      Log.Server.debug (fun m -> m "skipping typecheck: content unchanged")
   else
     let result = Typecheck.run text in
-    Store.set uri ~text ~result ;
+    Store.set_result uri ~text ~result ;
     let params =
       Lsp.Types.PublishDiagnosticsParams.create ~uri ~diagnostics:result.diagnostics ()
     in
@@ -105,8 +110,11 @@ let handle_request ~shutdown_received (req : Jsonrpc.Request.t) =
           send (Packet.Response (Response.ok req.id `Null)) ;
           true
       | Lsp.Client_request.TextDocumentCodeLens params ->
+          (* Lens offsets are kept in sync with the live buffer via
+             [Store.apply_change] on each didChange, so the projection to
+             LSP Range is against the current line layout. *)
           let uri = params.textDocument.uri in
-          let lenses = (Store.result uri).code_lenses in
+          let lenses = Store.code_lenses uri in
           let json = Lsp.Client_request.yojson_of_result typed_req lenses in
           send (Packet.Response (Response.ok req.id json)) ;
           shutdown_received
@@ -138,6 +146,13 @@ let handle_notification ~shutdown_received (notif : Jsonrpc.Notification.t) =
       | Some text -> typecheck_and_publish uri text
       | None ->
           Log.Server.warn (fun m -> m "didSave without text despite includeText:true; skipping") ) ;
+      shutdown_received
+  | Ok (Lsp.Client_notification.TextDocumentDidChange params) ->
+      (* Apply each edit to the cached buffer and shift lens offsets
+         through it. Events are ordered; each subsequent event's range
+         refers to the buffer state after prior events have been applied. *)
+      let uri = params.textDocument.uri in
+      List.iter (Store.apply_change uri) params.contentChanges ;
       shutdown_received
   | Ok (Lsp.Client_notification.TextDocumentDidClose params) ->
       Store.remove params.textDocument.uri ;

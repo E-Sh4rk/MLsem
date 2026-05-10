@@ -1,23 +1,36 @@
 (* Runs the MLsem typechecker on a source buffer and converts its results
-   into LSP-native values (CodeLenses + Diagnostics).
+   into intermediate, position-stable values.
 
    Mirrors the logic of [src/bin/web.ml], but targets LSP clients instead of
-   the web editor. Each top-level binding becomes one CodeLens anchored on
-   the binder's source location, with the inferred type (or untypeable error)
-   as its title. Analyzer messages and untypeable bindings also surface as
-   Diagnostics. *)
+   the web editor. Each top-level binding becomes one CodeLens descriptor
+   anchored on the binder's source location. The descriptors carry byte
+   offsets rather than line/character positions so that [Store] can shift
+   them through edits without re-typechecking — see the [applyChangesToRange]
+   approach in [webeditor/codelens.js]. Diagnostics are emitted as LSP types
+   directly: we publish them once per typecheck and don't try to keep them
+   accurate during edits. *)
 
 open Mlsem_common
 open Mlsem_app
 open Mlsem_app.Main.NoExt
 module LT = Lsp.Types
 
+(* A lens range over the typechecked source, expressed as a byte interval.
+   [Store] converts these to [Lsp.Types.Range.t] at codeLens response time
+   using the current buffer's line offsets, after possibly shifting them
+   through edits. *)
+type lens = {
+  start_offset: int;
+  end_offset: int;
+  title: string;
+}
+
 type result = {
-  code_lenses: LT.CodeLens.t list;
+  lenses: lens list;
   diagnostics: LT.Diagnostic.t list;
 }
 
-let empty = {code_lenses = []; diagnostics = []}
+let empty = {lenses = []; diagnostics = []}
 
 (* LSP positions are 0-indexed; Lexing.pos_lnum is 1-indexed while
    [Position.column] already returns a 0-indexed offset within the line. *)
@@ -31,6 +44,14 @@ let lsp_range_of_pos (pos : Position.t) : LT.Range.t option =
     let start = lsp_position (Position.start_of_position pos) in
     let end_ = lsp_position (Position.end_of_position pos) in
     Some (LT.Range.create ~start ~end_)
+
+let offsets_of_pos (pos : Position.t) : (int * int) option =
+  if pos = Position.dummy then
+    None
+  else
+    Some
+      ( Position.offset (Position.start_of_position pos),
+        Position.offset (Position.end_of_position pos) )
 
 (* Fallback range when a diagnostic has no usable source position. Placing
    it at (0,0) keeps it visible in the problems panel rather than dropping
@@ -54,11 +75,7 @@ let full_message title descr =
 let diagnostic ?(severity = LT.DiagnosticSeverity.Error) ~range ~message () =
   LT.Diagnostic.create ~message:(`String message) ~range ~severity ~source:"mlsem" ()
 
-(* A titled CodeLens with no executable command — the title carries the
-   inferred type; clients render it above the binding. *)
-let type_lens ~range ~title =
-  let command = LT.Command.create ~command:"" ~title () in
-  LT.CodeLens.create ~range ~command ()
+let make_lens ~start_offset ~end_offset ~title = {start_offset; end_offset; title}
 
 let add_message acc (sev, pos, title, descr) =
   let range =
@@ -78,11 +95,10 @@ let add_result acc (res : treat_result) : result =
         | None -> pos
       in
       let lenses =
-        match lsp_range_of_pos def_pos with
-        | None -> acc.code_lenses
-        | Some range ->
-            let title = "Untypeable: " ^ msg in
-            type_lens ~range ~title :: acc.code_lenses
+        match offsets_of_pos def_pos with
+        | None -> acc.lenses
+        | Some (s, e) ->
+            make_lens ~start_offset:s ~end_offset:e ~title:("Untypeable: " ^ msg) :: acc.lenses
       in
       let diag_range =
         match lsp_range_of_pos pos with
@@ -96,21 +112,20 @@ let add_result acc (res : treat_result) : result =
         diagnostic ~severity:LT.DiagnosticSeverity.Error ~range:diag_range
           ~message:(full_message msg descr) ()
       in
-      {code_lenses = lenses; diagnostics = diag :: acc.diagnostics}
+      {lenses; diagnostics = diag :: acc.diagnostics}
   | TSuccess (lst, msgs, _time) ->
       let lenses =
         List.fold_left
           (fun lenses (v, ty) ->
-             match lsp_range_of_pos (Variable.get_location v) with
+             match offsets_of_pos (Variable.get_location v) with
              | None -> lenses
-             | Some range ->
+             | Some (s, e) ->
                  let name = Variable.get_name v |> Option.value ~default:"_" in
-                 let title = name ^ " : " ^ ty in
-                 type_lens ~range ~title :: lenses )
-          acc.code_lenses lst
+                 make_lens ~start_offset:s ~end_offset:e ~title:(name ^ " : " ^ ty) :: lenses )
+          acc.lenses lst
       in
       let diagnostics = List.fold_left add_message acc.diagnostics msgs in
-      {code_lenses = lenses; diagnostics}
+      {lenses; diagnostics}
 
 (* Counterpart to [web.ml]'s [typecheck]: runs the full pipeline on the
    source string. Returns a parse/internal error as a single diagnostic
@@ -126,7 +141,7 @@ let run (source : string) : result =
           | None -> fallback_range ()
         in
         {
-          code_lenses = [];
+          lenses = [];
           diagnostics = [diagnostic ~severity:LT.DiagnosticSeverity.Error ~range ~message:msg ()];
         }
     | PSuccess program ->
@@ -151,7 +166,7 @@ let run (source : string) : result =
   with
   | e ->
       {
-        code_lenses = [];
+        lenses = [];
         diagnostics =
           [
             diagnostic ~range:(fallback_range ())
