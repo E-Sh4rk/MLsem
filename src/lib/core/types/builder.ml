@@ -41,6 +41,7 @@ module TyExpr = struct
         (* Type operators (may inspect their parameters!) *)
         | TRecUpd of t * (string * t) list
         | TRecProj of t * string
+        | TTagProj of t * string
 end
 
 module Builder = struct
@@ -138,6 +139,14 @@ module Builder = struct
         let tenv = ref env.tenv in
         let henv = Hashtbl.create 16 in
         let eqs, n = ref [], ref 0 in
+        let get_enum name =
+            let enum, tenv' = get_enum !tenv name in
+            tenv := tenv' ; enum
+        in
+        let get_tag name =
+            let tag, tenv' = get_tag !tenv name in
+            tenv := tenv' ; tag
+        in
         let rec derecurse_types defs =
             List.iter (fun (name, params, def) ->
                 Hashtbl.add henv name (def, params, [])) defs ;
@@ -195,12 +204,8 @@ module Builder = struct
                 | TApp (n, args) ->
                     let args = args |> List.map (aux lcl) in
                     get_name (Some args) n
-                | TEnum name ->
-                    let enum, tenv' = get_enum !tenv name in
-                    tenv := tenv' ; Enum.typ enum
-                | TTag (name, t) ->
-                    let tag, tenv' = get_tag !tenv name in
-                    tenv := tenv' ; Tag.mk tag (aux lcl t)
+                | TEnum name -> Enum.typ (get_enum name)
+                | TTag (name, t) -> Tag.mk (get_tag name) (aux lcl t)
                 | TTuple ts -> Tuple.mk (List.map (aux lcl) ts)
                 | TRecord (fields, tail) ->
                     let aux' (label,f) = (label, aux_field lcl f) in
@@ -251,6 +256,13 @@ module Builder = struct
                     if TVOp.top_vars t |> MVarSet.proj1 |> TVarSet.is_empty |> not then
                         raise (TypeDefinitionError "Record projection applied on a type variable.") ;
                     Record.proj t lbl
+                | TTagProj (t, tag) ->
+                    let t, tag = aux lcl t, get_tag tag in
+                    if Ty.leq t (Tag.mk tag Ty.any) |> not then
+                        raise (TypeDefinitionError "Tag projection applied on an untagged type.") ;
+                    if TVOp.top_vars t |> MVarSet.proj1 |> TVarSet.is_empty |> not then
+                        raise (TypeDefinitionError "Tag projection applied on a type variable.") ;
+                    Tag.proj tag t
             and aux_field lcl t =
                 let open TyExpr in
                 match t with

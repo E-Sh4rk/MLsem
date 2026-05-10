@@ -39,6 +39,7 @@ module TyExpr : sig
         (* Type operators (may inspect their parameters!) *)
         | TRecUpd of t * (string * t) list
         | TRecProj of t * string
+        | TTagProj of t * string
 end
 
 (** @canonical Mlsem_types.Builder *)
