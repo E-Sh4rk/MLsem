@@ -150,7 +150,7 @@ let minimize_new_tvars mono sol =
   let res = List.fold_left minimize_binding1 sol (Subst.bindings1 sol) in
   List.fold_left minimize_binding2 res (Subst.bindings2 sol)
 
-let tallying_simpl mono tvars res cs =
+let tally_simpl mono tvars res cs =
   let ntvars s = MVarSet.union tvars (Subst.restrict tvars s |> Subst.intro) in
   let is_better (s1,r1) (s2,r2) =
     let mono2 = List.fold_left MVarSet.union MVarSet.empty
@@ -181,14 +181,14 @@ let tallying_simpl mono tvars res cs =
   |> tsort (fun (_,r1) (_,r2) -> Ty.leq r1 r2)
   (* |> List.map (fun (s,r) -> Format.printf "%a@.%a@." Subst.pp_raw s Ty.pp r ; s,r) *)
 
-let tallying_simpl env res cs =
+let tally_simpl env res cs =
   let mono = MVarSet.of_set (TVar.all_vars KNoInfer) (RVar.all_vars KNoInfer) in
   let tvars = Env.tvars env in
   let fc = TVOp.get_field_ctx (MVarSet.proj2 mono) (cs |> List.concat_map (fun (a,b) -> [a;b])) in
   let tvars = MVarSet.elements2 tvars |> List.fold_left
     (fun acc rv -> MVarSet.union acc (TVOp.fvars_associated_with fc rv |> MVarSet.of_set2)) tvars in
   cs |> List.map (fun (a,b) -> (TVOp.decorrelate_fields fc a, TVOp.decorrelate_fields fc b))
-     |> tallying_simpl mono tvars (TVOp.decorrelate_fields fc res)
+     |> tally_simpl mono tvars (TVOp.decorrelate_fields fc res)
      |> List.map (fun (s,r) -> TVOp.recombine_fields' fc s, TVOp.recombine_fields fc r)
 
 (* Reconstruction algorithm *)
@@ -233,7 +233,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
   let app res t1 t2 =
     let t1, t2 = GTy.lb t1, GTy.lb t2 in
     let arrow = Arrow.mk t2 res in
-    let ss = tallying_simpl env res [(t1, arrow)] in
+    let ss = tally_simpl env res [(t1, arrow)] in
     let ss = if !Config.infer_overload || Ty.is_empty t2 then ss else
       ss |> List.filter (fun (s, _) -> Subst.apply s t2 |> Ty.non_empty)
     in
@@ -260,7 +260,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
       let tys = List.map GTy.lb tys in
       let ss =
         doms |> List.concat_map (fun doms ->
-        tallying_simpl env (Ast.construct c tys) (List.combine tys doms)
+        tally_simpl env (Ast.construct c tys) (List.combine tys doms)
       ) in
       log "untypeable constructor" (fun fmt ->
         Format.fprintf fmt "expected: @[<h>%a@]@.given: @[<h>%a@]"
@@ -293,7 +293,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
     | AllOk (annots,tys') ->
       let tys' = List.map GTy.lb tys' in
       let cs = List.combine tys' (List.map GTy.lb tys) in
-      let ss = tallying_simpl env (Tuple.mk tys') cs in
+      let ss = tally_simpl env (Tuple.mk tys') cs in
       let ok_ann = ac (Annot.ALambdaRec (List.combine tys annots)) in
       log "untypeable recursive function" (fun fmt ->
         Format.fprintf fmt "cannot unify the body with self"
@@ -362,7 +362,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
     | Ok (annot', s) ->
       let ty = Ast.domain_of_proj p res in
       let s = GTy.lb s in
-      let ss = tallying_simpl env res [(s, ty)] in
+      let ss = tally_simpl env res [(s, ty)] in
       log "untypeable projection" (fun fmt ->
         Format.fprintf fmt "argument: @[<h>%a@]" Ty.pp s
         ) ;
@@ -388,7 +388,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
       let lbc, ubc = (GTy.lb s, GTy.lb t), (GTy.ub s, GTy.ub t) in
       let cs = match c with
         | Check -> [lbc;ubc] | CheckStatic -> [lbc] | NoCheck -> [] in
-      let ss = tallying_simpl env (GTy.lb (GTy.cap t s)) cs in
+      let ss = tally_simpl env (GTy.lb (GTy.cap t s)) cs in
       log "untypeable cast" (fun fmt ->
         if c = Check then
           Format.fprintf fmt "expected: @[<h>%a@]@.given: @[<h>%a@]" GTy.pp t GTy.pp s
@@ -405,7 +405,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
       let lbc, ubc = (GTy.lb s, GTy.lb t), (GTy.ub s, GTy.ub t) in
       let cs = match c with
         | Check -> [lbc;ubc] | CheckStatic -> [lbc] | NoCheck -> [] in
-      let ss = tallying_simpl env (GTy.lb t) cs in
+      let ss = tally_simpl env (GTy.lb t) cs in
       log "untypeable coercion" (fun fmt ->
         if c = Check then
           Format.fprintf fmt "expected: @[<h>%a@]@.given: @[<h>%a@]" GTy.pp t GTy.pp s
@@ -480,7 +480,7 @@ and refine_b' cache env (rid, bannot) e s tau =
   | IAnnot.BMaybe annot ->
     let unsat = Checker.is_type_test_unsat ~tau s in
     if !Config.infer_overload then
-      let ss = tallying_simpl env Ty.empty [(unsat, Ty.empty)] in
+      let ss = tally_simpl env Ty.empty [(unsat, Ty.empty)] in
       Subst (with_no_res ss, IAnnot.BSkip, IAnnot.BType annot, REnv.empty)
     else if Ty.is_empty unsat
     then retry_with (IAnnot.BSkip)
