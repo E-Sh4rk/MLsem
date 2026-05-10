@@ -36,6 +36,7 @@ let expr_to_ast t =
     | Var v -> Var v
     | Enum e -> Constructor (Enum e, [])
     | Tag (t, e) -> Constructor (Tag t, [aux e])
+    | TagProj (e, t) -> Projection (PiTag t, aux e)
     | Suggest (v, tys, (_,e)) ->
       add_suggs v tys ; aux_e e
     | Lambda (x, a, e) ->
@@ -57,16 +58,16 @@ let expr_to_ast t =
       Let (get_sugg x, x, e1, e2)
     | Declare ((_,x), e) -> Declare (x, aux e)
     | Tuple es -> Constructor (Tuple (List.length es), List.map aux es)
+    | TupleProj (e, n, i) -> Projection (Pi (n,i), aux e)
     | Cons (e1, e2) -> Constructor (Cons, [aux e1 ; aux e2])
-    | Projection (p, e) -> Projection (p, aux e)
-    | Constructor (c, es) -> Constructor (c, List.map aux es)
-    | Operation (o, e) -> Operation (o, aux e)
+    | Hd e -> Projection (Hd, aux e) | Tl e -> Projection (Tl, aux e)
     | Record lst ->
       Constructor (Rec (List.map fst lst, false), List.map snd lst |> List.map aux)
     | RecordUpdate (e, lbl, None) -> Operation (RecDel lbl, aux e)
     | RecordUpdate (e, lbl, Some e') ->
       let id = Position.join (fst e |> Eid.loc) (fst e' |> Eid.loc) |> Eid.unique_with_pos in
       Operation (RecUpd lbl, (id, Constructor (Tuple 2, [aux e ; aux e'])))
+    | RecordProj (e, str) -> Projection (PiField str, aux e)
     | TypeCast (e, gty, c) -> TypeCast (aux e, gty, c)
     | TypeCoerce (e, gty, c) -> TypeCoerce (aux e, gty, c)
     | VarAssign (v, e) -> VarAssign (v, aux e)

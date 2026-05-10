@@ -29,6 +29,7 @@ and ('a, 'typ, 'gty, 'enu, 'tag, 'v) ast =
 | Var of 'v
 | Enum of 'enu
 | Tag of 'tag * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| TagProj of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'tag
 | Suggest of 'v * 'typ list * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | Lambda of 'v * 'gty lambda_annot * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | LambdaRec of ('v * 'gty lambda_annot * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t) list
@@ -37,12 +38,12 @@ and ('a, 'typ, 'gty, 'enu, 'tag, 'v) ast =
 | Let of ('gty,'v) vdef * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | Declare of ('gty,'v) vdef * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | Tuple of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t list
+| TupleProj of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * int * int
 | Cons of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
-| Projection of projection * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
-| Constructor of constructor * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t list
-| Operation of operation * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Hd of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t | Tl of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | Record of (string * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t) list
 | RecordUpdate of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * string * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t option
+| RecordProj of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * string
 | TypeCast of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'gty * check
 | TypeCoerce of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'gty * check
 | VarAssign of 'v * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
@@ -117,6 +118,7 @@ let to_expr benv env e =
         | Var str -> Var (aux_var env str)
         | Enum str -> Enum (get_enum str)
         | Tag (str, e) -> Tag (get_tag str, aux env e)
+        | TagProj (e, str) -> TagProj (aux env e, get_tag str)
         | Suggest (str,tys,e) ->
             Suggest (aux_var env str, aux_tys tys, aux env e)
         | Lambda (str,da,e) ->
@@ -149,13 +151,13 @@ let to_expr benv env e =
             let env' = NameMap.add str var env in
             Declare ((kind, var), aux env' e)
         | Tuple es -> Tuple (List.map (aux env) es)
+        | TupleProj (e, n, i) -> TupleProj (aux env e, n, i)
         | Cons (e1, e2) -> Cons (aux env e1, aux env e2)
-        | Projection (p, e) -> Projection (p, aux env e)
-        | Constructor (c, es) -> Constructor (c, List.map (aux env) es)
-        | Operation (o, e) -> Operation (o, aux env e)
+        | Hd e -> Hd (aux env e) | Tl e -> Tl (aux env e)
         | Record lst -> Record (List.map (fun (str, e) -> str, aux env e) lst)
         | RecordUpdate (e1, l, e2) ->
             RecordUpdate (aux env e1, l, Option.map (aux env) e2)
+        | RecordProj (e, str) -> RecordProj (aux env e, str)
         | TypeCast (e, ty, c) ->
             let gty = aux_gty ty in
             TypeCast (aux env e, gty, c)

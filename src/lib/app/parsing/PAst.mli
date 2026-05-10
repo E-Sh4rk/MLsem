@@ -31,6 +31,7 @@ and ('a, 'typ, 'gty, 'enu, 'tag, 'v) ast =
 | Var of 'v
 | Enum of 'enu
 | Tag of 'tag * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| TagProj of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'tag
 | Suggest of 'v * 'typ list * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | Lambda of 'v * 'gty lambda_annot * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | LambdaRec of ('v * 'gty lambda_annot * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t) list
@@ -39,12 +40,12 @@ and ('a, 'typ, 'gty, 'enu, 'tag, 'v) ast =
 | Let of ('gty,'v) vdef * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | Declare of ('gty,'v) vdef * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | Tuple of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t list
+| TupleProj of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * int * int
 | Cons of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
-| Projection of projection * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
-| Constructor of constructor * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t list
-| Operation of operation * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Hd of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t | Tl of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | Record of (string * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t) list
 | RecordUpdate of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * string * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t option
+| RecordProj of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * string
 | TypeCast of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'gty * check
 | TypeCoerce of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'gty * check
 | VarAssign of 'v * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t

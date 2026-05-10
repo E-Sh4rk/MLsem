@@ -198,7 +198,10 @@ simple_term2:
 simple_term3:
   a=simple_term4 { a }
 | a=simple_term3 b=simple_term4 { annot $startpos $endpos (App (a, b)) }
-| p=proj a=simple_term4 { annot $startpos $endpos (Projection (p, a)) }
+| FST a=simple_term4 { annot $startpos $endpos (TupleProj (a, 2, 0)) }
+| SND a=simple_term4 { annot $startpos $endpos (TupleProj (a, 2, 1)) }
+| HD a=simple_term4 { annot $startpos $endpos (Hd a) }
+| TL a=simple_term4 { annot $startpos $endpos (Tl a) }
 | a=simple_term4 s=infix_term b=simple_term4 { bin_app $startpos $endpos s a b }
 | LT t=typ GT { annot $startpos $endpos (Magic t) }
 | t=indexed i=INDEXED t3=simple_term4
@@ -210,16 +213,14 @@ simple_term3:
 
 simple_term4:
   a=atomic_term { a }
-| a=atomic_term POINT id=ID { annot $startpos $endpos (Projection (PiField id, a)) }
+| a=atomic_term POINT id=ID { annot $startpos $endpos (RecordProj (a, id)) }
+| a=atomic_term POINT id=CID { annot $startpos $endpos (TagProj (a, id)) }
 | a=atomic_term DIFF id=ID { annot $startpos $endpos (RecordUpdate (a,id,None)) }
 | p=prefix_term a=simple_term4 { annot $startpos $endpos (App (p, a)) }
 
 %inline indexed:
 | x=IID t=term { annot $startpos $endpos (Var x), t }
 | LPAREN t1=terms IRPAREN t2=term { t1, t2 }
-
-proj:
-| FST { Pi(2,0) } | SND { Pi(2,1) } | HD { Hd } | TL { Tl }
 
 infix_term:
   x=infix { annot $startpos $endpos (Var x) }
