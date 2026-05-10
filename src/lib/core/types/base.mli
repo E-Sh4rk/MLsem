@@ -1,4 +1,30 @@
 
+(** @canonical Mlsem_types.PrinterCfg *)
+module PrinterCfg : sig
+    open Sstt.Printer
+    open Sstt.Extensions
+    val set_bool_printer : (int -> Sstt.Prec.assoc -> Format.formatter -> Bools.t -> unit) -> unit
+    val set_float_printer : (int -> Sstt.Prec.assoc -> Format.formatter -> Floats.t -> unit) -> unit
+    val set_string_printer : (int -> Sstt.Prec.assoc -> Format.formatter -> Strings.t -> unit) -> unit
+    val set_list_printer : (int -> Sstt.Prec.assoc -> Format.formatter -> Lists.t -> unit) -> unit
+    val set_char_printer : (int -> Sstt.Prec.assoc -> Format.formatter -> Chars.t -> unit) -> unit
+    val set_abstract_printer :
+        (Sstt.Tag.t -> int -> Sstt.Prec.assoc -> Format.formatter -> descr Abstracts.t -> unit) -> unit
+    val set_unit_printer : string -> unit
+    val set_dyn_printer : string -> unit
+    val set_descr_printer : (int -> Sstt.Prec.assoc -> Format.formatter -> descr -> unit) -> unit
+    val set_printer : (Format.formatter -> descr t -> unit) -> unit
+
+    val add_abstract_type : Sstt.Tag.t -> unit
+    val add_printer_param : params -> unit
+
+    val printer_params : unit -> params
+    val print_descr_ctx : int -> Sstt.Prec.assoc -> Format.formatter -> descr -> unit
+    val print_descr : Format.formatter -> descr -> unit
+    val print : Format.formatter -> descr t -> unit
+    val print_dyn : Format.formatter -> unit -> unit
+end
+
 (** @canonical Mlsem_types.PEnv *)
 module PEnv : sig
     type t (* Printing environment *)
@@ -15,7 +41,6 @@ module PEnv : sig
     val register_parametrized : string -> Sstt.Ty.t list -> Sstt.Ty.t -> unit
 
     (* Pretty-printing *)
-    val add_printer_param : Sstt.Printer.params -> unit
     val printer_params : unit -> Sstt.Printer.params
     val printer_params' : Sstt.Subst.t -> Sstt.Printer.params
 end
@@ -110,6 +135,10 @@ module Abstract : sig
     val any : t -> Ty.t
     val mk : t -> Ty.t list -> Ty.t
     val dnf : t -> Ty.t -> (Ty.t list) list list
+    val top_transform :
+        (t * (Ty.t list list * Ty.t list list) list
+          -> (Ty.t list list * Ty.t list list) list)
+        -> Ty.t -> Ty.t
     val transform :
         (t * (Ty.t list list * Ty.t list list) list
           -> (Ty.t list list * Ty.t list list) list)
@@ -149,7 +178,9 @@ module Record : sig
     val any_with : string -> Ty.t
     val any_without : string -> Ty.t
     val dnf : Ty.t -> ((string * oty) list * oty) list
+    val dnf' : Ty.t -> ((string * FTy.t) list * FTy.t) list
     val of_dnf : ((string * oty) list * oty) list -> Ty.t
+    val of_dnf' : ((string * FTy.t) list * FTy.t) list -> Ty.t
     val proj : Ty.t -> string -> Ty.t
     val merge : Ty.t -> Ty.t -> Ty.t
     val remove_field : Ty.t -> string -> Ty.t

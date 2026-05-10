@@ -1,46 +1,14 @@
 open Mlsem_common
 open Mlsem_types
 open Mlsem_system.Ast
+open IO
+open Builder
 module MVariable = Mlsem_lang.MVariable
+module NameMap = PAst.NameMap
 
 exception IncompatibleType of Variable.t * TyScheme.t
 exception UnresolvedType of Variable.t * TyScheme.t
 exception Untypeable of Variable.t option * Mlsem_system.Checker.error
-
-module type Main = sig
-  module P : PAst.ParserExt
-
-  module NameMap : Map.S with type key=string
-  type message = Mlsem_system.Analyzer.severity * Position.t * string * string option
-  type treat_result =
-  | TSuccess of (Variable.t * string) list * message list * float
-  | TDone
-  | TFailure of Variable.t option * Position.t * string * string option * float
-
-  type envs = P.B.benv * Variable.t NameMap.t * Ty.t list VarMap.t * Env.t * PEnv.t
-  val treat : envs -> 'a Position.located * P.E.element -> envs * treat_result
-  val treat_sig : envs -> 'a Position.located * P.E.element -> envs * treat_result
-  val treat_def : envs -> 'a Position.located * P.E.element -> envs * treat_result
-  val treat_all_sigs : envs -> ('a Position.located * P.E.element) list -> envs * treat_result
-
-  val initial_envs : envs
-  val initial_senv : Ty.t list VarMap.t
-  val initial_benv : P.B.benv
-  val initial_penv : PEnv.t
-
-  type parsing_result =
-  | PSuccess of P.E.program
-  | PFailure of Position.t * string
-
-  val parse : [< `File of string | `String of string ] -> parsing_result
-end
-
-module Make(P:PAst.ParserExt) : Main with module P=P = struct
-
-module P = P
-module NameMap = P.E.NameMap
-open IO.Make(P)
-open P.B
 
 let simplify_tl ty = ty |> TyScheme.bot_instance |> TyScheme.norm_and_simpl
 let merge_tl tys =
@@ -49,7 +17,7 @@ let merge_tl tys =
     TyScheme.mk (MVarSet.union tvs1 tvs2) (GTy.cap t1 t2)
   in
   List.fold_left tscap (TyScheme.mk_mono GTy.any) tys |> simplify_tl
-let sigs_of_ty mono ty =
+let sigs_of_ty ty =
   let rec aux ty =
     match Arrow.dnf ty with
     | [arrs] ->
@@ -65,7 +33,7 @@ let sigs_of_ty mono ty =
       (fun tv -> TVar.has_kind KNoInfer tv |> not)
       (fun rv -> RVar.has_kind KNoInfer rv |> not)
     |> MVarSet.is_empty
-  then Some (aux ty, GTy.mk ty |> TyScheme.mk_poly_except mono |> simplify_tl)
+  then Some (aux ty)
   else None
 let infer var env e =
   let annot =
@@ -77,7 +45,10 @@ let infer var env e =
       else Mlsem_system.Refinement.Refinements.empty
     in
     (* REnvSet.elements r |> List.iter (fun renv -> Format.printf "Renv: %a@." REnv.pp renv) ; *)
-    try Mlsem_system.Reconstruction.infer ~direct_narrowing:(narrowing = DirectNarrowing) env r e with
+    try Mlsem_system.Reconstruction.infer
+      ~direct_narrowing:(narrowing = DirectNarrowing || narrowing = BothNarrowing)
+      ~partition_narrowing:(narrowing = PartitionNarrowing || narrowing = BothNarrowing)
+      env r e with
     | Mlsem_system.Checker.Untypeable err ->
       (* Format.printf "@.@.%a@.@." Mlsem_system.Ast.pp e ; *)
       raise (Untypeable (var, err))
@@ -139,7 +110,7 @@ let sigs_of_def benv varm senv env (kind,str) =
   let kind, benv = match kind with
   | PAst.Immut -> MVariable.Immut, benv | PAst.Mut -> MVariable.Mut, benv
   | PAst.AnnotMut ty ->
-    let ty, benv = type_expr_to_typ benv ty in
+    let ty, benv = type_expr_to_gty benv ty in
     MVariable.AnnotMut ty, benv
   in
   match NameMap.find_opt str varm with
@@ -150,7 +121,7 @@ let sigs_of_def benv varm senv env (kind,str) =
     begin match VarMap.find_opt v senv with
     | None -> raise (AlreadyDefined v)
     | Some sigs ->
-      if MVariable.kind_leq (MVariable.kind v) kind |> not then raise (AlreadyDefined v) ;
+      if MVariable.kind_compat kind (MVariable.kind v) |> not then raise (AlreadyDefined v) ;
       v, Some (sigs, Env.find v env), benv
     end
 
@@ -161,7 +132,7 @@ let treat (benv,varm,senv,env) (annot, elem) =
   let v = ref dummy in
   try  
     match elem with
-    | P.E.Definitions lst ->
+    | PAst.Definitions lst ->
       let varm, benv = ref varm, ref benv in
       let lst = lst |> List.map (fun ((kind, name), e) ->
         let var, sigs, benv' = sigs_of_def !benv !varm senv env (kind, name) in
@@ -173,7 +144,7 @@ let treat (benv,varm,senv,env) (annot, elem) =
       let varm = !varm in
       let sigs, recs = List.partition_map (fun (var, e, sigs) ->
         v := var ;
-        let e, benv' = P.E.to_expr !benv varm e in
+        let e, benv' = PAst.to_expr !benv varm e in
         benv := benv' ;
         match sigs with
         | None -> Either.Right (var, e)
@@ -191,43 +162,34 @@ let treat (benv,varm,senv,env) (annot, elem) =
       let senv = List.fold_left (fun senv (v,_) -> VarMap.remove v senv) senv tys2 in
       let tys = tys1@tys2 |> List.map (fun (v, ty) -> v, Format.asprintf "@[<hov>%a@]" TyScheme.pp_short ty) in
       (!benv,varm,senv,env), TSuccess (tys,msg,retrieve_time time)
-    | P.E.SigDef (name, mut, tyo) ->
+    | PAst.SigDef (name, mut, ty) ->
       check_not_defined varm name ;
-      begin match tyo with
-      | None ->
-        let kind = if mut then MVariable.Mut else MVariable.Immut in
-        let v = MVariable.create kind (Some name) in
-        Variable.attach_location v (Position.position annot) ;
-        let varm = NameMap.add name v varm in
-        let senv = VarMap.add v [] senv in
-        let env = MVariable.add_to_env v (TyScheme.mk_mono GTy.dyn) env in
-        (benv,varm,senv,env), TDone
-      | Some ty ->
-        let ty, benv = type_expr_to_typ benv ty in
-        let kind = if mut then MVariable.AnnotMut ty else MVariable.Immut in
-        let v = MVariable.create kind (Some name) in
-        Variable.attach_location v (Position.position annot) ;
-        begin match sigs_of_ty (Env.tvars env) ty with
-        | None -> (benv,varm,senv,env),
-          TFailure (Some v, pos, "Invalid signature annotation.", None, 0.0)
-        | Some (sigs, ty) ->
-          try
-            let varm = NameMap.add name v varm in
-            let senv = VarMap.add v sigs senv in
-            let env = MVariable.add_to_env v ty env in
-            (benv,varm,senv,env), TDone
-          with Invalid_argument str -> (benv,varm,senv,env),
-            TFailure (Some v, pos, str, None, 0.0)
-        end
+      let ty, benv = type_expr_to_gty benv ty in
+      let kind = if mut then MVariable.AnnotMut ty else MVariable.Immut in
+      let v = MVariable.create kind (Some name) in
+      Variable.attach_location v (Position.position annot) ;
+      begin match sigs_of_ty (GTy.ub ty) with
+      | None -> (benv,varm,senv,env),
+        TFailure (Some v, pos, "Invalid signature annotation.", None, 0.0)
+      | Some sigs ->
+        try
+          let varm = NameMap.add name v varm in
+          let senv = VarMap.add v sigs senv in
+          let ty = TyScheme.mk_poly_except (Env.tvars env) ty |> simplify_tl in
+          let env = MVariable.add_to_env v ty env in
+          (benv,varm,senv,env), TDone
+        with Invalid_argument str -> (benv,varm,senv,env),
+          TFailure (Some v, pos, str, None, 0.0)
       end
-    | P.E.Command (str, c) ->
+    | PAst.Command (str, c) ->
       begin match str, c with
       | "value_restriction", Bool b -> Config.value_restriction := b
-      | "type_narrowing", Bool true | "type_narrowing", String "partition"
-      -> Config.type_narrowing := PartitionNarrowing
+      | "type_narrowing", String "partition" -> Config.type_narrowing := PartitionNarrowing
+      | "type_narrowing", String "direct" -> Config.type_narrowing := DirectNarrowing
       | "type_narrowing", Bool false | "type_narrowing", String "no"
       -> Config.type_narrowing := NoNarrowing
-      | "type_narrowing", String "direct" -> Config.type_narrowing := DirectNarrowing
+      | "type_narrowing", Bool true | "type_narrowing", String "yes"
+      -> Config.type_narrowing := BothNarrowing
       | "allow_implicit_downcast", Bool b -> Config.allow_implicit_downcast := b
       | "infer_overload", Bool b -> Config.infer_overload := b
       | "no_empty_param", Bool b ->
@@ -237,10 +199,10 @@ let treat (benv,varm,senv,env) (annot, elem) =
       | _ -> failwith ("Invalid command "^str)
       end ;
       (benv,varm,senv,env), TDone
-    | P.E.Types lst ->
+    | PAst.Types lst ->
       let benv = define_aliases benv lst in
       (benv,varm,senv,env), TDone
-    | P.E.AbsType (name, n) ->
+    | PAst.AbsType (name, n) ->
       let benv = define_abstract benv name n in
       (benv,varm,senv,env), TDone
   with
@@ -272,12 +234,12 @@ let treat (benv,varm,senv,env,penv) e =
   (benv,varm,senv,env,penv),r
 
 let treat_sig envs (annot,elem) =
-  let open P.E in
+  let open PAst in
   match elem with
   | Types _ | AbsType _ | SigDef _ -> treat envs (annot,elem)
   | Command _ | Definitions _ -> envs, TDone
 let treat_def envs (annot,elem) =
-  let open P.E in
+  let open PAst in
   match elem with
   | Types _ | AbsType _ | SigDef _ -> envs, TDone
   | Command _ | Definitions _ -> treat envs (annot,elem)
@@ -299,7 +261,7 @@ let initial_varm =
   builtin_functions |> List.fold_left (fun varm (name, _) ->
     let var = MVariable.create Immut (Some name) in
     NameMap.add name var varm
-  ) P.E.empty_name_var_map
+  ) PAst.empty_name_var_map
 let initial_env =
   builtin_functions |> List.fold_left (fun env (name, t) ->
     let var = NameMap.find name initial_varm in
@@ -313,7 +275,7 @@ let initial_envs = initial_benv, initial_varm, initial_senv, initial_env, initia
 type envs = benv * Variable.t NameMap.t * Ty.t list VarMap.t * Env.t * PEnv.t
 
 type parsing_result =
-| PSuccess of P.E.program
+| PSuccess of PAst.program
 | PFailure of Position.t * string
 
 let parse f =
@@ -326,12 +288,3 @@ let parse f =
   with
   | PAst.LexicalError(pos, msg) -> PFailure (pos, msg)
   | PAst.SyntaxError (pos, msg) -> PFailure (pos, msg)
-end
-
-module PNoExt : PAst.ParserExt = struct
-  module B = Mlsem_types.Builder
-  module E = PAst.ParserExpr(B)
-  let parse_ty_ext _ = failwith "Type extensions are not available."
-  let parse_expr_ext _ = failwith "Expression extensions are not available."
-end
-module NoExt = Make(PNoExt)

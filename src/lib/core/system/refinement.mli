@@ -13,10 +13,10 @@ module Refinements : sig
 end
 
 val typeof_def : Env.t -> Ast.t -> TyScheme.t
-(** [typeof_def env e] returns an approximation of the type of the definition
-    [e] under the environment [env]. This approximation is [TyScheme.any] in most cases,
-    but it can be more precise for simple definitions used to encode pattern matching
-    (variables, casts, projections) or in the presence of user type annotations (coercions). *)
+(** [typeof_def env e] returns an approximation of the type of the definition [e]
+    under the environment [env]. This approximation is [TyScheme.any] for non-trivial cases,
+    but it can be more precise for simple constructs (e.g. variables, casts, projections)
+    or in the presence of user type annotations (coercions). *)
 
 val refine : Env.t -> Ast.t -> Ty.t -> REnv.t
 val refinements :

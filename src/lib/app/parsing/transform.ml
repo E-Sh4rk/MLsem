@@ -14,7 +14,7 @@ let expr_to_ast t =
   let lambda_annot name a =
     match a with
     | None -> TVar.mk KInfer name |> TVar.typ |> GTy.mk
-    | Some d -> GTy.mk d
+    | Some d -> d
   in
   let rec aux_pat = function
     | PAst.PatType ty -> PType ty
@@ -31,11 +31,12 @@ let expr_to_ast t =
   in
   let rec aux_e e =
     match e with
-    | PAst.Magic t -> Value (GTy.mk t)
+    | PAst.Magic t -> Value t
     | Const c -> Value (Mlsem_lang.Const.typeof c |> GTy.mk)
     | Var v -> Var v
     | Enum e -> Constructor (Enum e, [])
     | Tag (t, e) -> Constructor (Tag t, [aux e])
+    | TagProj (e, t) -> Projection (PiTag t, aux e)
     | Suggest (v, tys, (_,e)) ->
       add_suggs v tys ; aux_e e
     | Lambda (x, a, e) ->
@@ -50,37 +51,33 @@ let expr_to_ast t =
         List.fold_left (fun e (x,x',_,_) -> rename_fv x x' e) (aux e) lst
       in
       LambdaRec (List.map aux lst)
-    | Ite (e,t,e1,e2) -> Ite (aux e, GTy.mk t, aux e1, aux e2)
+    | Ite (e,t,e1,e2) -> Ite (aux e, t, aux e1, aux e2)
     | App (e1,e2) -> App (aux e1, aux e2)
     | Let ((_,x), e1, e2) ->
       let e1, e2 = aux e1, aux e2 in
       Let (get_sugg x, x, e1, e2)
     | Declare ((_,x), e) -> Declare (x, aux e)
     | Tuple es -> Constructor (Tuple (List.length es), List.map aux es)
+    | TupleProj (e, n, i) -> Projection (Pi (n,i), aux e)
     | Cons (e1, e2) -> Constructor (Cons, [aux e1 ; aux e2])
-    | Projection (p, e) -> Projection (p, aux e)
-    | Constructor (c, es) -> Constructor (c, List.map aux es)
-    | Operation (o, e) -> Operation (o, aux e)
+    | Hd e -> Projection (Hd, aux e) | Tl e -> Projection (Tl, aux e)
     | Record lst ->
       Constructor (Rec (List.map fst lst, false), List.map snd lst |> List.map aux)
     | RecordUpdate (e, lbl, None) -> Operation (RecDel lbl, aux e)
     | RecordUpdate (e, lbl, Some e') ->
       let id = Position.join (fst e |> Eid.loc) (fst e' |> Eid.loc) |> Eid.unique_with_pos in
       Operation (RecUpd lbl, (id, Constructor (Tuple 2, [aux e ; aux e'])))
-    | TypeCast (e, tyo, c) ->
-      let ty = match tyo with None -> GTy.dyn | Some ty -> GTy.mk ty in
-      TypeCast (aux e, ty, c)
-    | TypeCoerce (e, tyo, c) ->
-      let ty = match tyo with None -> GTy.dyn | Some ty -> GTy.mk ty in
-      TypeCoerce (aux e, ty, c)
+    | RecordProj (e, str) -> Projection (PiField str, aux e)
+    | TypeCast (e, gty, c) -> TypeCast (aux e, gty, c)
+    | TypeCoerce (e, gty, c) -> TypeCoerce (aux e, gty, c)
     | VarAssign (v, e) -> VarAssign (v, aux e)
     | PatMatch (e, pats) ->
       PatMatch (aux e, List.map (fun (pat,e) ->
         let e = aux e in (* e must be transformed before the pattern in case of a suggest *)
         (aux_pat pat, e)
         ) pats)
-    | Cond (e,t,e1,e2) -> If (aux e, GTy.mk t, aux e1, Option.map aux e2)
-    | While (e,t,e1) -> While (aux e, GTy.mk t, aux e1)
+    | Cond (e,t,e1,e2) -> If (aux e, t, aux e1, Option.map aux e2)
+    | While (e,t,e1) -> While (aux e, t, aux e1)
     | Seq (e1, e2) -> Seq (aux e1, aux e2)
     | Alt (e1, e2) -> Alt (aux e1, aux e2)
     | Return e -> Return (aux e)

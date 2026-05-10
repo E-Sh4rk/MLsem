@@ -15,7 +15,7 @@ let normalize_empty_abstracts =
   in
   Abstract.transform aux
 
-(* ---------------- 1*)
+(* ---------------- *)
 
 let value_restriction = ref true
 

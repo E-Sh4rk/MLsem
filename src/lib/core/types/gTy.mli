@@ -37,3 +37,22 @@ val normalize : t -> t
 
 val pp : Format.formatter -> t -> unit
 val pp' : Subst.t -> Format.formatter -> t -> unit
+
+module Builder : sig
+    val dyn : unit -> Ty.t
+    (** [dyn ()] returns a fresh instance of the dyn type for the builder.
+        Each occurrence of dyn in a type should use a fresh instance. *)
+
+    val refresh : Ty.t -> Ty.t
+    (** [refresh ty] refreshes the instances of dyn in [ty].
+        This function should be called when combining multiple occurrences
+        of a gradual type that is in the process of being built. *)
+
+    val non_gradual : Ty.t -> bool
+    (** [non_gradual ty] returns true if and only if [ty] is not gradual,
+        i.e. it has no instance of dyn. *)
+
+    val build : Ty.t -> t
+    (** [build ty] builds the gradual type corresponding to [ty].
+        Raises [Invalid_argument] if a dyn occurs in an invariant position. *)
+end

@@ -1,7 +1,4 @@
-%parameter<M:PAst.ParserExt>
-
 %{
-  open M.E
   open Mlsem_common
   open Mlsem_system.Ast
   open Mlsem_lang.Const
@@ -93,7 +90,7 @@
 %token LPAREN RPAREN IRPAREN EQUAL COMMA CONS COLON ASSIGN
 %token COERCE COERCE_STATIC COERCE_NOCHECK CAST_STATIC CAST_NOCHECK
 %token INTERROGATION_MARK EXCLAMATION_MARK
-%token ARROW AND OR NEG DIFF
+%token ARROW AND OR NEG DIFF DYN
 %token TIMES PLUS MINUS DIV
 %token LBRACE RBRACE DOUBLEPOINT MATCH WITH END POINT LT GT
 %token AND_KW OR_KW
@@ -105,7 +102,6 @@
 %token<Z.t> LINT
 %token<bool> LBOOL
 %token<char> LCHAR
-%token<string> EXT
 %token<string> LSTRING
 %token<string> INFIX PREFIX INDEXED OPID
 
@@ -140,9 +136,7 @@ unique_term: t=terms EOF { t }
 
 element:
 | LET ds=separated_nonempty_list(AND_KW, tl_let) { annot $symbolstartpos $endpos (Definitions ds) }
-| VAL m=mut id=generalized_identifier COLON ty=typ { annot $symbolstartpos $endpos (SigDef (id, m, Some ty)) }
-| VAL m=mut id=generalized_identifier | VAL m=mut id=generalized_identifier COLON HASHTAG
-{ annot $symbolstartpos $endpos (SigDef (id, m, None)) }
+| VAL m=mut id=generalized_identifier COLON ty=typ { annot $symbolstartpos $endpos (SigDef (id, m, ty)) }
 | TYPE ts=separated_nonempty_list(AND_KW, param_type_def) { annot $symbolstartpos $endpos (Types ts) }
 | ABSTRACT TYPE name=ID params=abs_params { annot $symbolstartpos $endpos (AbsType (name, params)) }
 | HASHTAG cmd=ID EQUAL v=literal { annot $symbolstartpos $endpos (Command (cmd, v)) }
@@ -204,7 +198,10 @@ simple_term2:
 simple_term3:
   a=simple_term4 { a }
 | a=simple_term3 b=simple_term4 { annot $startpos $endpos (App (a, b)) }
-| p=proj a=simple_term4 { annot $startpos $endpos (Projection (p, a)) }
+| FST a=simple_term4 { annot $startpos $endpos (TupleProj (a, 2, 0)) }
+| SND a=simple_term4 { annot $startpos $endpos (TupleProj (a, 2, 1)) }
+| HD a=simple_term4 { annot $startpos $endpos (Hd a) }
+| TL a=simple_term4 { annot $startpos $endpos (Tl a) }
 | a=simple_term4 s=infix_term b=simple_term4 { bin_app $startpos $endpos s a b }
 | LT t=typ GT { annot $startpos $endpos (Magic t) }
 | t=indexed i=INDEXED t3=simple_term4
@@ -216,16 +213,14 @@ simple_term3:
 
 simple_term4:
   a=atomic_term { a }
-| a=atomic_term POINT id=ID { annot $startpos $endpos (Projection (PiField id, a)) }
+| a=atomic_term POINT id=ID { annot $startpos $endpos (RecordProj (a, id)) }
+| a=atomic_term POINT id=CID { annot $startpos $endpos (TagProj (a, id)) }
 | a=atomic_term DIFF id=ID { annot $startpos $endpos (RecordUpdate (a,id,None)) }
 | p=prefix_term a=simple_term4 { annot $startpos $endpos (App (p, a)) }
 
 %inline indexed:
 | x=IID t=term { annot $startpos $endpos (Var x), t }
 | LPAREN t1=terms IRPAREN t2=term { t1, t2 }
-
-proj:
-| FST { Pi(2,0) } | SND { Pi(2,1) } | HD { Hd } | TL { Tl }
 
 infix_term:
   x=infix { annot $startpos $endpos (Var x) }
@@ -252,8 +247,8 @@ atomic_term:
   let annot = annot $startpos $endpos in
   annot (Ite (t,ty,annot (Const (Bool true)),annot (Const (Bool false))))
   }
-| LPAREN t=term c=cast ty=typ_or_dyn RPAREN { annot $startpos $endpos (TypeCast (t,ty,c)) }
-| LPAREN t=term c=coerce ty=typ_or_dyn RPAREN { annot $startpos $endpos (TypeCoerce (t,ty,c)) }
+| LPAREN t=term c=cast ty=typ RPAREN { annot $startpos $endpos (TypeCast (t,ty,c)) }
+| LPAREN t=term c=coerce ty=typ RPAREN { annot $startpos $endpos (TypeCoerce (t,ty,c)) }
 | LBRACE fs=separated_list(SEMICOLON, field_term) RBRACE { annot $startpos $endpos (Record fs) }
 | LBRACE br=atomic_term WITH fs=separated_list(SEMICOLON, field_term) RBRACE
 { record_update $startpos $endpos br fs }
@@ -261,11 +256,6 @@ atomic_term:
 { list_of_elts $startpos $endpos lst }
 | LBRACKET t1=term OR ts=separated_nonempty_list(OR, term) RBRACKET
 { alts $startpos $endpos (t1::ts) }
-| str=EXT { M.parse_expr_ext (Position.lex_join $startpos $endpos) str }
-
-%inline typ_or_dyn:
-  ty=typ { Some ty }
-| HASHTAG { None }
 
 %inline cast:
   COLON { Check } | CAST_STATIC { CheckStatic } | CAST_NOCHECK { NoCheck }
@@ -347,9 +337,12 @@ simple_typ:
 | lhs=simple_typ OR rhs=simple_typ  { TCup (lhs, rhs) }
 | lhs=simple_typ AND rhs=simple_typ { TCap (lhs, rhs) }
 | lhs=simple_typ DIFF rhs=simple_typ  { TDiff (lhs, rhs) }
+| r=atomic_typ POINT id=ID  { TRecProj (r, id) }
+| r=atomic_typ POINT id=CID  { TTagProj (r, id) }
 
 atomic_typ:
   x=type_constant { TBase x }
+| DYN { TDyn }
 | s=ID { builtin_type_or_custom s }
 | s=CID { TEnum s }
 | s=PCID t=typ RPAREN { TTag (s, t) }
@@ -361,8 +354,8 @@ atomic_typ:
 | LPAREN RPAREN { TBase TUnit }
 | LPAREN t=typ RPAREN { t }
 | LBRACE fs=separated_list(SEMICOLON, typ_field) tail=optional_tail RBRACE { TRecord (fs,tail) }
+| LBRACE br=typ WITH fs=separated_list(SEMICOLON, typ_field) RBRACE { TRecUpd (br, fs) }
 | LBRACKET re=typ_re RBRACKET { TSList re }
-| str=EXT { TExt (M.parse_ty_ext str) }
 
 %inline optional_tail:
 | DOUBLESEMICOLON ty=typ { ty }

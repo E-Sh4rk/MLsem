@@ -89,7 +89,7 @@
            | <kbd>abstract</kbd> <kbd>type</kbd> <var>id</var> [<kbd>(</kbd><var>tvar</var>, ..., <var>tvar</var><kbd>)</kbd>]
            | <kbd>let</kbd> <var>gid</var> <var>param</var>* <kbd>=</kbd> <var>e</var> [<kbd>and</kbd> ...]
            | <kbd>let</kbd> <kbd>mut</kbd> <var>id</var> [<kbd>:</kbd> <var>t</var>] <kbd>=</kbd> <var>e</var> [<kbd>and</kbd> ...]
-           | <kbd>val</kbd> [<kbd>mut</kbd>] <var>gid</var> [<kbd>:</kbd> <var>t</var>]
+           | <kbd>val</kbd> [<kbd>mut</kbd>] <var>gid</var> <kbd>:</kbd> <var>t</var>
 
     <var>param</var> ::= <var>id</var>
            | <kbd>(</kbd> <var>pat</var> <kbd>:</kbd> <var>t</var> <kbd>)</kbd>
@@ -112,9 +112,7 @@
                 identifiers or <a href="#patterns">patterns</a> and optionally
                 feature a <a href="#type">type</a> constraint.
             </li>
-            <li>a type signature for a mutable or immutable variable, composed of a simple identifier and the associated type.
-                If no type is given, the identifier will be given the dynamic type (gradual typing).
-            </li>
+            <li>a type signature for a mutable or immutable variable, composed of a simple identifier and the associated type.</li>
         </ul>
 
         Note that top-level definitions are considered recursive. A definition may refer to an identifier
@@ -147,7 +145,7 @@
         | <var>t</var> <kbd>,</kbd>...<kbd>,</kbd> <var>t</var>
         | <var>t</var> <kbd>::</kbd> <var>t</var>
         | <kbd>[</kbd> <var>tregex</var> <kbd>]</kbd>
-        | <kbd>{</kbd> <var>id</var> <kbd>:</kbd>[<kbd>?</kbd>] <var>t</var><kbd>;</kbd>...<kbd>;</kbd> <var>id</var> <kbd>:</kbd>[<kbd>?</kbd>] <var>t</var> [<kbd>..</kbd>]<kbd>}</kbd>
+        | <kbd>{</kbd> <var>id</var> <kbd>:</kbd> <var>t</var> [<kbd>?</kbd>] <kbd>;</kbd>...<kbd>;</kbd> <var>id</var> <kbd>:</kbd> <var>t</var> [<kbd>?</kbd>] [<kbd>..</kbd>]<kbd>}</kbd>
         | <var>t</var> <kbd>|</kbd> <var>t</var>
         | <var>t</var> <kbd>&</kbd> <var>t</var>
         | <var>t</var> <kbd>\</kbd> <var>t</var>
@@ -155,15 +153,16 @@
         | <var>t</var> <kbd>where</kbd> <var>id</var> <var>tvar</var>* <kbd>=</kbd> <var>t</var> [<kbd>and</kbd> ...]
 
     <var>simple_type</var> ::= <var>b</var>
+                | <kbd>dyn</kbd>
                 | <var>id</var> [<kbd>(</kbd><var>t</var>, ..., <var>t</var><kbd>)</kbd>]
                 | <var>cid</var> [<kbd>(</kbd><var>t</var><kbd>)</kbd>]
                 | <var>tvar</var>
                 | <kbd>(</kbd><var>t</var><kbd>)</kbd>
     <var>b</var> ::= <kbd>()</kbd>
-        | <var>lit</var>
+        | <var>lit</var> | <kbd>true</kbd> | <kbd>false</kbd> | <kbd>unit</kbd>
         | <kbd>(</kbd><var>int</var><kbd>..</kbd><var>int</var><kbd>)</kbd> | <kbd>(..</kbd><var>int</var><kbd>)</kbd> | <kbd>(</kbd><var>int</var><kbd>..)</kbd> | <kbd>(..)</kbd>
-        | <kbd>any</kbd> | <kbd>empty</kbd> | <kbd>tuple</kbd> | <kbd>tuple</kbd><var>n</var> | <kbd>true</kbd> | <kbd>false</kbd> | <kbd>bool</kbd>
-        | <kbd>int</kbd> | <kbd>char</kbd> | <kbd>unit</kbd> | <kbd>string</kbd> | <kbd>list</kbd> | <kbd>nil</kbd>
+        | <kbd>any</kbd> | <kbd>empty</kbd> | <kbd>enum</kbd> | <kbd>tuple</kbd> | <kbd>tuple</kbd><var>n</var>| <kbd>bool</kbd>
+        | <kbd>int</kbd> | <kbd>float</kbd> | <kbd>char</kbd> | <kbd>string</kbd> | <kbd>list</kbd> | <kbd>record</kbd>
 
         </code>
         <p>Types are the usual set-theoretic types with tuple (product), arrow and record
@@ -182,6 +181,18 @@
             Basic types consists of <a href="#literals">literals</a> (which denote their own singleton type),
             augmented with integer interval types, and set of builtin type identifiers.
         </p>
+        <p>Some meta type operators (given below) can be used inside type expressions,
+            even though they are not type constructors. To be computed, these type operators must inspect
+            the top-level structure of the type on which they are applied:
+            when defining recursive types, one must be careful not to use these operators
+            on a type whose top-level structure is not fully determined yet.
+        </p>
+    <code>
+    <var>t</var> ::= ...
+        | <kbd>{</kbd> <var>t</var> <kbd>with</kbd> <var>id</var> <kbd>:</kbd> <var>t</var> [<kbd>?</kbd>] <kbd>;</kbd>...<kbd>;</kbd> <var>id</var> <kbd>:</kbd> <var>t</var> [<kbd>?</kbd>] <kbd>}</kbd>
+        | <var>t</var><kbd>.</kbd><var>id</var>
+        | <var>t</var><kbd>.</kbd><var>cid</var>
+    </code>
     <h2>Expressions</h2>
     <code>
         <var>e</var> ::= <var>lit</var>
@@ -197,7 +208,7 @@
             | <kbd>let</kbd> <kbd>mut</kbd> <var>id</var> [<kbd>:</kbd> <var>t</var>] <kbd>=</kbd> <var>e</var> <kbd>in</kbd> <var>e</var>
             | <kbd>let (</kbd><var>pat</var><kbd>) =</kbd> <var>e</var> <kbd>in</kbd> <var>e</var>
             | <kbd>if</kbd> <var>e</var> [<kbd>is</kbd> <var>t</var>] <kbd>then</kbd> <var>e</var> <kbd>else</kbd> <var>e</var>
-            | <kbd>fst</kbd> <var>e</var> | <kbd>snd</kbd> <var>e</var> | <kbd>hd</kbd> <var>e</var> | <kbd>tl</kbd> <var>e</var>
+            | <kbd>fst</kbd> <var>e</var> | <kbd>snd</kbd> <var>e</var> | <var>e</var><kbd>.</kbd><var>id</var> | <var>e</var><kbd>.</kbd><var>cid</var> | <kbd>hd</kbd> <var>e</var> | <kbd>tl</kbd> <var>e</var>
             | <kbd>match</kbd> <var>e</var> <kbd>with</kbd> [<kbd>|</kbd>] <var>pat</var> <kbd>-></kbd> <var>e</var> <kbd>|</kbd> ... <kbd>|</kbd> <var>pat</var> <kbd>-></kbd> <var>e</var> <kbd>end</kbd>
             | <var>e</var> <kbd>;</kbd> <var>e</var>
             | <var>id</var> <kbd>:=</kbd> <var>e</var>
@@ -223,18 +234,17 @@
             <li>type casts, e.g. <kbd> (x : bool)</kbd>.
             Two other cast operators are available: <kbd>(x :! int)</kbd>
             will not check the dynamic part statically, and <kbd>(x :!! int)</kbd>
-            will not check the dynamic part nor the static part.
-            You can write <kdb>#</kdb> as target type for a cast to the dynamic type.</li>
+            will not check the dynamic part nor the static part.</li>
             <li>type coercions, e.g. <kbd>(42 :> int)</kbd> which
             can be used locally to coerce the type of an expression into
             a supertype. Similarly to casts, the variants <kbd>(x :>! int)</kbd> and <kbd>(x :>!! int)</kbd>
-            are also available. You can write <kdb>#</kdb> as target type for a coercion to the dynamic type.</li>
+            are also available.</li>
             <li>constructors for products, lists and records</li>
             <li>anonymous functions</li>
             <li>local let binding (defined using either a variable or a <a href="#pattern">pattern</a>)</li>
             <li>a type case. In the tested type, all occurrences of the arrow constructor are of the form <tt>empty->any</tt>.
             If the tested type is missing, it is synonymous for <tt><kbd>is</kbd> <kbd>true</kbd></tt></li>
-            <li>first and second projections for pairs</li>
+            <li>first and second projections for pairs, projections for records and tags, head and tail projections for lists</li>
             <li>a pattern matching construct.
             <a href="#patterns">Patterns</a> follow a first match policy.</li>
             <li>a sequence</li>

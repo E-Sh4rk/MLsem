@@ -13,6 +13,21 @@ let record_test =
   let r3 = record_delete r2 in
   (r1,r2,r3)
 
+(* Record type operators *)
+
+type ra('a) = { a:'a }
+type rabc('a,'b,'c) = { ra('a) with b:'b ; c:'c  }
+type rac('a,'c) = { rabc('a,'b,'c) with b:empty? }
+
+let test_rac (x:rac(int,bool)) =
+  match x with
+  | {a ; c} -> a,c
+  end
+
+type a_or_b = (rabc(int,A|B,string)).b
+val test_rec_proj : a_or_b
+let test_rec_proj = A
+
 (* Encoding of ellipsis (extra arguments) *)
 
 val extract_ellipsis_param1 : { l1: any? ;; 'a? } -> 'a

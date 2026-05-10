@@ -9,75 +9,62 @@ module TyExpr : sig
         | TString | TList | TFloat | TArrowAny | TTupleAny | TTupleN of int | TEnumAny
         | TTagAny | TRecordAny 
 
-    type 'ext regexp =
-        | Epsilon | Symbol of 'ext t
-        | Union of 'ext regexp list | Concat of 'ext regexp list
-        | Star of 'ext regexp | Plus of 'ext regexp | Option of 'ext regexp
+    type regexp =
+        | Epsilon | Symbol of t
+        | Union of regexp list | Concat of regexp list
+        | Star of regexp | Plus of regexp | Option of regexp
 
-    and 'ext t =
+    and t =
+        (* Type constructors *)
+        | TDyn
         | TVar of kind * string
         | TRowVar of kind * string
         | TBase of base
-        | TCustom of string
-        | TApp of  string * 'ext t list
+        | TApp of  string * t list
         | TEnum of string
-        | TTag of string * 'ext t
-        | TTuple of 'ext t list
-        | TRecord of (string * 'ext t) list * 'ext t
-        | TSList of 'ext regexp
-        | TCons of 'ext t * 'ext t
-        | TArrow of 'ext t * 'ext t
-        | TCup of 'ext t * 'ext t
-        | TCap of 'ext t * 'ext t
-        | TDiff of 'ext t * 'ext t
-        | TNeg of 'ext t
-        | TOption of 'ext t
-        | TWhere of 'ext t * (string * string list * 'ext t) list
-        | TExt of 'ext
+        | TTag of string * t
+        | TTuple of t list
+        | TRecord of (string * t) list * t
+        | TSList of regexp
+        | TCons of t * t
+        | TArrow of t * t
+        | TOption of t
+        (* Type connectives *)
+        | TCustom of string
+        | TCup of t * t
+        | TCap of t * t
+        | TDiff of t * t
+        | TNeg of t
+        | TWhere of t * (string * string list * t) list
+        (* Type operators (may inspect their parameters!) *)
+        | TRecUpd of t * (string * t) list
+        | TRecProj of t * string
+        | TTagProj of t * string
 end
-
-(** @canonical Mlsem_types.Builder' *)
-module Builder' : sig
-    module type B = sig
-        type ext
-
-        exception TypeDefinitionError of string
-
-        type type_base = TyExpr.base
-        type type_regexp = ext TyExpr.regexp
-        type type_expr = ext TyExpr.t
-
-        type type_env
-        type var_type_env
-        val empty_tenv : type_env
-        val empty_vtenv : var_type_env
-
-        type benv = { tenv:type_env ; vtenv:var_type_env }
-        val empty_benv : benv
-
-        val type_base_to_typ : type_base -> Ty.t
-
-        val type_expr_to_typ : benv -> type_expr -> Ty.t * benv
-        val type_exprs_to_typs : benv -> type_expr list -> Ty.t list * benv
-
-        val define_abstract : benv -> string -> int -> benv
-        val define_aliases : benv -> (string * string list * type_expr) list -> benv
-        val get_enum : benv -> string -> Enum.t * benv
-        val get_tag : benv -> string -> Tag.t * benv
-
-        val is_test_type : Ty.t -> bool
-    end
-
-    module type Ext = sig
-        type t
-        val to_typ : (t TyExpr.t -> Ty.t) -> t -> Ty.t
-    end
-
-    module Make(E:Ext) : B with type ext = E.t
-end
-
-(** @canonical Mlsem_types.empty *)
-type empty = |
 
 (** @canonical Mlsem_types.Builder *)
-module Builder : Builder'.B with type ext = empty
+module Builder : sig
+    exception TypeDefinitionError of string
+
+    type type_env
+    type var_type_env
+    val empty_tenv : type_env
+    val empty_vtenv : var_type_env
+
+    type benv = { tenv:type_env ; vtenv:var_type_env }
+    val empty_benv : benv
+
+    val type_base_to_typ : TyExpr.base -> Ty.t
+
+    val type_expr_to_typ : benv -> TyExpr.t -> Ty.t * benv
+    val type_exprs_to_typs : benv -> TyExpr.t list -> Ty.t list * benv
+    val type_expr_to_gty : benv -> TyExpr.t -> GTy.t * benv
+    val type_exprs_to_gtys : benv -> TyExpr.t list -> GTy.t list * benv
+
+    val define_abstract : benv -> string -> int -> benv
+    val define_aliases : benv -> (string * string list * TyExpr.t) list -> benv
+    val get_enum : benv -> string -> Enum.t * benv
+    val get_tag : benv -> string -> Tag.t * benv
+
+    val is_test_type : Ty.t -> bool
+end

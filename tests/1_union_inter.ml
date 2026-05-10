@@ -181,6 +181,8 @@ let is_string = fun x ->
      if x is string then true else false
 let is_int = fun x ->
      if x is int then true else false
+let is_bool = fun x ->
+     if x is bool then true else false
 
 val f : (int | string) -> int
 val g : (int, int) -> int
@@ -311,3 +313,10 @@ let implicit14 = fun input ->
     else if is_int(fst extra) is true then
         add (strlen input) (fst extra)
     else 0
+
+(* Example connectives from ifT-benchmark *)
+(* https://github.com/utahplt/ifT-benchmark *)
+
+val connectives : (string|int|bool) -> int
+let connectives x =
+  if and_ (not_ (is_bool x), not_ (is_int x)) is true then strlen x else 0

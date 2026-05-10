@@ -1,16 +1,55 @@
 
 open Effect
 
+module PrinterCfg = struct
+    open Sstt.Printer
+    open Sstt.Extensions
+    let bool_pp = ref Bools.print
+    let float_pp = ref Floats.print
+    let string_pp = ref Strings.print
+    let lists_pp = ref Lists.print
+    let chars_pp = ref Chars.print
+    let abstract_pp = ref Abstracts.print
+    let unit_pp = ref "()"
+    let dyn_pp = ref "dyn"
+    let descr_pp = ref print_descr_ctx
+    let pp = ref print
+    let abstract_types : Sstt.Tag.t list ref = ref []
+    let extra_params : params list ref = ref []
+
+    let set_bool_printer f = bool_pp := f
+    let set_float_printer f = float_pp := f
+    let set_string_printer f = string_pp := f
+    let set_list_printer f = lists_pp := f
+    let set_char_printer f = chars_pp := f
+    let set_abstract_printer f = abstract_pp := f
+    let set_unit_printer f = unit_pp := f
+    let set_dyn_printer f = dyn_pp := f
+    let set_descr_printer f = descr_pp := f
+    let set_printer f = pp := f
+    let add_abstract_type t = abstract_types := t::!abstract_types
+    let add_printer_param p = extra_params := p::!extra_params
+
+    let printer_params () =
+      let bools = Bools.tag, builder ~to_t:Bools.to_t ~map:Bools.map ~print:!bool_pp in
+      let floats = Floats.tag, builder ~to_t:Floats.to_t ~map:Floats.map ~print:!float_pp in
+      let strings = Strings.tag, builder ~to_t:Strings.to_t ~map:Strings.map ~print:!string_pp in
+      let lists = Lists.tag, builder ~to_t:Lists.to_t ~map:Lists.map ~print:!lists_pp in
+      let chars = Chars.tag, builder ~to_t:Chars.to_t ~map:Chars.map ~print:!chars_pp in
+      let abstracts =
+        !abstract_types |> List.map (fun t ->
+          t, builder ~to_t:Abstracts.to_t ~map:Abstracts.map ~print:(!abstract_pp t)) in
+      let units = Sstt.Descr.mk_tuple [] |> Sstt.Ty.mk_descr, !unit_pp in
+      { extensions=[bools;floats;strings;lists;chars]@abstracts ; aliases=[units] }::!extra_params
+      |> merge_params
+
+    let print_descr_ctx i a fmt d = !descr_pp i a fmt d
+    let print_descr fmt d = print_descr_ctx Sstt.Prec.min_prec Sstt.Prec.NoAssoc fmt d
+    let print fmt t = !pp fmt t
+    let print_dyn fmt () = Format.fprintf fmt "%s" !dyn_pp
+end
+
 module PEnv = struct
-  let pparams = ref (
-    [
-      Sstt.Extensions.Bools.printer_params ;
-      Sstt.Extensions.Floats.printer_params ;
-      Sstt.Extensions.Strings.printer_params ;
-      Sstt.Extensions.Lists.printer_params ;
-      Sstt.Extensions.Chars.printer_params
-    ] |> Sstt.Printer.merge_params
-  )
 
   type gstring (* gap string *) = string (* name *)
                                 * (string * Sstt.Var.t) list (* gaps (type variables) *)
@@ -20,7 +59,6 @@ module PEnv = struct
   type _ Effect.t += Update: t -> unit Effect.t
   type _ Effect.t += Get: t Effect.t
 
-  let add_printer_param p = pparams := Sstt.Printer.merge_params [!pparams ; p]
   let printer_params' s =
     let penv = perform Get in
     let paliases =
@@ -34,9 +72,8 @@ module PEnv = struct
           ty, str
         )
     in
-    let aliases = penv.aliases in
-    let pparams' = { Sstt.Printer.empty_params with aliases=aliases@paliases } in
-    Sstt.Printer.merge_params [ !pparams ; pparams' ]
+    let pparams = { Sstt.Printer.empty_params with aliases=penv.aliases@paliases } in
+    Sstt.Printer.merge_params [ PrinterCfg.printer_params () ; pparams ]
   let printer_params () = printer_params' Sstt.Subst.identity
 
   let empty = { aliases = [] ; paliases = [] }
@@ -89,10 +126,10 @@ module PEnv = struct
       in
       if List.is_empty t.defs then
         let d = t.main |> Sstt.Printer.map_descr rename_vars in
-        Sstt.Printer.print_descr_ctx prio Sstt.Prec.NoAssoc fmt d
+        PrinterCfg.print_descr_ctx prio Sstt.Prec.NoAssoc fmt d
       else
         let t = t |> Sstt.Printer.map rename_vars in
-        Format.fprintf fmt "(%a)" Sstt.Printer.print t
+        Format.fprintf fmt "(%a)" PrinterCfg.print t
     in
     let str = Format.asprintf "@[<h>%s(%a)@]" name (Sstt.Prec.print_seq pp_param sep) ps in
     perform (Update { empty with paliases=[ty, (str, StrMap.bindings !hmap)] })
@@ -101,9 +138,12 @@ end
 module Ty = struct
   type t = Sstt.Ty.t
   
-  let pp fmt ty = Sstt.Printer.print_ty (PEnv.printer_params ()) fmt ty
+  let pp fmt ty =
+    Sstt.Printer.get (PEnv.printer_params ()) ty
+    |> PrinterCfg.print fmt
   let pp' s fmt ty =
-    Sstt.Printer.print_ty (PEnv.printer_params' s) fmt (Sstt.Subst.apply s ty)
+    Sstt.Printer.get (PEnv.printer_params' s) (Sstt.Subst.apply s ty)
+    |> PrinterCfg.print fmt
   let pp_raw fmt ty =
     let t = Sstt.Printer.get ~factorize:false Sstt.Printer.empty_params ty in
     Sstt.Printer.print fmt t
@@ -116,9 +156,7 @@ module Ty = struct
   let int = Sstt.Intervals.any |> Sstt.Descr.mk_intervals |> Sstt.Ty.mk_descr
   let float = Sstt.Extensions.Floats.any
   let char = Sstt.Extensions.Chars.any
-  let unit =
-    let ty = Sstt.Descr.mk_tuple [] |> Sstt.Ty.mk_descr in
-    PEnv.add_printer_param { Sstt.Printer.empty_params with aliases=[ty, "()"] } ; ty
+  let unit = Sstt.Descr.mk_tuple [] |> Sstt.Ty.mk_descr
   let string = Sstt.Extensions.Strings.any
 
   let interval i1 i2 =
@@ -179,8 +217,7 @@ module Abstract = struct
   let define name n =
     let vs = List.init n (fun _ -> Sstt.Extensions.Abstracts.Inv) in
     let tag = Sstt.Extensions.Abstracts.define name vs in
-    let printer = Sstt.Extensions.Abstracts.printer_params tag in
-    PEnv.add_printer_param printer ; tag
+    PrinterCfg.add_abstract_type tag ; tag
   let arity = Sstt.Extensions.Abstracts.arity
   let mk = Sstt.Extensions.Abstracts.mk
   let any = Sstt.Extensions.Abstracts.mk_any
@@ -216,19 +253,23 @@ module Abstract = struct
     ) in
     construct (pos, comps)
   let trans_vdescr f = Sstt.VDescr.map (trans_descr f)
-  let transform f ty =
+  let exit_on_abstract ty =
     let open Sstt in
-    try
-    let _ = ty |> Ty.nodes |> List.map (fun ty ->
-      Ty.def ty |> VDescr.map (fun d ->
+    Ty.def ty |> VDescr.map (fun d ->
         let (tags,_) = Descr.get_tags d |> Tags.components in
         List.map (fun tc ->
           if TagComp.tag tc |> Extensions.Abstracts.is_abstract
           then raise Exit ; tc) tags |> ignore ;
         d
-      )) in
-    ty
-  with Exit -> Transform.transform (trans_vdescr f) ty
+      ) |> ignore
+  let top_transform f ty =
+    let open Sstt in
+    try exit_on_abstract ty ; ty
+    with Exit -> Ty.def ty |> trans_vdescr f |> Ty.of_def
+  let transform f ty =
+    let open Sstt in
+    try ty |> Ty.nodes |> List.iter exit_on_abstract ; ty
+    with Exit -> Transform.transform (trans_vdescr f) ty
 end
 
 module Tuple = struct
@@ -291,6 +332,7 @@ module Record = struct
       Hashtbl.add labels str lbl ; Hashtbl.add names lbl str ; str
 
   module LabelMap = Sstt.Op.Records.Atom.LabelMap
+  module LabelMap' = Sstt.Op.Records'.Atom.LabelMap
   let mk tail bindings =
     let bindings = bindings |>
       List.map (fun (str, (ty, opt)) -> (to_label str, (ty, opt))) |>
@@ -316,18 +358,34 @@ module Record = struct
     t |> Sstt.Ty.get_descr |> Sstt.Descr.get_records
     |> Sstt.Op.Records.as_union |> List.map (fun a ->
       let bindings = a.Sstt.Op.Records.Atom.bindings |> LabelMap.bindings |>
-        List.map (fun (lbl, (ty,opt)) -> (from_label lbl, (ty,opt))) in
+        List.map (fun (lbl, oty) -> (from_label lbl, oty)) in
+      bindings, a.tail
+    )
+  let dnf' t =
+    t |> Sstt.Ty.get_descr |> Sstt.Descr.get_records
+    |> Sstt.Op.Records'.as_union |> List.map (fun a ->
+      let bindings = a.Sstt.Op.Records'.Atom.bindings |> LabelMap'.bindings |>
+        List.map (fun (lbl, fty) -> (from_label lbl, fty)) in
       bindings, a.tail
     )
   let of_dnf lst =
     let lst = lst |> List.map (fun (bs, tail) ->
         let bindings = bs |>
-          List.map (fun (str, (ty,opt)) -> (to_label str, (ty,opt))) |> LabelMap.of_list
+          List.map (fun (str, oty) -> (to_label str, oty)) |> LabelMap.of_list
         in
         { Sstt.Op.Records.Atom.tail ; bindings }
       )
     in
     Sstt.Op.Records.of_union lst |> Sstt.Descr.mk_records |> Sstt.Ty.mk_descr
+  let of_dnf' lst =
+    let lst = lst |> List.map (fun (bs, tail) ->
+        let bindings = bs |>
+          List.map (fun (str, fty) -> (to_label str, fty)) |> LabelMap'.of_list
+        in
+        { Sstt.Op.Records'.Atom.tail ; bindings }
+      )
+    in
+    Sstt.Op.Records'.of_union lst |> Sstt.Descr.mk_records |> Sstt.Ty.mk_descr
 
   let proj t field =
     t |> Sstt.Ty.get_descr |> Sstt.Descr.get_records

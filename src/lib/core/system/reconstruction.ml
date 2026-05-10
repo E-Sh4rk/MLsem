@@ -7,7 +7,7 @@ open Mlsem_utils
 
 (* ===== Initial Annot ===== *)
 
-let initial ?(direct_narrowing=false) refinements e =
+let initial ?(direct_narrowing=true) ?(partition_narrowing=true) refinements e =
   let new_renaming () =
     let s = ref Subst.identity in
     fun dom ->
@@ -20,9 +20,9 @@ let initial ?(direct_narrowing=false) refinements e =
     TVar.mk KInfer None |> TVar.typ
   in
   let r =
-    if direct_narrowing
-    then Refinement.Partitioner.from_refinements (Refinement.Refinements.empty)
-    else Refinement.Partitioner.from_refinements refinements
+    if partition_narrowing
+    then Refinement.Partitioner.from_refinements refinements
+    else Refinement.Partitioner.from_refinements (Refinement.Refinements.empty)
   in
   let rec initial r (eid, e) =
     let open IAnnot in
@@ -58,6 +58,7 @@ let initial ?(direct_narrowing=false) refinements e =
       then Refinement.Refinements.get refinements eid
       else REnv.empty
     in
+    (* Format.printf "Refinements:@.%a@." REnv.pp refinement ; *)
     match ann with
     | Left a -> A (Annot.nc refinement a)
     | Right (rid, ann) -> I { rid ; ann ; refinement }
@@ -97,7 +98,7 @@ let abstract_factors v ty =
         res := (Ty.cap ps ns)::(!res) ; false
     )
   in
-  let remaining = Abstract.transform aux factor in
+  let remaining = Abstract.top_transform aux factor in
   match !res with
   | [] -> [ Subst.identity ]
   | res -> (remaining::res) |> List.map (fun ty -> Subst.singleton1 v ty)
@@ -149,13 +150,13 @@ let minimize_new_tvars mono sol =
   let res = List.fold_left minimize_binding1 sol (Subst.bindings1 sol) in
   List.fold_left minimize_binding2 res (Subst.bindings2 sol)
 
-let tallying_simpl mono tvars res cs =
+let tally_simpl mono tvars res cs =
   let ntvars s = MVarSet.union tvars (Subst.restrict tvars s |> Subst.intro) in
   let is_better (s1,r1) (s2,r2) =
     let mono2 = List.fold_left MVarSet.union MVarSet.empty
       [ mono ; ntvars s2 ; TVOp.vars r2 ] in
     TVOp.decompose mono (Subst.restrict tvars s1) (Subst.restrict tvars s2)
-    |> List.exists (fun s' -> TVOp.tallying mono2 [(Subst.apply s' r1, r2)] <> [])
+    |> List.exists (fun s' -> TVOp.tally ~record:false mono2 [(Subst.apply s' r1, r2)] <> [])
   in
   let not_redundant s ss =
     ss |> List.for_all (fun s' -> is_better s' s |> not)
@@ -165,7 +166,7 @@ let tallying_simpl mono tvars res cs =
   (* Format.printf "with tvars=%a@." (Utils.pp_list TVar.pp)
     (TVarSet.destruct tvars) ; *)
   (* Format.printf "with env=%a@." Env.pp env ; *)
-  tallying_fields mono cs
+  tally_fields mono cs
   |> List.concat_map (abstract_factors tvars)
   |> List.map (minimize_new_tvars (MVarSet.union mono tvars))
   |> List.map (fun s -> s, Subst.apply s res)
@@ -180,14 +181,14 @@ let tallying_simpl mono tvars res cs =
   |> tsort (fun (_,r1) (_,r2) -> Ty.leq r1 r2)
   (* |> List.map (fun (s,r) -> Format.printf "%a@.%a@." Subst.pp_raw s Ty.pp r ; s,r) *)
 
-let tallying_simpl env res cs =
+let tally_simpl env res cs =
   let mono = MVarSet.of_set (TVar.all_vars KNoInfer) (RVar.all_vars KNoInfer) in
   let tvars = Env.tvars env in
   let fc = TVOp.get_field_ctx (MVarSet.proj2 mono) (cs |> List.concat_map (fun (a,b) -> [a;b])) in
   let tvars = MVarSet.elements2 tvars |> List.fold_left
     (fun acc rv -> MVarSet.union acc (TVOp.fvars_associated_with fc rv |> MVarSet.of_set2)) tvars in
   cs |> List.map (fun (a,b) -> (TVOp.decorrelate_fields fc a, TVOp.decorrelate_fields fc b))
-     |> tallying_simpl mono tvars (TVOp.decorrelate_fields fc res)
+     |> tally_simpl mono tvars (TVOp.decorrelate_fields fc res)
      |> List.map (fun (s,r) -> TVOp.recombine_fields' fc s, TVOp.recombine_fields fc r)
 
 (* Reconstruction algorithm *)
@@ -232,7 +233,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
   let app res t1 t2 =
     let t1, t2 = GTy.lb t1, GTy.lb t2 in
     let arrow = Arrow.mk t2 res in
-    let ss = tallying_simpl env res [(t1, arrow)] in
+    let ss = tally_simpl env res [(t1, arrow)] in
     let ss = if !Config.infer_overload || Ty.is_empty t2 then ss else
       ss |> List.filter (fun (s, _) -> Subst.apply s t2 |> Ty.non_empty)
     in
@@ -259,7 +260,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
       let tys = List.map GTy.lb tys in
       let ss =
         doms |> List.concat_map (fun doms ->
-        tallying_simpl env (Ast.construct c tys) (List.combine tys doms)
+        tally_simpl env (Ast.construct c tys) (List.combine tys doms)
       ) in
       log "untypeable constructor" (fun fmt ->
         Format.fprintf fmt "expected: @[<h>%a@]@.given: @[<h>%a@]"
@@ -292,7 +293,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
     | AllOk (annots,tys') ->
       let tys' = List.map GTy.lb tys' in
       let cs = List.combine tys' (List.map GTy.lb tys) in
-      let ss = tallying_simpl env (Tuple.mk tys') cs in
+      let ss = tally_simpl env (Tuple.mk tys') cs in
       let ok_ann = ac (Annot.ALambdaRec (List.combine tys annots)) in
       log "untypeable recursive function" (fun fmt ->
         Format.fprintf fmt "cannot unify the body with self"
@@ -361,7 +362,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
     | Ok (annot', s) ->
       let ty = Ast.domain_of_proj p res in
       let s = GTy.lb s in
-      let ss = tallying_simpl env res [(s, ty)] in
+      let ss = tally_simpl env res [(s, ty)] in
       log "untypeable projection" (fun fmt ->
         Format.fprintf fmt "argument: @[<h>%a@]" Ty.pp s
         ) ;
@@ -387,7 +388,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
       let lbc, ubc = (GTy.lb s, GTy.lb t), (GTy.ub s, GTy.ub t) in
       let cs = match c with
         | Check -> [lbc;ubc] | CheckStatic -> [lbc] | NoCheck -> [] in
-      let ss = tallying_simpl env (GTy.lb (GTy.cap t s)) cs in
+      let ss = tally_simpl env (GTy.lb (GTy.cap t s)) cs in
       log "untypeable cast" (fun fmt ->
         if c = Check then
           Format.fprintf fmt "expected: @[<h>%a@]@.given: @[<h>%a@]" GTy.pp t GTy.pp s
@@ -404,7 +405,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
       let lbc, ubc = (GTy.lb s, GTy.lb t), (GTy.ub s, GTy.ub t) in
       let cs = match c with
         | Check -> [lbc;ubc] | CheckStatic -> [lbc] | NoCheck -> [] in
-      let ss = tallying_simpl env (GTy.lb t) cs in
+      let ss = tally_simpl env (GTy.lb t) cs in
       log "untypeable coercion" (fun fmt ->
         if c = Check then
           Format.fprintf fmt "expected: @[<h>%a@]@.given: @[<h>%a@]" GTy.pp t GTy.pp s
@@ -451,7 +452,6 @@ and refine_ann r cache env (rid, annot) (id, e) =
     assert false
 and refine' cache env annot e =
   let tvars = Env.tvars env in
-  let ic_norefinement ann = IAnnot.I { rid = Rid.dummy ; ann ; refinement=REnv.empty } in
   let subst_disjoint s =
     MVarSet.inter (Subst.domain s) tvars |> MVarSet.is_empty
   in
@@ -469,8 +469,9 @@ and refine' cache env annot e =
       let coverage = res, REnv.substitute s r in
       { IAnnot.coverage=(Some coverage) ; ann }
       ) in
-    let annot = IAnnot.AInter (branches@default) |> ic_norefinement in
-    refine' cache env annot e
+    let ann = IAnnot.AInter (branches@default) in
+    let ann = IAnnot.I { rid = Rid.dummy ; ann ; refinement=REnv.empty } in
+    refine' cache env ann e
   | Subst (ss, a1, a2, r) -> Subst (ss, a1, a2, r)
 and refine_b' cache env (rid, bannot) e s tau =
   let with_no_res ss = ss |> List.map (fun (s,_) -> (s, None)) in
@@ -479,7 +480,7 @@ and refine_b' cache env (rid, bannot) e s tau =
   | IAnnot.BMaybe annot ->
     let unsat = Checker.is_type_test_unsat ~tau s in
     if !Config.infer_overload then
-      let ss = tallying_simpl env Ty.empty [(unsat, Ty.empty)] in
+      let ss = tally_simpl env Ty.empty [(unsat, Ty.empty)] in
       Subst (with_no_res ss, IAnnot.BSkip, IAnnot.BType annot, REnv.empty)
     else if Ty.is_empty unsat
     then retry_with (IAnnot.BSkip)
@@ -528,4 +529,5 @@ let refine env iannot e =
   | Subst _ -> failwith "Top-level environment should not contain an unresolved type variable."
   | Ok (a,_) -> a
 
-let infer ?(direct_narrowing=false) env r e = refine env (initial ~direct_narrowing r e) e
+let infer ?(direct_narrowing=true) ?(partition_narrowing=true) env r e =
+  refine env (initial ~direct_narrowing ~partition_narrowing r e) e

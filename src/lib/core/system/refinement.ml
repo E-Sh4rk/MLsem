@@ -26,11 +26,11 @@ end
 
 let rec typeof env (_,e) =
   match e with
-  | TypeCoerce (_, ty, _) -> ty
-  (* The cases below are necessary because of pattern matching encoding *)
+  | Value gty -> gty
   | Var v when Env.mem v env -> Env.find v env |> TyScheme.get_fresh |> snd
   | Projection (p, e) -> GTy.map (Ast.proj p) (typeof env e )
   | TypeCast (e, ty, _) -> GTy.cap (typeof env e) ty
+  | TypeCoerce (_, ty, _) -> ty
   | _ -> GTy.any
 let typeof_def env e = Checker.generalize ~e env (typeof env e)
 
@@ -53,7 +53,7 @@ let sufficient_refinements env e t =
       | [] -> []
       | [arrows] ->
         let t1 = Arrow.of_dnf [arrows] in
-        let res = tallying mono [ (t1, Arrow.mk (TVar.typ alpha) t) ] in
+        let res = tally mono [ (t1, Arrow.mk (TVar.typ alpha) t) ] in
         res |> List.concat_map (fun sol ->
             let targ = Subst.find1 sol alpha |> top_instance mono in
             if MVarSet.subset (vars targ) mono |> not then [] else aux env e2 targ
@@ -99,7 +99,11 @@ let refine env e t =
   let rec aux renv renvs =
     let renvs = renvs |> List.map (fun renv' ->
       renv' |> REnv.filter (fun v ty ->
-        let ty' = Env.find v env |> TyScheme.get_fresh |> snd |> GTy.ub in
+        let ty' =
+          if Env.mem v env
+          then Env.find v env |> TyScheme.get_fresh |> snd |> GTy.ub
+          else Ty.any
+        in
         let ty'' = REnv.find' v renv in
         Ty.leq (Ty.cap ty' ty'') ty |> not
       )
@@ -121,18 +125,19 @@ let refinements
   let add_anonymous_refinement env e t =
     res := Refinements.add_anonymous !res (refine env e t)
   in
-  let rec aux_lambda env (d,v,e) =
-    let t = TyScheme.mk_mono d in
-    aux (Env.add v t env) e
-  and aux env (id,e) : unit =
+  let rec aux env (id,e) : unit =
     let extra = Hashtbl.find_all extra id in
     extra |> List.iter (fun ty -> add_anonymous_refinement env (id,e) ty) ;
     match e with
     | Value _ | Var _ -> ()
     | Constructor (_, es) -> es |> List.iter (aux env)
     | Projection (_, e) | TypeCoerce (e, _, _) | Operation (_, e) -> aux env e
-    | Lambda (d, v, e) -> aux_lambda env (d,v,e)
-    | LambdaRec lst -> lst |> List.iter (aux_lambda env)
+    | Lambda (d, v, e) -> aux (Env.add v (TyScheme.mk_mono d) env) e
+    | LambdaRec lst ->
+      let env = List.fold_left (fun env (ty,v,_) ->
+        Env.add v (TyScheme.mk_mono ty) env
+      ) env lst in
+      lst |> List.map (fun (_,_,e) -> e) |> List.iter (aux env)
     | TypeCast (e, tau, _) ->
       if refine_on_casts then add_anonymous_refinement env e (GTy.ub tau) ;
       aux env e
@@ -174,7 +179,7 @@ let partition dom ts =
 module Partitioner = struct
   type t = REnv.t list
 
-  let isolate_tuple_comp (n,lst) =
+  (* let isolate_tuple_comp (n,lst) =
     lst |>
     List.filter (function [] -> false | _ -> true) |>
     List.map (fun atom -> n, [atom])
@@ -184,12 +189,12 @@ module Partitioner = struct
     let comps = comps |> List.map (fun cp -> Tuple.recompose ([cp], false)) in
     comps
   let isolate_record_conjuncts t =
-    Record.dnf t |>
+    Record.dnf' t |>
     List.filter (function [], _ -> false | _, _ -> true) |>
-    List.map (fun atom -> Record.of_dnf [atom])
+    List.map (fun atom -> Record.of_dnf' [atom])
   let isolate_conjuncts t =
     (* Necessary because of pattern matching encoding for uncurrified functions *)
-    t::(isolate_tuple_conjuncts t)@(isolate_record_conjuncts t)
+    t::(isolate_tuple_conjuncts t)@(isolate_record_conjuncts t) *)
 
   let from_refinements rs = Refinements.all rs
   let filter_compatible lst v ty =
@@ -203,7 +208,7 @@ module Partitioner = struct
       if REnv.mem v renv then Some (REnv.find v renv) else None)
     in
     let part_for_dom dom =
-      tys |> partition dom |> List.concat_map isolate_conjuncts |> partition dom
+      tys |> partition dom (*|> List.concat_map isolate_conjuncts |> partition dom*)
     in
     List.concat_map part_for_dom initial
     (* |> (fun tys -> Format.printf "Partition for %a: %a@." Variable.pp v

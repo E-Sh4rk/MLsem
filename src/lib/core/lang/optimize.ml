@@ -75,6 +75,28 @@ let optimize_dataflow e =
     { env with mut = VarMap.add v (v'::(get_muts env v)) env.mut }|> norm
   in
   let get_preferred_mut env v = match get_muts env v with hd::_ -> hd | [] -> v in
+  let add_immut_def (env, ctx) tys v e =
+    let vimmut = MVariable.refresh MVariable.Immut v in
+    let env = add_immut env v vimmut in
+    let ctx = fill ctx (Eid.unique (), Let (tys, vimmut, e, hole)) in
+    (env,ctx,vimmut)
+  in
+  let add_immut_alias (env, ctx) v =
+    if has_immut env v then
+      (env,ctx,get_immut env v)
+    else
+      add_immut_def (env, ctx) [] v (Eid.unique (), Var (get_preferred_mut env v))
+  in
+  let add_mut_alias (env,ctx) v =
+    if has_immut env v then
+      let vdef = get_immut env v in
+      let vmut = MVariable.refresh (MVariable.kind v) v in
+      let env = add_mut env v vmut in
+      let ctx = fill ctx (Eid.unique (), Let ([], vmut, (Eid.unique (), Var vdef), hole)) in
+      (env,ctx)
+    else
+      (env,ctx)
+  in
   let reset_env env =
     { captured=env.captured ; mut=VarMap.empty ; immut=VarMap.empty }
   in
@@ -86,11 +108,8 @@ let optimize_dataflow e =
       (* It would be unsound to move an expr of type empty outside *)
       let env, e = aux' env e in
       env, hole, (id, Voidify e)
-    | Var v when has_immut env v -> env, hole, (id, Var (get_immut env v))
     | Var v ->
-      let v' = MVariable.refresh MVariable.Immut v in
-      let env = add_immut env v v' in
-      let ctx = Eid.unique (), Let ([], v', (Eid.unique (), Var (get_preferred_mut env v)), hole) in
+      let env,ctx,v' = add_immut_alias (env,hole) v in
       env, ctx, (id, Var v')
     | Constructor (c, es) ->
       let env, ctx, es = aux_order (eval_order_of_constructor c) env es in
@@ -108,7 +127,13 @@ let optimize_dataflow e =
       (id, LambdaRec (List.map2 (fun (d,v,_) e -> d,v,e) lst es))
     | Ite (e, ty, e1, e2) ->
       let env, ctx, e = aux env e in
-      let (env1, e1), (env2, e2) = aux' env e1, aux' env e2 in
+      let narrowed_vars e =
+        read_vars e |> VarSet.filter MVariable.is_mutable |> VarSet.elements
+      in
+      let (env1, ctx1) = List.fold_left add_mut_alias (env, hole) (narrowed_vars e1) in
+      let (env2, ctx2) = List.fold_left add_mut_alias (env, hole) (narrowed_vars e2) in
+      let (env1, e1), (env2, e2) = aux' env1 e1, aux' env2 e2 in
+      let e1, e2 = fill ctx1 e1, fill ctx2 e2 in
       merge_envs' env [env1 ; env2], ctx, (id, Ite (e, ty, e1, e2))
     | App (e1, e2) ->
       let env, ctx, es = aux_order !Config.app_eval_order env [e1;e2] in
@@ -123,11 +148,10 @@ let optimize_dataflow e =
       let env, ctx, e = aux env e in
       env, (id, Declare (v, ctx)), e
     | Let (tys, v, e1, e2) when MVariable.is_mutable v ->
-      let v' = MVariable.refresh MVariable.Immut v in
       let env, ctx1, e1 = aux env e1 in
-      let ctx1 = fill ctx1 (Eid.unique (), Let (tys, v', e1, hole)) in
+      let env,ctx1,v' = add_immut_def (env,ctx1) tys v e1 in
       let ctx1 = fill ctx1 (Eid.unique (), Let ([], v, (Eid.unique (), Var v'), hole)) in
-      let env, ctx2, e2 = aux (add_immut env v v') e2 in
+      let env, ctx2, e2 = aux env e2 in
       env, fill ctx1 ctx2, e2
     | Let (tys, v, e1, e2) ->
       let env, ctx1, e1 = aux env e1 in
@@ -141,13 +165,9 @@ let optimize_dataflow e =
       env, ctx, (id, TypeCoerce (e, ty, c))
     | VarAssign (v, e) ->
       let env, ctx, e = aux env e in
-      let vimmut = MVariable.refresh MVariable.Immut v in
-      let env = add_immut env v vimmut in
-      let ctx = fill ctx (Eid.unique (), Let ([], vimmut, e, hole)) in
-      let vmut = MVariable.refresh (MVariable.kind v) v in
-      let env = add_mut env v vmut in
-      let ctx = fill ctx (Eid.unique (), Declare (vmut, hole)) in
+      let env,ctx,vimmut = add_immut_def (env,ctx) [] v e in
       let vmuts = get_muts env v in
+      let env,ctx = add_mut_alias (env,ctx) v in
       let e = Eid.refresh id, VarAssign (v, (Eid.unique (), Var vimmut)) in
       let add_assign e v =
         Eid.refresh id, Seq (
