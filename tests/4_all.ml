@@ -28,6 +28,8 @@ let test_annot (x:'a|bool) (y:'a|int) = (x,y)
 (* ========= SIMPLE CONSTRUCTOR TESTS ======== *)
 
 let proj_a (A(v)) = v
+val proj_a' : A('a) -> (A('a)).A
+let proj_a' v = v.A
 let proj_ab x =
   match x with
   | A(v) -> v
