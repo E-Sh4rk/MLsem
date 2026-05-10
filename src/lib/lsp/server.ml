@@ -181,5 +181,6 @@ let rec loop ~shutdown_received =
 
 let run () =
   Log.setup () ;
+  Log.Server.info (fun m -> m "server started") ;
   try loop ~shutdown_received:false with
   | Exit_requested code -> exit code
