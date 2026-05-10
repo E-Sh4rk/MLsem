@@ -156,7 +156,7 @@ let tallying_simpl mono tvars res cs =
     let mono2 = List.fold_left MVarSet.union MVarSet.empty
       [ mono ; ntvars s2 ; TVOp.vars r2 ] in
     TVOp.decompose mono (Subst.restrict tvars s1) (Subst.restrict tvars s2)
-    |> List.exists (fun s' -> TVOp.tallying mono2 [(Subst.apply s' r1, r2)] <> [])
+    |> List.exists (fun s' -> TVOp.tally ~record:false mono2 [(Subst.apply s' r1, r2)] <> [])
   in
   let not_redundant s ss =
     ss |> List.for_all (fun s' -> is_better s' s |> not)
@@ -166,7 +166,7 @@ let tallying_simpl mono tvars res cs =
   (* Format.printf "with tvars=%a@." (Utils.pp_list TVar.pp)
     (TVarSet.destruct tvars) ; *)
   (* Format.printf "with env=%a@." Env.pp env ; *)
-  tallying_fields mono cs
+  tally_fields mono cs
   |> List.concat_map (abstract_factors tvars)
   |> List.map (minimize_new_tvars (MVarSet.union mono tvars))
   |> List.map (fun s -> s, Subst.apply s res)

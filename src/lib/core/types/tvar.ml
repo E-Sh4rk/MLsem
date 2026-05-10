@@ -267,11 +267,11 @@ module TVOp = struct
     |> clean ~pos1:Ty.any ~neg1:Ty.empty ~pos2:Row.any ~neg2:Row.empty mono
     |> recombine_fields fc
 
-  let tallying mono cs =
-    Recording_internal.record mono cs ;
+  let tally ?(record=true) mono cs =
+    if record then Recording_internal.record mono cs ;
     Sstt.Tallying.tally mono cs
-  let tallying_fields mono cs =
-    Recording_internal.record mono cs ;
+  let tally_fields ?(record=true) mono cs =
+    if record then Recording_internal.record mono cs ;
     Sstt.Tallying.tally_fields mono cs
   let decompose mono t1 t2 =
     Sstt.Tallying.decompose mono t1 t2

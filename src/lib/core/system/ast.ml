@@ -215,7 +215,7 @@ let coerce c ty (id,t) =
     let unify ty1 ty2 =
       let s = !cs in
       let ty1, ty2 = GTy.substitute s ty1, GTy.substitute s ty2 in
-      match TVOp.tallying mono
+      match TVOp.tally mono
         [(GTy.lb ty1, GTy.lb ty2) ; (GTy.lb ty2, GTy.lb ty1) ;
         (GTy.ub ty1, GTy.ub ty2) ; (GTy.ub ty2, GTy.ub ty1)]
       with

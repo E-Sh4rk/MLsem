@@ -90,7 +90,7 @@ module TVOp : sig
     val bot_instance : MVarSet.t -> Ty.t -> Ty.t
     val top_instance : MVarSet.t -> Ty.t -> Ty.t
 
-    val tallying : MVarSet.t -> (Ty.t * Ty.t) list -> Subst.t list
+    val tally : ?record:bool -> MVarSet.t -> (Ty.t * Ty.t) list -> Subst.t list
     val decompose : MVarSet.t -> Subst.t -> Subst.t -> Subst.t list
 
     val factorize : TVarSet.t * TVarSet.t -> Ty.t -> Ty.t * Ty.t
@@ -104,5 +104,5 @@ module TVOp : sig
     val recombine_fields' : field_ctx -> Subst.t -> Subst.t
     val fvars_associated_with : field_ctx -> RVar.t -> RVarSet.t
     val rvar_associated_with : field_ctx -> RVar.t -> (RVar.t * string) option
-    val tallying_fields : MVarSet.t -> (Ty.t * Ty.t) list -> Subst.t list
+    val tally_fields : ?record:bool -> MVarSet.t -> (Ty.t * Ty.t) list -> Subst.t list
 end
