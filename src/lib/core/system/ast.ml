@@ -255,3 +255,180 @@ let coerce c ty (id,t) =
   in
   let res = aux ty (id,t) in
   apply_subst !cs res
+
+(* ===== PRETTY PRINTER ===== *)
+
+let pp_raw = pp
+
+let pp_check fmt c = match c with
+  | Check -> ()
+  | CheckStatic -> Format.pp_print_string fmt "!"
+  | NoCheck -> Format.pp_print_string fmt "!!"
+
+let e_prio = function
+  | Value _ | Var _ -> 100
+  | Constructor (Tuple _, _) | Constructor (Rec _, _) | Constructor (Enum _, _) -> 100
+  | Constructor (Tag _, _) -> 90
+  | Constructor (Cons, _) -> 70
+  | Constructor _ -> 80
+  | Projection _ -> 90
+  | App _ | Operation _ -> 80
+  | Alt _ -> 50
+  | Lambda _ | LambdaRec _ | Ite _ | Let _ | TypeCast _ | TypeCoerce _ -> 10
+
+let rec pp fmt (_, e) = pp_e fmt e
+
+and pp_prio prio fmt ((_, e) as t) =
+  if e_prio e < prio then Format.fprintf fmt "@[(%a)@]" pp t
+  else pp_e fmt e
+
+and pp_e fmt e = match e with
+  | Value gty ->
+    Format.fprintf fmt "@[<hov><%a>@]" GTy.pp gty
+
+  | Var v ->
+    Variable.pp_uniq fmt v
+
+  | Constructor (Tuple _, []) ->
+    Format.pp_print_string fmt "()"
+
+  | Constructor (Tuple _, es) ->
+    Format.fprintf fmt "@[<1>(%a)@]"
+      (Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt ",@ ")
+        (pp_prio 0)) es
+
+  | Constructor (Cons, [h; t]) ->
+    Format.fprintf fmt "@[<hov 2>%a ::@ %a@]"
+      (pp_prio 80) h (pp_prio 70) t
+
+  | Constructor (Rec (labels, _), es) ->
+    Format.fprintf fmt "@[<hv 1>{%a}@]"
+      (Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt ";@ ")
+        (fun fmt (lbl, e) ->
+          Format.fprintf fmt "@[%s =@ %a@]" lbl (pp_prio 0) e))
+      (List.combine labels es)
+
+  | Constructor (Tag tag, [e]) ->
+    Format.fprintf fmt "@[%a(%a)@]" Tag.pp tag (pp_prio 0) e
+
+  | Constructor (Enum en, []) ->
+    Enum.pp fmt en
+
+  | Constructor (Join _, es) ->
+    Format.fprintf fmt "@[<hov 1>(%a)@]"
+      (Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt "@ |@ ")
+        (pp_prio 51)) es
+
+  | Constructor (Meet _, es) ->
+    Format.fprintf fmt "@[<hov 1>(%a)@]"
+      (Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt "@ &@ ")
+        (pp_prio 81)) es
+
+  | Constructor (Negate, [e]) ->
+    Format.fprintf fmt "@[~%a@]" (pp_prio 90) e
+
+  | Constructor (Normalize, [e]) ->
+    Format.fprintf fmt "@[normalize(%a)@]" (pp_prio 0) e
+
+  | Constructor (Ternary ty, [cond; e1; e2]) ->
+    Format.fprintf fmt "@[<hov 2>ternary(%a,@ %a,@ %a,@ %a)@]"
+      Ty.pp ty (pp_prio 0) cond (pp_prio 0) e1 (pp_prio 0) e2
+
+  | Constructor (CCustom { cname; _ }, es) ->
+    Format.fprintf fmt "@[%s(%a)@]" cname
+      (Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt ",@ ")
+        (pp_prio 0)) es
+
+  | Constructor _ ->
+    Format.pp_print_string fmt "<malformed-constructor>"
+
+  | Lambda (dom, v, body) ->
+    Format.fprintf fmt "@[<hov 2>fun (%a :@ %a) ->@ %a@]"
+      Variable.pp_uniq v GTy.pp dom (pp_prio 0) body
+
+  | LambdaRec [(dom, v, body)] ->
+    Format.fprintf fmt "@[<hov 2>fun (%a :@ %a) ->@ %a@]"
+      Variable.pp_uniq v GTy.pp dom (pp_prio 0) body
+
+  | LambdaRec lst ->
+    Format.fprintf fmt "@[<hv 1>(%a)@]"
+      (Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt ",@ ")
+        (fun fmt (dom, v, body) ->
+          Format.fprintf fmt "@[<hov 2>fun (%a :@ %a) ->@ %a@]"
+            Variable.pp_uniq v GTy.pp dom (pp_prio 0) body))
+      lst
+
+  | Ite (cond, ty, e1, e2) when GTy.equiv ty (GTy.mk Ty.tt) ->
+    Format.fprintf fmt "@[<hov>if %a@ then %a@ else %a@]"
+      (pp_prio 0) cond (pp_prio 0) e1 (pp_prio 0) e2
+
+  | Ite (cond, ty, e1, e2) ->
+    Format.fprintf fmt "@[<hov>if %a@ is %a@ then %a@ else %a@]"
+      (pp_prio 0) cond GTy.pp ty (pp_prio 0) e1 (pp_prio 0) e2
+
+  | App (f, arg) ->
+    Format.fprintf fmt "@[<hov 2>%a@ %a@]"
+      (pp_prio 80) f (pp_prio 90) arg
+
+  | Operation (RecUpd lbl, (_, Constructor (Tuple 2, [record; value]))) ->
+    Format.fprintf fmt "@[<hv 1>{%a@ with %s =@ %a}@]"
+      (pp_prio 100) record lbl (pp_prio 0) value
+
+  | Operation (RecUpd lbl, arg) ->
+    Format.fprintf fmt "@[recupd_%s(%a)@]" lbl (pp_prio 0) arg
+
+  | Operation (RecDel lbl, e) ->
+    Format.fprintf fmt "@[%a\\%s@]" (pp_prio 90) e lbl
+
+  | Operation (OCustom { oname; _ }, e) ->
+    Format.fprintf fmt "@[<hov 2>%s@ %a@]" oname (pp_prio 90) e
+
+  | Projection (PiField lbl, e) ->
+    Format.fprintf fmt "@[%a.%s@]" (pp_prio 90) e lbl
+
+  | Projection (PiFieldOpt lbl, e) ->
+    Format.fprintf fmt "@[%a.%s?@]" (pp_prio 90) e lbl
+
+  | Projection (Pi (2, 0), e) ->
+    Format.fprintf fmt "@[fst %a@]" (pp_prio 90) e
+
+  | Projection (Pi (2, 1), e) ->
+    Format.fprintf fmt "@[snd %a@]" (pp_prio 90) e
+
+  | Projection (Pi (_, i), e) ->
+    Format.fprintf fmt "@[pi%d %a@]" i (pp_prio 90) e
+
+  | Projection (Hd, e) ->
+    Format.fprintf fmt "@[hd %a@]" (pp_prio 90) e
+
+  | Projection (Tl, e) ->
+    Format.fprintf fmt "@[tl %a@]" (pp_prio 90) e
+
+  | Projection (PiTag tag, e) ->
+    Format.fprintf fmt "@[%a.%a@]" (pp_prio 90) e Tag.pp tag
+
+  | Projection (PCustom { pname; _ }, e) ->
+    Format.fprintf fmt "@[%s %a@]" pname (pp_prio 90) e
+
+  | Let ([], v, e1, e2) ->
+    Format.fprintf fmt "@[<hov>let %a =@ %a@ in@ %a@]"
+      Variable.pp_uniq v (pp_prio 0) e1 (pp_prio 0) e2
+
+  | Let (tys, v, e1, e2) ->
+    Format.fprintf fmt "@[<hov>let %a : [%a] =@ %a@ in@ %a@]"
+      Variable.pp_uniq v
+      (Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt ",@ ")
+        Ty.pp) tys
+      (pp_prio 0) e1 (pp_prio 0) e2
+
+  | TypeCast (e, ty, check) ->
+    Format.fprintf fmt "@[(%a :%a %a)@]"
+      (pp_prio 0) e pp_check check GTy.pp ty
+
+  | TypeCoerce (e, ty, check) ->
+    Format.fprintf fmt "@[(%a :>%a %a)@]"
+      (pp_prio 0) e pp_check check GTy.pp ty
+
+  | Alt (e1, e2) ->
+    Format.fprintf fmt "@[<hov>%a@ |@ %a@]"
+      (pp_prio 51) e1 (pp_prio 50) e2

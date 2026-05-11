@@ -3,6 +3,7 @@
 module Variable : sig
   type t
   val pp : Format.formatter -> t -> unit
+  val pp_uniq : Format.formatter -> t -> unit
   val show : t -> string
   val compare : t -> t -> int
   val equal : t -> t -> bool
@@ -11,7 +12,7 @@ module Variable : sig
   val attach_location : t -> Position.t -> unit
   val get_location : t -> Position.t
   val get_name : t -> string option
-  val get_unique_name : t -> string
+  val show_uniq : t -> string
 end
 
 (** @canonical Mlsem_common.VarMap *)
