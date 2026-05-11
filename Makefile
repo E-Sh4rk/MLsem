@@ -45,9 +45,8 @@ test:
 promote:
 	./bench.sh ref
 
-
 time:
-	./time.sh
+	./bench.sh time
 
 perf:
 	sudo perf record --call-graph=dwarf -- ./_build/default/src/bin/native.exe tests/*.ml
