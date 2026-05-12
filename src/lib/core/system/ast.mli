@@ -39,6 +39,7 @@ val fv : t -> VarSet.t
 val vars : t -> VarSet.t
 val apply_subst : Subst.t -> t -> t
 
+val pp_raw : Format.formatter -> t -> unit
 val pp : Format.formatter -> t -> unit
 val pp_e : Format.formatter -> e -> unit
 val pp_check : Format.formatter -> check -> unit

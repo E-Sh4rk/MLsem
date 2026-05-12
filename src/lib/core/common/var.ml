@@ -34,20 +34,18 @@ module Variable = struct
   let get_name id =
     let (name, _) = Hashtbl.find data id in
     name
-
-  let get_unique_name id =
-    let prefix = match get_name id with None -> "" | Some str -> str in
-    prefix^"_"^(string_of_int id)
-
-  let pp fmt t =
-    match get_name t with
-    | None -> Format.fprintf fmt "%d" t
-    | Some str -> Format.fprintf fmt "%s" str
     
   let show t =
     match get_name t with
     | None -> string_of_int t
     | Some str -> str
+
+  let show_uniq id =
+    let prefix = match get_name id with None -> "" | Some str -> str in
+    prefix^"_"^(string_of_int id)
+
+  let pp fmt t = Format.fprintf fmt "%s" (show t)
+  let pp_uniq fmt t = Format.fprintf fmt "%s" (show_uniq t)
 end
 
 module VarMap = Map.Make(Variable)

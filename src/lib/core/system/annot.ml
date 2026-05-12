@@ -216,7 +216,7 @@ module Domain = struct
   let env_to_typ renv =
     let bindings = renv
       |> REnv.bindings |> List.map
-        (fun (v, ty) -> (Variable.get_unique_name v, (ty, false)))
+        (fun (v, ty) -> (Variable.show_uniq v, (ty, false)))
     in
     Record.mk_open bindings
 
