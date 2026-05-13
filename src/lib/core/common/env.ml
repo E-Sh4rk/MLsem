@@ -22,6 +22,7 @@ module type Env = sig
   val bindings : t -> (Variable.t * ty) list
   val mem : Variable.t -> t -> bool
   val find : Variable.t -> t -> ty
+  val find_opt : Variable.t -> t -> ty option
   val rm : Variable.t -> t -> t
   val rms : Variable.t list -> t -> t
   val restrict : Variable.t list -> t -> t
@@ -64,6 +65,7 @@ module Make(T:T) = struct
       t
 
   let find v (m, _) = VarMap.find v m
+  let find_opt v (m, _) = VarMap.find_opt v m
 
   let filter f (m, _) = VarMap.filter f m |> reconstruct
 
@@ -163,13 +165,15 @@ module REnv = struct
 
   let refine_env env t =
     let aux env (v,rty) =
-      let ts = Env.find v env in
-      let tvs, ty = TyScheme.get ts in
-      if MVarSet.disjoint tvs (TVOp.vars rty)
-      then
-        let ts = TyScheme.mk tvs (GTy.cap ty (GTy.mk rty)) in
-        Env.replace v ts env
-      else invalid_arg "Cannot refine a universally-quantified type variable."
+      match Env.find_opt v env with
+      | None -> env (* We do not add a var in the domain if it was not there before *)
+      | Some ts ->
+        let tvs, ty = TyScheme.get ts in
+        if MVarSet.disjoint tvs (TVOp.vars rty)
+        then
+          let ts = TyScheme.mk tvs (GTy.cap ty (GTy.mk rty)) in
+          Env.replace v ts env
+        else invalid_arg "Cannot refine a universally-quantified type variable."
     in
     List.fold_left aux env (bindings t)
 end

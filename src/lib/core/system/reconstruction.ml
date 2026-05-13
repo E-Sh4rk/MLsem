@@ -244,13 +244,15 @@ and refine_ann r cache env (rid, annot) (id, e) =
   in
   match e, annot with
   | _, Untyp -> Fail
-  | Var v, AVar f when Env.mem v env ->
-    let tvs, _ = Env.find v env |> TyScheme.get in
-    let s = f tvs in
-    retry_with (ac (Annot.AVar s))
-  | Var v, AVar _ ->
-    log "unbound variable" (fun fmt -> Format.fprintf fmt "name: %a" Variable.pp v) ;
-    Fail
+  | Var v, AVar f ->
+    begin match Env.find_opt v env with
+    | None ->
+      log "unbound variable" (fun fmt -> Format.fprintf fmt "name: %a" Variable.pp v) ;
+      Fail
+    | Some ty ->
+      let tvs, _ = TyScheme.get ty in
+      retry_with (ac (Annot.AVar (f tvs)))
+    end
   | Constructor (c, es), AConstruct annots ->
     begin match refine_seq' cache env (List.combine annots es) with
     | OneFail -> Fail

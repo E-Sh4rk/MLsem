@@ -14,6 +14,7 @@ module type Env = sig
     val bindings : t -> (Variable.t * ty) list
     val mem : Variable.t -> t -> bool
     val find : Variable.t -> t -> ty
+    val find_opt : Variable.t -> t -> ty option
     val rm : Variable.t -> t -> t
     val rms : Variable.t list -> t -> t
     val restrict : Variable.t list -> t -> t
