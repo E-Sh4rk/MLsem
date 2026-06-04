@@ -33,7 +33,7 @@ compare_output () {
 if [ "$1" = "perf" ]
 then
     opam exec -- dune build src/bin/native.exe
-    perf record --call-graph=dwarf -- _build/default/src/bin/native.exe -notime tests/*.ml >/dev/null 2>&1
+    perf record --call-graph=dwarf -- _build/default/src/bin/native.exe -notime tests/*.ml tests/benchmarks/*.ml >/dev/null 2>&1
 elif [ "$1" = "report" ]
 then
     perf report
@@ -52,7 +52,7 @@ then
     for i in `seq $N`
     do
         echo -n Run "$i ... "
-        opam exec -- dune exec --display=quiet -- src/bin/native.exe tests/*.ml > "$TMP_DIR"/timing.tmp
+        opam exec -- dune exec --display=quiet -- src/bin/native.exe tests/*.ml tests/benchmarks/*.ml > "$TMP_DIR"/timing.tmp
         T=`cat "$TMP_DIR"/timing.tmp | grep 'Cumulated total time' | grep -o '[0-9]\+[.][0-9]\+'`
         echo "$T"
         SUM_T=`echo "$T" "$SUM_T" + 2 k p | dc`

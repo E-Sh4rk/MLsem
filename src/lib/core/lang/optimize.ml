@@ -334,15 +334,24 @@ let rec can_fail (_,e) =
   | _ -> true
 let rec can_empty (_,e) =
   match e with
-  | Void | Voidify _ -> false
+  | Void | Voidify _
+  | Var _ (* would already be skipped if it was empty *)
+  | Value _ (* user should use Exc if they want to diverge *) -> false
   | Loop e | Declare (_, e)  -> can_empty e
   | Let (_, _, e1, e2) | Seq (e1, e2) | Try (e1, e2) | Alt (e1, e2) -> can_empty e1 || can_empty e2
   | _ -> true
+let is_alias (_,e) =
+  match e with
+  | Value _ -> true
+  | Var v -> MVariable.is_mutable v |> not
+  | _ -> false
 let clean e =
   let rec f (id,e) =
     match e with
     | Voidify e when can_fail e |> not -> id, Void
     | Seq (e1, e2) when (can_fail e1 |> not) && (can_empty e1 |> not) -> e2
+    | Let ([], v, e1, e2) when MVariable.is_mutable v |> not && is_alias e1 ->
+      map (function (id', Var v') when Variable.equal v v' -> id', snd e1 | e -> e) e2
     | Declare (v, e) when VarSet.mem v (fv e) |> not -> e
     | Let (_, v, e1, e2) when VarSet.mem v (fv e2) |> not -> f (id, Seq (e1, e2))
     | e -> id, e

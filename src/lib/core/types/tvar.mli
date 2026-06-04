@@ -77,6 +77,7 @@ module TVOp : sig
     val refresh : kind:kind -> MVarSet.t -> Subst.t
     val shorten_names : MVarSet.t -> Subst.t
     val pp_typ_short : Format.formatter -> Ty.t -> unit
+    val pp_typ_uniq : Format.formatter -> Ty.t -> unit
     val pp_typ_subst : Subst.t -> Format.formatter -> Ty.t -> unit
 
     (** [clean p n mono t] substitutes in [t]

@@ -100,9 +100,9 @@ let refine env e t =
     let renvs = renvs |> List.map (fun renv' ->
       renv' |> REnv.filter (fun v ty ->
         let ty' =
-          if Env.mem v env
-          then Env.find v env |> TyScheme.get_fresh |> snd |> GTy.ub
-          else Ty.any
+          match Env.find_opt v env with
+          | None -> Ty.any
+          | Some ty -> ty |> TyScheme.get_fresh |> snd |> GTy.ub
         in
         let ty'' = REnv.find' v renv in
         Ty.leq (Ty.cap ty' ty'') ty |> not
@@ -152,11 +152,9 @@ let refinements
       aux env e1 ; aux (Env.add v (typeof_def env e1) env) e2 ;
       let res' =
         !res |> Refinements.map (fun renv ->
-          if REnv.mem v renv
-          then
-            let renv' = refine env e1 (REnv.find v renv) in
-            REnv.cap renv renv'
-          else renv
+          match REnv.find_opt v renv with
+          | None -> renv
+          | Some ty -> REnv.cap renv (refine env e1 ty)
         )
       in
       res := res'
@@ -204,9 +202,7 @@ module Partitioner = struct
     )
   let decomposition_for t v initial =
     let initial = if List.is_empty initial then [Ty.any] else initial in
-    let tys = t |> List.filter_map (fun renv ->
-      if REnv.mem v renv then Some (REnv.find v renv) else None)
-    in
+    let tys = t |> List.filter_map (fun renv -> REnv.find_opt v renv) in
     let part_for_dom dom =
       tys |> partition dom (*|> List.concat_map isolate_conjuncts |> partition dom*)
     in

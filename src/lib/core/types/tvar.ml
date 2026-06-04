@@ -225,6 +225,11 @@ module TVOp = struct
 
   let pp_typ_short fmt t =
     Ty.pp' (vars t |> shorten_names) fmt t
+  let pp_typ_uniq fmt t =
+    let names1 x = Format.asprintf "%a" Sstt.Var.pp_unique x in
+    let names2 x = Format.asprintf "%a" Sstt.RowVar.pp_unique x in
+    let s, _ = Sstt.Subst.refresh ~names1 ~names2 (vars t) in
+    Ty.pp' s fmt t
   let pp_typ_subst s fmt t =
     Ty.pp' s fmt t
 

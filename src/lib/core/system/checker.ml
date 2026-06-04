@@ -68,8 +68,10 @@ let rec typeof' env annot (id,e) =
   match e, annot with
   | Value _, AValue ty -> ty
   | Var v, AVar s ->
-    if Env.mem v env then Env.find v env |> subst_ts s
-    else untypeable id ("Undefined variable "^(Variable.show v)^".")
+    begin match Env.find_opt v env with
+    | None -> untypeable id ("Undefined variable "^(Variable.show v)^".")
+    | Some ty -> subst_ts s ty
+    end
   | Constructor (c, es), AConstruct annots when List.length es = List.length annots ->
     let doms = domains_of_construct c Ty.any in
     let check tys =

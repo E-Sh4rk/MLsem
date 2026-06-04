@@ -187,7 +187,7 @@ end
 module FTy = struct
   include Sstt.Ty.F
 
-  let of_oty (t,o) = Sstt.Ty.F.mk_descr (t,o)
+  let of_oty (t,o) = (t,o) |> Sstt.Ty.O.mk |> Sstt.Ty.F.mk_descr
 end
 
 module Enum = struct
@@ -335,8 +335,10 @@ module Record = struct
   module LabelMap' = Sstt.Op.Records'.Atom.LabelMap
   let mk tail bindings =
     let bindings = bindings |>
-      List.map (fun (str, (ty, opt)) -> (to_label str, (ty, opt))) |>
-      LabelMap.of_list in
+      List.map (fun (str, (ty, opt)) -> (to_label str, Sstt.Ty.O.mk (ty, opt))) |>
+      LabelMap.of_list
+    in
+    let tail = Sstt.Ty.O.mk tail in
     { Sstt.Op.Records.Atom.tail ; bindings } |> Sstt.Op.Records.of_atom
     |> Sstt.Descr.mk_records |> Sstt.Ty.mk_descr
   let mk_open = mk (Ty.any, true)
@@ -358,8 +360,8 @@ module Record = struct
     t |> Sstt.Ty.get_descr |> Sstt.Descr.get_records
     |> Sstt.Op.Records.as_union |> List.map (fun a ->
       let bindings = a.Sstt.Op.Records.Atom.bindings |> LabelMap.bindings |>
-        List.map (fun (lbl, oty) -> (from_label lbl, oty)) in
-      bindings, a.tail
+        List.map (fun (lbl, oty) -> (from_label lbl, oty |> Sstt.Ty.O.get)) in
+      bindings, Sstt.Ty.O.get a.tail
     )
   let dnf' t =
     t |> Sstt.Ty.get_descr |> Sstt.Descr.get_records
@@ -371,8 +373,9 @@ module Record = struct
   let of_dnf lst =
     let lst = lst |> List.map (fun (bs, tail) ->
         let bindings = bs |>
-          List.map (fun (str, oty) -> (to_label str, oty)) |> LabelMap.of_list
+          List.map (fun (str, oty) -> (to_label str, Sstt.Ty.O.mk oty)) |> LabelMap.of_list
         in
+        let tail = Sstt.Ty.O.mk tail in
         { Sstt.Op.Records.Atom.tail ; bindings }
       )
     in
@@ -389,7 +392,7 @@ module Record = struct
 
   let proj t field =
     t |> Sstt.Ty.get_descr |> Sstt.Descr.get_records
-    |> Sstt.Op.Records.proj (to_label field) |> fst
+    |> Sstt.Op.Records.proj (to_label field) |> Sstt.Ty.O.get |> Sstt.Ty.O.Atom.get
 
   let merge t1 t2 =
     try
