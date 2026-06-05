@@ -51,4 +51,7 @@ let pp' s fmt (vs, ty) =
 let pp_short fmt (tvs, ty) =
   let s = TVOp.shorten_names tvs in
   pp' s fmt (tvs,ty)
+let pp_unquantified fmt (tvs, ty) =
+  let s = TVOp.shorten_names tvs in
+  GTy.pp' s fmt ty
 let pp fmt t = pp' Subst.identity fmt t

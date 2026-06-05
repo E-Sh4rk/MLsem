@@ -96,8 +96,13 @@ let type_check_recs pos env lst =
   ) lst, msg
 
 type message = Mlsem_system.Analyzer.severity * Position.t * string * string option
+type inferred = {
+  var: Variable.t;
+  display: string;
+  signature: string;
+}
 type treat_result =
-| TSuccess of (Variable.t * string) list * message list * float
+| TSuccess of inferred list * message list * float
 | TDone
 | TFailure of Variable.t option * Position.t * string * string option * float
 
@@ -160,7 +165,10 @@ let treat (benv,varm,senv,env) (annot, elem) =
         (r.Mlsem_system.Analyzer.severity, Eid.loc r.eid, r.title, r.descr)
       ) in
       let senv = List.fold_left (fun senv (v,_) -> VarMap.remove v senv) senv tys2 in
-      let tys = tys1@tys2 |> List.map (fun (v, ty) -> v, Format.asprintf "@[<hov>%a@]" TyScheme.pp_short ty) in
+      let tys = tys1@tys2 |> List.map (fun (v, ty) ->
+        { var = v;
+          display = Format.asprintf "@[<hov>%a@]" TyScheme.pp_short ty;
+          signature = Format.asprintf "@[<hov>%a@]" TyScheme.pp_unquantified ty }) in
       (!benv,varm,senv,env), TSuccess (tys,msg,retrieve_time time)
     | PAst.SigDef (name, mut, ty) ->
       check_not_defined varm name ;

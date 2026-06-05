@@ -19,3 +19,4 @@ val norm_and_simpl : t -> t
 val pp : Format.formatter -> t -> unit
 val pp' : Subst.t -> Format.formatter -> t -> unit
 val pp_short : Format.formatter -> t -> unit
+val pp_unquantified : Format.formatter -> t -> unit

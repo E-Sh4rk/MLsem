@@ -53,7 +53,7 @@ let add_res res res' =
     untyp::res
   | TSuccess (lst,msgs,time) ->
     let res = ref res in
-    lst |> List.iter (fun (v,t)->
+    lst |> List.iter (fun {var=v; display=t; _} ->
       let name = Variable.get_name v |> Option.get in
       let def_pos = Variable.get_location v in
       let typ =
