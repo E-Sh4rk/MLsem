@@ -4,8 +4,14 @@ module MVariable = Mlsem_lang.MVariable
 
 module NameMap : Map.S with type key=string
 type message = Mlsem_system.Analyzer.severity * Position.t * string * string option
+type inferred = {
+  var: Variable.t;
+  display: string;
+  signature: string;
+  declared: bool;
+}
 type treat_result =
-| TSuccess of (Variable.t * string) list * message list * float
+| TSuccess of inferred list * message list * float
 | TDone
 | TFailure of Variable.t option * Position.t * string * string option * float
 
