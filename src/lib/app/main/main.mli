@@ -8,6 +8,7 @@ type inferred = {
   var: Variable.t;
   display: string;
   signature: string;
+  declared: bool;
 }
 type treat_result =
 | TSuccess of inferred list * message list * float
