@@ -23,6 +23,12 @@ type lens = {
   start_offset: int;
   end_offset: int;
   title: string;
+  (* For a successfully-typed binding, the pieces needed to synthesize a
+     [val name : type] signature: the binder name and the type rendered
+     *without* the [∀] quantifier (which is not valid [val] surface syntax —
+     variables are implicitly quantified). [None] for untypeable bindings,
+     where no inline-signature action is offered. *)
+  signature: (string * string) option;
 }
 
 type result = {
@@ -75,7 +81,8 @@ let full_message title descr =
 let diagnostic ?(severity = LT.DiagnosticSeverity.Error) ~range ~message () =
   LT.Diagnostic.create ~message:(`String message) ~range ~severity ~source:"mlsem" ()
 
-let make_lens ~start_offset ~end_offset ~title = {start_offset; end_offset; title}
+let make_lens ?signature ~start_offset ~end_offset ~title () =
+  {start_offset; end_offset; title; signature}
 
 let add_message acc (sev, pos, title, descr) =
   let range =
@@ -98,7 +105,7 @@ let add_result acc (res : treat_result) : result =
         match offsets_of_pos def_pos with
         | None -> acc.lenses
         | Some (s, e) ->
-            make_lens ~start_offset:s ~end_offset:e ~title:("Untypeable: " ^ msg) :: acc.lenses
+            make_lens ~start_offset:s ~end_offset:e ~title:("Untypeable: " ^ msg) () :: acc.lenses
       in
       let diag_range =
         match lsp_range_of_pos pos with
@@ -116,12 +123,24 @@ let add_result acc (res : treat_result) : result =
   | TSuccess (lst, msgs, _time) ->
       let lenses =
         List.fold_left
-          (fun lenses (v, ty) ->
-             match offsets_of_pos (Variable.get_location v) with
+          (fun lenses (b : inferred) ->
+             match offsets_of_pos (Variable.get_location b.var) with
              | None -> lenses
              | Some (s, e) ->
-                 let name = Variable.get_name v |> Option.value ~default:"_" in
-                 make_lens ~start_offset:s ~end_offset:e ~title:(name ^ " : " ^ ty) :: lenses )
+                 let name = Variable.get_name b.var |> Option.value ~default:"_" in
+                 (* [val name : type] inline action, offered only for
+                    genuinely-named bindings. *)
+                 let signature =
+                   if name = "" || name = "_" then
+                     None
+                   else
+                     Some (name, b.signature)
+                 in
+                 (* Lens title keeps the [∀]-quantified display form. *)
+                 make_lens ?signature ~start_offset:s ~end_offset:e
+                   ~title:(name ^ " : " ^ b.display)
+                   ()
+                 :: lenses )
           acc.lenses lst
       in
       let diagnostics = List.fold_left add_message acc.diagnostics msgs in

@@ -81,6 +81,51 @@ let diagnostics uri =
   | Some e -> e.diagnostics
   | None -> []
 
+(* Indentation prefix (leading spaces/tabs) of the line containing [offset]. *)
+let indent_at (text : string) (line_offsets : int array) (offset : int) : string =
+  let n = Array.length line_offsets in
+  let lo = ref 0 and hi = ref (n - 1) in
+  while !lo < !hi do
+    let mid = (!lo + !hi + 1) / 2 in
+    if line_offsets.(mid) <= offset then lo := mid else hi := mid - 1
+  done ;
+  let start = line_offsets.(!lo) in
+  let len = String.length text in
+  let i = ref start in
+  while !i < len && (text.[!i] = ' ' || text.[!i] = '\t') do
+    incr i
+  done ;
+  String.sub text start (!i - start)
+
+(* Lenses overlapping [req_range]. Returns, for each: the binder's LSP range,
+   the inline-signature payload [(name, type)] (present only for typeable
+   bindings — see [Typecheck.lens.signature]), and the indentation of the
+   binder's source line — the code-action provider uses the indent to align
+   an inserted [val] signature with the [let] binding. *)
+let lenses_in_range uri (req_range : Lsp.Types.Range.t) :
+  (Lsp.Types.Range.t * (string * string) option * string) list
+  =
+  match Hashtbl.find_opt entries uri with
+  | None -> []
+  | Some e ->
+      let text_len = String.length e.text in
+      let req_s = offset_of_position e.line_offsets text_len req_range.start in
+      let req_e = offset_of_position e.line_offsets text_len req_range.end_ in
+      let lo, hi = (min req_s req_e, max req_s req_e) in
+      List.filter_map
+        (fun (l : Typecheck.lens) ->
+           if l.end_offset < lo || l.start_offset > hi then
+             None
+           else
+             let range =
+               Lsp.Types.Range.create
+                 ~start:(position_of_offset e.line_offsets l.start_offset)
+                 ~end_:(position_of_offset e.line_offsets l.end_offset)
+             in
+             let indent = indent_at e.text e.line_offsets l.start_offset in
+             Some (range, l.signature, indent) )
+        e.lenses
+
 let code_lenses uri : Lsp.Types.CodeLens.t list =
   match Hashtbl.find_opt entries uri with
   | None -> []

@@ -60,8 +60,11 @@ let initialize_result_json () =
       ~save:(`SaveOptions (SaveOptions.create ~includeText:true ()))
       ()
   in
+  let code_action_opts =
+    CodeActionOptions.create ~codeActionKinds:[CodeActionKind.RefactorInline] ()
+  in
   let capabilities =
-    ServerCapabilities.create
+    ServerCapabilities.create ~codeActionProvider:(`CodeActionOptions code_action_opts)
       ~codeLensProvider:(CodeLensOptions.create ~resolveProvider:false ())
       ~textDocumentSync:(`TextDocumentSyncOptions sync) ()
   in
@@ -94,6 +97,24 @@ let typecheck_and_publish uri text =
     in
     send_notification (Lsp.Server_notification.PublishDiagnostics params)
 
+(* Build a [Refactor.Inline] action that prepends a [val name : type]
+   signature line above the binder, indented to match the binding. *)
+let inline_type_action uri (range : Lsp.Types.Range.t) ~indent ~name ~ty : Lsp.Types.CodeAction.t =
+  let insert_pos = Lsp.Types.Position.create ~line:range.start.line ~character:0 in
+  let edit_range = Lsp.Types.Range.create ~start:insert_pos ~end_:insert_pos in
+  let new_text = indent ^ "val " ^ name ^ " : " ^ ty ^ "\n" in
+  let edit = Lsp.Types.TextEdit.create ~newText:new_text ~range:edit_range in
+  let workspace_edit = Lsp.Types.WorkspaceEdit.create ~changes:[(uri, [edit])] () in
+  Lsp.Types.CodeAction.create ~title:("Inline inferred type: " ^ ty)
+    ~kind:Lsp.Types.CodeActionKind.RefactorInline ~edit:workspace_edit ()
+
+let code_actions_for uri (req_range : Lsp.Types.Range.t) =
+  Store.lenses_in_range uri req_range
+  |> List.filter_map (fun (range, signature, indent) ->
+    match signature with
+    | None -> None
+    | Some (name, ty) -> Some (`CodeAction (inline_type_action uri range ~indent ~name ~ty)) )
+
 (* Handle client requests via typed LSP decoding. *)
 let handle_request ~shutdown_received (req : Jsonrpc.Request.t) =
   match Lsp.Client_request.of_jsonrpc req with
@@ -109,6 +130,13 @@ let handle_request ~shutdown_received (req : Jsonrpc.Request.t) =
       | Lsp.Client_request.Shutdown ->
           send (Packet.Response (Response.ok req.id `Null)) ;
           true
+      | Lsp.Client_request.CodeAction params ->
+          let uri = params.textDocument.uri in
+          let actions = code_actions_for uri params.range in
+          let result = if actions = [] then None else Some actions in
+          let json = Lsp.Client_request.yojson_of_result typed_req result in
+          send (Packet.Response (Response.ok req.id json)) ;
+          shutdown_received
       | Lsp.Client_request.TextDocumentCodeLens params ->
           (* Lens offsets are kept in sync with the live buffer via
              [Store.apply_change] on each didChange, so the projection to
