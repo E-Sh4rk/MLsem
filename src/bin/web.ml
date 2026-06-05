@@ -53,9 +53,10 @@ let add_res res res' =
     untyp::res
   | TSuccess (lst,msgs,time) ->
     let res = ref res in
-    lst |> List.iter (fun (v,t)->
+    lst |> List.iter (fun {var=v; ty} ->
       let name = Variable.get_name v |> Option.get in
       let def_pos = Variable.get_location v in
+      let t = Format.asprintf "@[<hov>%a@]" Mlsem_types.TyScheme.pp_short ty in
       let typ =
         `Assoc [("name", `String name) ; ("def_pos", json_of_pos def_pos) ;
         ("typeable", `Bool true) ; ("type", `String t) ; ("time", `Float time) ;
