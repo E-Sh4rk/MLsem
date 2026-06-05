@@ -129,9 +129,10 @@ let add_result acc (res : treat_result) : result =
              | Some (s, e) ->
                  let name = Variable.get_name b.var |> Option.value ~default:"_" in
                  (* [val name : type] inline action, offered only for
-                    genuinely-named bindings. *)
+                    genuinely-named bindings that lack a user-written
+                    declaration. *)
                  let signature =
-                   if name = "" || name = "_" then
+                   if b.declared || name = "" || name = "_" then
                      None
                    else
                      Some (name, b.signature)
