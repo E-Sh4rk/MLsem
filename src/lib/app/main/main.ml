@@ -99,6 +99,7 @@ type message = Mlsem_system.Analyzer.severity * Position.t * string * string opt
 type inferred = {
   var: Variable.t;
   ty: TyScheme.t;
+  declared: bool;
 }
 type treat_result =
 | TSuccess of inferred list * message list * float
@@ -164,7 +165,11 @@ let treat (benv,varm,senv,env) (annot, elem) =
         (r.Mlsem_system.Analyzer.severity, Eid.loc r.eid, r.title, r.descr)
       ) in
       let senv = List.fold_left (fun senv (v,_) -> VarMap.remove v senv) senv tys2 in
-      let tys = tys1@tys2 |> List.map (fun (v, ty) -> { var = v; ty }) in
+      (* [tys1] are the inferred (signature-less) bindings; [tys2] carry a
+         user-written [val] declaration. [declared] lets the LSP suppress the
+         inline-signature action where a declaration already exists. *)
+      let render ~declared (v, ty) = { var = v; ty; declared } in
+      let tys = List.map (render ~declared:false) tys1 @ List.map (render ~declared:true) tys2 in
       (!benv,varm,senv,env), TSuccess (tys,msg,retrieve_time time)
     | PAst.SigDef (name, mut, ty) ->
       check_not_defined varm name ;

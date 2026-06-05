@@ -53,7 +53,7 @@ let add_res res res' =
     untyp::res
   | TSuccess (lst,msgs,time) ->
     let res = ref res in
-    lst |> List.iter (fun {var=v; ty} ->
+    lst |> List.iter (fun {var=v; ty; _} ->
       let name = Variable.get_name v |> Option.get in
       let def_pos = Variable.get_location v in
       let t = Format.asprintf "@[<hov>%a@]" Mlsem_types.TyScheme.pp_short ty in

@@ -7,6 +7,7 @@ type message = Mlsem_system.Analyzer.severity * Position.t * string * string opt
 type inferred = {
   var: Variable.t;
   ty: TyScheme.t;
+  declared: bool;
 }
 type treat_result =
 | TSuccess of inferred list * message list * float
