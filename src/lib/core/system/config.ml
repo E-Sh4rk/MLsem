@@ -23,4 +23,6 @@ let infer_overload = ref true
 
 let normalization_fun : (Ty.t -> Ty.t) ref = ref normalize_empty_abstracts
 
+let subst_normalization_fun : (MVarSet.t -> Subst.t list -> Subst.t list) ref = ref (fun _ ss -> ss)
+
 let no_abstract_inter = ref true

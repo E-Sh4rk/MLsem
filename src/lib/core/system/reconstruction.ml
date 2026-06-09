@@ -167,6 +167,7 @@ let tally_simpl mono tvars res cs =
     (TVarSet.destruct tvars) ; *)
   (* Format.printf "with env=%a@." Env.pp env ; *)
   tally_fields mono cs
+  |> !Config.subst_normalization_fun mono
   |> List.concat_map (abstract_factors tvars)
   |> List.map (minimize_new_tvars (MVarSet.union mono tvars))
   |> List.map (fun s -> s, Subst.apply s res)
