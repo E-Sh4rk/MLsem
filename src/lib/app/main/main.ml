@@ -192,10 +192,14 @@ let treat (benv,varm,senv,env) (annot, elem) =
       -> Config.type_narrowing := BothNarrowing
       | "allow_implicit_downcast", Bool b -> Config.allow_implicit_downcast := b
       | "infer_overload", Bool b -> Config.infer_overload := b
-      | "no_empty_param", Bool b ->
-        Config.normalization_fun :=
-          if b then Config.normalize_empty_abstracts else Fun.id
-      | "no_abstract_inter", Bool b -> Config.no_abstract_inter := b
+      | "normalization", Bool false | "normalization", String "no" ->
+        Config.normalization_fun := Fun.id
+      | "normalization", String "no_empty_param" ->
+        Config.normalization_fun := Mlsem_system.Heuristics.normalize_empty_abstracts
+      | "subst_normalization", Bool false | "subst_normalization", String "no" ->
+        Config.subst_normalization_fun := (fun _ x -> x)
+      | "subst_normalization", String "no_abstract_inter" ->
+        Config.subst_normalization_fun := Mlsem_system.Heuristics.normalize_abstract_factors
       | _ -> failwith ("Invalid command "^str)
       end ;
       (benv,varm,senv,env), TDone

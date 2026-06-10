@@ -86,33 +86,6 @@ let tsort leq lst =
   in
   List.fold_left add_elt [] (List.rev lst)
 
-let abstract_factors v ty =
-  let (factor, _) = factorize (TVarSet.singleton v, TVarSet.empty) ty in
-  let res = ref [] in
-  let aux (abs, dnf) =
-    dnf |> List.filter (fun (ps, ns) ->
-      if ps = [] then true
-      else
-        let ps = ps |> List.map (Abstract.mk abs) |> Ty.conj in
-        let ns = ns |> List.map (Abstract.mk abs) |> List.map Ty.neg |> Ty.conj in
-        res := (Ty.cap ps ns)::(!res) ; false
-    )
-  in
-  let remaining = Abstract.top_transform aux factor in
-  match !res with
-  | [] -> [ Subst.identity ]
-  | res -> (remaining::res) |> List.map (fun ty -> Subst.singleton1 v ty)
-let abstract_factors sols (v,t) =
-  let ss = abstract_factors v t in
-  sols |> List.concat_map (fun sol -> List.map (fun s -> Subst.compose s sol) ss)
-let abstract_factors tvars sol =
-  (* Note: this simplification does nothing if parameters are fully annotated *)
-  if !Config.no_abstract_inter then
-    List.fold_left abstract_factors [sol]
-      (Subst.restrict tvars sol |> Subst.bindings1)
-  else
-    [sol]
-
 let substitute_similar_vars1 mono v t =
   let vs = MVarSet.diff (top_vars t) (MVarSet.union (strict_vars t) (MVarSet.add1 v mono)) in
   let nt = vars_with_polarity1 t |> List.filter_map (fun (v', k) ->
@@ -167,8 +140,7 @@ let tally_simpl mono tvars res cs =
     (TVarSet.destruct tvars) ; *)
   (* Format.printf "with env=%a@." Env.pp env ; *)
   tally_fields mono cs
-  |> !Config.subst_normalization_fun mono
-  |> List.concat_map (abstract_factors tvars)
+  |> !Config.subst_normalization_fun { mono ; tvars ; res }
   |> List.map (minimize_new_tvars (MVarSet.union mono tvars))
   |> List.map (fun s -> s, Subst.apply s res)
   (* Simplify result if it does not impact the domains *)
