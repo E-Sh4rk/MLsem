@@ -28,11 +28,16 @@ let rec typeof env (_,e) =
   match e with
   | Value gty -> gty
   | Var v when Env.mem v env -> Env.find v env |> TyScheme.get_fresh |> snd
-  | Projection (p, e) -> GTy.map (Ast.proj p) (typeof env e )
+  | Var _ -> GTy.any
+  | Constructor (v, es) -> GTy.mapl (Ast.construct v) (List.map (typeof env) es)
+  | Projection (p, e) -> GTy.map (Ast.proj p) (typeof env e)
+  | Ite (_, _, e1, e2) -> GTy.cup (typeof env e1) (typeof env e2)
+  | Let (_, v, e1, e2) -> typeof (Env.add v (typeof_def env e1) env) e2
   | TypeCast (e, ty, _) -> GTy.cap (typeof env e) ty
   | TypeCoerce (_, ty, _) -> ty
-  | _ -> GTy.any
-let typeof_def env e = Checker.generalize ~e env (typeof env e)
+  | Alt (e1, e2) -> GTy.cap (typeof env e1) (typeof env e2)
+  | Lambda _ | LambdaRec _ | App _ | Operation _ -> GTy.any
+and typeof_def env e = Checker.generalize ~e env (typeof env e)
 
 let combine rs1 rs2 =
   Utils.cartesian_prod rs1 rs2
@@ -73,8 +78,8 @@ let sufficient_refinements env e t =
     | Value _ | TypeCoerce _ -> []
     | Projection (p, e) -> aux env e (Ast.domain_of_proj p t)
     | TypeCast (e, _, _) -> aux env e t
-    | App ((_, Var v), e) when Env.mem v env -> app (Env.find v env) e
-    | App _ -> []
+    | App (e1, e2) ->
+      app (typeof env e1 |> TyScheme.mk_poly_except (Env.tvars env)) e2
     | Operation (o, e) -> app (Ast.fun_of_operation o) e
     | Ite (e, s, e1, e2) ->
       let r1 = combine (aux env e (GTy.ub s)) (aux env e1 t) in
