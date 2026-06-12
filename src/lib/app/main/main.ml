@@ -96,8 +96,13 @@ let type_check_recs pos env lst =
   ) lst, msg
 
 type message = Mlsem_system.Analyzer.severity * Position.t * string * string option
+type inferred = {
+  var: Variable.t;
+  ty: TyScheme.t;
+  declared: bool;
+}
 type treat_result =
-| TSuccess of (Variable.t * string) list * message list * float
+| TSuccess of inferred list * message list * float
 | TDone
 | TFailure of Variable.t option * Position.t * string * string option * float
 
@@ -160,7 +165,11 @@ let treat (benv,varm,senv,env) (annot, elem) =
         (r.Mlsem_system.Analyzer.severity, Eid.loc r.eid, r.title, r.descr)
       ) in
       let senv = List.fold_left (fun senv (v,_) -> VarMap.remove v senv) senv tys2 in
-      let tys = tys1@tys2 |> List.map (fun (v, ty) -> v, Format.asprintf "@[<hov>%a@]" TyScheme.pp_short ty) in
+      (* [tys1] are the inferred (signature-less) bindings; [tys2] carry a
+         user-written [val] declaration. [declared] lets the LSP suppress the
+         inline-signature action where a declaration already exists. *)
+      let render ~declared (v, ty) = { var = v; ty; declared } in
+      let tys = List.map (render ~declared:false) tys1 @ List.map (render ~declared:true) tys2 in
       (!benv,varm,senv,env), TSuccess (tys,msg,retrieve_time time)
     | PAst.SigDef (name, mut, ty) ->
       check_not_defined varm name ;
@@ -277,6 +286,13 @@ let initial_benv = empty_benv
 let initial_penv = PEnv.empty
 let initial_envs = initial_benv, initial_varm, initial_senv, initial_env, initial_penv
 type envs = benv * Variable.t NameMap.t * Ty.t list VarMap.t * Env.t * PEnv.t
+
+let print_ty pp (_,_,_,_,penv) ty =
+  PEnv.sequential_handler penv
+    (fun () -> Format.asprintf "@[<hov>%a@]" pp ty) ()
+  |> fst
+let display envs ty = print_ty TyScheme.pp_short envs ty
+let signature envs ty = print_ty TyScheme.pp_unquantified envs ty
 
 type parsing_result =
 | PSuccess of PAst.program
