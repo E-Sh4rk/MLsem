@@ -287,6 +287,13 @@ let initial_penv = PEnv.empty
 let initial_envs = initial_benv, initial_varm, initial_senv, initial_env, initial_penv
 type envs = benv * Variable.t NameMap.t * Ty.t list VarMap.t * Env.t * PEnv.t
 
+let print_ty pp (_,_,_,_,penv) ty =
+  PEnv.sequential_handler penv
+    (fun () -> Format.asprintf "@[<hov>%a@]" pp ty) ()
+  |> fst
+let display envs ty = print_ty TyScheme.pp_short envs ty
+let signature envs ty = print_ty TyScheme.pp_unquantified envs ty
+
 type parsing_result =
 | PSuccess of PAst.program
 | PFailure of Position.t * string
