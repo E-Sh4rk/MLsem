@@ -11,8 +11,6 @@ exception UnresolvedType of Variable.t * TyScheme.t
 exception Untypeable of Variable.t option * Mlsem_system.Checker.error
 exception AlreadyDefined of Variable.t
 
-(* TODO: for each definition, return both a type scheme and a signature *)
-
 (* Utility *)
 
 let retrieve_time time =
@@ -76,14 +74,15 @@ let infer var env e =
 let type_check_with_sigs env (var,e,sigs,aty) =
   if sigs = [] then
     (* Dyn type *)
-    (var, aty), []
+    (var, (aty,[])), []
   else
     let e = Transform.expr_to_ast e in
     let c = if !Config.allow_implicit_downcast then CheckStatic else Check in
     let es = List.map (fun s -> coerce c (GTy.ub s |> GTy.mk) e) sigs in
-    let _, msg = List.map (infer (Some var) env) es |> List.split in
+    let tys, msg = List.map (infer (Some var) env) es |> List.split in
+    List.iter (check_resolved var env) tys ;
     let msg = (List.concat msg)@(Mlsem_system.Analyzer.get_unreachable e) in
-    (var,aty),msg
+    (var,(aty,sigs)),msg
 
 let type_check_recs pos env lst =
   let e =
@@ -95,15 +94,17 @@ let type_check_recs pos env lst =
   let tvs, ty = ty |> TyScheme.get in
   let n = List.length lst in
   List.mapi (fun i (var,_) ->
-    let ty = TyScheme.mk tvs (GTy.map (Tuple.proj n i) ty) |> Signature.simplify in
+    let ty = GTy.map (Tuple.proj n i) ty in
+    let sigs, ty = GTy.ub ty |> Signature.of_ty, TyScheme.mk tvs ty |> Signature.simplify in
     check_resolved var env ty ;
-    (var, ty)
+    (var, (ty,sigs))
   ) lst, msg
 
 type message = Mlsem_system.Analyzer.severity * Position.t * string * string option
 type inferred = {
   var: Variable.t;
   ty: TyScheme.t;
+  sigs: Signature.t;
   declared: bool;
 }
 type treat_result =
@@ -138,7 +139,7 @@ let treat (benv,varm,senv,env) (annot, elem) =
         | Some (sigs,aty) -> Either.Left (var, e, sigs, aty)
         ) lst in
       let tys1, msg1 = type_check_recs pos env recs in
-      let env = List.fold_left (fun env (v,ty) ->
+      let env = List.fold_left (fun env (v,(ty,_)) ->
         try MVariable.add_to_env v ty env
         with Invalid_argument _ -> raise (IncompatibleType (v,ty))
       ) env tys1 in
@@ -150,7 +151,7 @@ let treat (benv,varm,senv,env) (annot, elem) =
       (* [tys1] are the inferred (signature-less) bindings; [tys2] carry a
          user-written [val] declaration. [declared] lets the LSP suppress the
          inline-signature action where a declaration already exists. *)
-      let render ~declared (v, ty) = { var = v; ty; declared } in
+      let render ~declared (v, (ty,sigs)) = { var = v; ty; sigs; declared } in
       let tys = List.map (render ~declared:false) tys1 @ List.map (render ~declared:true) tys2 in
       (!benv,varm,senv,env), TSuccess (tys,msg,retrieve_time time)
     | PAst.SigDef (name, mut, ty) ->
