@@ -154,7 +154,9 @@ let treat (benv,varm,senv,env) (annot, elem) =
       let tys = List.map (render ~declared:false) tys1 @ List.map (render ~declared:true) tys2 in
       (!benv,varm,senv,env), TSuccess (tys,msg,retrieve_time time)
     | PAst.SigDef (name, mut, ty) ->
-      let ty, benv = type_expr_to_gty benv ty in
+      let ty, benv = type_expr_to_typ ~allow_gradual:true benv ty in
+      let new_sigs = Signature.decompose ty |> List.map GTy.Builder.build in
+      let ty = GTy.Builder.build ty in
       let kind = if mut then MVariable.AnnotMut ty else Immut in
       let var, sigs = sigs_of_def varm senv env (kind, name) in
       begin try
@@ -164,8 +166,8 @@ let treat (benv,varm,senv,env) (annot, elem) =
         let sigs = match sigs with
         | None when Env.mem var env ->
           invalid_arg "A type annotation must precede the definition."
-        | None (* First definition *) -> [ty]
-        | Some (sigs, _) -> ty::sigs
+        | None (* First definition *) -> new_sigs
+        | Some (sigs, _) -> sigs@new_sigs
         in
         let ty = Signature.to_tyscheme env sigs in
         let env = MVariable.replace_in_env var ty env in

@@ -19,14 +19,15 @@ let to_tyscheme env tys =
 let extract ty =
   let tvs, ty = TyScheme.get ty in
   Subst.apply (TVOp.shorten_names tvs) (GTy.ub ty)
-let rec of_ty ty =
+let rec decompose ty =
   if Ty.leq ty Arrow.any then
     match Arrow.dnf ty with
     | [arrs] -> arrs |> List.concat_map
-      (fun (a,b) -> of_ty b |> List.map (fun b -> Arrow.mk a b))
+      (fun (a,b) -> decompose b |> List.map (fun b -> Arrow.mk a b))
     | _ -> [ty]
   else [ty]
-let of_tyscheme ty = ty |> extract |> of_ty |> List.map GTy.mk
+let of_ty ty = ty |> decompose |> List.map GTy.mk
+let of_tyscheme ty = ty |> extract |> of_ty
 
 let merge tys =
   tys |> GTy.mapl (fun tys ->
