@@ -200,7 +200,7 @@ test_classes: { data_frame : true ;; false }
 test_class_ok: { c1 : true ;; false }
 test_class_fail: untypeable application
 File "tests/3_records.ml", line 110, characters 22-45
-function: 'I2076 & { c1 : true ;; false } -> 'I2076
+function: 'I2077 & { c1 : true ;; false } -> 'I2077
 argument: { c1 : true ;; bool }
 test_class_ok2: { c1 : true ; c2 : true ;; bool }
 
@@ -227,8 +227,8 @@ record_ab_open: ∀'a,'b. { a : 'b ; b : 'a ..} -> { a : 'b ; b : 'a }
 record_ab: ∀'a,'b. { a : 'b ; b : 'a } -> { a : 'b ; b : 'a }
 ref_42: ref(int)
 ref_42_unresolved: the type inferred is not fully resolved
-File "tests/4_all.ml", line 61, characters 0-30
-type inferred: ref(42 | 'I2218)
+File "tests/4_all.ml", line 62, characters 0-30
+type inferred: ref(42 | 'I2224)
 mutate_ref: ∀'a. 42 | 'a -> 42 | 'a
 is_ref: (ref -> true) & (~ref -> false)
 is_not_ref: (~ref -> true) & (ref -> false)
@@ -281,7 +281,7 @@ break_return_cf: ∀'a. ('a \ (0 | false) -> 'a \ (0 | false)) & ('a & (0 | fals
 weird_return: (true -> 69) & (~true -> (42, 69))
 mx: 42
 mut_invalid: untypeable application
-File "tests/4_all.ml", line 294, characters 2-12
+File "tests/4_all.ml", line 299, characters 2-12
 function: (any, int) -> ()
 argument: int, true
 mut_valid: 69
@@ -294,8 +294,8 @@ neg_and_pos_ann: Nil | int -> Nil | (int, int)
 order: Nil | (Nil | int, Nil | int) -> Nil | int | (int, int)
 loop_tricky_narrowing: int -> (any, int)
 loop_invalid: untypeable application
-File "tests/4_all.ml", line 367, characters 4-14
-function: (ref('I2942), 'I2942) -> ()
+File "tests/4_all.ml", line 372, characters 4-14
+function: (ref('I2948), 'I2948) -> ()
 argument: ref(int), false
 loop_valid: ∀'a. (false | 'a -> false | 'a) & ('a \ int -> 'a \ int)
 filter_imp: ∀'a,'b,'c. ('a -> bool) & ('b -> false) -> array('b | 'a) -> array('a \ 'b
@@ -308,15 +308,15 @@ Nil) & (int -> int)
 test_noalt: (string -> string) & (char -> char) & (bool -> bool) & (() -> ()) & (Nil ->
 Nil) & (int -> int)
 typeof_app: Int -> 0
-[Warning] File "tests/4_all.ml", line 446, characters 9--28 Unreachable code
+[Warning] File "tests/4_all.ml", line 451, characters 9--28 Unreachable code
 typeof_app': Int -> 0
-[Warning] File "tests/4_all.ml", line 466, characters 7-27 Unreachable code
-[Warning] File "tests/4_all.ml", line 464, characters 43-48 Unreachable code
-[Warning] File "tests/4_all.ml", line 461, characters 10-156 Unreachable code
-[Warning] File "tests/4_all.ml", line 462, characters 36-45 Unreachable code
-[Warning] File "tests/4_all.ml", line 462, characters 24-33 Unreachable code
-[Warning] File "tests/4_all.ml", line 462, characters 12-21 Unreachable code
-[Warning] File "tests/4_all.ml", line 461, characters 48-57 Unreachable code
-[Warning] File "tests/4_all.ml", line 461, characters 36-45 Unreachable code
-[Warning] File "tests/4_all.ml", line 461, characters 24-33 Unreachable code
-[Warning] File "tests/4_all.ml", line 461, characters 12-21 Unreachable code
+[Warning] File "tests/4_all.ml", line 471, characters 7-27 Unreachable code
+[Warning] File "tests/4_all.ml", line 469, characters 43-48 Unreachable code
+[Warning] File "tests/4_all.ml", line 466, characters 10-156 Unreachable code
+[Warning] File "tests/4_all.ml", line 467, characters 36-45 Unreachable code
+[Warning] File "tests/4_all.ml", line 467, characters 24-33 Unreachable code
+[Warning] File "tests/4_all.ml", line 467, characters 12-21 Unreachable code
+[Warning] File "tests/4_all.ml", line 466, characters 48-57 Unreachable code
+[Warning] File "tests/4_all.ml", line 466, characters 36-45 Unreachable code
+[Warning] File "tests/4_all.ml", line 466, characters 24-33 Unreachable code
+[Warning] File "tests/4_all.ml", line 466, characters 12-21 Unreachable code

@@ -33,8 +33,10 @@ abstract type array('a)
 
 val dict : () -> dict('a, 'b)
 val array : () -> array('a)
-val ([]<-) : ((dict('a, 'b), 'a, 'b) -> ()) & ((array('b), int, 'b) -> ())
-val ([]) : ((dict('a, 'b), 'a) -> 'b) & ((array('b), int) -> 'b)
+val ([]<-) : (dict('a, 'b), 'a, 'b) -> ()
+val ([]<-) : (array('b), int, 'b) -> ()
+val ([]) : (dict('a, 'b), 'a) -> 'b
+val ([]) : (array('b), int) -> 'b
 val push : array('a) -> 'a -> ()
 val len : array('a) -> int
 
@@ -61,9 +63,8 @@ let filter_imp (f:('a -> bool) & ('b -> false)) (arr:array('a|'b)) =
   end ;
   return res
 
-val filtermap :
-    (('t -> ((true, 'u) | false), ['t*]) -> ['u*])
-  & (('t -> ((true, 'u) | bool), ['t*]) -> [('t | 'u)*])
+val filtermap : ('t -> ((true, 'u) | false), ['t*]) -> ['u*]
+val filtermap : ('t -> ((true, 'u) | bool), ['t*]) -> [('t | 'u)*]
 let filtermap (f, l) =
     match l with
     | [] -> []
@@ -233,7 +234,8 @@ let example6_invalid = fun (x : int|string) -> fun (y : any) ->
   if and_ (is_int x, is_string y) is true then
    add  x (strlen y) else strlen x
 
-val example6 : (int -> string -> int) & (string -> any -> int)
+val example6 : int -> string -> int
+val example6 : string -> any -> int
 let example6 = fun x -> fun y ->
   if and_ (is_int x, is_string y) is true then
    add  x (strlen y) else strlen x

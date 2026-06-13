@@ -14,14 +14,14 @@ type treat_result =
 | TDone
 | TFailure of Variable.t option * Position.t * string * string option * float
 
-type envs = Builder.benv * Variable.t NameMap.t * Ty.t list VarMap.t * Env.t * PEnv.t
+type envs = Builder.benv * Variable.t NameMap.t * GTy.t list VarMap.t * Env.t * PEnv.t
 val treat : envs -> 'a Position.located * PAst.element -> envs * treat_result
 val treat_sig : envs -> 'a Position.located * PAst.element -> envs * treat_result
 val treat_def : envs -> 'a Position.located * PAst.element -> envs * treat_result
 val treat_all_sigs : envs -> ('a Position.located * PAst.element) list -> envs * treat_result
 
 val initial_envs : envs
-val initial_senv : Ty.t list VarMap.t
+val initial_senv : GTy.t list VarMap.t
 val initial_benv : Builder.benv
 val initial_penv : PEnv.t
 

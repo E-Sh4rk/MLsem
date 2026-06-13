@@ -54,6 +54,8 @@ let add_to_env v ty env =
     if Ty.leq (TyScheme.get ty |> snd |> GTy.lb) (GTy.ub ty') |> not
     then invalid_arg "Top-level mutable variable has an incompatible type." ;
     Env.add v (TyScheme.mk_mono ty') env
+let replace_in_env v ty env =
+  add_to_env v ty (Env.rm v env)
 
 let a = TVar.mk KInfer None
 let alb v =
