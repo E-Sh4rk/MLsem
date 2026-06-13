@@ -94,10 +94,9 @@ let type_check_recs pos env lst =
   let tvs, ty = ty |> TyScheme.get in
   let n = List.length lst in
   List.mapi (fun i (var,_) ->
-    let ty = GTy.map (Tuple.proj n i) ty in
-    let sigs, ty = GTy.ub ty |> Signature.of_ty, TyScheme.mk tvs ty |> Signature.simplify in
+    let ty = GTy.map (Tuple.proj n i) ty |> TyScheme.mk tvs |> Signature.simplify in
     check_resolved var env ty ;
-    (var, (ty,sigs))
+    (var, (ty, Signature.of_tyscheme ty))
   ) lst, msg
 
 type message = Mlsem_system.Analyzer.severity * Position.t * string * string option
@@ -277,7 +276,7 @@ let print_ty pp (_,_,_,_,penv) ty =
     (fun () -> Format.asprintf "@[<hov>%a@]" pp ty) ()
   |> fst
 let display envs ty = print_ty TyScheme.pp_short envs ty
-let signature envs ty = print_ty TyScheme.pp_unquantified envs ty
+let signature envs sigs = sigs |> List.map (print_ty GTy.pp envs)
 
 type parsing_result =
 | PSuccess of PAst.program
