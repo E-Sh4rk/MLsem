@@ -23,6 +23,7 @@ let mutate_ref x =
 
 abstract type dict('k, 'v)
 abstract type array('a)
+
 val dict : () -> dict('a, 'b)
 val array : () -> array('a)
 val ([]<-) : (dict('a, 'b), 'a, 'b) -> ()
@@ -61,8 +62,8 @@ let nested x y =
   d[x]<- (array ()) ;
   (d[x])[0]<- y ; (d[x])[0]
 
-val swap : 'a -> 'a -> dict('a,'b) -> ()
-val swap : int -> int -> array('b) -> ()
+val swap : 'a -> 'a -> dict('a,'b) -> () &&
+           int -> int -> array('b) -> ()
 let swap i j x =
     let tmp = x[i] in
     x[i]<- x[j] ; x[j]<- tmp

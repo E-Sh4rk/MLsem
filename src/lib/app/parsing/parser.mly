@@ -90,7 +90,7 @@
 %token LPAREN RPAREN IRPAREN EQUAL COMMA CONS COLON ASSIGN
 %token COERCE COERCE_STATIC COERCE_NOCHECK CAST_STATIC CAST_NOCHECK
 %token INTERROGATION_MARK EXCLAMATION_MARK
-%token ARROW AND OR NEG DIFF DYN
+%token ARROW AND OR AAND OOR NEG DIFF DYN
 %token TIMES PLUS MINUS DIV
 %token LBRACE RBRACE DOUBLEPOINT MATCH WITH END POINT LT GT
 %token AND_KW OR_KW
@@ -109,6 +109,8 @@
 %start<pexpr> unique_term
 %start<program> program
 
+%left OOR
+%left AAND
 %right ARROW
 %left OR
 %left AND
@@ -305,6 +307,10 @@ infix:
   | LT    {"<"}
   | GT    {">"}
   | DOUBLEPOINT {".."}
+  // | AND  {"&"}
+  // | OR   {"|"}
+  | AAND  {"&&"}
+  | OOR   {"||"}
 
 prefix:
   | x=PREFIX {x}
@@ -336,6 +342,8 @@ simple_typ:
 | ty=atomic_typ INTERROGATION_MARK { TOption ty }
 | lhs=simple_typ OR rhs=simple_typ  { TCup (lhs, rhs) }
 | lhs=simple_typ AND rhs=simple_typ { TCap (lhs, rhs) }
+| lhs=simple_typ OOR rhs=simple_typ  { TCup (lhs, rhs) }
+| lhs=simple_typ AAND rhs=simple_typ { TCap (lhs, rhs) }
 | lhs=simple_typ DIFF rhs=simple_typ  { TDiff (lhs, rhs) }
 | r=atomic_typ POINT id=ID  { TRecProj (r, id) }
 | r=atomic_typ POINT id=CID  { TTagProj (r, id) }
