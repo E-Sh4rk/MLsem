@@ -6,8 +6,7 @@ module NameMap : Map.S with type key=string
 type message = Mlsem_system.Analyzer.severity * Position.t * string * string option
 type inferred = {
   var: Variable.t;
-  display: string;
-  signature: string;
+  ty: TyScheme.t;
   declared: bool;
 }
 type treat_result =
@@ -25,6 +24,12 @@ val initial_envs : envs
 val initial_senv : Ty.t list VarMap.t
 val initial_benv : Builder.benv
 val initial_penv : PEnv.t
+
+(* Render an [inferred.ty] using the type-alias environment carried in [envs].
+   [display] gives the short form shown to users; [signature] gives the
+   unquantified form suitable for a [val] declaration. *)
+val display : envs -> TyScheme.t -> string
+val signature : envs -> TyScheme.t -> string
 
 type parsing_result =
 | PSuccess of PAst.program

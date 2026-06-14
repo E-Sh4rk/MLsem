@@ -20,9 +20,9 @@ let severity_to_str s =
 let treat_res (acc, res) =
     match res with
     | TSuccess (lst, msg, time) ->
-        lst |> List.iter (fun {var=v; display=t; _} ->
+        lst |> List.iter (fun {var=v; ty; _} ->
             Format.printf "@{<blue;bold>%s@}: %s"
-                (Variable.get_name v |> Option.get) t ;
+                (Variable.get_name v |> Option.get) (display acc ty) ;
             if !notime |> not then
                 Format.printf " @{<italic;yellow>(checked in %.00fms)@}" time ;
             Format.printf "\n%!"

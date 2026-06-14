@@ -98,8 +98,7 @@ let type_check_recs pos env lst =
 type message = Mlsem_system.Analyzer.severity * Position.t * string * string option
 type inferred = {
   var: Variable.t;
-  display: string;
-  signature: string;
+  ty: TyScheme.t;
   declared: bool;
 }
 type treat_result =
@@ -169,11 +168,7 @@ let treat (benv,varm,senv,env) (annot, elem) =
       (* [tys1] are the inferred (signature-less) bindings; [tys2] carry a
          user-written [val] declaration. [declared] lets the LSP suppress the
          inline-signature action where a declaration already exists. *)
-      let render ~declared (v, ty) =
-        { var = v;
-          display = Format.asprintf "@[<hov>%a@]" TyScheme.pp_short ty;
-          signature = Format.asprintf "@[<hov>%a@]" TyScheme.pp_unquantified ty;
-          declared } in
+      let render ~declared (v, ty) = { var = v; ty; declared } in
       let tys = List.map (render ~declared:false) tys1 @ List.map (render ~declared:true) tys2 in
       (!benv,varm,senv,env), TSuccess (tys,msg,retrieve_time time)
     | PAst.SigDef (name, mut, ty) ->
@@ -206,10 +201,14 @@ let treat (benv,varm,senv,env) (annot, elem) =
       -> Config.type_narrowing := BothNarrowing
       | "allow_implicit_downcast", Bool b -> Config.allow_implicit_downcast := b
       | "infer_overload", Bool b -> Config.infer_overload := b
-      | "no_empty_param", Bool b ->
-        Config.normalization_fun :=
-          if b then Config.normalize_empty_abstracts else Fun.id
-      | "no_abstract_inter", Bool b -> Config.no_abstract_inter := b
+      | "normalization", Bool false | "normalization", String "no" ->
+        Config.normalization_fun := Fun.id
+      | "normalization", String "no_empty_param" ->
+        Config.normalization_fun := Mlsem_system.Heuristics.normalize_empty_abstracts
+      | "subst_normalization", Bool false | "subst_normalization", String "no" ->
+        Config.subst_normalization_fun := (fun _ x -> x)
+      | "subst_normalization", String "no_abstract_inter" ->
+        Config.subst_normalization_fun := Mlsem_system.Heuristics.normalize_abstract_factors
       | _ -> failwith ("Invalid command "^str)
       end ;
       (benv,varm,senv,env), TDone
@@ -287,6 +286,13 @@ let initial_benv = empty_benv
 let initial_penv = PEnv.empty
 let initial_envs = initial_benv, initial_varm, initial_senv, initial_env, initial_penv
 type envs = benv * Variable.t NameMap.t * Ty.t list VarMap.t * Env.t * PEnv.t
+
+let print_ty pp (_,_,_,_,penv) ty =
+  PEnv.sequential_handler penv
+    (fun () -> Format.asprintf "@[<hov>%a@]" pp ty) ()
+  |> fst
+let display envs ty = print_ty TyScheme.pp_short envs ty
+let signature envs ty = print_ty TyScheme.pp_unquantified envs ty
 
 type parsing_result =
 | PSuccess of PAst.program

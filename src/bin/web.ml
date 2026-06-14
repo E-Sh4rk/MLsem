@@ -32,7 +32,7 @@ let json_of_msg (s, pos, title, descr) =
     `Assoc ([("severity", `String (severity_to_str s)) ; ("message", `String title) ;
     ("pos", json_of_pos pos)]@descr)
 
-let add_res res res' =
+let add_res envs res res' =
   match res' with
   | TDone -> res
   | TFailure (Some v, pos, msg, descr, time) ->
@@ -53,9 +53,10 @@ let add_res res res' =
     untyp::res
   | TSuccess (lst,msgs,time) ->
     let res = ref res in
-    lst |> List.iter (fun {var=v; display=t; _} ->
+    lst |> List.iter (fun {var=v; ty; _} ->
       let name = Variable.get_name v |> Option.get in
       let def_pos = Variable.get_location v in
+      let t = display envs ty in
       let typ =
         `Assoc [("name", `String name) ; ("def_pos", json_of_pos def_pos) ;
         ("typeable", `Bool true) ; ("type", `String t) ; ("time", `Float time) ;
@@ -82,13 +83,13 @@ let typecheck code callback =
         let envs = initial_envs in
         let envs,res = treat_all_sigs envs program in
         let ok = match res with | TFailure _ -> false | _ -> true in
-        let res = add_res [] res in
+        let res = add_res envs [] res in
         notify_res callback res ;
         let (_, res) =
           if ok then
             List.fold_left (fun (env, res) e ->
               let env, res' = treat_def env e in
-              let res = add_res res res' in
+              let res = add_res env res res' in
               notify_res callback res ;
               (env,res)
             ) (envs, res) program
