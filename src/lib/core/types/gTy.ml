@@ -110,4 +110,7 @@ module Builder = struct
     let ub = Subst.apply (Subst.of_list1 sub) ty in
     let lb = Subst.apply (Subst.of_list1 slb) ty in
     mk_gradual lb ub
+  let pp' s fmt ty =
+    Format.fprintf fmt "%a" (TVOp.pp_typ_subst s) ty
+  let pp fmt ty = pp' Subst.identity fmt ty
 end

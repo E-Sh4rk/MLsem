@@ -74,8 +74,8 @@ module TVOp : sig
     val vars_with_polarity1' : Ty.t list -> (TVar.t * [ `Both | `Neg | `Pos ]) list
     val vars_with_polarity2' : Ty.t list -> (RVar.t * [ `Both | `Neg | `Pos ]) list
     val is_ground_typ : Ty.t -> bool
-    val refresh : kind:kind -> MVarSet.t -> Subst.t
-    val shorten_names : MVarSet.t -> Subst.t
+    val refresh : ?preserve_names:bool -> kind:kind -> MVarSet.t -> Subst.t
+    val shorten_names : ?kind:kind -> MVarSet.t -> Subst.t
     val pp_typ_short : Format.formatter -> Ty.t -> unit
     val pp_typ_uniq : Format.formatter -> Ty.t -> unit
     val pp_typ_subst : Subst.t -> Format.formatter -> Ty.t -> unit

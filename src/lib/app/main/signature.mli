@@ -1,14 +1,19 @@
 open Mlsem_types
 open Mlsem_common
 
-(* TODO: also store the unbuilt gradual type for better printing *)
-type overload = GTy.t
+type overload
 type t = overload list
 
-val is_well_formed : overload -> bool
 val simplify : TyScheme.t -> TyScheme.t
-val to_tyscheme : Env.t -> t -> TyScheme.t
-val decompose : Ty.t -> Ty.t list
-val of_ty : Ty.t -> t
+
+(* May raise [Invalid_argument] if the type is not fully resolved. *)
+val build : Builder.benv -> TyExpr.t -> t * Builder.benv
+(* May raise [Invalid_argument] if the type is not fully resolved. *)
 val of_tyscheme : TyScheme.t -> t
+
+val to_tyscheme : Env.t -> t -> TyScheme.t
+val to_gty : overload -> GTy.t
+
 val merge : t -> overload
+
+val pp_overload : Format.formatter -> overload -> unit

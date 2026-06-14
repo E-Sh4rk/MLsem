@@ -21,10 +21,6 @@ let check_resolved var env typ =
   if MVarSet.diff (TyScheme.fv typ) (Env.tvars env) |> MVarSet.is_empty |> not
   then raise (UnresolvedType (var,typ))
 
-let check_sig var env ty =
-  if Signature.is_well_formed ty |> not
-  then raise (UnresolvedType (var,Signature.to_tyscheme env [ty]))
-
 let resolve_kind benv kind =
   match kind with
   | PAst.Immut -> MVariable.Immut, benv | PAst.Mut -> MVariable.Mut, benv
@@ -78,7 +74,7 @@ let type_check_with_sigs env (var,e,sigs,aty) =
   else
     let e = Transform.expr_to_ast e in
     let c = if !Config.allow_implicit_downcast then CheckStatic else Check in
-    let es = List.map (fun s -> coerce c (GTy.ub s |> GTy.mk) e) sigs in
+    let es = List.map (fun s -> coerce c (Signature.to_gty s |> GTy.ub |> GTy.mk) e) sigs in
     let tys, msg = List.map (infer (Some var) env) es |> List.split in
     List.iter (check_resolved var env) tys ;
     let msg = (List.concat msg)@(Mlsem_system.Analyzer.get_unreachable e) in
@@ -154,15 +150,13 @@ let treat (benv,varm,senv,env) (annot, elem) =
       let tys = List.map (render ~declared:false) tys1 @ List.map (render ~declared:true) tys2 in
       (!benv,varm,senv,env), TSuccess (tys,msg,retrieve_time time)
     | PAst.SigDef (name, mut, ty) ->
-      let ty, benv = type_expr_to_typ ~allow_gradual:true benv ty in
-      let new_sigs = Signature.decompose ty |> List.map GTy.Builder.build in
-      let ty = GTy.Builder.build ty in
-      let kind = if mut then MVariable.AnnotMut ty else Immut in
-      let var, sigs = sigs_of_def varm senv env (kind, name) in
       begin try
+        let new_sigs, benv = Signature.build benv ty in
+        let ty = new_sigs |> List.map Signature.to_gty |> GTy.conj in
+        let kind = if mut then MVariable.AnnotMut ty else Immut in
+        let var, sigs = sigs_of_def varm senv env (kind, name) in
         Variable.attach_location var (Position.position annot) ;
         let varm = NameMap.add name var varm in
-        check_sig var env ty ;
         let sigs = match sigs with
         | None when Env.mem var env ->
           invalid_arg "A type annotation must precede the definition."
@@ -174,7 +168,7 @@ let treat (benv,varm,senv,env) (annot, elem) =
         let senv = VarMap.add var sigs senv in
         (benv,varm,senv,env), TDone
       with Invalid_argument str -> (benv,varm,senv,env),
-        TFailure (Some var, pos, str, None, 0.0)
+        TFailure (None, pos, str, None, 0.0)
       end
     | PAst.Command (str, c) ->
       begin match str, c with
@@ -271,14 +265,14 @@ let initial_senv = VarMap.empty
 let initial_benv = empty_benv
 let initial_penv = PEnv.empty
 let initial_envs = initial_benv, initial_varm, initial_senv, initial_env, initial_penv
-type envs = Builder.benv * Variable.t NameMap.t * GTy.t list VarMap.t * Env.t * PEnv.t
+type envs = Builder.benv * Variable.t NameMap.t * Signature.t VarMap.t * Env.t * PEnv.t
 
 let print_ty pp (_,_,_,_,penv) ty =
   PEnv.sequential_handler penv
     (fun () -> Format.asprintf "@[<hov>%a@]" pp ty) ()
   |> fst
 let display envs ty = print_ty TyScheme.pp_short envs ty
-let signature envs sigs = sigs |> List.map (print_ty GTy.pp envs)
+let signature envs sigs = sigs |> List.map (print_ty Signature.pp_overload envs)
 
 type parsing_result =
 | PSuccess of PAst.program

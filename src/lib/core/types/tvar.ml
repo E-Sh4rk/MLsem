@@ -190,14 +190,16 @@ module TVOp = struct
   let vars_with_polarity2 t = vars_with_polarity2' [t]
   let is_ground_typ t = vars t |> MVarSet.is_empty
 
-  let refresh ~kind vars =
-    let f1 v = (v, TVar.mk kind None |> TVar.typ) in
-    let f2 v = (v, RVar.mk kind None |> RVar.row) in
+  let refresh ?(preserve_names=false) ~kind vars =
+    let name1 = if preserve_names then (fun v -> Some (TVar.name v)) else (fun _ -> None) in
+    let name2 = if preserve_names then (fun v -> Some (RVar.name v)) else (fun _ -> None) in
+    let f1 v = (v, TVar.mk kind (name1 v) |> TVar.typ) in
+    let f2 v = (v, RVar.mk kind (name2 v) |> RVar.row) in
     let l1 = vars |> MVarSet.elements1 |> List.map f1 in
     let l2 = vars |> MVarSet.elements2 |> List.map f2 in
     Subst.of_list l1 l2
 
-  let shorten_names vs =
+  let shorten_names ?(kind=KTemporary) vs =
     let char i = Char.chr ((i mod 26)+97) in
     let nb i = i / 26 in
     let names1 =
@@ -206,9 +208,9 @@ module TVOp = struct
         let letter, n = char !c, nb !c in
         c := !c + 1 ;
         if n = 0 then
-          Format.asprintf "'%c" letter
+          Format.asprintf "%c" letter
         else
-          Format.asprintf "'%c%i" letter n
+          Format.asprintf "%c%i" letter n
     in
     let names2 =
       let c = ref 0 in
@@ -216,12 +218,25 @@ module TVOp = struct
         let letter, n = char !c, nb !c in
         c := !c + 1 ;
         if n = 0 then
-          Format.asprintf "`%c" letter
+          Format.asprintf "%c" letter
         else
-          Format.asprintf "`%c%i" letter n
+          Format.asprintf "%c%i" letter n
     in
-    let (s,_) = Sstt.Subst.refresh ~names1 ~names2 vs in
-    s
+    let bindings1 =
+      vs |> MVarSet.elements1 |> List.map
+        (fun v ->
+          let v' = TVar.mk kind (Some (names1 v)) in
+          v, TVar.typ v'
+        )
+    in
+    let bindings2 =
+      vs |> MVarSet.elements2 |> List.map
+        (fun v ->
+          let v' = RVar.mk kind (Some (names2 v)) in
+          v, Row.id_for v'
+        )
+    in
+    Subst.of_list bindings1 bindings2
 
   let pp_typ_short fmt t =
     Ty.pp' (vars t |> shorten_names) fmt t
