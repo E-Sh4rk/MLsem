@@ -173,6 +173,7 @@ let apply_change uri (event : Lsp.Types.TextDocumentContentChangeEvent.t) =
           in
           e.text <- new_text ;
           e.line_offsets <- compute_line_offsets new_text ;
+          let dropped = ref false in
           e.lenses <-
             List.filter_map
               (fun (l : Typecheck.lens) ->
@@ -185,8 +186,17 @@ let apply_change uri (event : Lsp.Types.TextDocumentContentChangeEvent.t) =
                      }
                  else if l.end_offset <= s_off then
                    Some l
-                 else
-                   None )
-              e.lenses )
+                 else (
+                   dropped := true ;
+                   None ) )
+              e.lenses ;
+          (* A dropped lens is gone for good: reverting the edit restores the
+             text but not the lens. The [typechecked_digest] deliberately
+             survives didChange so an edit-and-undo can short-circuit the next
+             save (see the field comment) — but if any lens was dropped along
+             the way, the cached set no longer matches the (restored) text, and
+             that skip would serve a stale, incomplete lens set. Invalidate the
+             digest so the next save re-typechecks and rebuilds the lenses. *)
+          if !dropped then e.typechecked_digest <- Digest.string "" )
 
 let remove uri = Hashtbl.remove entries uri
