@@ -55,4 +55,7 @@ module Builder : sig
     val build : Ty.t -> t
     (** [build ty] builds the gradual type corresponding to [ty].
         Raises [Invalid_argument] if a dyn occurs in an invariant position. *)
+
+    val pp : Format.formatter -> Ty.t -> unit
+    val pp' : Subst.t -> Format.formatter -> Ty.t -> unit
 end

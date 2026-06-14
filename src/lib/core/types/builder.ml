@@ -309,9 +309,9 @@ module Builder = struct
         let vtenv, rvenv, tenv = map_of venv, map_of rvenv, !tenv in
         res, { tenv ; vtenv={ tv=vtenv ; rv=rvenv } }
 
-    let type_expr_to_typ env t =
+    let type_expr_to_typ ?(allow_gradual=false) env t =
         match derecurse_types env [ ("", [], t) ] with
-        | ([ "", [], t ], env) when GTy.Builder.non_gradual t -> (t, env)
+        | ([ "", [], t ], env) when allow_gradual || GTy.Builder.non_gradual t -> (t, env)
         | ([ "", [], _ ], _) -> raise (TypeDefinitionError "Unexpected dyn type.")
         | _ -> assert false
     let type_expr_to_gty env t =
@@ -329,7 +329,7 @@ module Builder = struct
             env := env' ; t
         ) ts in
         (ts, !env)
-    let type_exprs_to_typs = chain type_expr_to_typ
+    let type_exprs_to_typs ?(allow_gradual=false) = chain (type_expr_to_typ ~allow_gradual)
     let type_exprs_to_gtys = chain type_expr_to_gty
 
     let define_aliases env defs =

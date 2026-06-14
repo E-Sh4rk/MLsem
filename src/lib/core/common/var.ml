@@ -1,6 +1,7 @@
 module Variable = struct
 
-  let data : (int, string option * Position.t) Hashtbl.t = Hashtbl.create 100
+  type data = { name:string option ; pos:Position.t ; sig_pos:Position.t list }
+  let data : (int, data) Hashtbl.t = Hashtbl.create 100
 
   type t = int
   let compare = Int.compare
@@ -14,26 +15,28 @@ module Variable = struct
 
   let create display_name =
     let id = next_id () in
-    Hashtbl.add data id (display_name, Position.dummy) ;
+    Hashtbl.add data id { name=display_name ; pos=Position.dummy ; sig_pos=[] } ;
     id
 
   let refresh id =
-    let (name, loc) = Hashtbl.find data id in
+    let v = Hashtbl.find data id in
     let id = next_id () in
-    Hashtbl.add data id (name, loc) ;
+    Hashtbl.add data id v ;
     id
 
   let attach_location id loc =
-    let (name, _) = Hashtbl.find data id in
-    Hashtbl.replace data id (name, loc)
+    let v = Hashtbl.find data id in
+    Hashtbl.replace data id { v with pos=loc }
 
-  let get_location id =
-    let (_, loc) = Hashtbl.find data id
-    in loc
+  let attach_sig_location id loc =
+    let v = Hashtbl.find data id in
+    Hashtbl.replace data id { v with sig_pos=loc::v.sig_pos }
 
-  let get_name id =
-    let (name, _) = Hashtbl.find data id in
-    name
+  let get_location id = (Hashtbl.find data id).pos
+
+  let get_sig_locations id = (Hashtbl.find data id).sig_pos
+
+  let get_name id = (Hashtbl.find data id).name
     
   let show t =
     match get_name t with

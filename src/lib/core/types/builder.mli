@@ -56,8 +56,8 @@ module Builder : sig
 
     val type_base_to_typ : TyExpr.base -> Ty.t
 
-    val type_expr_to_typ : benv -> TyExpr.t -> Ty.t * benv
-    val type_exprs_to_typs : benv -> TyExpr.t list -> Ty.t list * benv
+    val type_expr_to_typ : ?allow_gradual:bool -> benv -> TyExpr.t -> Ty.t * benv
+    val type_exprs_to_typs : ?allow_gradual:bool -> benv -> TyExpr.t list -> Ty.t list * benv
     val type_expr_to_gty : benv -> TyExpr.t -> GTy.t * benv
     val type_exprs_to_gtys : benv -> TyExpr.t list -> GTy.t list * benv
 

@@ -54,9 +54,8 @@ let filter f l =
 
 let test_filter = filter (fun x -> (x is int)) [42 ; Null ; true ; 33]
 
-val filtermap :
-    (('t -> ((true, 'u) | false), ['t*]) -> ['u*])
-  & (('t -> ((true, 'u) | bool), ['t*]) -> [('t | 'u)*])
+val filtermap : ('t -> ((true, 'u) | false), ['t*]) -> ['u*] &&
+                ('t -> ((true, 'u) | bool), ['t*]) -> [('t | 'u)*]
 let filtermap (f, l) =
     match l with
     | [] -> []

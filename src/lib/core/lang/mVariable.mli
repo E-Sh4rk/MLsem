@@ -13,6 +13,7 @@ val kind_compat : kind -> kind -> bool
 
 (* May raise Invalid_argument *)
 val add_to_env : Variable.t -> TyScheme.t -> Env.t -> Env.t
+val replace_in_env : Variable.t -> TyScheme.t -> Env.t -> Env.t
 
 val ref_uninit : Variable.t -> TyScheme.t
 val ref_cons : Variable.t -> TyScheme.t

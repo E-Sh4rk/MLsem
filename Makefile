@@ -36,6 +36,9 @@ lsp-dev:
 lsp-dev-build:
 	opam exec -- dune build src/bin/lsp.exe
 
+ocaml-index:
+	opam exec -- dune build @ocaml-index --watch
+
 js:
 	opam exec -- dune build --profile release src/bin/js.bc.js
 	cp _build/default/src/bin/js.bc.js ./webeditor/typechecker.js

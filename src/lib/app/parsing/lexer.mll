@@ -67,6 +67,8 @@ rule token = parse
 | "->"    { ARROW }
 | "&"     { AND }
 | "|"     { OR }
+| "&&"    { AAND }
+| "||"    { OOR }
 | "\\"    { DIFF }
 | "~"     { NEG  }
 | "_"     { PLACEHOLDER_VAR }

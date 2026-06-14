@@ -20,7 +20,7 @@ val test_sig : 'a|bool -> 'a|int -> ('a|bool,'a|int)
 let test_sig x y = (y,x)
 let test_sig x y = (x,y)
 
-val test_sig_overloaded : (int -> int) & (bool -> bool)
+val test_sig_overloaded : int -> int && bool -> bool
 let test_sig_overloaded x = x
 
 let test_annot (x:'a|bool) (y:'a|int) = (x,y)
@@ -71,8 +71,10 @@ abstract type array('a)
 
 val dict : () -> dict('a, 'b)
 val array : () -> array('a)
-val ([]<-) : ((dict('a, 'b), 'a, 'b) -> ()) & ((array('b), int, 'b) -> ())
-val ([]) : ((dict('a, 'b), 'a) -> 'b) & ((array('b), int) -> 'b)
+val ([]<-) : (dict('a, 'b), 'a, 'b) -> ()
+val ([]<-) : (array('b), int, 'b) -> ()
+val ([]) : (dict('a, 'b), 'a) -> 'b
+val ([]) : (array('b), int) -> 'b
 val push : array('a) -> 'a -> ()
 val len : array('a) -> int
 
@@ -114,8 +116,8 @@ let nested x y =
   d[x]<- (array ()) ;
   (d[x])[0]<- y ; (d[x])[0]
 
-(* val swap : ('a -> 'a -> dict('a,'b) -> ())
-         & (int -> int -> array('b) -> ()) *)
+(* val swap : 'a -> 'a -> dict('a,'b) -> () &&
+              int -> int -> array('b) -> () *)
 let swap i j x =
     let tmp = x[i] in
     x[i]<- x[j] ; x[j]<- tmp
@@ -148,7 +150,8 @@ let test_pair = fun x ->
 type tt('a, 'b)  =  'a -> 'b -> 'a
 type ff('a, 'b)  =  'a -> 'b -> 'b
 
-val ifthenelse : (tt('c, 'd) -> 'c -> 'd -> 'c) & (ff('c, 'd) -> 'c -> 'd -> 'd)
+val ifthenelse : tt('c, 'd) -> 'c -> 'd -> 'c &&
+                 ff('c, 'd) -> 'c -> 'd -> 'd
 let ifthenelse b x y = b x y
 
 let test1_patterns (a,_) = a
@@ -208,9 +211,8 @@ let filter_noannot f l =
     if f e is true then e::l else l
   end
 
-val filtermap :
-    (('t -> ((true, 'u) | false), ['t*]) -> ['u*])
-  & (('t -> ((true, 'u) | bool), ['t*]) -> [('t | 'u)*])
+val filtermap : ('t -> ((true, 'u) | false), ['t*]) -> ['u*] &&
+                ('t -> ((true, 'u) | bool), ['t*]) -> [('t | 'u)*]
 let filtermap (f, l) =
     match l with
     | [] -> []
@@ -225,7 +227,7 @@ let filtermap (f, l) =
 val lor : ((true,bool)->true) & ((false, false) -> (false) ) & ((false, true) -> (true) )
 val (==) : ((any,any)-> bool) & (('a, ~'a)-> false)
 
-(* val member : (('a, ['a*])-> bool) & ((any, []) -> false) & (('b,[(~'b)*]) -> false) *)
+(* val member : ('a, ['a*])-> bool && (any, []) -> false && ('b,[(~'b)*]) -> false *)
 let member (e,l) =
 match l with
 | [] -> false
