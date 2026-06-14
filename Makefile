@@ -24,6 +24,9 @@ record:
 clean:
 	opam exec -- dune clean
 
+ocaml-index:
+	opam exec -- dune build @ocaml-index --watch
+
 js:
 	opam exec -- dune build --profile release src/bin/js.bc.js
 	cp _build/default/src/bin/js.bc.js ./webeditor/typechecker.js
