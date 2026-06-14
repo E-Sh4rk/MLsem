@@ -155,7 +155,7 @@ let treat (benv,varm,senv,env) (annot, elem) =
         let ty = new_sigs |> List.map Signature.to_gty |> GTy.conj in
         let kind = if mut then MVariable.AnnotMut ty else Immut in
         let var, sigs = sigs_of_def varm senv env (kind, name) in
-        Variable.attach_location var (Position.position annot) ;
+        Variable.attach_sig_location var (Position.position annot) ;
         let varm = NameMap.add name var varm in
         let sigs = match sigs with
         | None when Env.mem var env ->
