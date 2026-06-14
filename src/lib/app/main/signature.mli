@@ -1,6 +1,7 @@
 open Mlsem_types
 open Mlsem_common
 
+(* TODO: also store the unbuilt gradual type for better printing *)
 type overload = GTy.t
 type t = overload list
 
