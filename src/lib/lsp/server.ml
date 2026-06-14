@@ -49,6 +49,17 @@ let send packet = log_packet ~dir:"out" packet ; Transport.write stdout packet
 
 let send_notification n = send (Packet.Notification (Lsp.Server_notification.to_jsonrpc n))
 
+(* Server-initiated request ids. They share no namespace with client request
+   ids, so a private counter suffices. We never wait on the response — the
+   main loop drops inbound responses — so these are fire-and-forget. *)
+let next_request_id =
+  let counter = ref 0 in
+  fun () -> incr counter ; `Int !counter
+
+let send_request (req : _ Lsp.Server_request.t) =
+  let jsonrpc = Lsp.Server_request.to_jsonrpc_request req ~id:(next_request_id ()) in
+  send (Packet.Request jsonrpc)
+
 (* Advertise full-sync text, save notifications (with text), and CodeLens. *)
 let initialize_result_json () =
   let open Lsp.Types in
@@ -95,7 +106,13 @@ let typecheck_and_publish uri text =
     let params =
       Lsp.Types.PublishDiagnosticsParams.create ~uri ~diagnostics:result.diagnostics ()
     in
-    send_notification (Lsp.Server_notification.PublishDiagnostics params)
+    send_notification (Lsp.Server_notification.PublishDiagnostics params) ;
+    (* A save does not bump the document version, so VS Code will not re-pull
+       codeLens on its own after didSave — it would keep showing the lenses
+       from before the edit until some other event invalidates them (e.g.
+       switching files). Ask the client to refresh so the freshly-typechecked
+       lenses are pulled immediately. *)
+    send_request Lsp.Server_request.CodeLensRefresh
 
 (* Build a [Refactor.Inline] action that prepends a [val name : type]
    signature line above the binder, indented to match the binding. A binding
