@@ -40,7 +40,9 @@ let extract ty =
 let of_tyscheme ty = ty |> extract |> decompose
 
 let rec merge tys =
-  if List.for_all (fun ty -> Ty.leq ty Arrow.any) tys
+  if tys <> []
+     && List.for_all (fun ty -> Ty.leq ty Arrow.any) tys
+     && not (List.exists Ty.is_empty tys)
   then
     let dom = List.map Arrow.domain tys |> Ty.disj in
     let codom = Arrow.apply (Ty.conj tys) dom |> decompose |> merge in
