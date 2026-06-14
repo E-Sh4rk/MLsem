@@ -98,12 +98,12 @@ let indent_at (text : string) (line_offsets : int array) (offset : int) : string
   String.sub text start (!i - start)
 
 (* Lenses overlapping [req_range]. Returns, for each: the binder's LSP range,
-   the inline-signature payload [(name, type)] (present only for typeable
+   the inline-signature payload [(name, types)] (present only for typeable
    bindings — see [Typecheck.lens.signature]), and the indentation of the
    binder's source line — the code-action provider uses the indent to align
    an inserted [val] signature with the [let] binding. *)
 let lenses_in_range uri (req_range : Lsp.Types.Range.t) :
-  (Lsp.Types.Range.t * (string * string) option * string) list
+  (Lsp.Types.Range.t * (string * string list) option * string) list
   =
   match Hashtbl.find_opt entries uri with
   | None -> []

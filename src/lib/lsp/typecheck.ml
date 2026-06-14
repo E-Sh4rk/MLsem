@@ -24,11 +24,11 @@ type lens = {
   end_offset: int;
   title: string;
   (* For a successfully-typed binding, the pieces needed to synthesize a
-     [val name : type] signature: the binder name and the type rendered
-     *without* the [∀] quantifier (which is not valid [val] surface syntax —
-     variables are implicitly quantified). [None] for untypeable bindings,
-     where no inline-signature action is offered. *)
-  signature: (string * string) option;
+     [val name : type] signature: the binder name and the binding's signature(s)
+     rendered as valid [val] surface syntax (a binding may carry several
+     overload signatures). [None] for untypeable bindings, where no
+     inline-signature action is offered. *)
+  signature: (string * string list) option;
 }
 
 type result = {
@@ -92,7 +92,7 @@ let add_message acc (sev, pos, title, descr) =
   in
   diagnostic ~severity:(severity_of sev) ~range ~message:(full_message title descr) () :: acc
 
-let add_result acc (res : treat_result) : result =
+let add_result envs acc (res : treat_result) : result =
   match res with
   | TDone -> acc
   | TFailure (v_opt, pos, msg, descr, _time) ->
@@ -135,11 +135,11 @@ let add_result acc (res : treat_result) : result =
                    if b.declared || name = "" || name = "_" then
                      None
                    else
-                     Some (name, b.signature)
+                     Some (name, Main.signature envs b.sigs)
                  in
                  (* Lens title keeps the [∀]-quantified display form. *)
                  make_lens ?signature ~start_offset:s ~end_offset:e
-                   ~title:(name ^ " : " ^ b.display)
+                   ~title:(name ^ " : " ^ Main.display envs b.ty)
                    ()
                  :: lenses )
           acc.lenses lst
@@ -166,7 +166,7 @@ let run (source : string) : result =
         }
     | PSuccess program ->
         let envs, sigs_res = treat_all_sigs initial_envs program in
-        let acc = add_result empty sigs_res in
+        let acc = add_result envs empty sigs_res in
         let sigs_ok =
           match sigs_res with
           | TFailure _ -> false
@@ -179,7 +179,7 @@ let run (source : string) : result =
             List.fold_left
               (fun (env, acc) e ->
                  let env, res = treat_def env e in
-                 (env, add_result acc res) )
+                 (env, add_result env acc res) )
               (envs, acc) program
           in
           acc
