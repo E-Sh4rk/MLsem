@@ -116,10 +116,14 @@ let treat (benv,varm,senv,env) (annot, elem) =
     match elem with
     | PAst.Definitions lst ->
       let varm, benv = ref varm, ref benv in
-      let lst = lst |> List.map (fun ((kind, name), e) ->
+      let lst = lst |> List.map (fun (bpos, (kind, name), e) ->
         let kind, benv' = resolve_kind !benv kind in
         let var, sigs = sigs_of_def !varm senv env (kind, name) in
-        benv := benv' ; Variable.attach_location var (Position.position annot) ;
+        (* Per-binder location (the binder's own span) so the LSP can tell
+           apart the members of a [let .. and ..] group; falls back to the
+           whole element when the parser had no narrower span. *)
+        let bpos = if bpos = Position.dummy then Position.position annot else bpos in
+        benv := benv' ; Variable.attach_location var bpos ;
         varm := NameMap.add name var !varm ;
         (var, e, sigs)
       )

@@ -250,7 +250,7 @@ let to_expr benv env e =
     let res = aux env e in res, !benv
 
 type element =
-| Definitions of ((TyExpr.t, string) vdef * pexpr) list
+| Definitions of (Position.t * (TyExpr.t, string) vdef * pexpr) list
 | SigDef of string * bool (* mutable *) * TyExpr.t
 | Types of (string * string list * TyExpr.t) list
 | AbsType of string * int

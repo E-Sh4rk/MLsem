@@ -2,40 +2,37 @@
    overload-merge webview. Each takes the request's [params] as raw JSON and
    returns the JSON result; [Server] wires them into the dispatch loop.
 
-   Merge operates on the cached [Signature.t] values (not the rendered
-   strings), so every handler re-resolves the binding under the cursor from
-   [Store] and renders/merges through the typecheck's cached [envs]. Ambient
-   global config may have been mutated by an intervening typecheck of another
-   document, so we [Config.restore_all ()] before rendering or merging — the
-   cached [envs]/[Signature.t] are immutable and safe to reuse, the global
-   config is not. *)
+   Consistency model: every request carries the client's current buffer [text].
+   We typecheck *that* text and resolve the request's inputs against it, so the
+   client's view and the server's never drift:
+   - [mlsem/overloads] resolves the binding by [position] (against the sent
+     text) — used to open/refresh the panel.
+   - [mlsem/mergePreview] and [mlsem/applyMerge] resolve the binding by [name]
+     (stable across edits, unlike a position) and select overloads by matching
+     their rendered [text]. If a requested overload text is no longer present,
+     the binding changed under the client: we reply [stale] so the client
+     refreshes instead of merging a subset the user did not pick.
+   Ambient global config may have been mutated by an intervening typecheck, so
+   we [Config.restore_all ()] before rendering/merging. *)
 
 open Mlsem_app
 open Yojson.Safe.Util
 
-(* {textDocument:{uri}, position} → (uri, position), via the standard LSP
-   decoders so we inherit their tolerance and uri normalisation. *)
-let decode_target params =
-  let td = params |> member "textDocument" |> Lsp.Types.TextDocumentIdentifier.t_of_yojson in
-  let pos = params |> member "position" |> Lsp.Types.Position.t_of_yojson in
-  (td.uri, pos)
+let decode_uri params =
+  (params |> member "textDocument" |> Lsp.Types.TextDocumentIdentifier.t_of_yojson).uri
 
-let decode_indices params = params |> member "indices" |> to_list |> List.map to_int
+let decode_position params = params |> member "position" |> Lsp.Types.Position.t_of_yojson
+let decode_name params = params |> member "name" |> to_string
+let decode_overload_texts params = params |> member "overloadTexts" |> to_list |> List.map to_string
 
-(* The client's current buffer text, sent with mutating/preview requests so the
-   server acts on exactly what the editor shows. Absent for cursor-follow. *)
-let decode_text params =
-  match member "text" params with
-  | `String s -> Some s
-  | _ -> None
-
-(* Bring the cache in line with the request before resolving the binding:
-   prefer the client-sent text (race-free), else re-typecheck the cached
-   buffer if it has drifted since the last typecheck. *)
+(* Typecheck and cache the client-sent buffer so binding resolution below runs
+   against exactly the text the request's position/name refer to. The shipped
+   client always sends [text]; if a request omits it we leave the cache as-is
+   (resolution then runs against whatever was last typechecked). *)
 let sync params uri =
-  match decode_text params with
-  | Some text -> Store.sync_text uri text
-  | None -> Store.ensure_fresh uri
+  match member "text" params with
+  | `String text -> Store.sync_text uri text
+  | _ -> ()
 
 let not_found =
   `Assoc
@@ -45,24 +42,38 @@ let not_found =
     ]
 
 let error msg = `Assoc [("ok", `Bool false); ("error", `String msg)]
+let stale = `Assoc [("ok", `Bool false); ("stale", `Bool true)]
 
-(* Render and merge a chosen subset of overloads. [None] for an empty
-   selection — [Signature.merge []] is ill-defined. *)
-let merge_selected envs (sigs : Signature.t) indices : string option =
-  Config.restore_all () ;
-  match List.filter_map (List.nth_opt sigs) indices with
-  | [] -> None
-  | selected -> (
-      match Main.signature envs [Signature.merge selected] with
-      | [s] -> Some s
-      | _ -> assert false (* one overload in → exactly one rendered string *) )
+(* Merge the overloads of [sigs] whose rendered text is in [wanted]. [`Stale]
+   if any wanted text is absent (the overload set changed), [`Empty] if nothing
+   was selected ([Signature.merge []] is ill-defined). *)
+let merge_texts envs (sigs : Signature.t) (wanted : string list) =
+  match wanted with
+  | [] -> `Empty
+  | _ -> (
+      Config.restore_all () ;
+      let rendered = Main.signature envs sigs in
+      if not (List.for_all (fun w -> List.mem w rendered) wanted) then
+        `Stale
+      else
+        let selected =
+          List.fold_left2
+            (fun acc s r -> if List.mem r wanted then s :: acc else acc)
+            [] sigs rendered
+          |> List.rev
+        in
+        match Main.signature envs [Signature.merge selected] with
+        | [s] -> `Ok s
+        | _ -> assert false (* one overload in → exactly one rendered string *) )
 
 (* mlsem/overloads: the binding under the cursor and its overloads, each
-   rendered to [val]-compatible surface syntax with its index. *)
+   rendered to [val]-compatible surface syntax (text is the overload's
+   identity for selection). *)
 let overloads params : Yojson.Safe.t =
   try
-    let uri, pos = decode_target params in
-    Store.ensure_fresh uri ;
+    let uri = decode_uri params in
+    let pos = decode_position params in
+    sync params uri ;
     match (Store.find_binding_at uri pos, Store.envs_of uri) with
     | Some b, Some envs ->
         Config.restore_all () ;
@@ -70,9 +81,7 @@ let overloads params : Yojson.Safe.t =
         `Assoc
           [
             ("found", `Bool true); ("name", `String b.name); ("declared", `Bool b.declared);
-            ( "overloads",
-              `List (List.mapi (fun i t -> `Assoc [("index", `Int i); ("text", `String t)]) texts)
-            );
+            ("overloads", `List (List.map (fun t -> `String t) texts));
           ]
     | _ -> not_found
   with
@@ -82,43 +91,51 @@ let overloads params : Yojson.Safe.t =
    one-line [val name : ...] the apply would write. *)
 let merge_preview params : Yojson.Safe.t =
   try
-    let uri, pos = decode_target params in
-    let indices = decode_indices params in
+    let uri = decode_uri params in
+    let name = decode_name params in
+    let wanted = decode_overload_texts params in
     sync params uri ;
-    match (Store.find_binding_at uri pos, Store.envs_of uri) with
+    match (Store.find_binding_by_name uri name, Store.envs_of uri) with
     | Some b, Some envs -> (
-        match merge_selected envs b.sigs indices with
-        | None -> error "Select at least one overload."
-        | Some merged ->
-            `Assoc [("ok", `Bool true); ("text", `String ("val " ^ b.name ^ " : " ^ merged))] )
-    | _ -> error "No binding at this position."
+        match merge_texts envs b.sigs wanted with
+        | `Empty -> error "Select at least one overload."
+        | `Stale -> stale
+        | `Ok merged ->
+            `Assoc [("ok", `Bool true); ("text", `String ("val " ^ name ^ " : " ^ merged))] )
+    | _ -> error "No binding found."
   with
   | e -> error (Printexc.to_string e)
 
-(* mlsem/applyMerge: the workspace edit that writes the merged declaration —
-   replacing existing [val] line(s) or inserting above the binder. Returned
-   for the extension to apply via [vscode.workspace.applyEdit]. *)
+(* mlsem/applyMerge: the workspace edits that write the merged declaration —
+   replacing existing [val] line(s) or inserting above the binder. Returned as
+   a list for the extension to apply via [vscode.workspace.applyEdit]. *)
 let apply_merge params : Yojson.Safe.t =
   try
-    let uri, pos = decode_target params in
-    let indices = decode_indices params in
+    let uri = decode_uri params in
+    let name = decode_name params in
+    let wanted = decode_overload_texts params in
     sync params uri ;
-    match (Store.find_binding_at uri pos, Store.envs_of uri) with
+    match (Store.find_binding_by_name uri name, Store.envs_of uri) with
     | Some b, Some envs -> (
-        match merge_selected envs b.sigs indices with
-        | None -> error "Select at least one overload."
-        | Some merged ->
-            let range, newText = Store.merge_edit uri b ~name:b.name ~merged in
+        match merge_texts envs b.sigs wanted with
+        | `Empty -> error "Select at least one overload."
+        | `Stale -> stale
+        | `Ok merged ->
+            let edits = Store.merge_edit uri b ~name ~merged in
             `Assoc
               [
-                ("ok", `Bool true);
-                ( "edit",
-                  `Assoc
-                    [
-                      ("uri", Lsp.Types.DocumentUri.yojson_of_t uri);
-                      ("range", Lsp.Types.Range.yojson_of_t range); ("newText", `String newText);
-                    ] );
+                ("ok", `Bool true); ("uri", Lsp.Types.DocumentUri.yojson_of_t uri);
+                ( "edits",
+                  `List
+                    (List.map
+                       (fun (range, newText) ->
+                          `Assoc
+                            [
+                              ("range", Lsp.Types.Range.yojson_of_t range);
+                              ("newText", `String newText);
+                            ] )
+                       edits ) );
               ] )
-    | _ -> error "No binding at this position."
+    | _ -> error "No binding found."
   with
   | e -> error (Printexc.to_string e)

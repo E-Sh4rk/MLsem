@@ -79,39 +79,17 @@ let set_result uri ~text ~(result : Typecheck.result) =
   e.envs <- result.envs ;
   Hashtbl.replace entries uri e
 
-(* Re-typecheck the live buffer when it has drifted from the cached typecheck
-   — e.g. after an applied edit that has not yet been saved. Custom requests
-   call this so they act on the current text: without it a second Apply would
-   still see the pre-edit state (binding still [declared = false]) and insert a
-   duplicate declaration instead of replacing the one the first Apply wrote.
-   Cheap when the buffer is unchanged — just a digest comparison. *)
-let ensure_fresh uri =
-  match Hashtbl.find_opt entries uri with
-  | Some e when not (Digest.equal e.typechecked_digest (Digest.string e.text)) ->
-      let result = Typecheck.run e.text in
-      set_result uri ~text:e.text ~result
-  | _ -> ()
-
-(* Bring the cache up to date before a request resolves a binding, using the
-   freshest text available so Apply never acts on stale bindings (which is what
-   let a second Apply insert a duplicate declaration). [text] is the client's
-   buffer sent with the request; [e.text] is the cache, kept current by
-   didChange. We prefer the sent text when it has changed since the last
-   typecheck, but fall back to the cached buffer when the sent text looks
-   unchanged yet the buffer has drifted further — e.g. a stale client text
-   masking the edit a previous Apply just made. *)
+(* Typecheck [text] — the client's authoritative buffer sent with the request —
+   and make it the cached content, unless it is already what we last
+   typechecked. Custom requests carry their own [text] and resolve positions /
+   binding names against it, so request inputs and the typechecked buffer are
+   always the same snapshot (no drift between the client's view and ours). *)
 let sync_text uri text =
   match Hashtbl.find_opt entries uri with
-  | None ->
+  | Some e when Digest.equal e.typechecked_digest (Digest.string text) -> ()
+  | _ ->
       let result = Typecheck.run text in
       set_result uri ~text ~result
-  | Some e ->
-      if not (Digest.equal e.typechecked_digest (Digest.string text)) then
-        let result = Typecheck.run text in
-        set_result uri ~text ~result
-      else if not (Digest.equal e.typechecked_digest (Digest.string e.text)) then
-        let result = Typecheck.run e.text in
-        set_result uri ~text:e.text ~result
 
 (* True iff [text] hashes to the digest of the last *typechecked* content,
    regardless of intervening edits. *)
@@ -219,28 +197,59 @@ let find_binding_at uri (pos : Lsp.Types.Position.t) : Typecheck.binding option 
         None e.bindings
       |> Option.map fst
 
-(* Build the (range, newText) that applies [merged] as the [val name : ...]
-   declaration of [b]. Replaces the existing declaration line(s) when present
-   (collapsing several [val] lines into one), otherwise inserts a new line
-   above the binder — mirroring [Server.inline_type_action]'s placement. *)
-let merge_edit uri (b : Typecheck.binding) ~name ~merged : Lsp.Types.Range.t * string =
+(* The cached binding with the given [name]. Binding names are unique at top
+   level, so this disambiguates members of a [let .. and ..] group that share
+   no positional information — preview/apply identify their target by name
+   (stable across edits) rather than re-resolving a possibly-stale position. *)
+let find_binding_by_name uri name : Typecheck.binding option =
+  match Hashtbl.find_opt entries uri with
+  | None -> None
+  | Some e -> List.find_opt (fun (b : Typecheck.binding) -> b.name = name) e.bindings
+
+(* The edit(s) that apply [merged] as the [val name : ...] declaration of [b].
+   With existing declaration line(s): replace the first with the merged decl
+   and delete the rest as whole lines — so non-adjacent [val] lines collapse to
+   one without disturbing any code between them. Otherwise: a single insert
+   above the binder (mirroring [Server.inline_type_action]'s placement). *)
+let merge_edit uri (b : Typecheck.binding) ~name ~merged : (Lsp.Types.Range.t * string) list =
   let e = Hashtbl.find entries uri in
-  match b.sig_offsets with
-  | _ :: _ ->
-      let min_start = List.fold_left (fun a (s, _) -> min a s) max_int b.sig_offsets in
-      let max_end = List.fold_left (fun a (_, e) -> max a e) 0 b.sig_offsets in
-      let sp = position_of_offset e.line_offsets min_start in
-      let start = Lsp.Types.Position.create ~line:sp.line ~character:0 in
-      let end_ = position_of_offset e.line_offsets max_end in
-      let indent = indent_at e.text e.line_offsets min_start in
-      let range = Lsp.Types.Range.create ~start ~end_ in
-      (range, indent ^ "val " ^ name ^ " : " ^ merged)
+  let decl = "val " ^ name ^ " : " ^ merged in
+  match List.sort (fun (a, _) (b, _) -> compare a b) b.sig_offsets with
   | [] ->
       let dp = position_of_offset e.line_offsets b.def_start in
       let insert = Lsp.Types.Position.create ~line:dp.line ~character:0 in
       let indent = indent_at e.text e.line_offsets b.def_start in
-      let range = Lsp.Types.Range.create ~start:insert ~end_:insert in
-      (range, indent ^ "val " ^ name ^ " : " ^ merged ^ "\n")
+      [(Lsp.Types.Range.create ~start:insert ~end_:insert, indent ^ decl ^ "\n")]
+  | (first_start, first_end) :: rest ->
+      (* Replace the first declaration in place. *)
+      let fp = position_of_offset e.line_offsets first_start in
+      let first_line_start = Lsp.Types.Position.create ~line:fp.line ~character:0 in
+      let first_end_pos = position_of_offset e.line_offsets first_end in
+      let indent = indent_at e.text e.line_offsets first_start in
+      let replace =
+        (Lsp.Types.Range.create ~start:first_line_start ~end_:first_end_pos, indent ^ decl)
+      in
+      (* Delete each remaining declaration as a whole line (up to the start of
+         the next line), leaving anything in between untouched. *)
+      let last_line = Array.length e.line_offsets - 1 in
+      let deletions =
+        List.map
+          (fun (s, _) ->
+             let p = position_of_offset e.line_offsets s in
+             let line_start = Lsp.Types.Position.create ~line:p.line ~character:0 in
+             (* Delete the whole line up to the start of the next one; for the
+                last line (no next line) end at the document end so the emitted
+                range stays valid. *)
+             let line_end =
+               if p.line >= last_line then
+                 position_of_offset e.line_offsets (String.length e.text)
+               else
+                 Lsp.Types.Position.create ~line:(p.line + 1) ~character:0
+             in
+             (Lsp.Types.Range.create ~start:line_start ~end_:line_end, "") )
+          rest
+      in
+      replace :: deletions
 
 (* Shift a byte interval through an edit at [[s_off, e_off)] of length delta
    [delta]: intervals after the edit move by [delta], intervals before it stay,
@@ -297,23 +306,11 @@ let apply_change uri (event : Lsp.Types.TextDocumentContentChangeEvent.t) =
                      dropped := true ;
                      None )
               e.lenses ;
-          (* Shift cached bindings through the same edit so custom merge
-             requests keep resolving between saves. A binding whose definition
-             span overlaps the edit is dropped; individual declaration spans
-             that overlap are dropped but leave the binding in place. *)
-          e.bindings <-
-            List.filter_map
-              (fun (b : Typecheck.binding) ->
-                 match shift_offsets ~s_off ~e_off ~delta (b.def_start, b.def_end) with
-                 | None ->
-                     dropped := true ;
-                     None
-                 | Some (def_start, def_end) ->
-                     let sig_offsets =
-                       List.filter_map (shift_offsets ~s_off ~e_off ~delta) b.sig_offsets
-                     in
-                     Some {b with def_start; def_end; sig_offsets} )
-              e.bindings ;
+          (* Cached [bindings]/[envs] are intentionally not shifted: a custom
+             request always re-typechecks the buffer text it carries (see
+             [sync_text]) and rebuilds them. They are only ever read on a digest
+             match — i.e. when the text equals the last typecheck — and then the
+             original (unshifted) offsets are exactly right. *)
           (* A dropped lens is gone for good: reverting the edit restores the
              text but not the lens. The [typechecked_digest] deliberately
              survives didChange so an edit-and-undo can short-circuit the next
