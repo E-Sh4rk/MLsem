@@ -31,12 +31,33 @@ type lens = {
   signature: (string * string list) option;
 }
 
+(* A typeable, named binding retained so that custom requests can re-render
+   its overloads and merge a chosen subset on demand. [sigs] is the raw
+   overload list (the merge input); rendering and merging need the final
+   [envs] kept on [result]. Offsets are byte intervals, shifted through edits
+   by [Store.apply_change] just like [lens] offsets. *)
+type binding = {
+  name: string;
+  declared: bool;
+  def_start: int;
+  def_end: int;
+  (* Source spans of any existing [val name : ...] declaration lines, used to
+     replace them on apply. Empty for inferred (undeclared) bindings. *)
+  sig_offsets: (int * int) list;
+  sigs: Signature.t;
+}
+
 type result = {
   lenses: lens list;
   diagnostics: LT.Diagnostic.t list;
+  (* Per-binding overload data for custom merge requests. *)
+  bindings: binding list;
+  (* Final environment of the typecheck, needed to render/merge overloads.
+     [None] when the source failed to parse or sigs failed to elaborate. *)
+  envs: Main.envs option;
 }
 
-let empty = {lenses = []; diagnostics = []}
+let empty = {lenses = []; diagnostics = []; bindings = []; envs = None}
 
 (* LSP positions are 0-indexed; Lexing.pos_lnum is 1-indexed while
    [Position.column] already returns a 0-indexed offset within the line. *)
@@ -119,7 +140,7 @@ let add_result envs acc (res : treat_result) : result =
         diagnostic ~severity:LT.DiagnosticSeverity.Error ~range:diag_range
           ~message:(full_message msg descr) ()
       in
-      {lenses; diagnostics = diag :: acc.diagnostics}
+      {acc with lenses; diagnostics = diag :: acc.diagnostics}
   | TSuccess (lst, msgs, _time) ->
       let lenses =
         List.fold_left
@@ -145,7 +166,28 @@ let add_result envs acc (res : treat_result) : result =
           acc.lenses lst
       in
       let diagnostics = List.fold_left add_message acc.diagnostics msgs in
-      {lenses; diagnostics}
+      (* Retain every genuinely-named binding (declared ones included, so a
+         declared binding can be re-merged) for the custom merge requests. *)
+      let bindings =
+        List.fold_left
+          (fun bindings (b : inferred) ->
+             match Variable.get_name b.var with
+             | None
+             | Some ""
+             | Some "_" ->
+                 bindings
+             | Some name -> (
+                 match offsets_of_pos (Variable.get_location b.var) with
+                 | None -> bindings
+                 | Some (def_start, def_end) ->
+                     let sig_offsets =
+                       Variable.get_sig_locations b.var |> List.filter_map offsets_of_pos
+                     in
+                     {name; declared = b.declared; def_start; def_end; sig_offsets; sigs = b.sigs}
+                     :: bindings ) )
+          acc.bindings lst
+      in
+      {acc with lenses; diagnostics; bindings}
 
 (* Counterpart to [web.ml]'s [typecheck]: runs the full pipeline on the
    source string. Returns a parse/internal error as a single diagnostic
@@ -161,7 +203,7 @@ let run (source : string) : result =
           | None -> fallback_range ()
         in
         {
-          lenses = [];
+          empty with
           diagnostics = [diagnostic ~severity:LT.DiagnosticSeverity.Error ~range ~message:msg ()];
         }
     | PSuccess program ->
@@ -175,18 +217,20 @@ let run (source : string) : result =
         if not sigs_ok then
           acc
         else
-          let _, acc =
+          let final_envs, acc =
             List.fold_left
               (fun (env, acc) e ->
                  let env, res = treat_def env e in
                  (env, add_result env acc res) )
               (envs, acc) program
           in
-          acc
+          (* Keep the final environment so custom requests can render and
+             merge the cached overloads in the same elaboration context. *)
+          {acc with envs = Some final_envs}
   with
   | e ->
       {
-        lenses = [];
+        empty with
         diagnostics =
           [
             diagnostic ~range:(fallback_range ())

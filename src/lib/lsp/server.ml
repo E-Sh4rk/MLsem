@@ -60,6 +60,14 @@ let send_request (req : _ Lsp.Server_request.t) =
   let jsonrpc = Lsp.Server_request.to_jsonrpc_request req ~id:(next_request_id ()) in
   send (Packet.Request jsonrpc)
 
+(* Raw params as Yojson for the custom [mlsem/*] handlers. [Jsonrpc.Structured.t]
+   ([`Assoc]/[`List]) is a structural subtype of [Yojson.Safe.t], so the
+   coercion is total and allocation-free. *)
+let params_json (req : Jsonrpc.Request.t) : Yojson.Safe.t =
+  match req.params with
+  | Some s -> (s :> Yojson.Safe.t)
+  | None -> `Null
+
 (* Advertise full-sync text, save notifications (with text), and CodeLens. *)
 let initialize_result_json () =
   let open Lsp.Types in
@@ -136,43 +144,56 @@ let code_actions_for uri (req_range : Lsp.Types.Range.t) =
     | None -> None
     | Some (name, tys) -> Some (`CodeAction (inline_type_action uri range ~indent ~name ~tys)) )
 
-(* Handle client requests via typed LSP decoding. *)
+(* Handle client requests via typed LSP decoding. Custom [mlsem/*] methods are
+   intercepted first: the typed decoder would map them to [UnknownRequest], and
+   they carry plain-JSON params the [Handlers] module decodes itself. *)
 let handle_request ~shutdown_received (req : Jsonrpc.Request.t) =
-  match Lsp.Client_request.of_jsonrpc req with
-  | Error err ->
-      Log.Server.warn (fun m -> m "request decode error: %s" err) ;
-      send (method_not_found req.id) ;
+  match req.method_ with
+  | "mlsem/overloads" ->
+      send (Packet.Response (Response.ok req.id (Handlers.overloads (params_json req)))) ;
       shutdown_received
-  | Ok (Lsp.Client_request.E typed_req) -> (
-      match typed_req with
-      | Lsp.Client_request.Initialize _ ->
-          send (Packet.Response (Response.ok req.id (initialize_result_json ()))) ;
+  | "mlsem/mergePreview" ->
+      send (Packet.Response (Response.ok req.id (Handlers.merge_preview (params_json req)))) ;
+      shutdown_received
+  | "mlsem/applyMerge" ->
+      send (Packet.Response (Response.ok req.id (Handlers.apply_merge (params_json req)))) ;
+      shutdown_received
+  | _ -> (
+      match Lsp.Client_request.of_jsonrpc req with
+      | Error err ->
+          Log.Server.warn (fun m -> m "request decode error: %s" err) ;
+          send (method_not_found req.id) ;
           shutdown_received
-      | Lsp.Client_request.Shutdown ->
-          send (Packet.Response (Response.ok req.id `Null)) ;
-          true
-      | Lsp.Client_request.CodeAction params ->
-          let uri = params.textDocument.uri in
-          let actions = code_actions_for uri params.range in
-          let result = if actions = [] then None else Some actions in
-          let json = Lsp.Client_request.yojson_of_result typed_req result in
-          send (Packet.Response (Response.ok req.id json)) ;
-          shutdown_received
-      | Lsp.Client_request.TextDocumentCodeLens params ->
-          (* Lens offsets are kept in sync with the live buffer via
+      | Ok (Lsp.Client_request.E typed_req) -> (
+          match typed_req with
+          | Lsp.Client_request.Initialize _ ->
+              send (Packet.Response (Response.ok req.id (initialize_result_json ()))) ;
+              shutdown_received
+          | Lsp.Client_request.Shutdown ->
+              send (Packet.Response (Response.ok req.id `Null)) ;
+              true
+          | Lsp.Client_request.CodeAction params ->
+              let uri = params.textDocument.uri in
+              let actions = code_actions_for uri params.range in
+              let result = if actions = [] then None else Some actions in
+              let json = Lsp.Client_request.yojson_of_result typed_req result in
+              send (Packet.Response (Response.ok req.id json)) ;
+              shutdown_received
+          | Lsp.Client_request.TextDocumentCodeLens params ->
+              (* Lens offsets are kept in sync with the live buffer via
              [Store.apply_change] on each didChange, so the projection to
              LSP Range is against the current line layout. *)
-          let uri = params.textDocument.uri in
-          let lenses = Store.code_lenses uri in
-          let json = Lsp.Client_request.yojson_of_result typed_req lenses in
-          send (Packet.Response (Response.ok req.id json)) ;
-          shutdown_received
-      | Lsp.Client_request.UnknownRequest _ ->
-          send (method_not_found req.id) ;
-          shutdown_received
-      | _ ->
-          send (method_not_found req.id) ;
-          shutdown_received )
+              let uri = params.textDocument.uri in
+              let lenses = Store.code_lenses uri in
+              let json = Lsp.Client_request.yojson_of_result typed_req lenses in
+              send (Packet.Response (Response.ok req.id json)) ;
+              shutdown_received
+          | Lsp.Client_request.UnknownRequest _ ->
+              send (method_not_found req.id) ;
+              shutdown_received
+          | _ ->
+              send (method_not_found req.id) ;
+              shutdown_received ) )
 
 (* Handle client notifications via typed LSP decoding. *)
 let handle_notification ~shutdown_received (notif : Jsonrpc.Notification.t) =
