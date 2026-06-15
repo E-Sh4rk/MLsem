@@ -158,6 +158,12 @@ let handle_request ~shutdown_received (req : Jsonrpc.Request.t) =
   | "mlsem/applyMerge" ->
       send (Packet.Response (Response.ok req.id (Handlers.apply_merge (params_json req)))) ;
       shutdown_received
+  | "mlsem/instantiatePreview" ->
+      send (Packet.Response (Response.ok req.id (Handlers.instantiate_preview (params_json req)))) ;
+      shutdown_received
+  | "mlsem/applyInstantiate" ->
+      send (Packet.Response (Response.ok req.id (Handlers.apply_instantiate (params_json req)))) ;
+      shutdown_received
   | _ -> (
       match Lsp.Client_request.of_jsonrpc req with
       | Error err ->

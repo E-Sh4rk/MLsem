@@ -206,20 +206,23 @@ let find_binding_by_name uri name : Typecheck.binding option =
   | None -> None
   | Some e -> List.find_opt (fun (b : Typecheck.binding) -> b.name = name) e.bindings
 
-(* The edit(s) that apply [merged] as the [val name : ...] declaration of [b].
-   With existing declaration line(s): replace the first with the merged decl
-   and delete the rest as whole lines — so non-adjacent [val] lines collapse to
-   one without disturbing any code between them. Otherwise: a single insert
-   above the binder (mirroring [Server.inline_type_action]'s placement). *)
-let merge_edit uri (b : Typecheck.binding) ~name ~merged : (Lsp.Types.Range.t * string) list =
+(* The edit(s) that write [decls] as the [val name : ...] declaration line(s)
+   of [b], one [val] line per element. With existing declaration line(s):
+   replace the first with all the new lines and delete the rest as whole lines
+   — so non-adjacent [val] lines are rewritten without disturbing any code
+   between them. Otherwise: a single insert above the binder (mirroring
+   [Server.inline_type_action]'s placement). *)
+let signature_edit uri (b : Typecheck.binding) ~name ~decls : (Lsp.Types.Range.t * string) list =
   let e = Hashtbl.find entries uri in
-  let decl = "val " ^ name ^ " : " ^ merged in
+  let lines indent =
+    decls |> List.map (fun d -> "val " ^ name ^ " : " ^ d) |> String.concat ("\n" ^ indent)
+  in
   match List.sort (fun (a, _) (b, _) -> compare a b) b.sig_offsets with
   | [] ->
       let dp = position_of_offset e.line_offsets b.def_start in
       let insert = Lsp.Types.Position.create ~line:dp.line ~character:0 in
       let indent = indent_at e.text e.line_offsets b.def_start in
-      [(Lsp.Types.Range.create ~start:insert ~end_:insert, indent ^ decl ^ "\n")]
+      [(Lsp.Types.Range.create ~start:insert ~end_:insert, indent ^ lines indent ^ "\n")]
   | (first_start, first_end) :: rest ->
       (* Replace the first declaration in place. *)
       let fp = position_of_offset e.line_offsets first_start in
@@ -227,7 +230,7 @@ let merge_edit uri (b : Typecheck.binding) ~name ~merged : (Lsp.Types.Range.t * 
       let first_end_pos = position_of_offset e.line_offsets first_end in
       let indent = indent_at e.text e.line_offsets first_start in
       let replace =
-        (Lsp.Types.Range.create ~start:first_line_start ~end_:first_end_pos, indent ^ decl)
+        (Lsp.Types.Range.create ~start:first_line_start ~end_:first_end_pos, indent ^ lines indent)
       in
       (* Delete each remaining declaration as a whole line (up to the start of
          the next line), leaving anything in between untouched. *)
@@ -250,6 +253,10 @@ let merge_edit uri (b : Typecheck.binding) ~name ~merged : (Lsp.Types.Range.t * 
           rest
       in
       replace :: deletions
+
+(* The merge tool collapses the overloads to a single [merged] declaration. *)
+let merge_edit uri (b : Typecheck.binding) ~name ~merged =
+  signature_edit uri b ~name ~decls:[merged]
 
 (* Shift a byte interval through an edit at [[s_off, e_off)] of length delta
    [delta]: intervals after the edit move by [delta], intervals before it stay,

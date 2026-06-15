@@ -29,6 +29,14 @@ val initial_penv : PEnv.t
 val display : envs -> TyScheme.t -> string
 val signature : envs -> Signature.t -> string list
 
+(* Build the concrete type denoted by a surface type expression, resolved
+   against the given environment. Raises on a parse/elaboration failure. *)
+val build_type : envs -> string -> Ty.t
+
+(* User-defined type names known in the environment, for concrete-type
+   suggestions in the type toolkit. *)
+val user_type_names : envs -> string list
+
 type parsing_result =
 | PSuccess of PAst.program
 | PFailure of Position.t * string

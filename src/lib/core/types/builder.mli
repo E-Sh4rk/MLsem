@@ -54,6 +54,10 @@ module Builder : sig
     type benv = { tenv:type_env ; vtenv:var_type_env }
     val empty_benv : benv
 
+    (* User-defined type names known in the environment (aliases, enums, tags,
+       abstract types), sorted and de-duplicated. *)
+    val type_names : benv -> string list
+
     val type_base_to_typ : TyExpr.base -> Ty.t
 
     val type_expr_to_typ : ?allow_gradual:bool -> benv -> TyExpr.t -> Ty.t * benv
