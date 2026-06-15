@@ -207,25 +207,23 @@ let fun_of_operation o =
     Arrow.mk dom codom |> GTy.mk |> TyScheme.mk_poly
   | OCustom { ofun ; _ } -> ofun
 
-let coerce c ty (id,t) =
+let coerce c ty t =
   let mono = GTy.fv ty |> MVarSet.filter (TVar.has_kind KNoInfer) (RVar.has_kind KNoInfer) in
-  let cs = ref Subst.identity in
   let rec aux ty (id,t) =
-    let ok = ref true in
     let unify ty1 ty2 =
-      let s = !cs in
-      let ty1, ty2 = GTy.substitute s ty1, GTy.substitute s ty2 in
       match TVOp.tally mono
         [(GTy.lb ty1, GTy.lb ty2) ; (GTy.lb ty2, GTy.lb ty1) ;
-        (GTy.ub ty1, GTy.ub ty2) ; (GTy.ub ty2, GTy.ub ty1)]
+         (GTy.ub ty1, GTy.ub ty2) ; (GTy.ub ty2, GTy.ub ty1)]
       with
-      | [s'] -> cs := Subst.compose s' s
-      | _ -> ok := false
+      | [s'] -> s'
+      | _ -> raise Exit
     in
-    try let t = match t with
-    | Let (tys, v, e1, e2) -> Let (tys, v, e1, aux ty e2)
-    | Ite (e, tau, e1, e2) -> Ite (e, tau, aux ty e1, aux ty e2)
-    | Projection (p, e) -> Projection (p, aux (GTy.map (domain_of_proj p) ty) e)
+    try match t with
+    | Let (tys, v, e1, e2) -> id, Let (tys, v, e1, aux ty e2)
+    | Ite (e, tau, e1, e2) -> id, Ite (e, tau, aux ty e1, aux ty e2)
+    | Projection (p, e) ->
+      let e = Eid.refresh id, Projection (p, aux (GTy.map (domain_of_proj p) ty) e) in
+      id, TypeCoerce (e, ty, c)
     | Constructor (cons, es) ->
       let domains_of_construct ty =
         match domains_of_construct cons ty with
@@ -236,25 +234,25 @@ let coerce c ty (id,t) =
       let tys_ub = domains_of_construct (GTy.ub ty) in
       let tys = List.map2 GTy.mk_gradual tys_lb tys_ub in
       let e = Eid.refresh id, Constructor (cons, List.map2 aux tys es) in
-      TypeCoerce (e, ty, c)
+      id, TypeCoerce (e, ty, c)
     | Lambda (da,v,e) ->
       let d = GTy.map Arrow.domain ty in
       let cd = GTy.map2 Arrow.apply ty d in
       if GTy.equiv ty (GTy.map2 Arrow.mk d cd) |> not then raise Exit ;
-      unify d da ; Lambda (d, v, aux cd e)
+      let s = unify d da in
+      id, Lambda (GTy.substitute s d, v, aux (GTy.substitute s cd) (apply_subst s e))
     | LambdaRec lst ->
       let n = List.length lst in
       let tys = List.mapi (fun i _ -> GTy.map (Tuple.proj n i) ty) lst in
       if GTy.equiv ty (GTy.mapl Tuple.mk tys) |> not then raise Exit ;
-      LambdaRec (List.combine lst tys |>
-          List.map (fun ((tya,v,e), ty) -> unify ty tya ; (ty,v,aux ty e))
-        )
+      id, LambdaRec (List.combine lst tys |> List.map (fun ((tya,v,e), ty) ->
+          let s = unify ty tya in
+          (GTy.substitute s ty, v, aux (GTy.substitute s ty) (apply_subst s e))
+        ))
     | _ -> raise Exit
-    in if !ok then id, t else raise Exit
     with Exit -> Eid.refresh id, TypeCoerce ((id,t), ty, c)
   in
-  let res = aux ty (id,t) in
-  apply_subst !cs res
+  aux ty t
 
 (* ===== PRETTY PRINTER ===== *)
 
