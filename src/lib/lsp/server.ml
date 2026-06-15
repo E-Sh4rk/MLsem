@@ -99,28 +99,28 @@ let method_not_found id =
 (* Run the typechecker against the current document text, cache the result,
    and emit diagnostics. Called on didOpen and didSave.
 
-   Skips the run (and the diagnostic re-publish, which the client already
-   has) when [text] matches what was last typechecked — VS Code fires
-   didSave on every Ctrl+S, including saves of unchanged buffers. *)
+   Skips only the (expensive) re-typecheck when [text] matches what was last
+   typechecked — VS Code fires didSave on every Ctrl+S, including saves of
+   unchanged buffers. The diagnostic publish below is *not* skipped: a custom
+   panel request may have typechecked this exact text via [Store.sync_text]
+   (advancing the digest) without ever publishing, so the client does not
+   necessarily already have the diagnostics. *)
 let typecheck_and_publish uri text =
   if Store.matches_typechecked_digest uri text then
-    (* Buffer matches the last typecheck — applied edits and undid them, or
-       Ctrl+S without modification. Cached lenses already correspond to this
-       text and the client still has the diagnostics. Skip the work. *)
-      Log.Server.debug (fun m -> m "skipping typecheck: content unchanged")
-  else
+    Log.Server.debug (fun m -> m "skipping re-typecheck: content unchanged")
+  else begin
     let result = Typecheck.run text in
-    Store.set_result uri ~text ~result ;
-    let params =
-      Lsp.Types.PublishDiagnosticsParams.create ~uri ~diagnostics:result.diagnostics ()
-    in
-    send_notification (Lsp.Server_notification.PublishDiagnostics params) ;
-    (* A save does not bump the document version, so VS Code will not re-pull
-       codeLens on its own after didSave — it would keep showing the lenses
-       from before the edit until some other event invalidates them (e.g.
-       switching files). Ask the client to refresh so the freshly-typechecked
-       lenses are pulled immediately. *)
-    send_request Lsp.Server_request.CodeLensRefresh
+    Store.set_result uri ~text ~result
+  end ;
+  let params =
+    Lsp.Types.PublishDiagnosticsParams.create ~uri ~diagnostics:(Store.diagnostics uri) ()
+  in
+  send_notification (Lsp.Server_notification.PublishDiagnostics params) ;
+  (* A save does not bump the document version, so VS Code will not re-pull
+     codeLens on its own after didSave — it would keep showing the lenses from
+     before the edit until some other event invalidates them (e.g. switching
+     files). Ask the client to refresh so the current lenses are pulled. *)
+  send_request Lsp.Server_request.CodeLensRefresh
 
 (* Build a [Refactor.Inline] action that prepends a [val name : type]
    signature line above the binder, indented to match the binding. A binding
