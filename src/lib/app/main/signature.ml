@@ -13,9 +13,12 @@ let is_well_formed overload =
     (fun rv -> RVar.has_kind KNoInfer rv |> not)
   |> MVarSet.is_empty
 
+let is_arrow_sig ty = Ty.leq ty Arrow.any && not (Ty.is_empty ty)
+
 let rec decompose ty =
-  if Ty.leq ty Arrow.any then
+  if is_arrow_sig ty then
     match Arrow.dnf ty with
+    | [[]] -> [Arrow.any]
     | [arrs] -> arrs |> List.concat_map
       (fun (a,b) -> decompose b |> List.map (fun b -> Arrow.mk a b))
     | _ -> [ty]
@@ -39,14 +42,12 @@ let extract ty =
   ty
 let of_tyscheme ty = ty |> extract |> decompose
 
-let rec merge tys =
-  if tys <> []
-     && List.for_all (fun ty -> Ty.leq ty Arrow.any) tys
-     && not (List.exists Ty.is_empty tys)
-  then
-    let dom = List.map Arrow.domain tys |> Ty.disj in
-    let codom = Arrow.apply (Ty.conj tys) dom |> decompose |> merge in
+let rec merge ty =
+  if is_arrow_sig ty then
+    let dom = Arrow.domain ty in
+    let codom = Arrow.apply ty dom |> merge in
     Arrow.mk dom codom
-  else Ty.conj tys
+  else ty
+let merge tys = merge (Ty.conj tys)
 
 let pp_overload fmt o = GTy.Builder.pp fmt o
