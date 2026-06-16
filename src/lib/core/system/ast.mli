@@ -59,5 +59,5 @@ val construct : constructor -> Ty.t list -> Ty.t
 
 val fun_of_operation : operation -> TyScheme.t
 
-val coerce : check -> GTy.t -> t -> t
+val coerce : ?coercion_id:Eid.t -> check -> GTy.t -> t -> t
 val push_coercions : t -> t

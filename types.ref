@@ -169,7 +169,7 @@ argument: (1..5)
 mx: dyn
 read_mut: any
 read_mut_cast: bool
-[Notice] File "tests/2_dyn.ml", line 71, characters 21-23 Unchecked dynamic coercion
+[Notice] File "tests/2_dyn.ml", line 71, characters 20-33 Unchecked dynamic coercion
 expected: bool
 given: any
 write_mut: ()
