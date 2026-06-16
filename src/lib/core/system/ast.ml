@@ -16,6 +16,7 @@ type projection =
 type constructor =
 | Tuple of int | Cons | Rec of string list * bool | Tag of Tag.t | Enum of Enum.t 
 | Join of int | Meet of int | Negate | Ternary of Ty.t (* Should not contain type vars *)
+| Voidify of Ty.t (* Should not contain type vars *)
 | Normalize | CCustom of ccustom
 [@@deriving show]
 type operation =
@@ -152,6 +153,8 @@ let domains_of_construct (c:constructor) ty =
   | Negate -> [ ]
   | Normalize when Ty.is_any ty -> [ [Ty.any] ]
   | Normalize -> [ ]
+  | Voidify ty' when Ty.leq ty' ty -> [ [Ty.any] ]
+  | Voidify _ -> [ ]
   | Ternary _ -> [ [ Ty.any ; ty ; ty ] ]
   | Cons ->
     Lst.dnf ty
@@ -179,6 +182,7 @@ let construct (c:constructor) tys =
   | Meet n, tys when List.length tys = n -> Ty.conj tys
   | Negate, [ty] -> Ty.neg ty
   | Normalize, [ty] -> !Config.normalization_fun ty
+  | Voidify ty, [_] -> ty
   | Ternary tau, [t;t1;t2] ->
     if Ty.leq t tau then t1
     else if Ty.leq t (Ty.neg tau) then t2
@@ -208,7 +212,7 @@ let fun_of_operation o =
   | OCustom { ofun ; _ } -> ofun
 
 let coerce c ty t =
-  let mono = GTy.fv ty |> MVarSet.filter (TVar.has_kind KNoInfer) (RVar.has_kind KNoInfer) in
+  let mono = TVOp.all_vars KNoInfer in
   let rec aux ty (id,t) =
     let unify ty1 ty2 =
       match TVOp.tally mono
@@ -218,12 +222,18 @@ let coerce c ty t =
       | [s'] -> s'
       | _ -> raise Exit
     in
+    let coerce t =
+      Eid.refresh id, TypeCoerce (t, ty, c)
+    in
     try match t with
-    | Let (tys, v, e1, e2) -> id, Let (tys, v, e1, aux ty e2)
-    | Ite (e, tau, e1, e2) -> id, Ite (e, tau, aux ty e1, aux ty e2)
+    | Let (tys, v, e1, e2) ->
+      (* We need to keep the top-level coercion in case of a diverging definition *)
+      (id, Let (tys, v, e1, aux ty e2)) |> coerce
+    | Ite (e, tau, e1, e2) ->
+      (* We need to keep the top-level coercion in case of a diverging test *)
+      (id, Ite (e, tau, aux ty e1, aux ty e2)) |> coerce
     | Projection (p, e) ->
-      let e = Eid.refresh id, Projection (p, aux (GTy.map (domain_of_proj p) ty) e) in
-      id, TypeCoerce (e, ty, c)
+      (id, Projection (p, aux (GTy.map (domain_of_proj p) ty) e)) |> coerce
     | Constructor (cons, es) ->
       let domains_of_construct ty =
         match domains_of_construct cons ty with
@@ -233,8 +243,7 @@ let coerce c ty t =
       let tys_lb = domains_of_construct (GTy.lb ty) in
       let tys_ub = domains_of_construct (GTy.ub ty) in
       let tys = List.map2 GTy.mk_gradual tys_lb tys_ub in
-      let e = Eid.refresh id, Constructor (cons, List.map2 aux tys es) in
-      id, TypeCoerce (e, ty, c)
+      (id, Constructor (cons, List.map2 aux tys es)) |> coerce
     | Lambda (da,v,e) ->
       let d = GTy.map Arrow.domain ty in
       let cd = GTy.map2 Arrow.apply ty d in
@@ -250,9 +259,17 @@ let coerce c ty t =
           (GTy.substitute s ty, v, aux (GTy.substitute s ty) (apply_subst s e))
         ))
     | _ -> raise Exit
-    with Exit -> Eid.refresh id, TypeCoerce ((id,t), ty, c)
+    with Exit -> coerce (id,t)
   in
   aux ty t
+
+let push_coercions t =
+  let f t =
+    match t with
+    | _, TypeCoerce (t, ty, c) -> coerce c ty t
+    | _ -> t
+  in
+  map f t
 
 (* ===== PRETTY PRINTER ===== *)
 

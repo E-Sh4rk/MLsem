@@ -10,7 +10,7 @@
 
   type param = PPattern of pat | PVar of string
 
-  let tmp_var = "__encoding__"
+  let tmp_var = "_pat"
   let abstraction startpos endpos lst t =
     let step acc (da, pat) =
       match pat with

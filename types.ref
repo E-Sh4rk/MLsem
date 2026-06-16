@@ -169,10 +169,16 @@ argument: (1..5)
 mx: dyn
 read_mut: any
 read_mut_cast: bool
-[Notice] File "tests/2_dyn.ml", line 71, characters 20-33 Unchecked dynamic coercion
+[Notice] File "tests/2_dyn.ml", line 71, characters 21-23 Unchecked dynamic coercion
 expected: bool
 given: any
 write_mut: ()
+test_cast1: int -> int
+[Warning] File "tests/2_dyn.ml", line 77, characters 34-10 Unreachable code
+test_cast2: untypeable coercion
+File "tests/2_dyn.ml", line 80, characters 34-38
+expected: int
+given: true
 
 ===== Processing tests/3_records.ml =====
 record_delete: ∀`a. { l1 : any? ; l2 : any? ; l3 : any? ;; `a } -> { l1 : empty? ; l2 :
@@ -200,7 +206,7 @@ test_classes: { data_frame : true ;; false }
 test_class_ok: { c1 : true ;; false }
 test_class_fail: untypeable application
 File "tests/3_records.ml", line 110, characters 22-45
-function: 'I2223 & { c1 : true ;; false } -> 'I2223
+function: 'I2231 & { c1 : true ;; false } -> 'I2231
 argument: { c1 : true ;; bool }
 test_class_ok2: { c1 : true ; c2 : true ;; bool }
 
@@ -228,7 +234,7 @@ record_ab: ∀'a,'b. { a : 'b ; b : 'a } -> { a : 'b ; b : 'a }
 ref_42: ref(int)
 ref_42_unresolved: the type inferred is not fully resolved
 File "tests/4_all.ml", line 61, characters 0-30
-type inferred: ref(42 | 'I2395)
+type inferred: ref(42 | 'I2403)
 mutate_ref: ∀'a. 42 | 'a -> 42 | 'a
 is_ref: (ref -> true) & (~ref -> false)
 is_not_ref: (~ref -> true) & (ref -> false)
@@ -295,7 +301,7 @@ order: Nil | (Nil | int, Nil | int) -> Nil | int | (int, int)
 loop_tricky_narrowing: int -> (any, int)
 loop_invalid: untypeable application
 File "tests/4_all.ml", line 369, characters 4-14
-function: (ref('I3209), 'I3209) -> ()
+function: (ref('I3217), 'I3217) -> ()
 argument: ref(int), false
 loop_valid: ∀'a. (false | 'a -> false | 'a) & ('a \ int -> 'a \ int)
 filter_imp: ∀'a,'b,'c. ('a -> bool) & ('b -> false) -> array('b | 'a) -> array('a \ 'b

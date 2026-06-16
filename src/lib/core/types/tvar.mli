@@ -60,6 +60,7 @@ module Subst = Sstt.Subst
 
 (** @canonical Mlsem_types.TVOp *)
 module TVOp : sig
+    val all_vars : kind -> MVarSet.t
     val vars : Ty.t -> MVarSet.t
     val vars' : Ty.t list -> MVarSet.t
     val top_vars : Ty.t -> MVarSet.t

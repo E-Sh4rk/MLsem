@@ -28,7 +28,7 @@ let proj_is_gen p =
 let constr_is_gen c =
   match c with
   | Tuple _ | Cons | Rec _ | Tag _ | Enum _
-  | Join _ | Meet _  | Negate | Ternary _ | Normalize -> true
+  | Join _ | Meet _  | Negate | Ternary _ | Normalize | Voidify _ -> true
   | CCustom c -> c.cgen
 let op_is_gen o =
   match o with

@@ -72,9 +72,11 @@ let type_check_with_sigs env (var,e,sigs,aty) =
     (* Dyn type *)
     (var, (aty,[])), []
   else
-    let e = Transform.expr_to_ast e in
+    let e, id = Transform.expr_to_ast e, Eid.refresh (fst e) in
     let c = if !Config.allow_implicit_downcast then CheckStatic else Check in
-    let es = List.map (fun s -> coerce c (Signature.to_gty s |> GTy.ub |> GTy.mk) e) sigs in
+    let es = List.map (fun s ->
+      id, TypeCoerce (e, Signature.to_gty s |> GTy.ub |> GTy.mk, c)
+      ) sigs |> List.map push_coercions in
     let tys, msg = List.map (infer (Some var) env) es |> List.split in
     List.iter (check_resolved var env) tys ;
     let msg = (List.concat msg)@(Mlsem_system.Analyzer.get_unreachable e) in
@@ -84,7 +86,7 @@ let type_check_recs pos env lst =
   let e =
     Eid.unique_with_pos pos,
     PAst.LambdaRec (List.map (fun (v,e) -> (v,None,e)) lst) in
-  let e = Transform.expr_to_ast e in
+  let e = Transform.expr_to_ast e |> push_coercions in
   let ty, msg = infer None env e in
   let msg = msg@(Mlsem_system.Analyzer.get_unreachable e) in
   let tvs, ty = ty |> TyScheme.get in
