@@ -174,7 +174,7 @@ expected: bool
 given: any
 write_mut: ()
 test_cast1: int -> int
-[Warning] File "tests/2_dyn.ml", line 77, characters 34-10 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 77, characters 34-38 Unreachable code
 test_cast2: untypeable coercion
 File "tests/2_dyn.ml", line 80, characters 34-38
 expected: int
@@ -314,7 +314,7 @@ Nil) & (int -> int)
 test_noalt: (string -> string) & (char -> char) & (bool -> bool) & (() -> ()) & (Nil ->
 Nil) & (int -> int)
 typeof_app: Int -> 0
-[Warning] File "tests/4_all.ml", line 448, characters 9--28 Unreachable code
+[Warning] File "tests/4_all.ml", line 448, characters 9-29 Unreachable code
 typeof_app': Int -> 0
 [Warning] File "tests/4_all.ml", line 468, characters 7-27 Unreachable code
 [Warning] File "tests/4_all.ml", line 466, characters 43-48 Unreachable code

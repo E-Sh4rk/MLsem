@@ -29,7 +29,7 @@ let expr_to_ast t =
     | PatOr (p1, p2) -> POr (aux_pat p1, aux_pat p2)
     | PatAssign ((_,v), c) -> PAssign (get_sugg v, v, Mlsem_lang.Const.typeof c |> GTy.mk)
   in
-  let rec aux_e e =
+  let rec aux_e id e =
     match e with
     | PAst.Magic t -> Value t
     | Const c -> Value (Mlsem_lang.Const.typeof c |> GTy.mk)
@@ -37,8 +37,8 @@ let expr_to_ast t =
     | Enum e -> Constructor (Enum e, [])
     | Tag (t, e) -> Constructor (Tag t, [aux e])
     | TagProj (e, t) -> Projection (PiTag t, aux e)
-    | Suggest (v, tys, (_,e)) ->
-      add_suggs v tys ; aux_e e
+    | Suggest (v, tys, (id,e)) ->
+      add_suggs v tys ; aux_e id e
     | Lambda (x, a, e) ->
       let x' = MVariable.refresh MVariable.Immut x in
       let e = aux e |> rename_fv x x' in
@@ -65,8 +65,7 @@ let expr_to_ast t =
       Constructor (Rec (List.map fst lst, false), List.map snd lst |> List.map aux)
     | RecordUpdate (e, lbl, None) -> Operation (RecDel lbl, aux e)
     | RecordUpdate (e, lbl, Some e') ->
-      let id = Position.join (fst e |> Eid.loc) (fst e' |> Eid.loc) |> Eid.unique_with_pos in
-      Operation (RecUpd lbl, (id, Constructor (Tuple 2, [aux e ; aux e'])))
+      Operation (RecUpd lbl, (Eid.refresh id, Constructor (Tuple 2, [aux e ; aux e'])))
     | RecordProj (e, str) -> Projection (PiField str, aux e)
     | TypeCast (e, gty, c) -> TypeCast (aux e, gty, c)
     | TypeCoerce (e, gty, c) -> TypeCoerce (aux e, gty, c)
@@ -83,6 +82,6 @@ let expr_to_ast t =
     | Return e -> Return (aux e)
     | Break | Continue -> Break
   and aux (id, e) =
-    (id, aux_e e)
+    (id, aux_e id e)
   in
   aux t |> Mlsem_lang.Transform.transform
