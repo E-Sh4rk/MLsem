@@ -17,8 +17,9 @@ let retrieve_time time =
   let time' = Unix.gettimeofday () in
   (time' -. time) *. 1000.
 
-let check_resolved var env typ =
-  if MVarSet.diff (TyScheme.fv typ) (Env.tvars env) |> MVarSet.is_empty |> not
+let check_resolved ~allow_mono var env typ =
+  let allowed = if allow_mono then Env.tvars env else MVarSet.empty in
+  if MVarSet.subset (TyScheme.fv typ) allowed |> not
   then raise (UnresolvedType (var,typ))
 
 let resolve_kind benv kind =
@@ -63,7 +64,7 @@ let infer var env e =
   in
   let ty = Mlsem_system.Checker.typeof_def env annot e in
   let (tvs, ty) = TyScheme.get ty in
-  let ty = TyScheme.mk tvs (GTy.ub ty |> GTy.mk) |> Signature.simplify in
+  let ty = TyScheme.mk tvs (GTy.ub ty |> GTy.mk) |> Signature.simplify_tyscheme in
   let msg = Mlsem_system.Analyzer.analyze e annot in
   ty, msg
 
@@ -74,11 +75,11 @@ let type_check_with_sigs env (var,e,sigs,aty) =
   else
     let e, id = Transform.expr_to_ast e, Eid.refresh (fst e) in
     let c = if !Config.allow_implicit_downcast then CheckStatic else Check in
-    let es = List.map (fun s ->
+    let es = sigs |> List.concat_map (Signature.decompose ~recursive:true) |> List.map (fun s ->
       id, TypeCoerce (e, Signature.to_gty s |> GTy.ub |> GTy.mk, c)
-      ) sigs |> List.map push_coercions in
+      ) |> List.map push_coercions in
     let tys, msg = List.map (infer (Some var) env) es |> List.split in
-    List.iter (check_resolved var env) tys ;
+    List.iter (check_resolved ~allow_mono:false var env) tys ;
     let msg = (List.concat msg)@(Mlsem_system.Analyzer.get_unreachable e) in
     (var,(aty,sigs)),msg
 
@@ -92,8 +93,8 @@ let type_check_recs pos env lst =
   let tvs, ty = ty |> TyScheme.get in
   let n = List.length lst in
   List.mapi (fun i (var,_) ->
-    let ty = GTy.map (Tuple.proj n i) ty |> TyScheme.mk tvs |> Signature.simplify in
-    check_resolved var env ty ;
+    let ty = GTy.map (Tuple.proj n i) ty |> TyScheme.mk tvs |> Signature.simplify_tyscheme in
+    check_resolved ~allow_mono:true var env ty ;
     (var, (ty, Signature.of_tyscheme ty))
   ) lst, msg
 
@@ -153,19 +154,18 @@ let treat (benv,varm,senv,env) (annot, elem) =
       (!benv,varm,senv,env), TSuccess (tys,msg,retrieve_time time)
     | PAst.SigDef (name, mut, ty) ->
       begin try
-        let new_sigs, benv = Signature.build benv ty in
-        let ty = new_sigs |> List.map Signature.to_gty |> GTy.conj in
-        let kind = if mut then MVariable.AnnotMut ty else Immut in
+        let new_sig, benv = Signature.build benv ty in
+        let kind = if mut then MVariable.AnnotMut (Signature.to_gty new_sig) else Immut in
         let var, sigs = sigs_of_def varm senv env (kind, name) in
         Variable.attach_sig_location var (Position.position annot) ;
         let varm = NameMap.add name var varm in
         let sigs = match sigs with
         | None when Env.mem var env ->
           invalid_arg "A type annotation must precede the definition."
-        | None (* First definition *) -> new_sigs
-        | Some (sigs, _) -> sigs@new_sigs
+        | None (* First definition *) -> [new_sig]
+        | Some (sigs, _) -> sigs@[new_sig]
         in
-        let ty = Signature.to_tyscheme env sigs in
+        let ty = Signature.to_tyscheme sigs in
         let env = MVariable.replace_in_env var ty env in
         let senv = VarMap.add var sigs senv in
         (benv,varm,senv,env), TDone

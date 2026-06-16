@@ -56,6 +56,9 @@ module Builder : sig
     (** [build ty] builds the gradual type corresponding to [ty].
         Raises [Invalid_argument] if a dyn occurs in an invariant position. *)
 
+    val all_dyn_vars : unit -> TVarSet.t
+    (** [all_dyn_vars ()] returns the current set of all dyn vars. *)
+
     val pp : Format.formatter -> Ty.t -> unit
     val pp' : Subst.t -> Format.formatter -> Ty.t -> unit
 end

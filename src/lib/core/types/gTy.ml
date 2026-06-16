@@ -90,6 +90,7 @@ module Builder = struct
     let v = Sstt.Var.mk (Format.asprintf "%a" PrinterCfg.print_dyn ()) in
     dynvars := TVarSet.add v !dynvars ;
     Sstt.Ty.mk_var v
+  let all_dyn_vars () = !dynvars
   let dynvars_of_ty ty =
     Sstt.Ty.vars ty |> TVarSet.inter !dynvars
   let non_gradual ty =
