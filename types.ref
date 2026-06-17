@@ -179,9 +179,9 @@ File "tests/2_dyn.ml", line 76, characters 19-24
 function: 42
 argument: 42
 magic_ok: (any -> empty) | dyn & arrow
-test_cast1: int -> int
+test_cast1_ok: int -> int
 [Warning] File "tests/2_dyn.ml", line 85, characters 34-38 Unreachable code
-test_cast2: untypeable coercion
+test_cast2_fail: untypeable coercion
 File "tests/2_dyn.ml", line 88, characters 34-38
 expected: int
 given: true
@@ -216,31 +216,11 @@ function: 'I2249 & { c1 : true ;; false } -> 'I2249
 argument: { c1 : true ;; bool }
 test_class_ok2: { c1 : true ; c2 : true ;; bool }
 
-===== Processing tests/4_all.ml =====
-valint: untypeable coercion
-File "tests/4_all.ml", line 16, characters 13-17
-expected: int
-given: true
-valint: int
-test_sig: untypeable coercion
-File "tests/4_all.ml", line 20, characters 20-21
-expected: bool | 'a
-given: int | 'a
-test_sig: ∀'a. bool | 'a -> int | 'a -> (bool | 'a, int | 'a)
-test_sig_overloaded: (bool -> bool) & (int -> int)
-test_annot: ∀'a. bool | 'a -> int | 'a -> (bool | 'a, int | 'a)
-proj_a: ∀'a. A('a) -> 'a
-proj_a': ∀'a. A('a) -> 'a
-proj_ab: ∀'a,'b. (A('a) -> 'a) & (B('b) -> 'b)
-proj_a_test: ∀'a. 'a -> 'a
-proj_ab_test: ∀'a,'b. 'a -> 'b -> ('a, 'b)
-map_clist: ∀'a,'b. ('a -> 'b) -> clist('a) -> x1 where x1 = Nil | Cons('b, x1)
-record_ab_open: ∀'a,'b. { a : 'b ; b : 'a ..} -> { a : 'b ; b : 'a }
-record_ab: ∀'a,'b. { a : 'b ; b : 'a } -> { a : 'b ; b : 'a }
+===== Processing tests/4_imperative.ml =====
 ref_42: ref(int)
 ref_42_unresolved: the type inferred is not fully resolved
-File "tests/4_all.ml", line 61, characters 4-30
-type inferred: ref(42 | 'I2415)
+File "tests/4_imperative.ml", line 24, characters 4-30
+type inferred: ref(42 | 'I2286)
 mutate_ref: ∀'a. 42 | 'a -> 42 | 'a
 is_ref: (ref -> true) & (~ref -> false)
 is_not_ref: (~ref -> true) & (ref -> false)
@@ -254,6 +234,56 @@ arr_dict_assign: ∀'a,'b. dict((0..1) | 'b, 'a) | array('a) -> ()
 nested: ∀'a. any -> 'a -> 'a
 swap: ∀'a,'b. ('a -> 'a -> dict('a, 'b) -> ()) & ('a & int -> int -> array('b) ->
 ())
+mx: 42
+mut_invalid: untypeable application
+File "tests/4_imperative.ml", line 92, characters 2-12
+function: (any, int) -> ()
+argument: int, true
+mut_valid: 69
+counter: 0
+incr: any -> ()
+test_global: 0
+mut_narrowing: Nil | int
+mut_seq1: 42
+mut_seq2: Nil
+mut_and_return: any -> int | false
+neg_and_pos: ∀'a. ('a & Nil -> 'a & Nil) & (int -> (int, int))
+neg_and_pos_ann: Nil | int -> Nil | (int, int)
+order: Nil | (Nil | int, Nil | int) -> Nil | int | (int, int)
+loop_tricky_narrowing: int -> (any, int)
+loop_invalid: untypeable application
+File "tests/4_imperative.ml", line 174, characters 4-14
+function: (ref('I2655), 'I2655) -> ()
+argument: ref(int), false
+loop_valid: ∀'a. (false | 'a -> false | 'a) & ('a \ int -> 'a \ int)
+filter_imp: ∀'a,'b,'c. ('a -> bool) & ('b -> false) -> array('b | 'a) -> array('a \ 'b
+| 'c)
+filter_imp_test: array(13 | 42 | "abc")
+rec_and_imp: ∀'a,'b. dict(int | 'a, int | 'b) | array(int | 'b) -> int -> int -> int ->
+()
+interval: ∀'a. int -> int -> array(int | 'a)
+
+===== Processing tests/5_misc.ml =====
+valint: untypeable coercion
+File "tests/5_misc.ml", line 18, characters 13-17
+expected: int
+given: true
+valint: int
+test_sig: untypeable coercion
+File "tests/5_misc.ml", line 22, characters 20-21
+expected: bool | 'a
+given: int | 'a
+test_sig: ∀'a. bool | 'a -> int | 'a -> (bool | 'a, int | 'a)
+test_sig_overloaded: (bool -> bool) & (int -> int)
+test_annot: ∀'a. bool | 'a -> int | 'a -> (bool | 'a, int | 'a)
+proj_a: ∀'a. A('a) -> 'a
+proj_a': ∀'a. A('a) -> 'a
+proj_ab: ∀'a,'b. (A('a) -> 'a) & (B('b) -> 'b)
+proj_a_test: ∀'a. 'a -> 'a
+proj_ab_test: ∀'a,'b. 'a -> 'b -> ('a, 'b)
+map_clist: ∀'a,'b. ('a -> 'b) -> clist('a) -> x1 where x1 = Nil | Cons('b, x1)
+record_ab_open: ∀'a,'b. { a : 'b ; b : 'a ..} -> { a : 'b ; b : 'a }
+record_ab: ∀'a,'b. { a : 'b ; b : 'a } -> { a : 'b ; b : 'a }
 test: ∀'a,'b. ('b & 'a, any) -> ('a, 'b & 'a)
 and_js: ∀'a,'b. ('a & falsy -> any -> 'a & falsy) & ('a & truthy -> 'b -> 'b)
 not_js: (falsy -> 1) & (truthy -> 0)
@@ -284,35 +314,10 @@ call_f: ∀'a. objF('a) -> () | 'a
 deep_flatten: ∀'a. tree('a) -> [ ('a \ [ any* ])* ]
 eval: expr -> int
 obj: obj
-rec_and_imp: ∀'a,'b. dict(int | 'a, int | 'b) | array(int | 'b) -> int -> int -> int ->
-()
-interval: ∀'a. int -> int -> array(int | 'a)
 typeof_cf: (() -> "unit") & (~(int | bool | char | string | ()) -> "object") & (string
 -> "string") & (bool -> "bool") & (char -> "char") & (int -> "int")
 break_return_cf: ∀'a. ('a \ (0 | false) -> 'a \ (0 | false)) & ('a & (0 | false) -> ())
 weird_return: (true -> 69) & (~true -> (42, 69))
-mx: 42
-mut_invalid: untypeable application
-File "tests/4_all.ml", line 296, characters 2-12
-function: (any, int) -> ()
-argument: int, true
-mut_valid: 69
-mut_narrowing: Nil | int
-mut_seq1: 42
-mut_seq2: Nil
-mut_and_return: any -> int | false
-neg_and_pos: ∀'a. ('a & Nil -> 'a & Nil) & (int -> (int, int))
-neg_and_pos_ann: Nil | int -> Nil | (int, int)
-order: Nil | (Nil | int, Nil | int) -> Nil | int | (int, int)
-loop_tricky_narrowing: int -> (any, int)
-loop_invalid: untypeable application
-File "tests/4_all.ml", line 369, characters 4-14
-function: (ref('I3226), 'I3226) -> ()
-argument: ref(int), false
-loop_valid: ∀'a. (false | 'a -> false | 'a) & ('a \ int -> 'a \ int)
-filter_imp: ∀'a,'b,'c. ('a -> bool) & ('b -> false) -> array('b | 'a) -> array('a \ 'b
-| 'c)
-filter_imp_test: array(13 | 42 | "abc")
 test_alt: (() -> ()) & (char -> char) & (string -> string) & (bool -> bool) & (Nil ->
 Nil) & (int -> int)
 fall: (() -> ()) & (char -> char) & (string -> string) & (bool -> bool) & (Nil ->
@@ -320,15 +325,15 @@ Nil) & (int -> int)
 test_noalt: (string -> string) & (char -> char) & (bool -> bool) & (() -> ()) & (Nil ->
 Nil) & (int -> int)
 typeof_app: Int -> 0
-[Warning] File "tests/4_all.ml", line 448, characters 9-29 Unreachable code
+[Warning] File "tests/5_misc.ml", line 256, characters 9-29 Unreachable code
 typeof_app': Int -> 0
-[Warning] File "tests/4_all.ml", line 468, characters 7-27 Unreachable code
-[Warning] File "tests/4_all.ml", line 466, characters 43-48 Unreachable code
-[Warning] File "tests/4_all.ml", line 463, characters 10-156 Unreachable code
-[Warning] File "tests/4_all.ml", line 464, characters 36-45 Unreachable code
-[Warning] File "tests/4_all.ml", line 464, characters 24-33 Unreachable code
-[Warning] File "tests/4_all.ml", line 464, characters 12-21 Unreachable code
-[Warning] File "tests/4_all.ml", line 463, characters 48-57 Unreachable code
-[Warning] File "tests/4_all.ml", line 463, characters 36-45 Unreachable code
-[Warning] File "tests/4_all.ml", line 463, characters 24-33 Unreachable code
-[Warning] File "tests/4_all.ml", line 463, characters 12-21 Unreachable code
+[Warning] File "tests/5_misc.ml", line 276, characters 7-27 Unreachable code
+[Warning] File "tests/5_misc.ml", line 274, characters 43-48 Unreachable code
+[Warning] File "tests/5_misc.ml", line 271, characters 10-156 Unreachable code
+[Warning] File "tests/5_misc.ml", line 272, characters 36-45 Unreachable code
+[Warning] File "tests/5_misc.ml", line 272, characters 24-33 Unreachable code
+[Warning] File "tests/5_misc.ml", line 272, characters 12-21 Unreachable code
+[Warning] File "tests/5_misc.ml", line 271, characters 48-57 Unreachable code
+[Warning] File "tests/5_misc.ml", line 271, characters 36-45 Unreachable code
+[Warning] File "tests/5_misc.ml", line 271, characters 24-33 Unreachable code
+[Warning] File "tests/5_misc.ml", line 271, characters 12-21 Unreachable code

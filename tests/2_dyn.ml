@@ -81,9 +81,8 @@ let magic_ok x = x
 
 (* Cast propagation *)
 
-let test_cast1 x =
+let test_cast1_ok x =
   (match x with :int -> 42 | x -> true end :> int)
 
-let test_cast2 (x:any) =
+let test_cast2_fail (x:any) =
   (match x with :int -> 42 | x -> true end :> int)
-
