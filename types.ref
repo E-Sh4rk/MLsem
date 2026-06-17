@@ -239,10 +239,10 @@ mut_invalid: untypeable application
 File "tests/4_imperative.ml", line 92, characters 2-12
 function: (any, int) -> ()
 argument: int, true
-mut_valid: 69
+mut_valid: int
 counter: 0
 incr: any -> ()
-test_global: 0
+test_global: int
 mut_narrowing: Nil | int
 mut_seq1: 42
 mut_seq2: Nil

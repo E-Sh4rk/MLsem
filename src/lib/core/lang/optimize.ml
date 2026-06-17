@@ -220,7 +220,8 @@ let optimize_dataflow e =
     let env', ctx, e = aux env e in
     merge_envs env env', fill ctx e
   in
-  aux' { captured=VarSet.empty ; immut=VarMap.empty ; mut=VarMap.empty } e |> snd
+  (* We consider the free variables captured because they may be mutated by external functions *)
+  aux' { captured=fv e ; immut=VarMap.empty ; mut=VarMap.empty } e |> snd
 
 (* === Cleaning === *)
 

@@ -100,7 +100,7 @@ let incr x = counter := succ counter
 let test_global =
     counter := 0 ;
     incr () ;
-    counter (* TODO: fix wrong assumption that counter cannot be modified by incr *)
+    counter
 
 let mut_narrowing =
   let mut y = 42 in
