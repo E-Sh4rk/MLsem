@@ -52,6 +52,15 @@ let gradual4_ann x =
   | y -> 42::y
   end
 
+(* Mutable var *)
+
+let mut mx : dyn = 42
+let read_mut = mx
+let read_mut_cast = (mx :>! bool)
+let write_mut = mx := false
+
+(* Complex sigs using dyn *)
+
 val lkp : ['a*] -> 'a | Nil & dyn
 
 val test_lkp_ok : int
@@ -63,13 +72,12 @@ let test_lkp_fail =
     let elt = lkp [1;2;3;4;5] in
     lnot elt
 
-(* Mutable var *)
+val magic_fail : dyn -> dyn
+let magic_fail x = 42 42 ; x
 
-val mut mx : dyn
-let mut mx = 42
-let read_mut = mx
-let read_mut_cast = (mx :>! bool)
-let write_mut = mx := false
+val magic_ok : dyn -> dyn
+let magic_ok x = x
+
 
 (* Cast propagation *)
 

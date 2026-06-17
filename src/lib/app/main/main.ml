@@ -69,19 +69,15 @@ let infer var env e =
   ty, msg
 
 let type_check_with_sigs env (var,e,sigs,aty) =
-  if sigs = [] then
-    (* Dyn type *)
-    (var, (aty,[])), []
-  else
-    let e, id = Transform.expr_to_ast e, Eid.refresh (fst e) in
-    let c = if !Config.allow_implicit_downcast then CheckStatic else Check in
-    let es = sigs |> List.concat_map (Signature.decompose ~recursive:true) |> List.map (fun s ->
-      id, TypeCoerce (e, Signature.to_gty s |> GTy.ub |> GTy.mk, c)
-      ) |> List.map push_coercions in
-    let tys, msg = List.map (infer (Some var) env) es |> List.split in
-    List.iter (check_resolved ~allow_mono:false var env) tys ;
-    let msg = (List.concat msg)@(Mlsem_system.Analyzer.get_unreachable e) in
-    (var,(aty,sigs)),msg
+  let e, id = Transform.expr_to_ast e, Eid.refresh (fst e) in
+  let c = if !Config.allow_implicit_downcast then CheckStatic else Check in
+  let es = sigs |> List.concat_map (Signature.decompose ~recursive:true) |> List.map (fun s ->
+    id, TypeCoerce (e, Signature.to_gty s, c)
+    ) |> List.map push_coercions in
+  let tys, msg = List.map (infer (Some var) env) es |> List.split in
+  List.iter (check_resolved ~allow_mono:false var env) tys ;
+  let msg = (List.concat msg)@(Mlsem_system.Analyzer.get_unreachable e) in
+  (var,(aty,sigs)),msg
 
 let type_check_recs pos env lst =
   let e =

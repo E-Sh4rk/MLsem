@@ -15,7 +15,7 @@ type projection =
 [@@deriving show]
 type constructor =
 | Tuple of int | Cons | Rec of string list * bool | Tag of Tag.t | Enum of Enum.t 
-| Join of int | Meet of int | Negate | Ternary of Ty.t (* Should not contain type vars *)
+| Join of int | Meet of int | Ternary of Ty.t (* Should not contain type vars *)
 | Voidify of Ty.t (* Should not contain type vars *)
 | Normalize | CCustom of ccustom
 [@@deriving show]
@@ -149,8 +149,6 @@ let domains_of_construct (c:constructor) ty =
     Tuple.dnf n ty
     |> List.filter (fun b -> Ty.leq (Tuple.mk b) ty)
   | Join n | Meet n -> [List.init n (fun _ -> ty)]
-  | Negate when Ty.is_any ty -> [ [Ty.any] ]
-  | Negate -> [ ]
   | Normalize when Ty.is_any ty -> [ [Ty.any] ]
   | Normalize -> [ ]
   | Voidify ty' when Ty.leq ty' ty -> [ [Ty.any] ]
@@ -180,7 +178,6 @@ let construct (c:constructor) tys =
   | Tuple n, tys when List.length tys = n -> Tuple.mk tys
   | Join n, tys when List.length tys = n -> Ty.disj tys
   | Meet n, tys when List.length tys = n -> Ty.conj tys
-  | Negate, [ty] -> Ty.neg ty
   | Normalize, [ty] -> !Config.normalization_fun ty
   | Voidify ty, [_] -> ty
   | Ternary tau, [t;t1;t2] ->
@@ -239,10 +236,11 @@ let coerce ?coercion_id c ty t =
         let tys = List.map2 GTy.mk_gradual tys_lb tys_ub in
         Constructor (cons, List.map2 aux tys es)
       | Lambda (da,v,e) ->
-        let d = GTy.map Arrow.domain ty in
+        let d = GTy.mk_gradual (Arrow.domain (GTy.ub ty)) (Arrow.domain (GTy.lb ty)) in (* TODO: map' *)
         let cd = GTy.map2 Arrow.apply ty d in
-        if GTy.leq (GTy.map2 Arrow.mk d cd) ty |> not then raise Exit ;
-        let s = unify d da in
+        let ty' = GTy.mk_gradual (Arrow.mk (GTy.ub d) (GTy.lb cd)) (Arrow.mk (GTy.lb d) (GTy.ub cd)) in
+        if GTy.leq ty' ty |> not then raise Exit ;
+        let s = unify d da in (* TODO: no solution if 'a must be unified with dyn... *)
         Lambda (GTy.substitute s d, v, aux (GTy.substitute s cd) (apply_subst s e))
       | LambdaRec lst ->
         let n = List.length lst in
@@ -322,8 +320,6 @@ and pp_e fmt e = match e with
     Format.fprintf fmt "@[<hov 1>(%a)@]"
       (Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt "@ &@ ")
         (pp_prio 81)) es
-  | Constructor (Negate, [e]) ->
-    Format.fprintf fmt "@[~%a@]" (pp_prio 90) e
   | Constructor (Normalize, [e]) ->
     Format.fprintf fmt "@[normalize(%a)@]" (pp_prio 0) e
   | Constructor (Ternary ty, [cond; e1; e2]) ->
@@ -339,13 +335,13 @@ and pp_e fmt e = match e with
     Format.fprintf fmt "@[<hov 2>fun (%a :@ %a) ->@ %a@]"
       Variable.pp_uniq v GTy.pp dom (pp_prio 0) body
   | LambdaRec [(dom, v, body)] ->
-    Format.fprintf fmt "@[<hov 2>fun (%a :@ %a) ->@ %a@]"
+    Format.fprintf fmt "@[<hov 2>rec (%a :@ %a) ->@ %a@]"
       Variable.pp_uniq v GTy.pp dom (pp_prio 0) body
   | LambdaRec lst ->
     Format.fprintf fmt "@[<hv 1>(%a)@]"
       (Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt ",@ ")
         (fun fmt (dom, v, body) ->
-          Format.fprintf fmt "@[<hov 2>fun (%a :@ %a) ->@ %a@]"
+          Format.fprintf fmt "@[<hov 2>rec (%a :@ %a) ->@ %a@]"
             Variable.pp_uniq v GTy.pp dom (pp_prio 0) body))
       lst
   | Ite (cond, ty, e1, e2) when GTy.equiv ty (GTy.mk Ty.tt) ->

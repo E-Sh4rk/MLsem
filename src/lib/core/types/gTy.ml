@@ -4,6 +4,10 @@ open Tvar
 type t = { lb:Ty.t ; ub:Ty.t ; eq:bool }
 let mk ty = { lb=ty ; ub=ty ; eq=true }
 let mk_gradual lb ub = { lb ; ub ; eq=Ty.leq ub lb }
+let mk_gradual lb ub =
+  if Ty.leq lb ub |> not
+  then raise (Invalid_argument "Upper bound must be larger than lower bound") ;
+  mk_gradual lb ub
 let empty = mk Ty.empty
 let any = mk Ty.any
 let dyn = mk_gradual Ty.empty Ty.any
@@ -78,11 +82,6 @@ let pp' s fmt t =
     let ty = Ty.cap (Sstt.Ty.mk_var dynv) t.ub |> Ty.cup t.lb in
     Format.fprintf fmt "%a" pp ty
 let pp fmt t = pp' Subst.identity fmt t
-
-let mk_gradual lb ub =
-  if Ty.leq lb ub |> not
-  then raise (Invalid_argument "Upper bound must be larger than lower bound") ;
-  mk_gradual lb ub
 
 module Builder = struct
   let dynvars = ref TVarSet.empty
