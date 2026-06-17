@@ -25,17 +25,40 @@ let decode_position params = params |> member "position" |> Lsp.Types.Position.t
 let decode_name params = params |> member "name" |> to_string
 let decode_overload_texts params = params |> member "overloadTexts" |> to_list |> List.map to_string
 
+(* Apply mode: [append=true] adds the result as new [val] declaration line(s),
+   keeping the existing ones; otherwise the existing declaration is replaced. *)
+let mode_of params =
+  match member "append" params with
+  | `Bool true -> `Insert
+  | _ -> `Replace
+
+(* Optional [only]: restrict the written result to the overloads whose original
+   rendered text is in this list — used by the per-overload Insert action to
+   write a single overload's instantiated declaration. Absent means "all". *)
+let decode_only params =
+  match member "only" params with
+  | `List l -> Some (List.map to_string l)
+  | _ -> None
+
+(* Merge apply: [keepOthers=true] (the scoped Apply) keeps the unselected
+   overloads alongside the merged result; otherwise (the full Replace) only the
+   merged declaration is written. *)
+let decode_keep_others params =
+  match member "keepOthers" params with
+  | `Bool b -> b
+  | _ -> false
+
 (* The [instantiations] payload: per overload (identified by its rendered
    text), the variable -> concrete-type-string assignments to apply. *)
 let decode_instantiations params =
   params |> member "instantiations" |> to_list
   |> List.map (fun o ->
-         let overload = o |> member "overload" |> to_string in
-         let assignments =
-           o |> member "assignments" |> to_list
-           |> List.map (fun a -> (a |> member "var" |> to_string, a |> member "type" |> to_string))
-         in
-         (overload, assignments) )
+    let overload = o |> member "overload" |> to_string in
+    let assignments =
+      o |> member "assignments" |> to_list
+      |> List.map (fun a -> (a |> member "var" |> to_string, a |> member "type" |> to_string))
+    in
+    (overload, assignments) )
 
 (* Builtin concrete types worth offering as instantiation suggestions; the
    webview also lets the user type any other type expression. *)
@@ -63,9 +86,11 @@ let stale = `Assoc [("ok", `Bool false); ("stale", `Bool true)]
 (* A concrete type the user typed could not be parsed/elaborated. *)
 exception Bad_type of string
 
-(* Merge the overloads of [sigs] whose rendered text is in [wanted]. [`Stale]
-   if any wanted text is absent (the overload set changed), [`Empty] if nothing
-   was selected ([Signature.merge []] is ill-defined). *)
+(* Merge the overloads of [sigs] whose rendered text is in [wanted]. Returns the
+   merged rendering together with the full list of rendered overloads (so the
+   caller can keep the unselected ones). [`Stale] if any wanted text is absent
+   (the overload set changed), [`Empty] if nothing was selected
+   ([Signature.merge []] is ill-defined). *)
 let merge_texts envs (sigs : Signature.t) (wanted : string list) =
   match wanted with
   | [] -> `Empty
@@ -82,33 +107,49 @@ let merge_texts envs (sigs : Signature.t) (wanted : string list) =
           |> List.rev
         in
         match Main.signature envs [Signature.merge selected] with
-        | [s] -> `Ok s
+        | [s] -> `Ok (s, rendered)
         | _ -> assert false (* one overload in → exactly one rendered string *) )
 
 (* Apply [insts] to [sigs]: for each overload (matched by rendered text), apply
    its variable -> concrete-type assignments, leaving untouched overloads as-is.
    Returns the rendered result overloads (one per input overload, NOT merged),
    or [`Stale] if any requested overload text is absent (the set changed).
+   [only], when present, keeps just the overloads whose *original* rendered text
+   is in it (the per-overload Insert action writes a single one).
    May raise on a malformed concrete type (caught by the handler). *)
-let instantiate_texts envs (sigs : Signature.t) insts =
+let instantiate_texts ?only envs (sigs : Signature.t) insts =
   Config.restore_all () ;
   let rendered = Main.signature envs sigs in
-  if not (List.for_all (fun (t, _) -> List.mem t rendered) insts) then `Stale
+  if not (List.for_all (fun (t, _) -> List.mem t rendered) insts) then
+    `Stale
   else
-    let result =
+    let pairs =
       List.map2
         (fun s r ->
-           match List.assoc_opt r insts with
-           | None | Some [] -> s
-           | Some assignments ->
-               List.fold_left
-                 (fun s (var, tystr) ->
-                    let ty = try Main.build_type envs tystr with _ -> raise (Bad_type tystr) in
-                    Signature.instantiate s var ty )
-                 s assignments )
+           let s' =
+             match List.assoc_opt r insts with
+             | None
+             | Some [] ->
+                 s
+             | Some assignments ->
+                 List.fold_left
+                   (fun s (var, tystr) ->
+                      let ty =
+                        try Main.build_type envs tystr with
+                        | _ -> raise (Bad_type tystr)
+                      in
+                      Signature.instantiate s var ty )
+                   s assignments
+           in
+           (r, s') )
         sigs rendered
     in
-    `Ok (Main.signature envs result)
+    let kept =
+      match only with
+      | None -> pairs
+      | Some texts -> List.filter (fun (r, _) -> List.mem r texts) pairs
+    in
+    `Ok (Main.signature envs (List.map snd kept))
 
 (* mlsem/overloads: the binding under the cursor and its overloads, each
    rendered to [val]-compatible surface syntax (text is the overload's
@@ -148,7 +189,7 @@ let merge_preview params : Yojson.Safe.t =
         match merge_texts envs b.sigs wanted with
         | `Empty -> error "Select at least one overload."
         | `Stale -> stale
-        | `Ok merged ->
+        | `Ok (merged, _) ->
             `Assoc [("ok", `Bool true); ("text", `String ("val " ^ name ^ " : " ^ merged))] )
     | _ -> error "No binding found."
   with
@@ -168,8 +209,21 @@ let apply_merge params : Yojson.Safe.t =
         match merge_texts envs b.sigs wanted with
         | `Empty -> error "Select at least one overload."
         | `Stale -> stale
-        | `Ok merged ->
-            let edits = Store.merge_edit uri b ~name ~merged in
+        | `Ok (merged, rendered) ->
+            (* Apply (scoped) keeps the unselected overloads alongside the
+               merged one; Replace (full) writes only the merged declaration;
+               Insert appends the merged declaration (existing source kept). *)
+            let mode = mode_of params in
+            let decls =
+              match mode with
+              | `Insert -> [merged]
+              | `Replace ->
+                  if decode_keep_others params then
+                    merged :: List.filter (fun r -> not (List.mem r wanted)) rendered
+                  else
+                    [merged]
+            in
+            let edits = Store.signature_edit uri b ~name ~decls ~mode in
             `Assoc
               [
                 ("ok", `Bool true); ("uri", Lsp.Types.DocumentUri.yojson_of_t uri);
@@ -205,7 +259,8 @@ let instantiate_preview params : Yojson.Safe.t =
             `Assoc
               [
                 ("ok", `Bool true);
-                ("overloads", `List (List.map (fun s -> `String ("val " ^ name ^ " : " ^ s)) overloads));
+                ( "overloads",
+                  `List (List.map (fun s -> `String ("val " ^ name ^ " : " ^ s)) overloads) );
               ] )
     | _ -> error "No binding found."
   with
@@ -219,13 +274,14 @@ let apply_instantiate params : Yojson.Safe.t =
     let uri = decode_uri params in
     let name = decode_name params in
     let insts = decode_instantiations params in
+    let only = decode_only params in
     sync params uri ;
     match (Store.find_binding_by_name uri name, Store.envs_of uri) with
     | Some b, Some envs -> (
-        match instantiate_texts envs b.sigs insts with
+        match instantiate_texts ?only envs b.sigs insts with
         | `Stale -> stale
         | `Ok overloads ->
-            let edits = Store.signature_edit uri b ~name ~decls:overloads in
+            let edits = Store.signature_edit uri b ~name ~decls:overloads ~mode:(mode_of params) in
             `Assoc
               [
                 ("ok", `Bool true); ("uri", Lsp.Types.DocumentUri.yojson_of_t uri);
