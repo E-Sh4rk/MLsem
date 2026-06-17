@@ -92,16 +92,16 @@ let mapi_aux i f l =
 
 let mapi f x = mapi_aux 0 f x
 
-let fold_left f l acc =
+let fold_left f acc l =
   match l with
   | [] -> acc
-  | x::ll -> fold_left f ll (f acc x)
+  | x::ll -> fold_left f (f acc x) ll
   end
 
-let fold_right f acc l =
+let fold_right f l acc =
   match l with
   | [] -> acc
-  | x::ll -> f x (fold_right f acc ll)
+  | x::ll -> f x (fold_right f ll acc)
   end
 
 (* ===== Operations on trees ===== *)

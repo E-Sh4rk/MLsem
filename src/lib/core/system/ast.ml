@@ -23,12 +23,14 @@ type operation =
 | RecUpd of string | RecDel of string
 | OCustom of ocustom
 [@@deriving show]
+type param_annot = GTy.t option
+[@@deriving show]
 type e =
 | Value of GTy.t
 | Var of Variable.t
 | Constructor of constructor * t list
-| Lambda of GTy.t * Variable.t * t
-| LambdaRec of (GTy.t * Variable.t * t) list
+| Lambda of param_annot * Variable.t * t
+| LambdaRec of (param_annot * Variable.t * t) list
 | Ite of t * GTy.t * t * t
 | App of t * t
 | Operation of operation * t
@@ -106,8 +108,8 @@ let apply_subst s e =
   let aux (id,e) =
     let e = match e with
     | Value t -> Value (GTy.substitute s t)
-    | Lambda (ty,v,e) -> Lambda (GTy.substitute s ty,v,e)
-    | LambdaRec lst -> LambdaRec (List.map (fun (ty,v,e) -> (GTy.substitute s ty, v, e)) lst)
+    | Lambda (ty,v,e) -> Lambda (Option.map (GTy.substitute s) ty,v,e)
+    | LambdaRec lst -> LambdaRec (List.map (fun (ty,v,e) -> (Option.map (GTy.substitute s) ty, v, e)) lst)
     | Let (ts, v, e1, e2) -> Let (List.map (Subst.apply s) ts, v, e1, e2)
     | Ite (e, ty, e1, e2) -> Ite (e, GTy.substitute s ty, e1, e2)
     | TypeCoerce (e, ty, b) -> TypeCoerce (e, GTy.substitute s ty, b)
@@ -240,15 +242,22 @@ let coerce ?coercion_id c ty t =
         let cd = GTy.map2 Arrow.apply ty d in
         let ty' = GTy.mk_gradual (Arrow.mk (GTy.ub d) (GTy.lb cd)) (Arrow.mk (GTy.lb d) (GTy.ub cd)) in
         if GTy.leq ty' ty |> not then raise Exit ;
-        let s = unify d da in (* TODO: no solution if 'a must be unified with dyn... *)
-        Lambda (GTy.substitute s d, v, aux (GTy.substitute s cd) (apply_subst s e))
+        begin match da with
+        | Some da ->
+          let s = unify d da in
+          Lambda (Some (GTy.substitute s d), v, aux (GTy.substitute s cd) (apply_subst s e))
+        | None -> Lambda (Some d, v, aux cd e)
+        end
       | LambdaRec lst ->
         let n = List.length lst in
         let tys = List.mapi (fun i _ -> GTy.map (Tuple.proj n i) ty) lst in
         if GTy.leq (GTy.mapl Tuple.mk tys) ty |> not then raise Exit ;
         LambdaRec (List.combine lst tys |> List.map (fun ((tya,v,e), ty) ->
-            let s = unify ty tya in
-            GTy.substitute s ty, v, aux (GTy.substitute s ty) (apply_subst s e)
+            match tya with
+            | Some tya ->
+              let s = unify ty tya in
+              Some (GTy.substitute s ty), v, aux (GTy.substitute s ty) (apply_subst s e)
+            | None -> Some ty, v, aux ty e
           ))
       | _ -> raise Exit
       with Exit -> t
@@ -292,6 +301,11 @@ and pp_prio prio fmt ((_, e) as t) =
   if e_prio e < prio then Format.fprintf fmt "@[(%a)@]" pp t
   else pp_e fmt e
 
+and pp_param fmt (v,annot) =
+  match annot with
+  | None -> Variable.pp_uniq fmt v
+  | Some dom -> Format.fprintf fmt "(%a :@ %a)" Variable.pp_uniq v GTy.pp dom
+
 and pp_e fmt e = match e with
   | Value gty -> Format.fprintf fmt "@[<hov><%a>@]" GTy.pp gty
   | Var v -> Variable.pp_uniq fmt v
@@ -332,17 +346,17 @@ and pp_e fmt e = match e with
   | Constructor _ ->
     Format.pp_print_string fmt "<malformed-constructor>"
   | Lambda (dom, v, body) ->
-    Format.fprintf fmt "@[<hov 2>fun (%a :@ %a) ->@ %a@]"
-      Variable.pp_uniq v GTy.pp dom (pp_prio 0) body
+    Format.fprintf fmt "@[<hov 2>fun %a ->@ %a@]"
+      pp_param (v,dom) (pp_prio 0) body
   | LambdaRec [(dom, v, body)] ->
-    Format.fprintf fmt "@[<hov 2>rec (%a :@ %a) ->@ %a@]"
-      Variable.pp_uniq v GTy.pp dom (pp_prio 0) body
+    Format.fprintf fmt "@[<hov 2>rec %a ->@ %a@]"
+      pp_param (v,dom) (pp_prio 0) body
   | LambdaRec lst ->
     Format.fprintf fmt "@[<hv 1>(%a)@]"
       (Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt ",@ ")
         (fun fmt (dom, v, body) ->
-          Format.fprintf fmt "@[<hov 2>rec (%a :@ %a) ->@ %a@]"
-            Variable.pp_uniq v GTy.pp dom (pp_prio 0) body))
+          Format.fprintf fmt "@[<hov 2>rec %a ->@ %a@]"
+            pp_param (v,dom) (pp_prio 0) body))
       lst
   | Ite (cond, ty, e1, e2) when GTy.equiv ty (GTy.mk Ty.tt) ->
     Format.fprintf fmt "@[<hov>if %a@ then %a@ else %a@]"

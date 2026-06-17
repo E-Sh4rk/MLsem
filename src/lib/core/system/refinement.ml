@@ -130,6 +130,7 @@ let refinements
   let add_anonymous_refinement env e t =
     res := Refinements.add_anonymous !res (refine env e t)
   in
+  let param_type ty = Option.value ty ~default:GTy.any |> TyScheme.mk_mono in
   let rec aux env (id,e) : unit =
     let extra = Hashtbl.find_all extra id in
     extra |> List.iter (fun ty -> add_anonymous_refinement env (id,e) ty) ;
@@ -137,10 +138,10 @@ let refinements
     | Value _ | Var _ -> ()
     | Constructor (_, es) -> es |> List.iter (aux env)
     | Projection (_, e) | TypeCoerce (e, _, _) | Operation (_, e) -> aux env e
-    | Lambda (d, v, e) -> aux (Env.add v (TyScheme.mk_mono d) env) e
+    | Lambda (d, v, e) -> aux (Env.add v (d |> param_type) env) e
     | LambdaRec lst ->
       let env = List.fold_left (fun env (ty,v,_) ->
-        Env.add v (TyScheme.mk_mono ty) env
+        Env.add v (param_type ty) env
       ) env lst in
       lst |> List.map (fun (_,_,e) -> e) |> List.iter (aux env)
     | TypeCast (e, tau, _) ->

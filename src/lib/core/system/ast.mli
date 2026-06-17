@@ -16,12 +16,13 @@ type constructor = (* Constructors must be monotonic operations *)
 type operation =
 | RecUpd of string | RecDel of string
 | OCustom of ocustom
+type param_annot = GTy.t option
 type e =
 | Value of GTy.t
 | Var of Variable.t
 | Constructor of constructor * t list
-| Lambda of GTy.t * Variable.t * t
-| LambdaRec of (GTy.t * Variable.t * t) list
+| Lambda of param_annot * Variable.t * t
+| LambdaRec of (param_annot * Variable.t * t) list
 | Ite of t * GTy.t * t * t
 | App of t * t
 | Operation of operation * t
@@ -47,6 +48,7 @@ val pp_check : Format.formatter -> check -> unit
 val pp_projection : Format.formatter -> projection -> unit
 val pp_constructor : Format.formatter -> constructor -> unit
 val pp_operation : Format.formatter -> operation -> unit
+val pp_param_annot : Format.formatter -> param_annot -> unit
 val pp_pcustom : Format.formatter -> pcustom -> unit
 val pp_ccustom : Format.formatter -> ccustom -> unit
 

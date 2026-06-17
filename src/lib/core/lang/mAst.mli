@@ -10,9 +10,9 @@ type e =
 | Value of GTy.t
 | Var of Variable.t
 | Constructor of SA.constructor * t list
-| Lambda of Ty.t list * GTy.t * Variable.t * t
+| Lambda of Ty.t list * SA.param_annot * Variable.t * t
 (** The first parameter is a suggested type decomposition, similarly to let-bindings *)
-| LambdaRec of (GTy.t * Variable.t * t) list
+| LambdaRec of (SA.param_annot * Variable.t * t) list
 | Ite of t * GTy.t * t * t
 | App of t * t
 | Operation of SA.operation * t

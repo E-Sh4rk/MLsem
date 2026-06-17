@@ -13,22 +13,24 @@ append: ∀'a,'b,'c. ([ 'b* ] -> ('a & ('b::x1) | 'c & 'a & [ any* ] -> 'b::x1) 
 ] -> 'a -> 'a) where x1 = ('b::x1) | 'c & [ any* ]
 @: ∀'a,'b,'c. (([ 'b* ], 'a & ('b::x1) | 'c & 'a & [ any* ]) -> ('b::x1) | 'c
 & 'a & [ any* ]) & (([  ], 'a) -> 'a) where x1 = ('b::x1) | 'c & [ any* ]
-rev_append: ∀'a,'b,'c. ([ 'b* ] -> x1 -> ('b::x1) | 'c) & ([  ] -> ('a & [ any* ] ->
-empty) | ('a -> 'a)) where x1 = ('b::x1) | 'c & 'a & [ any* ]
+rev_append: ∀'a,'b,'c. ([ 'c* ] -> (('c::x1) | 'a -> ('c::x1) | 'a) | (x1 -> ('c::x1) |
+'a)) & ([  ] -> ('a -> 'a) | ([ any* ] -> empty)) where x1 = ('c::x1) | 'b &
+[ any* ]
 rev: ∀'a. [ !('a | 'a 'a+)? ] -> [ !('a | 'a 'a+)? ]
 flatten: ∀'a. ([ [ 'a* ]* ] -> [ 'a* ]) & ([ [  ]* ] -> [  ])
 concat: ∀'a. [ [ 'a* ]* ] -> [ 'a* ]
 map: ∀'a,'b. ('a -> 'b) -> [ 'a* ] -> [ 'b* ]
 mapi_aux: ∀'a,'b. int -> (int -> 'a -> 'b) -> [ 'a* ] -> [ 'b* ]
 mapi: ∀'a,'b. (int -> 'a -> 'b) -> [ 'a* ] -> [ 'b* ]
-fold_left: ∀'a,'b. ('a -> 'b -> 'a) -> [ 'b* ] -> 'a -> 'a
-fold_right: ∀'a,'b. ('b -> 'a -> 'a) -> 'a -> [ 'b* ] -> 'a
+fold_left: ∀'a,'b. (('a -> 'b -> empty) -> 'a -> [ !('b any*)? ] -> 'a) & (('a -> 'b
+-> 'a) -> 'a -> [ 'b* ] -> 'a)
+fold_right: ∀'a,'b. ('b -> 'a -> 'a) -> [ 'b* ] -> 'a -> 'a
 height: x1 -> int where x1 = Nil | Node(x1, Key, any, x1, int)
-create: ∀'a,'b,'c,'d. 'd & (Nil | Node(x1)) -> 'c -> 'b -> 'a & (Nil | Node(x1)) ->
-Node('d & (Nil | Node(x1)), 'c, 'b, 'a & (Nil | Node(x1)), int) where x1 =
+create: ∀'a,'b,'c,'d. 'a & (Nil | Node(x1)) -> 'b -> 'c -> 'd & (Nil | Node(x1)) ->
+Node('a & (Nil | Node(x1)), 'b, 'c, 'd & (Nil | Node(x1)), int) where x1 =
 Nil | Node(x1), Key, any, Nil | Node(x1), int
 bal: ∀'a. t('a) -> Key -> 'a -> t('a) -> t('a)
-fixpoint: ∀'a,'b,'c. (('a -> 'c) -> 'b & ('a -> 'c)) -> 'b
+fixpoint: ∀'a,'b,'c. (('b -> 'c) -> 'a & ('b -> 'c)) -> 'a
 fact_stub: (int -> int) -> int -> int
 fact': int -> int
 length_stub: ∀'a. ('a & [ any* ] -> int) -> [] | (any::('a & [ any* ])) -> int
@@ -68,10 +70,10 @@ or_: ((~true, ~true) -> false) & ((true, any) | (any, true) -> true)
 impossible_branch: int -> int
 [Warning] File "tests/1_union_inter.ml", line 103, characters 32-36 Unreachable code
 impossible_branch2: (int -> any -> int) & (any -> int -> int)
-switch1: ∀'a,'b,'c,'d. (('b -> 'c) -> true -> 'b -> 'a -> 'c) & (('a -> 'd) -> ~true
--> 'b -> 'a -> 'd)
-switch2: ∀'a,'b,'c,'d. (true -> ('b -> 'c) -> 'b -> 'a -> 'c) & (~true -> ('a -> 'd)
--> 'b -> 'a -> 'd)
+switch1: ∀'a,'b,'c,'d. (('a -> 'b) -> true -> 'a -> any -> 'b) & (('c -> 'd) ->
+~true -> any -> 'c -> 'd)
+switch2: ∀'a,'b,'c,'d. (true -> ('a -> 'b) -> 'a -> any -> 'b) & (~true -> ('c ->
+'d) -> any -> 'c -> 'd)
 typeof: (bool -> "Boolean") & (~(int | bool | char | [  ] | string | ()) -> "Object")
 & ([  ] | () -> "[]") & (string -> "String") & (char -> "Character") & (int
 -> "Number")
@@ -87,12 +89,11 @@ test_many_params_ann1: any -> any -> any -> any -> any -> any -> false | (int, b
 bool)
 test_many_params_ann2: ∀'a,'b,'c,'d,'e,'f. 'f -> 'e -> 'd -> 'c -> 'b -> 'a -> false | ('f & int,
 'e & bool, 'd & int, 'c & bool, 'b & int, 'a & bool)
-test_many_params: ∀'a,'b,'c,'d,'e,'f. ('f & int -> ('e & bool -> ('d & int -> ('c & bool ->
-('b \ int -> 'a -> false) & ('b & int -> ('a & bool -> ('f & int, 'e & bool,
-'d & int, 'c & bool, 'b & int, 'a & bool)) & ('a \ bool -> false))) & ('c \
-bool -> 'b -> 'a -> false)) & ('d \ int -> 'c -> 'b -> 'a -> false)) & ('e \
-bool -> 'd -> 'c -> 'b -> 'a -> false)) & ('f \ int -> 'e -> 'd -> 'c -> 'b
--> 'a -> false)
+test_many_params: ∀'a,'b,'c,'d,'e,'f. (('f & int, 'e & bool, 'd & int, 'c & bool, 'b & int,
+'a & bool) -> ('f & int, 'e & bool, 'd & int, 'c & bool, 'b & int, 'a &
+bool)) & ((~int, any, any, any, any, any) | (any, ~bool, any, any, any, any)
+| (any, any, ~int, any, any, any) | (any, any, any, ~bool, any, any) | (any,
+any, any, any, ~int, any) | (any, any, any, any, any, ~bool) -> false)
 match_pair: any -> any -> false | (int, bool)
 type_narrowing_fail: untypeable application
 File "tests/1_union_inter.ml", line 160, characters 21-31
@@ -118,15 +119,15 @@ example4: any -> int | 'A' | string
 implicit4: ∀'a. ('a & string -> 'a & string) & ('a \ (int | string) -> 'A') & ('a &
 int -> 'a & int)
 example5: any -> any -> int
-implicit5: (~int -> any -> 0) & (any -> (~string -> 0) & (any -> int))
+implicit5: (int -> (~string -> 0) & (any -> int)) & (~int -> any -> 0)
 example6_invalid: untypeable application
 File "tests/1_union_inter.ml", line 229, characters 26-34
 function: string -> int
 argument: int
 example6: (string -> any -> int) & (int -> string -> int)
-implicit6: (int | string -> string -> int) & (string -> any -> int)
+implicit6: (string -> any -> int) & (int -> string -> int)
 example7: any -> any -> int
-implicit7: (~int -> any -> 0) & (any -> (~string -> 0) & (any -> int))
+implicit7: (int -> (~string -> 0) & (any -> int)) & (~int -> any -> 0)
 example8: any -> bool
 implicit8: (~(int | string) -> false) & (int | string -> true)
 example9: any -> int
@@ -177,10 +178,7 @@ magic_fail: untypeable application
 File "tests/2_dyn.ml", line 76, characters 19-24
 function: 42
 argument: 42
-magic_ok: untypeable coercion
-File "tests/2_dyn.ml", line 79, characters 4-18
-expected: any -> empty
-given: 'x -> 'x
+magic_ok: (any -> empty) | dyn & arrow
 test_cast1: int -> int
 [Warning] File "tests/2_dyn.ml", line 85, characters 34-38 Unreachable code
 test_cast2: untypeable coercion
@@ -214,7 +212,7 @@ test_classes: { data_frame : true ;; false }
 test_class_ok: { c1 : true ;; false }
 test_class_fail: untypeable application
 File "tests/3_records.ml", line 110, characters 22-45
-function: 'I2237 & { c1 : true ;; false } -> 'I2237
+function: 'I2249 & { c1 : true ;; false } -> 'I2249
 argument: { c1 : true ;; bool }
 test_class_ok2: { c1 : true ; c2 : true ;; bool }
 
@@ -235,14 +233,14 @@ proj_a: ∀'a. A('a) -> 'a
 proj_a': ∀'a. A('a) -> 'a
 proj_ab: ∀'a,'b. (A('a) -> 'a) & (B('b) -> 'b)
 proj_a_test: ∀'a. 'a -> 'a
-proj_ab_test: ∀'a,'b. 'b -> 'a -> ('b, 'a)
+proj_ab_test: ∀'a,'b. 'a -> 'b -> ('a, 'b)
 map_clist: ∀'a,'b. ('a -> 'b) -> clist('a) -> x1 where x1 = Nil | Cons('b, x1)
 record_ab_open: ∀'a,'b. { a : 'b ; b : 'a ..} -> { a : 'b ; b : 'a }
 record_ab: ∀'a,'b. { a : 'b ; b : 'a } -> { a : 'b ; b : 'a }
 ref_42: ref(int)
 ref_42_unresolved: the type inferred is not fully resolved
 File "tests/4_all.ml", line 61, characters 4-30
-type inferred: ref(42 | 'I2409)
+type inferred: ref(42 | 'I2415)
 mutate_ref: ∀'a. 42 | 'a -> 42 | 'a
 is_ref: (ref -> true) & (~ref -> false)
 is_not_ref: (~ref -> true) & (ref -> false)
@@ -254,20 +252,20 @@ test_arr: ∀'a,'b. bool | 'a -> array('a & int | 'b)
 test_double_array: 42
 arr_dict_assign: ∀'a,'b. dict((0..1) | 'b, 'a) | array('a) -> ()
 nested: ∀'a. any -> 'a -> 'a
-swap: ∀'a,'b. ('a -> 'a -> dict('a, 'b) -> ()) & (int -> 'a & int -> array('b) ->
+swap: ∀'a,'b. ('a -> 'a -> dict('a, 'b) -> ()) & ('a & int -> int -> array('b) ->
 ())
 test: ∀'a,'b. ('b & 'a, any) -> ('a, 'b & 'a)
-and_js: ∀'a,'b. ('b & falsy -> 'a -> 'b & falsy) & ('b & truthy -> 'a -> 'a)
+and_js: ∀'a,'b. ('a & falsy -> any -> 'a & falsy) & ('a & truthy -> 'b -> 'b)
 not_js: (falsy -> 1) & (truthy -> 0)
-or_js: ∀'a,'b. ('b & truthy -> 'a -> 'b & truthy) & ('b & falsy -> 'a -> 'a)
+or_js: ∀'a,'b. ('a & truthy -> any -> 'a & truthy) & ('a & falsy -> 'b -> 'b)
 identity_js: ∀'a. 'a -> 'a
-and_pair: ∀'a,'b. ('b & falsy -> 'a -> 'b & falsy) & ('b & int & ~0 -> 'a -> ('a,
+and_pair: ∀'a,'b. ('a & falsy -> any -> 'a & falsy) & ('a & int & ~0 -> 'b -> ('b,
 int))
 test_pair: (int \ 0, any) | (int, int) -> int
 ifthenelse: ∀'a,'b. (tt('a, 'b) -> tt('a, 'b)) & (ff('a, 'b) -> ff('a, 'b))
 test1_patterns: ∀'a. ('a, any) -> 'a
 test2_patterns: ∀'a,'b. ('b, 'a) -> ('b, 'a)
-test3_patterns: ∀'a,'b. 'b -> 'a -> ('a, 'b)
+test3_patterns: ∀'a,'b. 'a -> 'b -> ('b, 'a)
 fact: int -> int
 map: ∀'a,'b. ('a -> 'b) -> [ 'a* ] -> [ 'b* ]
 map_noannot: ∀'a,'b. (('a -> 'b) -> ([ 'a+ ] -> [ 'b+ ]) & ([ 'a ] -> [ 'b ]) & ([  ] ->
@@ -309,7 +307,7 @@ order: Nil | (Nil | int, Nil | int) -> Nil | int | (int, int)
 loop_tricky_narrowing: int -> (any, int)
 loop_invalid: untypeable application
 File "tests/4_all.ml", line 369, characters 4-14
-function: (ref('I3223), 'I3223) -> ()
+function: (ref('I3226), 'I3226) -> ()
 argument: ref(int), false
 loop_valid: ∀'a. (false | 'a -> false | 'a) & ('a \ int -> 'a \ int)
 filter_imp: ∀'a,'b,'c. ('a -> bool) & ('b -> false) -> array('b | 'a) -> array('a \ 'b

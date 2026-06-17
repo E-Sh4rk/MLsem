@@ -11,11 +11,6 @@ let expr_to_ast t =
   let add_suggs v tys =
     Hashtbl.replace sugg v (tys@(get_sugg v))
   in
-  let lambda_annot name a =
-    match a with
-    | None -> TVar.mk KInfer name |> TVar.typ |> GTy.mk
-    | Some d -> d
-  in
   let rec aux_pat = function
     | PAst.PatType ty -> PType ty
     | PatVar (_, v) -> PVar (get_sugg v, v)
@@ -42,13 +37,12 @@ let expr_to_ast t =
     | Lambda (x, a, e) ->
       let x' = MVariable.refresh MVariable.Immut x in
       let e = aux e |> rename_fv x x' in
-      Lambda (get_sugg x, lambda_annot (Variable.get_name x) a, x', e)
+      Lambda (get_sugg x, a, x', e)
     | LambdaRec lst ->
       let lst = lst |> List.map (fun (x,a,e) ->
         x, MVariable.refresh MVariable.Immut x, a, e) in
-      let aux (x,x',a,e) =
-        lambda_annot (Variable.get_name x) a, x',
-        List.fold_left (fun e (x,x',_,_) -> rename_fv x x' e) (aux e) lst
+      let aux (_,x',a,e) =
+        a, x', List.fold_left (fun e (x,x',_,_) -> rename_fv x x' e) (aux e) lst
       in
       LambdaRec (List.map aux lst)
     | Ite (e,t,e1,e2) -> Ite (aux e, t, aux e1, aux e2)

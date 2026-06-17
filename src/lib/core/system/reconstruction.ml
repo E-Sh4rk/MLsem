@@ -16,8 +16,11 @@ let initial ?(direct_narrowing=true) ?(partition_narrowing=true) refinements e =
       let s' = TVOp.refresh ~kind:KInfer dom in
       s := Subst.combine !s s' ; !s
   in
-  let new_result () =
-    TVar.mk KInfer None |> TVar.typ
+  let new_result () = TVar.mk KInfer None |> TVar.typ in
+  let new_param v oty =
+    match oty with
+    | None -> TVar.mk KInfer (Variable.get_name v) |> TVar.typ |> GTy.mk
+    | Some ty -> ty
   in
   let r =
     if partition_narrowing
@@ -32,9 +35,9 @@ let initial ?(direct_narrowing=true) ?(partition_narrowing=true) refinements e =
     | Value ty -> Annot.AValue ty |> left
     | Var _ -> AVar (new_renaming ()) |> right
     | Constructor (_,es) -> AConstruct (List.map (initial r) es) |> right
-    | Lambda (dom, _, e) -> ALambda (dom, initial r e) |> right
+    | Lambda (dom, v, e) -> ALambda (new_param v dom, initial r e) |> right
     | LambdaRec lst ->
-      ALambdaRec (lst |> List.map (fun (dom, _, e) -> dom, initial r e)) |> right
+      ALambdaRec (lst |> List.map (fun (dom, v, e) -> new_param v dom, initial r e)) |> right
     | Ite (e, tau, e1, e2) ->
       AIte (initial r e, tau, BMaybe (initial r e1), BMaybe (initial r e2)) |> right
     | App (e1, e2) -> AApp (initial r e1, initial r e2, new_result ()) |> right
