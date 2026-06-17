@@ -127,6 +127,7 @@ module TVOp = struct
     Sstt.Tallying.rvar_associated_with ctx rv |>
       Option.map (fun (rv,lbl) -> rv, Record.from_label lbl)
 
+  let all_vars kind = MVarSet.of_set (TVar.all_vars kind) (RVar.all_vars kind)
   let vars = Sstt.Ty.all_vars
   let vars' ts = List.map vars ts |> List.fold_left MVarSet.union MVarSet.empty
   let top_vars = Sstt.Ty.all_vars_toplevel

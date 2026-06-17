@@ -70,3 +70,12 @@ let mut mx = 42
 let read_mut = mx
 let read_mut_cast = (mx :>! bool)
 let write_mut = mx := false
+
+(* Cast propagation *)
+
+let test_cast1 x =
+  (match x with :int -> 42 | x -> true end :> int)
+
+let test_cast2 (x:any) =
+  (match x with :int -> 42 | x -> true end :> int)
+

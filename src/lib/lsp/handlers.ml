@@ -106,7 +106,9 @@ let merge_texts envs (sigs : Signature.t) (wanted : string list) =
             [] sigs rendered
           |> List.rev
         in
-        match Main.signature envs [Signature.merge selected] with
+        match
+          Main.signature envs [Signature.merge ~recursive:true (Signature.regroup selected)]
+        with
         | [s] -> `Ok (s, rendered)
         | _ -> assert false (* one overload in → exactly one rendered string *) )
 

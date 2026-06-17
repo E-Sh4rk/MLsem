@@ -155,7 +155,7 @@ let tally_simpl mono tvars res cs =
   (* |> List.map (fun (s,r) -> Format.printf "%a@.%a@." Subst.pp_raw s Ty.pp r ; s,r) *)
 
 let tally_simpl env res cs =
-  let mono = MVarSet.of_set (TVar.all_vars KNoInfer) (RVar.all_vars KNoInfer) in
+  let mono = TVOp.all_vars KNoInfer in
   let tvars = Env.tvars env in
   let fc = TVOp.get_field_ctx (MVarSet.proj2 mono) (cs |> List.concat_map (fun (a,b) -> [a;b])) in
   let tvars = MVarSet.elements2 tvars |> List.fold_left

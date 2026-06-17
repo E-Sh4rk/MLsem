@@ -1,20 +1,22 @@
 open Mlsem_types
-open Mlsem_common
 
 type overload
 type t = overload list
 
-val simplify : TyScheme.t -> TyScheme.t
+val simplify_tyscheme : TyScheme.t -> TyScheme.t
+val simplify_overload : overload -> overload
 
 (* May raise [Invalid_argument] if the type is not fully resolved. *)
-val build : Builder.benv -> TyExpr.t -> t * Builder.benv
+val build : Builder.benv -> TyExpr.t -> overload * Builder.benv
 (* May raise [Invalid_argument] if the type is not fully resolved. *)
 val of_tyscheme : TyScheme.t -> t
 
-val to_tyscheme : Env.t -> t -> TyScheme.t
-val to_gty : overload -> GTy.t
+val decompose : ?recursive:bool -> overload -> t
+val regroup : t -> overload
+val merge : ?recursive:bool -> overload -> overload
 
-val merge : t -> overload
+val to_tyscheme : t -> TyScheme.t
+val to_gty : overload -> GTy.t
 
 (* The (prefixed) names of [overload]'s free type variables, as rendered in its
    text. Per-overload: variables are not shared across overloads. *)

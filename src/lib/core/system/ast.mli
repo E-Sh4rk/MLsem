@@ -11,6 +11,7 @@ type projection =
 type constructor =
 | Tuple of int | Cons | Rec of string list * bool | Tag of Tag.t | Enum of Enum.t 
 | Join of int | Meet of int | Negate | Ternary of Ty.t (* Should not contain type vars *)
+| Voidify of Ty.t (* Should not contain type vars *)
 | Normalize | CCustom of ccustom
 type operation =
 | RecUpd of string | RecDel of string
@@ -58,4 +59,5 @@ val construct : constructor -> Ty.t list -> Ty.t
 
 val fun_of_operation : operation -> TyScheme.t
 
-val coerce : check -> GTy.t -> t -> t
+val coerce : ?coercion_id:Eid.t -> check -> GTy.t -> t -> t
+val push_coercions : t -> t
