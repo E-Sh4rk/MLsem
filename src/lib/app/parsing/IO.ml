@@ -12,24 +12,20 @@ let parse_with_errors parser buf =
   | Lexer.Parser.Error ->
     raise (PAst.SyntaxError (pos_of_lexbuf buf, "syntax error"))
 
-let parse_expr_file source_filename =
+let parse_file f source_filename =
   let cin = open_in source_filename in
   let buf = from_channel cin in
   buf.lex_curr_p <- { buf.lex_curr_p with  pos_fname = source_filename };
-  parse_with_errors Lexer.Parser.unique_term buf
+  parse_with_errors f buf
 
-let parse_expr_string str =
+let parse_string f str =
   let buf = from_string str in
   buf.lex_curr_p <- { buf.lex_curr_p with  pos_fname = "_" };
-  parse_with_errors Lexer.Parser.unique_term buf
+  parse_with_errors f buf
 
-let parse_program_file source_filename =
-  let cin = open_in source_filename in
-  let buf = from_channel cin in
-  buf.lex_curr_p <- { buf.lex_curr_p with  pos_fname = source_filename };
-  parse_with_errors Lexer.Parser.program buf
-
-let parse_program_string str =
-  let buf = from_string str in
-  buf.lex_curr_p <- { buf.lex_curr_p with  pos_fname = "_" };
-  parse_with_errors Lexer.Parser.program buf
+let parse_type_file = parse_file Lexer.Parser.unique_ty
+let parse_type_string = parse_string Lexer.Parser.unique_ty
+let parse_expr_file = parse_file Lexer.Parser.unique_term
+let parse_expr_string = parse_string Lexer.Parser.unique_term
+let parse_program_file = parse_file Lexer.Parser.program
+let parse_program_string = parse_string Lexer.Parser.program

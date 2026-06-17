@@ -107,7 +107,7 @@
 %token<string> LSTRING
 %token<string> INFIX PREFIX INDEXED OPID
 
-%type<pexpr> term
+%start<Mlsem_types.TyExpr.t> unique_ty
 %start<pexpr> unique_term
 %start<program> program
 
@@ -125,6 +125,8 @@
 program: e=element* EOF { e }
 
 unique_term: t=terms EOF { t }
+
+unique_ty: ty=typ EOF { ty }
 
 %inline tl_let:
 | id=generalized_identifier ais=parameter* EQUAL t=terms

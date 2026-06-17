@@ -118,9 +118,6 @@ let treat (benv,varm,senv,env) (annot, elem) =
       let lst = lst |> List.map (fun (bpos, (kind, name), e) ->
         let kind, benv' = resolve_kind !benv kind in
         let var, sigs = sigs_of_def !varm senv env (kind, name) in
-        (* Per-binder location (the binder's own span) so the LSP can tell
-           apart the members of a [let .. and ..] group; falls back to the
-           whole element when the parser had no narrower span. *)
         let bpos = if bpos = Position.dummy then pos else bpos in
         benv := benv' ; Variable.attach_location var bpos ;
         varm := NameMap.add name var !varm ;
@@ -146,9 +143,6 @@ let treat (benv,varm,senv,env) (annot, elem) =
         (r.Mlsem_system.Analyzer.severity, Eid.loc r.eid, r.title, r.descr)
       ) in
       let senv = List.fold_left (fun senv (v,_) -> VarMap.remove v senv) senv tys2 in
-      (* [tys1] are the inferred (signature-less) bindings; [tys2] carry a
-         user-written [val] declaration. [declared] lets the LSP suppress the
-         inline-signature action where a declaration already exists. *)
       let render ~declared (v, (ty,sigs)) = { var = v; ty; sigs; declared } in
       let tys = List.map (render ~declared:false) tys1 @ List.map (render ~declared:true) tys2 in
       (!benv,varm,senv,env), TSuccess (tys,msg,retrieve_time time)
@@ -276,16 +270,9 @@ let print_ty pp (_,_,_,_,penv) ty =
 let display envs ty = print_ty TyScheme.pp_short envs ty
 let signature envs sigs = sigs |> List.map (print_ty Signature.pp_overload envs)
 
-(* Build the concrete type denoted by the surface type expression [s], resolved
-   against [envs]'s type environment (so user-defined names resolve). Wraps [s]
-   as a signature declaration to reuse the program parser. Raises on a parse or
-   elaboration failure. *)
 let build_type ((benv, _, _, _, _) : envs) (s : string) : Ty.t =
-  match parse_program_string ("val __mlsem_probe__ : " ^ s) with
-  | [(_, PAst.SigDef (_, _, ty_expr))] ->
-      let ty, _ = type_expr_to_typ ~allow_gradual:true benv ty_expr in
-      ty
-  | _ -> invalid_arg "Expected a single type expression"
+  let ty_expr = parse_type_string s in
+  type_expr_to_typ ~allow_gradual:true benv ty_expr |> fst
 
 (* User-defined type names known in [envs], for concrete-type suggestions. *)
 let user_type_names ((benv, _, _, _, _) : envs) = Builder.type_names benv
