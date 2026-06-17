@@ -121,7 +121,7 @@ let treat (benv,varm,senv,env) (annot, elem) =
         (* Per-binder location (the binder's own span) so the LSP can tell
            apart the members of a [let .. and ..] group; falls back to the
            whole element when the parser had no narrower span. *)
-        let bpos = if bpos = Position.dummy then Position.position annot else bpos in
+        let bpos = if bpos = Position.dummy then pos else bpos in
         benv := benv' ; Variable.attach_location var bpos ;
         varm := NameMap.add name var !varm ;
         (var, e, sigs)
@@ -157,7 +157,7 @@ let treat (benv,varm,senv,env) (annot, elem) =
         let new_sig, benv = Signature.build benv ty in
         let kind = if mut then MVariable.AnnotMut (Signature.to_gty new_sig) else Immut in
         let var, sigs = sigs_of_def varm senv env (kind, name) in
-        Variable.attach_sig_location var (Position.position annot) ;
+        Variable.attach_sig_location var pos ;
         let varm = NameMap.add name var varm in
         let sigs = match sigs with
         | None when Env.mem var env ->

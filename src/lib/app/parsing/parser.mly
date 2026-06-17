@@ -7,17 +7,19 @@
 
   let annot sp ep e =
     (new_annot (Position.lex_join sp ep), e)
+  let dummy_annot e =
+    (new_annot Position.dummy, e)
 
   type param = PPattern of pat | PVar of string
 
   let tmp_var = "_pat"
+  let tmp_var_e = dummy_annot (Var tmp_var)
   let abstraction startpos endpos lst t =
     let step acc (da, pat) =
       match pat with
       | PVar v -> annot startpos endpos (Lambda (v, da, acc))
       | PPattern pat ->
-        let test = annot startpos endpos (Var tmp_var) in
-        let body = annot startpos endpos (PatMatch (test, [(pat, acc)])) in
+        let body = annot startpos endpos (PatMatch (tmp_var_e, [(pat, acc)])) in
         annot startpos endpos (Lambda (tmp_var, da, body))
     in
     List.rev lst |> List.fold_left step t

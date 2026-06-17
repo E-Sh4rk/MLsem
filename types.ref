@@ -241,7 +241,7 @@ record_ab_open: ∀'a,'b. { a : 'b ; b : 'a ..} -> { a : 'b ; b : 'a }
 record_ab: ∀'a,'b. { a : 'b ; b : 'a } -> { a : 'b ; b : 'a }
 ref_42: ref(int)
 ref_42_unresolved: the type inferred is not fully resolved
-File "tests/4_all.ml", line 61, characters 0-30
+File "tests/4_all.ml", line 61, characters 4-30
 type inferred: ref(42 | 'I2409)
 mutate_ref: ∀'a. 42 | 'a -> 42 | 'a
 is_ref: (ref -> true) & (~ref -> false)
