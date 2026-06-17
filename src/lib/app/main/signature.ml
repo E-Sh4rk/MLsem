@@ -53,5 +53,24 @@ let extract ty =
   ty
 let of_tyscheme ty = ty |> extract |> decompose |> List.map simplify_overload
 
+(* The variable's name as it is rendered in the overload's text (the printer
+   uses the var's full prefixed name), so combobox labels match what the user
+   sees and [instantiate] can select by that same string. *)
+let var_name v = TVar.prefix v ^ TVar.name v
+
+(* The (prefixed) names of [overload]'s free type variables. Variables are
+   per-overload: two overloads each rendering ['a] are distinct vars, so this
+   is always called per single overload. *)
+let overload_vars overload =
+  TVOp.vars overload |> MVarSet.proj1 |> TVarSet.elements |> List.map var_name
+
+(* Substitute every type variable of [overload] named [var_name] with the
+   concrete type [ty]. *)
+let instantiate overload name ty =
+  let vs =
+    TVOp.vars overload |> MVarSet.proj1 |> TVarSet.filter (fun v -> var_name v = name)
+  in
+  let s = vs |> TVarSet.elements |> List.map (fun v -> (v, ty)) |> Subst.of_list1 in
+  Subst.apply s overload
 
 let pp_overload fmt o = GTy.Builder.pp fmt o

@@ -128,9 +128,9 @@ unique_term: t=terms EOF { t }
 | id=generalized_identifier ais=parameter* EQUAL t=terms
 {
   let t = abstraction $startpos $endpos ais t in
-  ((Immut,id), t)
+  (Position.lex_join $startpos $endpos, (Immut,id), t)
 }
-| mid=mid EQUAL t=terms { (mid, t) }
+| mid=mid EQUAL t=terms { (Position.lex_join $startpos $endpos, mid, t) }
 
 %inline mut:
   { false }

@@ -77,7 +77,7 @@ val empty_name_var_map : name_var_map
 val to_expr : Builder.benv -> name_var_map -> pexpr -> expr * Builder.benv
 
 type element =
-| Definitions of ((TyExpr.t, string) vdef * pexpr) list
+| Definitions of (Position.t * (TyExpr.t, string) vdef * pexpr) list
 | SigDef of string * bool (* mutable *) * TyExpr.t
 | Types of (string * string list * TyExpr.t) list
 | AbsType of string * int

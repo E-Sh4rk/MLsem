@@ -24,6 +24,18 @@ record:
 clean:
 	opam exec -- dune clean
 
+lsp-build:
+	opam exec -- dune build --profile release src/bin/lsp.exe
+
+lsp-run: lsp-build
+	./_build/default/src/bin/lsp.exe
+
+lsp-dev:
+	opam exec -- dune exec src/bin/lsp.exe
+
+lsp-dev-build:
+	opam exec -- dune build src/bin/lsp.exe
+
 ocaml-index:
 	opam exec -- dune build @ocaml-index --watch
 

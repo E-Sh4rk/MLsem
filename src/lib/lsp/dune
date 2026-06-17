@@ -1,0 +1,12 @@
+(library
+ (name mlsem_lsp)
+ (libraries
+  lsp
+  jsonrpc
+  yojson
+  logs
+  logs.fmt
+  fmt
+  mlsem_app
+  mlsem_common
+  mlsem))

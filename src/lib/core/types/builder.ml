@@ -62,6 +62,13 @@ module Builder = struct
     type benv = { tenv:type_env ; vtenv:var_type_env }
     let empty_benv = { tenv=empty_tenv ; vtenv=empty_vtenv }
 
+    (* All user-defined type names known in [benv] (aliases, enums, tags and
+       abstract types), for offering as concrete-type suggestions. *)
+    let type_names { tenv ; _ } =
+        let keys m = StrMap.bindings m |> List.map fst in
+        keys tenv.aliases @ keys tenv.enums @ keys tenv.tags @ keys tenv.abs
+        |> List.sort_uniq String.compare
+
     let reg_to_sstt f r =
         let open TyExpr in
         let open Sstt.Extensions in

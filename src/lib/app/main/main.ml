@@ -115,10 +115,14 @@ let treat (benv,varm,senv,env) (annot, elem) =
     match elem with
     | PAst.Definitions lst ->
       let varm, benv = ref varm, ref benv in
-      let lst = lst |> List.map (fun ((kind, name), e) ->
+      let lst = lst |> List.map (fun (bpos, (kind, name), e) ->
         let kind, benv' = resolve_kind !benv kind in
         let var, sigs = sigs_of_def !varm senv env (kind, name) in
-        benv := benv' ; Variable.attach_location var (Position.position annot) ;
+        (* Per-binder location (the binder's own span) so the LSP can tell
+           apart the members of a [let .. and ..] group; falls back to the
+           whole element when the parser had no narrower span. *)
+        let bpos = if bpos = Position.dummy then Position.position annot else bpos in
+        benv := benv' ; Variable.attach_location var bpos ;
         varm := NameMap.add name var !varm ;
         (var, e, sigs)
       )
@@ -271,6 +275,20 @@ let print_ty pp (_,_,_,_,penv) ty =
   |> fst
 let display envs ty = print_ty TyScheme.pp_short envs ty
 let signature envs sigs = sigs |> List.map (print_ty Signature.pp_overload envs)
+
+(* Build the concrete type denoted by the surface type expression [s], resolved
+   against [envs]'s type environment (so user-defined names resolve). Wraps [s]
+   as a signature declaration to reuse the program parser. Raises on a parse or
+   elaboration failure. *)
+let build_type ((benv, _, _, _, _) : envs) (s : string) : Ty.t =
+  match parse_program_string ("val __mlsem_probe__ : " ^ s) with
+  | [(_, PAst.SigDef (_, _, ty_expr))] ->
+      let ty, _ = type_expr_to_typ ~allow_gradual:true benv ty_expr in
+      ty
+  | _ -> invalid_arg "Expected a single type expression"
+
+(* User-defined type names known in [envs], for concrete-type suggestions. *)
+let user_type_names ((benv, _, _, _, _) : envs) = Builder.type_names benv
 
 type parsing_result =
 | PSuccess of PAst.program
