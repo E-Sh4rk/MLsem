@@ -25,6 +25,8 @@ val mapl : (Ty.t list -> Ty.t) -> t list -> t
 val op : (Ty.t -> bool) -> (Ty.t -> Ty.t) -> t -> t option
 val op2 : (Ty.t -> Ty.t -> bool) -> (Ty.t -> Ty.t -> Ty.t) -> t -> t -> t option
 val opl : (Ty.t list -> bool) -> (Ty.t list -> Ty.t) -> t list -> t option
+(* Mapping functions below assume the operation is anti-monotonic *)
+val map' : (Ty.t -> Ty.t) -> t -> t
 
 val is_empty : t -> bool
 val is_any : t -> bool

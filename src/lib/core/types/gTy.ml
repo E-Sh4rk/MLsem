@@ -17,6 +17,8 @@ let destruct t = t.lb, t.ub
 let map_ f flb fub t =
   if t.eq then f t.lb |> mk else mk_gradual (flb t.lb) (fub t.ub)
 let map f = map_ f f f
+let map' f t =
+  if t.eq then f t.lb |> mk else mk_gradual (f t.ub) (f t.lb)
 let map2_ f flb fub t1 t2 =
   if t1.eq && t2.eq then
     f t1.lb t2.lb |> mk

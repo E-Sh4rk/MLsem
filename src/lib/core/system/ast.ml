@@ -236,7 +236,7 @@ let coerce ?coercion_id c ty t =
         let tys = List.map2 GTy.mk_gradual tys_lb tys_ub in
         Constructor (cons, List.map2 aux tys es)
       | Lambda (da,v,e) ->
-        let d = GTy.mk_gradual (Arrow.domain (GTy.ub ty)) (Arrow.domain (GTy.lb ty)) in (* TODO: map' *)
+        let d = GTy.map' Arrow.domain ty in
         let cd = GTy.map2 Arrow.apply ty d in
         let ty' = GTy.mk_gradual (Arrow.mk (GTy.ub d) (GTy.lb cd)) (Arrow.mk (GTy.lb d) (GTy.ub cd)) in
         if GTy.leq ty' ty |> not then raise Exit ;
