@@ -54,6 +54,10 @@ module Builder : sig
     (** [non_gradual ty] returns true if and only if [ty] is not gradual,
         i.e. it has no instance of dyn. *)
 
+    val is_valid : Ty.t -> bool
+    (** [is_valid ty] returns true if and only if [ty] is a valid gradual type,
+        i.e. it has no invariant instance of dyn. *)
+
     val build : Ty.t -> t
     (** [build ty] builds the gradual type corresponding to [ty].
         Raises [Invalid_argument] if a dyn occurs in an invariant position. *)

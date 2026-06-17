@@ -96,13 +96,19 @@ module Builder = struct
     Sstt.Ty.vars ty |> TVarSet.inter !dynvars
   let non_gradual ty =
     dynvars_of_ty ty |> TVarSet.is_empty
+  let is_valid ty =
+    dynvars_of_ty ty |> TVarSet.elements |> List.for_all (fun v ->
+      match TVOp.polarity1 v ty with
+      | `None -> assert false
+      | `Both -> false
+      | `Pos | `Neg -> true
+    )
   let refresh ty =
     let s = dynvars_of_ty ty |> TVarSet.elements
     |> List.map (fun v -> v, dyn ()) |> Subst.of_list1 in
     Subst.apply s ty
   let build ty =
-    let tvs = dynvars_of_ty ty in
-    let sub, slb = tvs |> TVarSet.elements |> List.map (fun v ->
+    let sub, slb = dynvars_of_ty ty |> TVarSet.elements |> List.map (fun v ->
       match TVOp.polarity1 v ty with
       | `None -> assert false
       | `Both -> invalid_arg "Dyn occurs in an invariant position."

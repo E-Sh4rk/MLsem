@@ -318,7 +318,8 @@ module Builder = struct
 
     let type_expr_to_typ ?(allow_gradual=false) env t =
         match derecurse_types env [ ("", [], t) ] with
-        | ([ "", [], t ], env) when allow_gradual || GTy.Builder.non_gradual t -> (t, env)
+        | ([ "", [], t ], env) when allow_gradual && GTy.Builder.is_valid t
+                                 || GTy.Builder.non_gradual t -> (t, env)
         | ([ "", [], _ ], _) -> raise (TypeDefinitionError "Unexpected dyn type.")
         | _ -> assert false
     let type_expr_to_gty env t =
