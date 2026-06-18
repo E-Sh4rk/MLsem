@@ -51,7 +51,7 @@ let extract ty =
   let ty = Subst.apply (TVOp.shorten_names ~kind:KNoInfer tvs) (GTy.ub ty) in
   if is_well_formed ty |> not then invalid_arg "Unresolved signature" ;
   ty
-let of_tyscheme ty = ty |> extract |> decompose |> List.map simplify_overload
+let of_tyscheme ty = ty |> extract |> decompose (* |> List.map simplify_overload *)
 
 (* The variable's name as it is rendered in the overload's text (the printer
    uses the var's full prefixed name), so combobox labels match what the user
