@@ -96,8 +96,8 @@ let mut_valid =
 (* ========= Type narrowing and complex control flow ========= *)
 
 let mut counter : int = 0
-let incr x = counter := succ counter
-let test_global =
+let incr () = counter := succ counter
+let test_global _ =
     counter := 0 ;
     incr () ;
     counter

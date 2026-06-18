@@ -241,8 +241,8 @@ function: (any, int) -> ()
 argument: int, true
 mut_valid: int
 counter: 0
-incr: any -> ()
-test_global: int
+incr: () -> ()
+test_global: any -> int
 mut_narrowing: Nil | int
 mut_seq1: 42
 mut_seq2: Nil
@@ -253,7 +253,7 @@ order: Nil | (Nil | int, Nil | int) -> Nil | int | (int, int)
 loop_tricky_narrowing: int -> (any, int)
 loop_invalid: untypeable application
 File "tests/4_imperative.ml", line 174, characters 4-14
-function: (ref('I2655), 'I2655) -> ()
+function: (ref('I2659), 'I2659) -> ()
 argument: ref(int), false
 loop_valid: ∀'a. (false | 'a -> false | 'a) & ('a \ int -> 'a \ int)
 filter_imp: ∀'a,'b,'c. ('a -> bool) & ('b -> false) -> array('b | 'a) -> array('a \ 'b

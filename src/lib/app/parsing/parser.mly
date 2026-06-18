@@ -296,6 +296,8 @@ lint:
 
 parameter:
   arg = ID { (None, PVar arg) }
+| PLACEHOLDER_VAR { (None, PPattern (PatType (TBase TAny))) }
+| LPAREN RPAREN { (None, PPattern (PatType (TBase TUnit))) }
 | LPAREN arg = pattern opta = optional_typ RPAREN { (opta, PPattern arg) }
 
 generalized_identifier:
