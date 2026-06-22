@@ -13,7 +13,7 @@ append: ∀'a,'b,'c. ([ 'b* ] -> ('a & ('b::x1) | 'c & 'a & [ any* ] -> 'b::x1) 
 ] -> 'a -> 'a) where x1 = ('b::x1) | 'c & [ any* ]
 @: ∀'a,'b,'c. (([ 'b* ], 'a & ('b::x1) | 'c & 'a & [ any* ]) -> ('b::x1) | 'c
 & 'a & [ any* ]) & (([  ], 'a) -> 'a) where x1 = ('b::x1) | 'c & [ any* ]
-rev_append: ∀'a,'b,'c. ([ 'c* ] -> (('c::x1) | 'a -> ('c::x1) | 'a) | (x1 -> ('c::x1) |
+rev_append: ∀'a,'b,'c. ([ 'c* ] -> (x1 -> ('c::x1) | 'a) | (('c::x1) | 'a -> ('c::x1) |
 'a)) & ([  ] -> ('a -> 'a) | ([ any* ] -> empty)) where x1 = ('c::x1) | 'b &
 [ any* ]
 rev: ∀'a. [ !('a | 'a 'a+)? ] -> [ !('a | 'a 'a+)? ]
@@ -46,42 +46,42 @@ succ': any -> (0..25)
 test2': (5..15) -> (0..25)
 f: int | string -> int
 test: (10..15) -> int
-succ: (2 -> 3) & (1 -> 2) & (0 -> 1) & (3 -> 4) & (4 -> 5) & (5 -> 6) & (6 -> 7) &
-(7 -> 8) & (8 -> 9) & (9 -> 10) & (10 -> 11) & (11 -> 12) & (12 -> 13) & (13
--> 14) & (14 -> 15) & (15 -> 16) & (16 -> 17) & (17 -> 18) & (18 -> 19) & (19
--> 20) & (20 -> 21) & (21 -> 22) & (22 -> 23) & (23 -> 24) & (24 -> 25) &
-(~(0..24) -> 0)
+succ: (2 -> 3) & (3 -> 4) & (4 -> 5) & (5 -> 6) & (6 -> 7) & (7 -> 8) & (8 -> 9) &
+(9 -> 10) & (10 -> 11) & (11 -> 12) & (12 -> 13) & (13 -> 14) & (14 -> 15) &
+(15 -> 16) & (16 -> 17) & (17 -> 18) & (18 -> 19) & (19 -> 20) & (20 -> 21) &
+(21 -> 22) & (22 -> 23) & (23 -> 24) & (24 -> 25) & (~(0..24) -> 0) & (0 ->
+1) & (1 -> 2)
 test2: (5..15) -> (10..20)
-to_bool: (float -> bool) & (int \ 0 | true | ('\001'-'\255') | string \ "" -> true) &
-(0 | false | '\000' | "" -> false)
-and_: ((true, true) -> true) & ((~true, any) | (any, ~true) -> false)
-&&: ((int | bool | char | float | string, int | bool | char | float | string) ->
-bool) & ((int \ 0 | true | ('\001'-'\255') | string \ "", int \ 0 | true |
-('\001'-'\255') | string \ "") -> true) & ((int | bool | char | float |
-string, 0 | false | '\000' | "") | (0 | false | '\000' | "", int | bool |
-char | float | string) -> false)
+to_bool: (int \ 0 | true | ('\001'-'\255') | string \ "" -> true) & (0 | false |
+'\000' | "" -> false) & (float -> bool)
+and_: ((any, ~true) | (~true, any) -> false) & ((true, true) -> true)
+&&: ((0 | false | '\000' | "", int | bool | char | float | string) | (int | bool
+| char | float | string, 0 | false | '\000' | "") -> false) & ((int | bool |
+char | float | string, int | bool | char | float | string) -> bool) & ((int \
+0 | true | ('\001'-'\255') | string \ "", int \ 0 | true | ('\001'-'\255') |
+string \ "") -> true)
 and1: false
 and2: false
 and3: true
 and4: bool
 and5: true
 not_: (~true -> true) & (true -> false)
-or_: ((~true, ~true) -> false) & ((true, any) | (any, true) -> true)
+or_: ((any, true) | (true, any) -> true) & ((~true, ~true) -> false)
 impossible_branch: int -> int
 [Warning] File "tests/1_union_inter.ml", line 103, characters 32-36 Unreachable code
-impossible_branch2: (int -> any -> int) & (any -> int -> int)
+impossible_branch2: (any -> int -> int) & (int -> any -> int)
 switch1: ∀'a,'b,'c,'d. (('a -> 'b) -> true -> 'a -> any -> 'b) & (('c -> 'd) ->
 ~true -> any -> 'c -> 'd)
 switch2: ∀'a,'b,'c,'d. (true -> ('a -> 'b) -> 'a -> any -> 'b) & (~true -> ('c ->
 'd) -> any -> 'c -> 'd)
-typeof: (bool -> "Boolean") & (~(int | bool | char | [  ] | string | ()) -> "Object")
-& ([  ] | () -> "[]") & (string -> "String") & (char -> "Character") & (int
--> "Number")
-typeof_patterns: (~(int | bool | char | [  ] | string | ()) -> "Object") & ([  ] | () -> "[]")
-& (string -> "String") & (char -> "Character") & (bool -> "Boolean") & (int
--> "Number")
+typeof: (int -> "Number") & (bool -> "Boolean") & (~(int | bool | char | [  ] |
+string | ()) -> "Object") & ([  ] | () -> "[]") & (string -> "String") &
+(char -> "Character")
+typeof_patterns: (int -> "Number") & (~(int | bool | char | [  ] | string | ()) -> "Object") &
+([  ] | () -> "[]") & (string -> "String") & (char -> "Character") & (bool ->
+"Boolean")
 land: (true -> true -> true) & (~true -> any -> false) & (any -> ~true -> false)
-lor: (~true -> ~true -> false) & (true -> any -> true) & (any -> true -> true)
+lor: (~true -> ~true -> false) & (any -> true -> true) & (true -> any -> true)
 lnot: (~true -> true) & (true -> false)
 tautology: any -> any -> true
 tautology_ann: any -> any -> true
@@ -91,9 +91,9 @@ test_many_params_ann2: ∀'a,'b,'c,'d,'e,'f. 'f -> 'e -> 'd -> 'c -> 'b -> 'a ->
 'e & bool, 'd & int, 'c & bool, 'b & int, 'a & bool)
 test_many_params: ∀'a,'b,'c,'d,'e,'f. (('f & int, 'e & bool, 'd & int, 'c & bool, 'b & int,
 'a & bool) -> ('f & int, 'e & bool, 'd & int, 'c & bool, 'b & int, 'a &
-bool)) & ((~int, any, any, any, any, any) | (any, ~bool, any, any, any, any)
-| (any, any, ~int, any, any, any) | (any, any, any, ~bool, any, any) | (any,
-any, any, any, ~int, any) | (any, any, any, any, any, ~bool) -> false)
+bool)) & ((any, ~bool, any, any, any, any) | (any, any, any, ~bool, any, any)
+| (any, any, any, any, any, ~bool) | (any, any, any, any, ~int, any) | (any,
+any, ~int, any, any, any) | (~int, any, any, any, any, any) -> false)
 match_pair: any -> any -> false | (int, bool)
 type_narrowing_fail: untypeable application
 File "tests/1_union_inter.ml", line 160, characters 21-31
@@ -116,8 +116,8 @@ implicit2: int | string -> int
 example3: any -> false | (~false, ~false)
 implicit3: ∀'a. ('a \ false -> ('a \ false, 'a \ false)) & ('a & false -> false)
 example4: any -> int | 'A' | string
-implicit4: ∀'a. ('a & string -> 'a & string) & ('a \ (int | string) -> 'A') & ('a &
-int -> 'a & int)
+implicit4: ∀'a. ('a & int -> 'a & int) & ('a & string -> 'a & string) & ('a \ (int |
+string) -> 'A')
 example5: any -> any -> int
 implicit5: (int -> (~string -> 0) & (any -> int)) & (~int -> any -> 0)
 example6_invalid: untypeable application
@@ -129,13 +129,13 @@ implicit6: (string -> any -> int) & (int -> string -> int)
 example7: any -> any -> int
 implicit7: (int -> (~string -> 0) & (any -> int)) & (~int -> any -> 0)
 example8: any -> bool
-implicit8: (~(int | string) -> false) & (int | string -> true)
+implicit8: (int | string -> true) & (~(int | string) -> false)
 example9: any -> int
-implicit9: (~(int | string) -> 0) & (any -> int)
+implicit9: (any -> int) & (~(int | string) -> 0)
 example10: tuple2 -> int
 implicit10: (tuple2 -> int) & ((~int, any) -> 7)
 example11: tuple2 -> No | int
-implicit11: ((int, int) -> int) & ((~int, any) | (any, ~int) -> No)
+implicit11: ((any, ~int) | (~int, any) -> No) & ((int, int) -> int)
 example12: tuple2 -> bool
 implicit12: ((~int, any) -> false) & ((int, any) -> true)
 example13: any -> any -> (1..3)
@@ -232,7 +232,7 @@ test_arr: ∀'a,'b. bool | 'a -> array('a & int | 'b)
 test_double_array: 42
 arr_dict_assign: ∀'a,'b. dict((0..1) | 'b, 'a) | array('a) -> ()
 nested: ∀'a. any -> 'a -> 'a
-swap: ∀'a,'b. ('a -> 'a -> dict('a, 'b) -> ()) & ('a & int -> int -> array('b) ->
+swap: ∀'a,'b. ('a & int -> int -> array('b) -> ()) & ('a -> 'a -> dict('a, 'b) ->
 ())
 mx: 42
 mut_invalid: untypeable application
@@ -255,7 +255,7 @@ loop_invalid: untypeable application
 File "tests/4_imperative.ml", line 174, characters 4-14
 function: (ref('I2659), 'I2659) -> ()
 argument: ref(int), false
-loop_valid: ∀'a. (false | 'a -> false | 'a) & ('a \ int -> 'a \ int)
+loop_valid: ∀'a. ('a \ int -> 'a \ int) & (false | 'a -> false | 'a)
 filter_imp: ∀'a,'b,'c. ('a -> bool) & ('b -> false) -> array('b | 'a) -> array('a \ 'b
 | 'c)
 filter_imp_test: array(13 | 42 | "abc")
@@ -274,7 +274,7 @@ File "tests/5_misc.ml", line 22, characters 20-21
 expected: bool | 'a
 given: int | 'a
 test_sig: ∀'a. bool | 'a -> int | 'a -> (bool | 'a, int | 'a)
-test_sig_overloaded: (bool -> bool) & (int -> int)
+test_sig_overloaded: (int -> int) & (bool -> bool)
 test_annot: ∀'a. bool | 'a -> int | 'a -> (bool | 'a, int | 'a)
 proj_a: ∀'a. A('a) -> 'a
 proj_a': ∀'a. A('a) -> 'a
@@ -284,14 +284,22 @@ proj_ab_test: ∀'a,'b. 'a -> 'b -> ('a, 'b)
 map_clist: ∀'a,'b. ('a -> 'b) -> clist('a) -> x1 where x1 = Nil | Cons('b, x1)
 record_ab_open: ∀'a,'b. { a : 'b ; b : 'a ..} -> { a : 'b ; b : 'a }
 record_ab: ∀'a,'b. { a : 'b ; b : 'a } -> { a : 'b ; b : 'a }
+[Message] File "tests/5_misc.ml", line 56, characters 0-12 Computation result
+true
+[Message] File "tests/5_misc.ml", line 57, characters 0-44 Computation result
+[ bool int* | int int* bool ]
+[Message] File "tests/5_misc.ml", line 58, characters 0-29 Computation result
+[
+  '_a: 42 | 'b
+]
 test: ∀'a,'b. ('b & 'a, any) -> ('a, 'b & 'a)
 and_js: ∀'a,'b. ('a & falsy -> any -> 'a & falsy) & ('a & truthy -> 'b -> 'b)
 not_js: (falsy -> 1) & (truthy -> 0)
 or_js: ∀'a,'b. ('a & truthy -> any -> 'a & truthy) & ('a & falsy -> 'b -> 'b)
 identity_js: ∀'a. 'a -> 'a
-and_pair: ∀'a,'b. ('a & falsy -> any -> 'a & falsy) & ('a & int & ~0 -> 'b -> ('b,
-int))
-test_pair: (int \ 0, any) | (int, int) -> int
+and_pair: ∀'a,'b. ('a & int & ~0 -> 'b -> ('b, int)) & ('a & falsy -> any -> 'a &
+falsy)
+test_pair: (0, int) | (int \ 0, any) -> int
 ifthenelse: ∀'a,'b. (tt('a, 'b) -> tt('a, 'b)) & (ff('a, 'b) -> ff('a, 'b))
 test1_patterns: ∀'a. ('a, any) -> 'a
 test2_patterns: ∀'a,'b. ('b, 'a) -> ('b, 'a)
@@ -314,26 +322,26 @@ call_f: ∀'a. objF('a) -> () | 'a
 deep_flatten: ∀'a. tree('a) -> [ ('a \ [ any* ])* ]
 eval: expr -> int
 obj: obj
-typeof_cf: (() -> "unit") & (~(int | bool | char | string | ()) -> "object") & (string
--> "string") & (bool -> "bool") & (char -> "char") & (int -> "int")
-break_return_cf: ∀'a. ('a \ (0 | false) -> 'a \ (0 | false)) & ('a & (0 | false) -> ())
+typeof_cf: (int -> "int") & (() -> "unit") & (~(int | bool | char | string | ()) ->
+"object") & (string -> "string") & (bool -> "bool") & (char -> "char")
+break_return_cf: ∀'a. ('a & (0 | false) -> ()) & ('a \ (0 | false) -> 'a \ (0 | false))
 weird_return: (true -> 69) & (~true -> (42, 69))
-test_alt: (() -> ()) & (char -> char) & (string -> string) & (bool -> bool) & (Nil ->
-Nil) & (int -> int)
-fall: (() -> ()) & (char -> char) & (string -> string) & (bool -> bool) & (Nil ->
-Nil) & (int -> int)
-test_noalt: (string -> string) & (char -> char) & (bool -> bool) & (() -> ()) & (Nil ->
-Nil) & (int -> int)
+test_alt: (Nil -> Nil) & (int -> int) & (() -> ()) & (char -> char) & (string ->
+string) & (bool -> bool)
+fall: (Nil -> Nil) & (int -> int) & (() -> ()) & (char -> char) & (string ->
+string) & (bool -> bool)
+test_noalt: (Nil -> Nil) & (int -> int) & (() -> ()) & (string -> string) & (char ->
+char) & (bool -> bool)
 typeof_app: Int -> 0
-[Warning] File "tests/5_misc.ml", line 256, characters 9-29 Unreachable code
+[Warning] File "tests/5_misc.ml", line 262, characters 9-29 Unreachable code
 typeof_app': Int -> 0
-[Warning] File "tests/5_misc.ml", line 276, characters 7-27 Unreachable code
-[Warning] File "tests/5_misc.ml", line 274, characters 43-48 Unreachable code
-[Warning] File "tests/5_misc.ml", line 271, characters 10-156 Unreachable code
-[Warning] File "tests/5_misc.ml", line 272, characters 36-45 Unreachable code
-[Warning] File "tests/5_misc.ml", line 272, characters 24-33 Unreachable code
-[Warning] File "tests/5_misc.ml", line 272, characters 12-21 Unreachable code
-[Warning] File "tests/5_misc.ml", line 271, characters 48-57 Unreachable code
-[Warning] File "tests/5_misc.ml", line 271, characters 36-45 Unreachable code
-[Warning] File "tests/5_misc.ml", line 271, characters 24-33 Unreachable code
-[Warning] File "tests/5_misc.ml", line 271, characters 12-21 Unreachable code
+[Warning] File "tests/5_misc.ml", line 282, characters 7-27 Unreachable code
+[Warning] File "tests/5_misc.ml", line 280, characters 43-48 Unreachable code
+[Warning] File "tests/5_misc.ml", line 277, characters 10-156 Unreachable code
+[Warning] File "tests/5_misc.ml", line 278, characters 36-45 Unreachable code
+[Warning] File "tests/5_misc.ml", line 278, characters 24-33 Unreachable code
+[Warning] File "tests/5_misc.ml", line 278, characters 12-21 Unreachable code
+[Warning] File "tests/5_misc.ml", line 277, characters 48-57 Unreachable code
+[Warning] File "tests/5_misc.ml", line 277, characters 36-45 Unreachable code
+[Warning] File "tests/5_misc.ml", line 277, characters 24-33 Unreachable code
+[Warning] File "tests/5_misc.ml", line 277, characters 12-21 Unreachable code

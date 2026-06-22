@@ -87,6 +87,6 @@ type element =
 | Types of (string * string list * TyExpr.t) list
 | AbsType of string * int
 | Command of string * Const.t
-| Debug of Position.t * debug
+| Debug of debug
 
 type program = (annotation * element) list

@@ -51,6 +51,12 @@ let map_clist f (lst:clist('a)) =
 let record_ab_open ({ a ; b ..}) = { a ; b }
 let record_ab ({ a ; b }) = { a ; b }
 
+(* ========= DEBUG COMMANDS ======== *)
+
+## 42 <= int
+## [ int* bool int* ] & [ bool* int* bool* ]
+## { T('_a) = T(42) | T('b) }
+
 (* ========= POLYMORPHISM ======== *)
 
 type falsy = false | "" | 0

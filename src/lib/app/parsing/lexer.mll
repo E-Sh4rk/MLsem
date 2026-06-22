@@ -62,6 +62,7 @@ rule token = parse
 | "suggest"   { SUGGEST }
 | "abstract"  { ABSTRACT }
 | "#"     { HASHTAG }
+| "##"    { DEBUG }
 | "dyn"   { DYN }
 | "(*"    { comment 0 lexbuf }
 | "->"    { ARROW }
@@ -122,6 +123,8 @@ rule token = parse
 | "/"     { DIV   }
 | "<"     { LT }
 | ">"     { GT }
+| "<="    { LEQ }
+| ">="    { GEQ }
 | int as i { LINT (Z.of_string i) }
 | float as f { LFLOAT (float_of_string f) }
 | "true"  { LBOOL true }

@@ -87,14 +87,14 @@
 %}
 
 %token EOF
-%token FUN VAL LET MUT IN FST SND HD TL HASHTAG SUGGEST
+%token FUN VAL LET MUT IN FST SND HD TL HASHTAG DEBUG SUGGEST
 %token IF IS THEN ELSE WHILE DO BEGIN PLACEHOLDER_VAR RETURN BREAK CONTINUE
 %token LPAREN RPAREN IRPAREN EQUAL COMMA CONS COLON ASSIGN
 %token COERCE COERCE_STATIC COERCE_NOCHECK CAST_STATIC CAST_NOCHECK
 %token INTERROGATION_MARK EXCLAMATION_MARK
 %token ARROW AND OR AAND OOR NEG DIFF DYN
 %token TIMES PLUS MINUS DIV
-%token LBRACE RBRACE DOUBLEPOINT MATCH WITH END POINT LT GT
+%token LBRACE RBRACE DOUBLEPOINT MATCH WITH END POINT LT GT LEQ GEQ
 %token AND_KW OR_KW
 %token TYPE WHERE ABSTRACT
 %token LBRACKET RBRACKET SEMICOLON DOUBLESEMICOLON
@@ -146,10 +146,26 @@ element:
 | TYPE ts=separated_nonempty_list(AND_KW, param_type_def) { annot $symbolstartpos $endpos (Types ts) }
 | ABSTRACT TYPE name=ID params=abs_params { annot $symbolstartpos $endpos (AbsType (name, params)) }
 | HASHTAG cmd=ID EQUAL v=literal { annot $symbolstartpos $endpos (Command (cmd, v)) }
+| DEBUG d=dbg { annot $symbolstartpos $endpos (Debug d) }
 
 %inline abs_params:
   { 0 }
 | LPAREN vs=separated_nonempty_list(COMMA, TVAR) RPAREN { List.length vs }
+
+(* ===== DEBUG TERMS ===== *)
+
+dbg:
+| ty=typ { DTy ty }
+| c=comp { let (ty1, c, ty2) = c in DCmp (ty1, c, ty2) }
+| LBRACE cs=separated_nonempty_list(SEMICOLON, comp) RBRACE { DTally cs }
+
+%inline comp:
+| ty1=typ c=comp_op ty2=typ { (ty1, c, ty2) }
+
+comp_op:
+| EQUAL { EQ }
+| LEQ   { LEQ }
+| GEQ   { GEQ }
 
 (* ===== TERMS ===== *)
 
@@ -312,6 +328,8 @@ infix:
   | EQUAL {"="}
   | LT    {"<"}
   | GT    {">"}
+  | LEQ   {"<="}
+  | GEQ   {">="}
   | DOUBLEPOINT {".."}
   // | AND  {"&"}
   // | OR   {"|"}

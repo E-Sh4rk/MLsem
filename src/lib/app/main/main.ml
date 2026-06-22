@@ -104,7 +104,7 @@ let debug benv d =
   match d with
   | PAst.DTy ty ->
     let ty, benv = type_expr_to_typ benv ty in
-    let ty = Ty.simplify ty in
+    let ty = ty |> Ty.simplify |> Ty.normalize in
     let msg = Format.asprintf "@[<h>%a@]" Ty.pp ty in
     msg, benv
   | DTally cs ->
@@ -186,7 +186,7 @@ let treat (benv,varm,senv,env) (annot, elem) =
       let render ~declared (v, (ty,sigs)) = { var = v; ty; sigs; declared } in
       let tys = List.map (render ~declared:false) tys1 @ List.map (render ~declared:true) tys2 in
       (!benv,varm,senv,env), { res=TSuccess (tys,retrieve_time time) ; msg }
-    | PAst.Debug (pos, dbg) ->
+    | PAst.Debug dbg ->
       let msg, benv = debug benv dbg in
       let msg = [Mlsem_system.Analyzer.Message, pos, "Computation result", Some msg] in
       (benv,varm,senv,env), { res=TDone ; msg }

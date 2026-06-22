@@ -35,7 +35,7 @@ let top_instance (tvs,t) =
   mk tvs t
 let simplify (tvs,ty) = (tvs, GTy.simplify ty)
 let normalize (tvs,ty) = (tvs, GTy.normalize ty)
-let norm_and_simpl ts = ts |> normalize |> simplify
+let norm_and_simpl ts = ts |> simplify |> normalize
 let pp' s fmt (vs, ty) =
   if MVarSet.is_empty vs
   then Format.fprintf fmt "%a" (GTy.pp' s) ty
