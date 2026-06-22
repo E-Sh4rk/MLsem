@@ -10,16 +10,17 @@ type inferred = {
   sigs: Signature.t;
   declared: bool;
 }
-type treat_result =
-| TSuccess of inferred list * message list * float
+type result =
+| TSuccess of inferred list * float
 | TDone
 | TFailure of Variable.t option * Position.t * string * string option * float
+type output = { res:result ; msg:message list }
 
 type envs = Builder.benv * Variable.t NameMap.t * Signature.t VarMap.t * Env.t * PEnv.t
-val treat : envs -> 'a Position.located * PAst.element -> envs * treat_result
-val treat_sig : envs -> 'a Position.located * PAst.element -> envs * treat_result
-val treat_def : envs -> 'a Position.located * PAst.element -> envs * treat_result
-val treat_all_sigs : envs -> ('a Position.located * PAst.element) list -> envs * treat_result
+val treat : envs -> 'a Position.located * PAst.element -> envs * output
+val treat_sig : envs -> 'a Position.located * PAst.element -> envs * output
+val treat_def : envs -> 'a Position.located * PAst.element -> envs * output
+val treat_all_sigs : envs -> ('a Position.located * PAst.element) list -> envs * output
 
 val initial_envs : envs
 val initial_senv : Signature.t VarMap.t

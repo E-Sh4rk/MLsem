@@ -32,8 +32,8 @@ let json_of_msg (s, pos, title, descr) =
     `Assoc ([("severity", `String (severity_to_str s)) ; ("message", `String title) ;
     ("pos", json_of_pos pos)]@descr)
 
-let add_res envs res res' =
-  match res' with
+let add_res envs res out =
+  match out.res with
   | TDone -> res
   | TFailure (Some v, pos, msg, descr, time) ->
     let name = Variable.get_name v |> Option.get in
@@ -51,7 +51,7 @@ let add_res envs res res' =
       ("typeable", `Bool false) ; ("message", `String msg) ; ("pos", json_of_pos pos)]@descr)
     in
     untyp::res
-  | TSuccess (lst,msgs,time) ->
+  | TSuccess (lst,time) ->
     let res = ref res in
     lst |> List.iter (fun {var=v; ty; _} ->
       let name = Variable.get_name v |> Option.get in
@@ -60,7 +60,7 @@ let add_res envs res res' =
       let typ =
         `Assoc [("name", `String name) ; ("def_pos", json_of_pos def_pos) ;
         ("typeable", `Bool true) ; ("type", `String t) ; ("time", `Float time) ;
-        ("messages", `List (List.map json_of_msg msgs))]
+        ("messages", `List (List.map json_of_msg out.msg))]
       in
       res := typ::!res
     ) ;
@@ -81,9 +81,9 @@ let typecheck code callback =
       match parse (`String (Js.to_string code)) with
       | PSuccess program ->
         let envs = initial_envs in
-        let envs,res = treat_all_sigs envs program in
-        let ok = match res with | TFailure _ -> false | _ -> true in
-        let res = add_res envs [] res in
+        let envs,out = treat_all_sigs envs program in
+        let ok = match out.res with | TFailure _ -> false | _ -> true in
+        let res = add_res envs [] out in
         notify_res callback res ;
         let (_, res) =
           if ok then

@@ -17,20 +17,15 @@ let severity_to_str s =
     | Notice -> "Notice"
     | Message -> "Message"
 
-let treat_res (acc, res) =
-    match res with
-    | TSuccess (lst, msg, time) ->
+let treat_res (acc, output) =
+    let acc, res = match output.res with
+    | TSuccess (lst, time) ->
         lst |> List.iter (fun {var=v; ty; _} ->
             Format.printf "@{<blue;bold>%s@}: %s"
                 (Variable.get_name v |> Option.get) (display acc ty) ;
             if !notime |> not then
                 Format.printf " @{<italic;yellow>(checked in %.00fms)@}" time ;
             Format.printf "\n%!"
-        ) ;
-        msg |> List.iter (fun (s,pos,title,descr) ->
-            Format.printf "@{<italic;bold;cyan>[%s]@} @{<italic;cyan>%s@} @{<italic;cyan>%s@}\n%!"
-                (severity_to_str s) (Position.string_of_pos pos) title ;
-            descr |> Option.iter (Format.printf "@{<italic;cyan>%s@}\n%!") ;
         ) ;
         acc, true
     | TFailure (Some v, pos, msg, descr, time) ->
@@ -46,6 +41,13 @@ let treat_res (acc, res) =
         Format.printf "@{<red>%s@}\n%!" msg ;
         acc, false
     | TDone -> acc, true
+    in
+    output.msg |> List.iter (fun (s,pos,title,descr) ->
+        Format.printf "@{<italic;bold;cyan>[%s]@} @{<italic;cyan>%s@} @{<italic;cyan>%s@}\n%!"
+            (severity_to_str s) (Position.string_of_pos pos) title ;
+        descr |> Option.iter (Format.printf "@{<italic;cyan>%s@}\n%!") ;
+    ) ;
+    acc, res
 
 (* Command line *)
 let usage_msg = "mlsem [-record] [-notime] <file1> [<file2>] ..."

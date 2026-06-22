@@ -249,11 +249,17 @@ let to_expr benv env e =
     in
     let res = aux env e in res, !benv
 
+type op = LEQ | EQ | GEQ
+type debug =
+| DTy of TyExpr.t
+| DTally of (TyExpr.t * op * TyExpr.t) list
+| DCmp of TyExpr.t * op * TyExpr.t
 type element =
 | Definitions of (Position.t * (TyExpr.t, string) vdef * pexpr) list
 | SigDef of string * bool (* mutable *) * TyExpr.t
 | Types of (string * string list * TyExpr.t) list
 | AbsType of string * int
 | Command of string * Const.t
+| Debug of Position.t * debug
 
 type program = (annotation * element) list

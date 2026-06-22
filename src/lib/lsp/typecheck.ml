@@ -113,8 +113,8 @@ let add_message acc (sev, pos, title, descr) =
   in
   diagnostic ~severity:(severity_of sev) ~range ~message:(full_message title descr) () :: acc
 
-let add_result envs acc (res : treat_result) : result =
-  match res with
+let add_result envs acc (out : Main.output) : result =
+  match out.res with
   | TDone -> acc
   | TFailure (v_opt, pos, msg, descr, _time) ->
       let def_pos =
@@ -141,7 +141,7 @@ let add_result envs acc (res : treat_result) : result =
           ~message:(full_message msg descr) ()
       in
       {acc with lenses; diagnostics = diag :: acc.diagnostics}
-  | TSuccess (lst, msgs, _time) ->
+  | TSuccess (lst, _time) ->
       let lenses =
         List.fold_left
           (fun lenses (b : inferred) ->
@@ -165,7 +165,7 @@ let add_result envs acc (res : treat_result) : result =
                  :: lenses )
           acc.lenses lst
       in
-      let diagnostics = List.fold_left add_message acc.diagnostics msgs in
+      let diagnostics = List.fold_left add_message acc.diagnostics out.msg in
       (* Retain every genuinely-named binding (declared ones included, so a
          declared binding can be re-merged) for the custom merge requests. *)
       let bindings =
@@ -207,10 +207,10 @@ let run (source : string) : result =
           diagnostics = [diagnostic ~severity:LT.DiagnosticSeverity.Error ~range ~message:msg ()];
         }
     | PSuccess program ->
-        let envs, sigs_res = treat_all_sigs initial_envs program in
-        let acc = add_result envs empty sigs_res in
+        let envs, sigs_out = treat_all_sigs initial_envs program in
+        let acc = add_result envs empty sigs_out in
         let sigs_ok =
-          match sigs_res with
+          match sigs_out.res with
           | TFailure _ -> false
           | _ -> true
         in

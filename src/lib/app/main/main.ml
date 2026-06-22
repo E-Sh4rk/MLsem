@@ -101,10 +101,11 @@ type inferred = {
   sigs: Signature.t;
   declared: bool;
 }
-type treat_result =
-| TSuccess of inferred list * message list * float
+type result =
+| TSuccess of inferred list * float
 | TDone
 | TFailure of Variable.t option * Position.t * string * string option * float
+type output = { res:result ; msg:message list }
 
 let dummy = Variable.create (Some "_")
 let treat (benv,varm,senv,env) (annot, elem) =
@@ -145,7 +146,8 @@ let treat (benv,varm,senv,env) (annot, elem) =
       let senv = List.fold_left (fun senv (v,_) -> VarMap.remove v senv) senv tys2 in
       let render ~declared (v, (ty,sigs)) = { var = v; ty; sigs; declared } in
       let tys = List.map (render ~declared:false) tys1 @ List.map (render ~declared:true) tys2 in
-      (!benv,varm,senv,env), TSuccess (tys,msg,retrieve_time time)
+      (!benv,varm,senv,env), { res=TSuccess (tys,retrieve_time time) ; msg }
+    | PAst.Debug _ -> failwith "TODO"
     | PAst.SigDef (name, mut, ty) ->
       begin try
         let new_sig, benv = Signature.build benv ty in
@@ -162,9 +164,9 @@ let treat (benv,varm,senv,env) (annot, elem) =
         let ty = Signature.to_tyscheme sigs in
         let env = MVariable.replace_in_env var ty env in
         let senv = VarMap.add var sigs senv in
-        (benv,varm,senv,env), TDone
+        (benv,varm,senv,env), { res=TDone ; msg=[] }
       with Invalid_argument str -> (benv,varm,senv,env),
-        TFailure (None, pos, str, None, 0.0)
+        { res=TFailure (None, pos, str, None, 0.0) ; msg=[] }
       end
     | PAst.Command (str, c) ->
       begin match str, c with
@@ -187,18 +189,20 @@ let treat (benv,varm,senv,env) (annot, elem) =
         Config.subst_normalization_fun := Mlsem_system.Heuristics.normalize_abstract_factors
       | _ -> failwith ("Invalid command "^str)
       end ;
-      (benv,varm,senv,env), TDone
+      (benv,varm,senv,env), { res=TDone ; msg=[] }
     | PAst.Types lst ->
       let benv = define_aliases benv lst in
-      (benv,varm,senv,env), TDone
+      (benv,varm,senv,env), { res=TDone ; msg=[] }
     | PAst.AbsType (name, n) ->
       let benv = define_abstract benv name n in
-      (benv,varm,senv,env), TDone
+      (benv,varm,senv,env), { res=TDone ; msg=[] }
   with
-  | PAst.SymbolError msg -> (benv,varm,senv,env), TFailure (Some !v, pos, msg, None, 0.0)
-  | TypeDefinitionError msg -> (benv,varm,senv,env), TFailure (None, pos, msg, None, 0.0)
+  | PAst.SymbolError msg ->
+    (benv,varm,senv,env), { res=TFailure (Some !v, pos, msg, None, 0.0) ; msg=[] }
+  | TypeDefinitionError msg ->
+    (benv,varm,senv,env), { res=TFailure (None, pos, msg, None, 0.0) ; msg=[] }
   | AlreadyDefined v ->
-    (benv,varm,senv,env), TFailure (Some v, pos, "Symbol already defined.", None, 0.0)
+    (benv,varm,senv,env), { res=TFailure (Some v, pos, "Symbol already defined.", None, 0.0) ; msg=[] }
   | Untypeable (v', err) ->
     let v = match v' with None -> !v | Some v -> v in
     let pos =
@@ -206,16 +210,16 @@ let treat (benv,varm,senv,env) (annot, elem) =
       then Variable.get_location v
       else Eid.loc err.eid
     in
-    (benv,varm,senv,env), TFailure (Some v, pos, err.title, err.descr, retrieve_time time)
+    (benv,varm,senv,env), { res=TFailure (Some v, pos, err.title, err.descr, retrieve_time time) ; msg=[] }
   | IncompatibleType (var,_) ->
-    (benv,varm,senv,env), TFailure (Some var, Variable.get_location var,
+    (benv,varm,senv,env), { res=TFailure (Some var, Variable.get_location var,
       "the type inferred is not a subtype of the type specified", None,
-      retrieve_time time)
+      retrieve_time time); msg=[] }
   | UnresolvedType (var,ty) ->
-    (benv,varm,senv,env), TFailure (Some var, Variable.get_location var,
+    (benv,varm,senv,env), { res=TFailure (Some var, Variable.get_location var,
       "the type inferred is not fully resolved",
       Some (Format.asprintf "type inferred: @[<hov>%a@]" TyScheme.pp_short ty),
-      retrieve_time time)
+      retrieve_time time); msg=[] }
 
 let treat (benv,varm,senv,env,penv) e =
   (* TODO: optimize aliases by tracking dependencies *)
@@ -226,21 +230,23 @@ let treat_sig envs (annot,elem) =
   let open PAst in
   match elem with
   | Types _ | AbsType _ | SigDef _ -> treat envs (annot,elem)
-  | Command _ | Definitions _ -> envs, TDone
+  | Command _ | Debug _ | Definitions _ -> envs, { res=TDone ; msg=[] }
 let treat_def envs (annot,elem) =
   let open PAst in
   match elem with
-  | Types _ | AbsType _ | SigDef _ -> envs, TDone
-  | Command _ | Definitions _ -> treat envs (annot,elem)
+  | Types _ | AbsType _ | SigDef _ -> envs, { res=TDone ; msg=[] }
+  | Command _ | Debug _ | Definitions _ -> treat envs (annot,elem)
 let treat_all_sigs envs elts =
   let rec aux envs elts =
     match elts with
-    | [] -> envs, TDone
+    | [] -> envs, { res=TDone ; msg=[] }
     | e::elts ->
       begin match treat_sig envs e with
-      | (envs, TDone) -> aux envs elts
-      | (envs, (TFailure _ as f)) -> envs, f
-      | (_, TSuccess _) -> assert false
+      | (envs, { res=TDone ; msg } ) ->
+        let envs, out = aux envs elts in
+        envs, { res=out.res ; msg=msg@out.msg }
+      | (envs, { res=(TFailure _ as res) ; msg }) -> envs, { res ; msg }
+      | (_, { res=TSuccess _ ; _ } ) -> assert false
       end
   in
   aux envs elts
