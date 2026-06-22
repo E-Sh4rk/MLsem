@@ -54,6 +54,35 @@
         text-decoration: none;
         color: darkred;
     }
+
+    table {
+        margin-left: 2em;
+        border-collapse: collapse;
+        font-family: monospace;
+        font-size: 0.95rem;
+    }
+    table th {
+        background: #eef;
+        color: darkblue;
+        text-align: left;
+        padding: 0.3em 0.8em;
+        border: 1px solid #ccd;
+    }
+    table td {
+        padding: 0.3em 0.8em;
+        border: 1px solid #ccd;
+        vertical-align: top;
+    }
+    table tr:nth-child(even) td {
+        background: #f8f8ff;
+    }
+    table td:first-child {
+        color: darkblue;
+        font-weight: bold;
+    }
+    table td code {
+        white-space: normal;
+    }
 </style>
 
 <body>
@@ -115,10 +144,13 @@
             <li>a type signature for a mutable or immutable variable, composed of a simple identifier and the associated type.</li>
         </ul>
 
-        Note that top-level definitions are considered recursive. A definition may refer to an identifier
-        whose type signature is declared later. However, as top-level value definitions are typed sequentially,
-        mutually-recursive definitions that have no explicit type signatures must be
-        defined together using the <kbd>and</kbd> keyword.
+        <p>
+            Note that top-level definitions are considered recursive. A definition may refer to an identifier
+            whose type signature is declared later. However, as top-level value definitions are typed sequentially,
+            mutually-recursive definitions that have no explicit type signatures must be
+            defined together using the <kbd>and</kbd> keyword.
+        </p>
+        
         <h2>Identifiers</h2>
         <p>Identifiers come in several flavours :</p>
         <code>
@@ -294,6 +326,93 @@
             Some examples may not terminate in reasonable time or cause a stack
             overflow due to the relatively shallow recursion stack of web browsers.</li>
         </ul>
+    </div>
+    <div class="section">
+        <h1 id="commands">Commands</h1>
+        <h2 id="configuration">Configuration commands</h2>
+
+        <p>Configuration commands are top-level statements of the following syntax:</p>
+        <code>
+            <kbd>#</kbd><var>cmd</var> <kbd>=</kbd> <var>val</var>
+        </code>
+        
+        <table>
+            <tr>
+                <th>Command</th>
+                <th>Values</th>
+                <th>Default</th>
+                <th>Description</th>
+            </tr>
+            <tr>
+                <td>value_restriction</td>
+                <td><tt>true</tt> | <tt>false</tt></td>
+                <td><tt>true</tt></td>
+                <td>Enable or disable the value restriction for polymorphic generalization.</td>
+            </tr>
+            <tr>
+                <td>type_narrowing</td>
+                <td><tt>"partition"</tt> | <tt>"direct"</tt> | <tt>"yes"</tt> | <tt>"no"</tt></td>
+                <td><tt>"yes"</tt></td>
+                <td>Configure the type narrowing strategy used in pattern matching.
+                    <tt>"partition"</tt> uses partition-based narrowing,
+                    <tt>"direct"</tt> uses direct narrowing,
+                    <tt>"yes"</tt> enables both strategies,
+                    <tt>"no"</tt> disables narrowing.</td>
+            </tr>
+            <tr>
+                <td>allow_implicit_downcast</td>
+                <td><tt>true</tt> | <tt>false</tt></td>
+                <td><tt>true</tt></td>
+                <td>Enable or disable implicit downcasts of the dynamic part of inferred types when the declared type is more precise.</td>
+            </tr>
+            <tr>
+                <td>infer_overload</td>
+                <td><tt>true</tt> | <tt>false</tt></td>
+                <td><tt>true</tt></td>
+                <td>Enable or disable the inference of multiple overloads when typing type-cases.
+                    Even when <tt>false</tt>, the types inferred for functions may still be overloaded:
+                    this setting only affect type-cases (not applications).
+                </td>
+            </tr>
+            <tr>
+                <td>normalization</td>
+                <td><tt>"no_empty_param"</tt> | <tt>"no"</tt></td>
+                <td><tt>"no_empty_param"</tt></td>
+                <td>Configure the type normalization heuristic applied during inference.
+                    <tt>"no_empty_param"</tt> removes abstract types with empty parameters,
+                    <tt>"no"</tt> disables normalization.</td>
+            </tr>
+            <tr>
+                <td>subst_normalization</td>
+                <td><tt>"no_abstract_inter"</tt> | <tt>"no"</tt></td>
+                <td><tt>"no_abstract_inter"</tt></td>
+                <td>Configure the substitution normalization heuristic applied during tallying.
+                    <tt>"no_abstract_inter"</tt> removes abstract type intersections from substitution results,
+                    <tt>"no"</tt> disables substitution normalization.</td>
+            </tr>
+        </table>
+
+        <h2 id="debug">Debug commands</h2>
+        <p>Debug commands are top-level statements of the following syntax:</p>
+        <code>
+    <kbd>##</kbd> <var>t</var>
+    <kbd>##</kbd> <var>t</var> <var>op</var> <var>t</var>
+    <kbd>##</kbd> <kbd>{</kbd> <var>t</var> <var>op</var> <var>t</var> [<kbd>;</kbd> ...] <kbd>}</kbd>
+
+    <var>op</var> ::= <kbd>=</kbd> | <kbd>&lt;=</kbd> | <kbd>&gt;=</kbd>
+        </code>
+        <ul>
+            <li><tt><kbd>##</kbd> <var>t</var></tt> &mdash; prints the simplified and normalized form of type <var>t</var>.</li>
+            <li><tt><kbd>##</kbd> <var>t</var><sub>1</sub> <var>op</var> <var>t</var><sub>2</sub></tt> &mdash; prints whether the
+                subtype relation <var>t</var><sub>1</sub> <var>op</var> <var>t</var><sub>2</sub> holds,
+                where <kbd>=</kbd> tests equivalence, <kbd>&lt;=</kbd> tests subtyping, and <kbd>&gt;=</kbd> tests the converse.</li>
+            <li><tt><kbd>##</kbd> <kbd>{</kbd> <var>t</var><sub>1</sub> <var>op</var> <var>t</var><sub>2</sub> <kbd>;</kbd> ... <kbd>}</kbd></tt> &mdash;
+                runs the tallying algorithm on the given set of subtype constraints and prints all solutions.</li>
+        </ul>
+        <p>
+            Note that type variables that are allowed to be substituted (for a tallying or subtyping instance)
+            must start with an underscore (e.g. <kbd>{ '_a <= int | 'b }</kbd> allows substituting <kbd>'_a</kbd> but not <kbd>'b</kbd>).
+        </p>
     </div>
 </body>
 
