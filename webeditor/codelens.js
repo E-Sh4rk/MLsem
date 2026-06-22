@@ -42,6 +42,7 @@ function fullErrorMessage(res) {
 
 let codelensemitter = new monaco.Emitter();
 let typesinfo = [];
+let messages = [];
 function updatePos(arr, changes) {
     if (isDummyPos(arr["pos"])) arr["pos"] = null;
     if (arr["pos"] !== null) {
@@ -58,15 +59,12 @@ function updatePos(arr, changes) {
     }
 }
 function applyChangesToCurCodeLens(changes) {
+    for (let i = 0; i < messages.length; i++) {
+        updatePos(messages[i], changes);
+    }
     for (let i = 0; i < typesinfo.length; i++) {
         // Pos
         updatePos(typesinfo[i], changes);
-        if (typesinfo[i]["messages"]) {
-            for (let j = 0; j < typesinfo[i]["messages"].length; j++) {
-                updatePos(typesinfo[i]["messages"][j], changes);
-            }
-        }
-        else typesinfo[i]["messages"] = null;
         // Def_pos
         let startL = typesinfo[i]["def_pos"]["startOffset"];
         let endL = typesinfo[i]["def_pos"]["endOffset"];
@@ -81,8 +79,9 @@ function applyChangesToCurCodeLens(changes) {
         }
     }
 }
-function updateTypeInfo(model, types, changes) {
-    typesinfo = types;
+function updateTypeInfo(model, results, changes) {
+    typesinfo = results.filter(r => "typeable" in r);
+    messages = results.filter(r => !("typeable" in r));
     applyChangesToCurCodeLens(changes);
     codelensemitter.fire();
     validateMarkers(model);
@@ -129,11 +128,9 @@ function validateMarkers(model) {
         if (!info["typeable"]) {
             addMarker(info, monaco.MarkerSeverity.Error);
         }
-        if (info["messages"] !== null) {
-            for (let j = 0; j < info["messages"].length; j++) {
-                addMarker(info["messages"][j], monaco.MarkerSeverity.Hint);
-            }
-        }
+    });
+    messages.forEach((info) => {
+        addMarker(info, monaco.MarkerSeverity.Hint);
     });
     monaco.editor.setModelMarkers(model, "owner", markers);
 }

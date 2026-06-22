@@ -33,7 +33,7 @@ let json_of_msg (s, pos, title, descr) =
     ("pos", json_of_pos pos)]@descr)
 
 let add_res envs res out =
-  match out.res with
+  let res = match out.res with
   | TDone -> res
   | TFailure (Some v, pos, msg, descr, time) ->
     let name = Variable.get_name v |> Option.get in
@@ -59,12 +59,13 @@ let add_res envs res out =
       let t = display envs ty in
       let typ =
         `Assoc [("name", `String name) ; ("def_pos", json_of_pos def_pos) ;
-        ("typeable", `Bool true) ; ("type", `String t) ; ("time", `Float time) ;
-        ("messages", `List (List.map json_of_msg out.msg))]
+        ("typeable", `Bool true) ; ("type", `String t) ; ("time", `Float time)]
       in
       res := typ::!res
     ) ;
-  !res
+    !res
+  in
+  res@(List.map json_of_msg out.msg)
 
 let ok_answer res =
   `Assoc [("exit_code", `Int 0); ("results", `List (List.rev res))]
