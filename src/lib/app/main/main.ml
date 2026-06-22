@@ -94,6 +94,45 @@ let type_check_recs pos env lst =
     (var, (ty, Signature.of_tyscheme ty))
   ) lst, msg
 
+let poly_leq t1 t2 =
+  let mono = TVOp.all_vars KNoInfer in
+  if MVarSet.subset (TVOp.vars t1) mono && MVarSet.subset (TVOp.vars t2) mono then
+    Ty.leq t1 t2
+  else
+    TVOp.tally mono [ t1, t2 ] |> List.is_empty |> not
+let debug benv d =
+  match d with
+  | PAst.DTy ty ->
+    let ty, benv = type_expr_to_typ benv ty in
+    let ty = Ty.simplify ty in
+    let msg = Format.asprintf "@[<h>%a@]" Ty.pp ty in
+    msg, benv
+  | DTally cs ->
+    let build_constraint (benv,acc) (t1,op,t2) =
+      let t1, benv = type_expr_to_typ benv t1 in
+      let t2, benv = type_expr_to_typ benv t2 in
+      let acc = match op with
+      | PAst.LEQ -> (t1,t2)::acc
+      | GEQ -> (t2,t1)::acc
+      | EQ -> (t1,t2)::(t2,t1)::acc
+      in
+      benv,acc
+    in
+    let benv, cs = List.fold_left build_constraint (benv,[]) cs in
+    let res = TVOp.tally (TVOp.all_vars KNoInfer) cs in
+    let msg = Format.asprintf "@[<v>%a@]" (Format.pp_print_list Subst.pp_full) res in
+    msg, benv
+  | DCmp (t1, op, t2) ->
+    let t1, benv = type_expr_to_typ benv t1 in
+    let t2, benv = type_expr_to_typ benv t2 in
+    let res = match op with
+    | LEQ -> poly_leq t1 t2
+    | GEQ -> poly_leq t2 t1
+    | EQ -> poly_leq t1 t2 && poly_leq t2 t1
+    in
+    let msg = Format.asprintf "%b" res in
+    msg, benv
+
 type message = Mlsem_system.Analyzer.severity * Position.t * string * string option
 type inferred = {
   var: Variable.t;
@@ -147,7 +186,10 @@ let treat (benv,varm,senv,env) (annot, elem) =
       let render ~declared (v, (ty,sigs)) = { var = v; ty; sigs; declared } in
       let tys = List.map (render ~declared:false) tys1 @ List.map (render ~declared:true) tys2 in
       (!benv,varm,senv,env), { res=TSuccess (tys,retrieve_time time) ; msg }
-    | PAst.Debug _ -> failwith "TODO"
+    | PAst.Debug (pos, dbg) ->
+      let msg, benv = debug benv dbg in
+      let msg = [Mlsem_system.Analyzer.Message, pos, "Computation result", Some msg] in
+      (benv,varm,senv,env), { res=TDone ; msg }
     | PAst.SigDef (name, mut, ty) ->
       begin try
         let new_sig, benv = Signature.build benv ty in
