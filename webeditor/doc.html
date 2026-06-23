@@ -89,8 +89,9 @@
     <div class="section">
         <h1>Documentation for MLsem</h1>
         <a href="#usage">Basic usage</a><br/>
-        <a href="#syntax">Syntax of the language</a><br/>
-        <a href="#caveat">Caveat</a>
+        <a href="#syntax">Syntax</a><br/>
+        <a href="#caveat">Caveat</a><br/>
+        <a href="#commands">Commands</a>
     </div>
     <div class="section">
         <h1 id="usage" >Basic usage</h1>
@@ -333,7 +334,7 @@
 
         <p>Configuration commands are top-level statements of the following syntax:</p>
         <code>
-            <kbd>#</kbd><var>cmd</var> <kbd>=</kbd> <var>val</var>
+    <kbd>#</kbd><var>cmd</var> <kbd>=</kbd> <var>val</var>
         </code>
         
         <table>
@@ -371,7 +372,7 @@
                 <td><tt>true</tt></td>
                 <td>Enable or disable the inference of multiple overloads when typing type-cases.
                     Even when <tt>false</tt>, the types inferred for functions may still be overloaded:
-                    this setting only affect type-cases (not applications).
+                    this setting only affects type-cases (not applications).
                 </td>
             </tr>
             <tr>
@@ -402,7 +403,7 @@
     <var>op</var> ::= <kbd>=</kbd> | <kbd>&lt;=</kbd> | <kbd>&gt;=</kbd>
         </code>
         <ul>
-            <li><tt><kbd>##</kbd> <var>t</var></tt> &mdash; prints the simplified and normalized form of type <var>t</var>.</li>
+            <li><tt><kbd>##</kbd> <var>t</var></tt> &mdash; prints the simplified form of type <var>t</var>.</li>
             <li><tt><kbd>##</kbd> <var>t</var><sub>1</sub> <var>op</var> <var>t</var><sub>2</sub></tt> &mdash; prints whether the
                 subtype relation <var>t</var><sub>1</sub> <var>op</var> <var>t</var><sub>2</sub> holds,
                 where <kbd>=</kbd> tests equivalence, <kbd>&lt;=</kbd> tests subtyping, and <kbd>&gt;=</kbd> tests the converse.</li>
