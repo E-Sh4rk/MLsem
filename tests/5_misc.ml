@@ -55,7 +55,7 @@ let record_ab ({ a ; b }) = { a ; b }
 
 ## 42 <= int
 ## [ int* bool int* ] & [ bool* int* bool* ]
-## { T('_a) = T(42) | T('b) }
+## { { a: T('_a) ;; `_c } = { a: T(bool) | T('b) ; b: int ;; `d } }
 
 (* ========= POLYMORPHISM ======== *)
 

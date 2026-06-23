@@ -288,9 +288,10 @@ record_ab: ∀'a,'b. { a : 'b ; b : 'a } -> { a : 'b ; b : 'a }
 true
 [Message] File "tests/5_misc.ml", line 57, characters 0-44 Computation result
 [ bool int* | int int* bool ]
-[Message] File "tests/5_misc.ml", line 58, characters 0-29 Computation result
+[Message] File "tests/5_misc.ml", line 58, characters 0-67 Computation result
 [
-  '_a: 42 | 'b
+  '_a: bool | 'b ;
+  `_c: { a : `_c ; b : int ;; `d }
 ]
 test: ∀'a,'b. ('b & 'a, any) -> ('a, 'b & 'a)
 and_js: ∀'a,'b. ('a & falsy -> any -> 'a & falsy) & ('a & truthy -> 'b -> 'b)
