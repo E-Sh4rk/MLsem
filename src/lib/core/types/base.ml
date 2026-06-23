@@ -125,10 +125,10 @@ module PEnv = struct
         | o -> o
       in
       if List.is_empty t.defs then
-        let d = t.main |> Sstt.Printer.map_descr rename_vars in
+        let d = t.main |> Sstt.Printer.map_descr rename_vars (fun fd -> fd.fop) in
         PrinterCfg.print_descr_ctx prio Sstt.Prec.NoAssoc fmt d
       else
-        let t = t |> Sstt.Printer.map rename_vars in
+        let t = t |> Sstt.Printer.map rename_vars (fun fd -> fd.fop) in
         Format.fprintf fmt "(%a)" PrinterCfg.print t
     in
     let str = Format.asprintf "@[<h>%s(%a)@]" name (Sstt.Prec.print_seq pp_param sep) ps in
