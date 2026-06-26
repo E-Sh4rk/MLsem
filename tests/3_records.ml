@@ -71,10 +71,10 @@ let test_merge2 x =
 (* ===== R language encodings ===== *)
 
 (* Encoding of arguments: typing lapply *)
-val mean: { p1: [(int|Na)*] ; na_rm: true } | { p1: [int*] ; na_rm: false? } -> [int*]
-val lapply : { p1:['a*] ; p2: { p1:'a ; p2:empty? ;; `r } -> 'b ;; `r } -> ['b*]
+val mean: { x: [(int|Na)*] ; na_rm: true } | { x: [int*] ; na_rm: false? } -> [int*]
+val lapply : { x:['a*] ; y: { x:'a ; y:empty? ;; `r } -> 'b ;; `r } -> ['b*]
 let test_lapply =
-  lapply { p1=[[1;2;3;4;5;6;7;8;9;10];[1;Na]] ; p2=mean ; na_rm=true }
+  lapply { x=[[1;2;3;4;5;6;7;8;9;10];[1;Na]] ; y=mean ; na_rm=true }
 
 (* Encoding of lists *)
 val set_b : { b:any? ;; `r } -> 'a -> { b:'a ;; `r }

@@ -204,7 +204,7 @@ l2 : empty? ;; `a & 'c? }, 'c)
 fun2_with_ellipsis_test: 1, 2, { l3 : 3 ; l4 : 4 ; l5 : 5 }, (3..5)
 test_mix: { l1 : 42? ; l2 : 33 | true ; l4 : false? }
 test_merge: { l1 : 42 ; l2 : 33 | true ; l4 : false }
-test_merge2: ∀'a,'b,'c. { y : (42 | 'b)? ; z : (73 | 'c)? ; x : 'a ..} -> ('a, 42 | 'b,
+test_merge2: ∀'a,'b,'c. { x : 'a ; y : (42 | 'b)? ; z : (73 | 'c)? ..} -> ('a, 42 | 'b,
 73 | 'c)
 test_lapply: [ [ int* ]* ]
 test_r_lists: { a : (1..3) ; c : (1..3) ; b : (1..3) ;; (1..3)? }
