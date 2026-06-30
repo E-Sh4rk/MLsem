@@ -334,11 +334,13 @@ and pp_e fmt e = match e with
     Format.fprintf fmt "@[<hov 1>(%a)@]"
       (Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt "@ &@ ")
         (pp_prio 81)) es
-  | Constructor (Normalize, [e]) ->
-    Format.fprintf fmt "@[normalize(%a)@]" (pp_prio 0) e
   | Constructor (Ternary ty, [cond; e1; e2]) ->
     Format.fprintf fmt "@[<hov 2>ternary(%a,@ %a,@ %a,@ %a)@]"
       Ty.pp ty (pp_prio 0) cond (pp_prio 0) e1 (pp_prio 0) e2
+  | Constructor (Normalize, [e]) ->
+    Format.fprintf fmt "@[normalize(%a)@]" (pp_prio 0) e
+  | Constructor (Voidify _, [e]) ->
+    Format.fprintf fmt "@[void(%a)@]" (pp_prio 0) e
   | Constructor (CCustom { cname; _ }, es) ->
     Format.fprintf fmt "@[%s(%a)@]" cname
       (Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt ",@ ")
