@@ -5,7 +5,7 @@ module SA = Mlsem_system.Ast
 type e =
 | Hole of int
 | Exc | Void | Voidify of t
-| Value of GTy.t
+| Value of TyScheme.t
 | Var of Variable.t
 | Constructor of SA.constructor * t list
 | Lambda of Ty.t list * SA.param_annot * Variable.t * t
@@ -116,8 +116,8 @@ let rename_fv v v' =
 let to_system_ast t =
   let rec aux (id, e) =
     let e = match e with
-    | Exc -> SA.Value (GTy.mk Ty.empty)
-    | Void -> SA.Value (GTy.mk !Config.void_ty)
+    | Exc -> SA.Value (GTy.empty |> TyScheme.mk_mono)
+    | Void -> SA.Value (GTy.mk !Config.void_ty |> TyScheme.mk_mono)
     | Voidify e -> SA.Constructor (SA.Voidify !Config.void_ty, [aux e])
     | Value t -> SA.Value t
     | Var v ->
@@ -146,7 +146,7 @@ let to_system_ast t =
     | Operation (o, e) -> SA.Operation (o, aux e)
     | Projection (p, e) -> SA.Projection (p, aux e)
     | Declare (x, e) when MVariable.is_mutable x ->
-      let arg = Eid.unique (), SA.Value (Ty.unit |> GTy.mk) in
+      let arg = Eid.unique (), SA.Value (Ty.unit |> GTy.mk |> TyScheme.mk_mono) in
       let op = { SA.oname="ref_uninit" ; ofun=MVariable.ref_uninit x ; ogen=false } in
       let def = Eid.unique (), SA.Operation (OCustom op, arg) in
       SA.Let ([], x, def, aux e)

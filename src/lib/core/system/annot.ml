@@ -14,7 +14,7 @@ module Annot = struct
   | AConstruct of t list
   | ALet of t * part
   | AApp of t * t * Ty.t (* result *)
-  | AOp of Subst.t * t * Ty.t (* result *)
+  | AOp of GTy.t * t * Ty.t (* result *)
   | AProj of t
   | ACast of GTy.t * t
   | ACoerce of GTy.t * t
@@ -28,15 +28,14 @@ module Annot = struct
   [@@deriving show]
 
   let substitute s t =
-    let comp s' = Subst.compose_restr s s' in
     let rec aux t =
       let ann = match t.ann with
       | AValue t -> AValue (GTy.substitute s t)
-      | AVar s' -> AVar (comp s')
+      | AVar s' -> AVar (Subst.compose_restr s s')
       | AConstruct ts -> AConstruct (List.map aux ts)
       | ALet (t, ps) -> ALet (aux t, List.map (fun (ty, t) -> Subst.apply s ty, Option.map aux t) ps)
       | AApp (t1, t2, ty) -> AApp (aux t1, aux t2, Subst.apply s ty)
-      | AOp (s', t, ty) -> AOp (comp s', aux t, Subst.apply s ty)
+      | AOp (gty, t, ty) -> AOp (GTy.substitute s gty, aux t, Subst.apply s ty)
       | AProj t -> AProj (aux t)
       | ACast (ty, t) -> ACast (GTy.substitute s ty, aux t)
       | ACoerce (ty, t) -> ACoerce (GTy.substitute s ty, aux t)
@@ -78,7 +77,7 @@ module rec IAnnot : sig
   | AConstruct of t list
   | ALet of t * part
   | AApp of t * t * Ty.t (* result *)
-  | AOp of (MVarSet.t -> Subst.t) * t * Ty.t (* result *)
+  | AOp of GTy.t * t * Ty.t (* result *)
   | AProj of t * Ty.t (* result *)
   | ACast of GTy.t * t
   | ACoerce of GTy.t * t
@@ -115,7 +114,7 @@ end = struct
   | AConstruct of t list
   | ALet of t * part
   | AApp of t * t * Ty.t (* result *)
-  | AOp of (MVarSet.t -> Subst.t) * t * Ty.t (* result *)
+  | AOp of GTy.t * t * Ty.t (* result *)
   | AProj of t * Ty.t (* result *)
   | ACast of GTy.t * t
   | ACoerce of GTy.t * t
@@ -139,7 +138,7 @@ end = struct
       | ALet (t, ps) ->
         ALet (aux t, List.map (fun (ty, t) -> Subst.apply s ty, Option.map (LazyIAnnot.substitute s) t) ps)
       | AApp (t1, t2, ty) -> AApp (aux t1, aux t2, Subst.apply s ty)
-      | AOp (f, t, ty) -> AOp (f, aux t, Subst.apply s ty)
+      | AOp (gty, t, ty) -> AOp (GTy.substitute s gty, aux t, Subst.apply s ty)
       | AProj (t, ty) -> AProj (aux t, Subst.apply s ty)
       | ACast (ty, t) -> ACast (GTy.substitute s ty, aux t)
       | ACoerce (ty, t) -> ACoerce (GTy.substitute s ty, aux t)

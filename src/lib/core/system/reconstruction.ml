@@ -22,6 +22,7 @@ let initial ?(direct_narrowing=true) ?(partition_narrowing=true) refinements e =
     | None -> TVar.mk KInfer (Variable.get_name v) |> TVar.typ |> GTy.mk
     | Some ty -> ty
   in
+  let new_ts ts = TyScheme.get_fresh ts |> snd in
   let r =
     if partition_narrowing
     then Refinement.Partitioner.from_refinements refinements
@@ -32,7 +33,7 @@ let initial ?(direct_narrowing=true) ?(partition_narrowing=true) refinements e =
     let left ann = Either.left ann in
     let right ann = Either.right (Rid.create (), ann) in
     let ann = match e with
-    | Value ty -> Annot.AValue ty |> left
+    | Value ty -> Annot.AValue (new_ts ty) |> left
     | Var _ -> AVar (new_renaming ()) |> right
     | Constructor (_,es) -> AConstruct (List.map (initial r) es) |> right
     | Lambda (dom, v, e) -> ALambda (new_param v dom, initial r e) |> right
@@ -41,7 +42,9 @@ let initial ?(direct_narrowing=true) ?(partition_narrowing=true) refinements e =
     | Ite (e, tau, e1, e2) ->
       AIte (initial r e, tau, BMaybe (initial r e1), BMaybe (initial r e2)) |> right
     | App (e1, e2) -> AApp (initial r e1, initial r e2, new_result ()) |> right
-    | Operation (_, e) -> AOp (new_renaming (), initial r e, new_result ()) |> right
+    | Operation (o, e) ->
+      let t1 = Ast.fun_of_operation o |> new_ts in
+      AOp (t1, initial r e, new_result ()) |> right
     | Projection (_, e) -> AProj (initial r e, new_result ()) |> right
     | TypeCast (e, ty, _) -> ACast (ty, initial r e) |> right
     | TypeCoerce (e, ty, _) -> ACoerce (ty, initial r e) |> right
@@ -324,15 +327,12 @@ and refine_ann r cache env (rid, annot) (id, e) =
       Subst (with_res ss, ac (Annot.AApp(a1,a2,res)), ic Untyp, REnv.empty)
     | _ -> assert false
     end
-  | Operation (o,e'), AOp (f,annot',res) ->
+  | Operation (_,e'), AOp (t,annot',res) ->
     begin match refine' cache env annot' e' with
     | Ok (annot', t') ->
-      let tvs, t = Ast.fun_of_operation o |> TyScheme.get in
-      let s = f tvs in
-      let t = GTy.substitute s t in
       let ss = app res t t' in
-      Subst (with_res ss, ac (Annot.AOp(s,annot',res)), ic Untyp, REnv.empty)
-    | Subst (ss,a,a',r) -> Subst (ss,AOp (f,a,res)|>ic,AOp (f,a',res)|>ic,r)
+      Subst (with_res ss, ac (Annot.AOp(t,annot',res)), ic Untyp, REnv.empty)
+    | Subst (ss,a,a',r) -> Subst (ss,AOp (t,a,res)|>ic,AOp (t,a',res)|>ic,r)
     | Fail -> Fail
     end
   | Projection (p,e'), AProj (annot',res) ->

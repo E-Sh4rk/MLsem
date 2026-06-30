@@ -111,8 +111,7 @@ let rec typeof' env annot (id,e) =
     let t1 = typeof env annot1 e1 in
     let t2 = typeof env annot2 e2 in
     app t1 t2 res
-  | Operation (o, e), AOp (s, annot, res) ->
-    let t1 = fun_of_operation o |> subst_ts s in
+  | Operation (_, e), AOp (t1, annot, res) ->
     let t2 = typeof env annot e in
     app t1 t2 res
   | Projection (p, e), AProj annot ->

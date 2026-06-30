@@ -18,7 +18,7 @@ type operation =
 | OCustom of ocustom
 type param_annot = GTy.t option
 type e =
-| Value of GTy.t
+| Value of TyScheme.t
 | Var of Variable.t
 | Constructor of constructor * t list
 | Lambda of param_annot * Variable.t * t

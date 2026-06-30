@@ -26,7 +26,7 @@ end
 
 let rec typeof env (_,e) =
   match e with
-  | Value gty -> gty
+  | Value ts -> ts |> TyScheme.get_fresh |> snd
   | Var v when Env.mem v env -> Env.find v env |> TyScheme.get_fresh |> snd
   | Var _ -> GTy.any
   | Constructor (v, es) -> GTy.mapl (Ast.construct v) (List.map (typeof env) es)
@@ -74,12 +74,11 @@ let sufficient_refinements env e t =
       Ast.domains_of_construct c t |> List.concat_map
         (fun ts -> List.map2 (fun e t -> aux env e t) es ts |> combine')
     | TypeCoerce (_, s, _) when Ty.leq (GTy.ub s) t -> [REnv.empty]
-    | Value s when Ty.leq (GTy.ub s) t -> [REnv.empty]
+    | Value s when Ty.leq (TyScheme.get_fresh s |> snd |> GTy.ub) t -> [REnv.empty]
     | Value _ | TypeCoerce _ -> []
     | Projection (p, e) -> aux env e (Ast.domain_of_proj p t)
     | TypeCast (e, _, _) -> aux env e t
-    | App (e1, e2) ->
-      app (typeof env e1 |> TyScheme.mk_poly_except (Env.tvars env)) e2
+    | App (e1, e2) -> app (typeof_def env e1) e2
     | Operation (o, e) -> app (Ast.fun_of_operation o) e
     | Ite (e, s, e1, e2) ->
       let r1 = combine (aux env e (GTy.ub s)) (aux env e1 t) in

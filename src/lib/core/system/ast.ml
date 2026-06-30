@@ -26,7 +26,7 @@ type operation =
 type param_annot = GTy.t option
 [@@deriving show]
 type e =
-| Value of GTy.t
+| Value of TyScheme.t
 | Var of Variable.t
 | Constructor of constructor * t list
 | Lambda of param_annot * Variable.t * t
@@ -107,7 +107,7 @@ let vars e = VarSet.union (uv e) (bv e)
 let apply_subst s e =
   let aux (id,e) =
     let e = match e with
-    | Value t -> Value (GTy.substitute s t)
+    | Value t -> Value (TyScheme.substitute s t)
     | Lambda (ty,v,e) -> Lambda (Option.map (GTy.substitute s) ty,v,e)
     | LambdaRec lst -> LambdaRec (List.map (fun (ty,v,e) -> (Option.map (GTy.substitute s) ty, v, e)) lst)
     | Let (ts, v, e1, e2) -> Let (List.map (Subst.apply s) ts, v, e1, e2)
@@ -307,7 +307,7 @@ and pp_param fmt (v,annot) =
   | Some dom -> Format.fprintf fmt "(%a :@ %a)" Variable.pp_uniq v GTy.pp dom
 
 and pp_e fmt e = match e with
-  | Value gty -> Format.fprintf fmt "@[<hov><%a>@]" GTy.pp gty
+  | Value ts -> Format.fprintf fmt "@[<hov><%a>@]" TyScheme.pp ts
   | Var v -> Variable.pp_uniq fmt v
   | Constructor (Tuple _, []) -> Format.pp_print_string fmt "()"
   | Constructor (Tuple _, es) ->
