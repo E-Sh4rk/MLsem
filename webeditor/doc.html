@@ -162,6 +162,8 @@
     <var>cid</var> ::= <s>[A-Z][a-zA-Z0-9_']*</s>
 
     <var>tvar</var> ::= <s>'[a-zA-Z][a-zA-Z0-9_]*</s>
+
+    <var>rvar</var> ::= <s>`[a-zA-Z][a-zA-Z0-9_]*</s>
                 </code>
         <ul>
             <li>value identifiers can be either variable names (starting with a lowercase)
@@ -169,6 +171,9 @@
             <li>constructor identifiers start with an uppercase.</li>
             <li>variable and type identifiers are variable names</li>
             <li>type variables start with a single quote <tt><kbd>'</kbd></tt> character
+            </li>
+            <li>row variables start with a backquote <tt><kbd>`</kbd></tt> character. They are
+                only used in <a href="#type">record types</a> to support row polymorphism.
             </li>
         </ul>
         <h2 id="type">Type expressions</h2>
@@ -178,12 +183,22 @@
         | <var>t</var> <kbd>,</kbd>...<kbd>,</kbd> <var>t</var>
         | <var>t</var> <kbd>::</kbd> <var>t</var>
         | <kbd>[</kbd> <var>tregex</var> <kbd>]</kbd>
-        | <kbd>{</kbd> <var>id</var> <kbd>:</kbd> <var>t</var> [<kbd>?</kbd>] <kbd>;</kbd>...<kbd>;</kbd> <var>id</var> <kbd>:</kbd> <var>t</var> [<kbd>?</kbd>] [<kbd>..</kbd>]<kbd>}</kbd>
+        | <kbd>{</kbd> <var>id</var> <kbd>:</kbd> <var>f</var> <kbd>;</kbd>...<kbd>;</kbd> <var>id</var> <kbd>:</kbd> <var>f</var> <var>row_tail</var> <kbd>}</kbd>
         | <var>t</var> <kbd>|</kbd> <var>t</var>
         | <var>t</var> <kbd>&</kbd> <var>t</var>
         | <var>t</var> <kbd>\</kbd> <var>t</var>
         | <kbd>~</kbd> <var>t</var>
         | <var>t</var> <kbd>where</kbd> <var>id</var> <var>tvar</var>* <kbd>=</kbd> <var>t</var> [<kbd>and</kbd> ...]
+
+    <var>row_tail</var> ::= ε
+             | <kbd>..</kbd>
+             | <kbd>;;</kbd> <var>f</var>
+
+    <var>f</var> ::= <var>t</var> [<kbd>?</kbd>]
+        | <var>rvar</var>
+        | <var>f</var> <kbd>|</kbd> <var>f</var>
+        | <var>f</var> <kbd>&</kbd> <var>f</var>
+        | <kbd>~</kbd> <var>f</var>
 
     <var>simple_type</var> ::= <var>b</var>
                 | <kbd>dyn</kbd>
@@ -207,13 +222,24 @@
     <code>
      t where t = 'a::t | s and s = [] | (bool | int)::[]
     </code>
-        <p> Record types are given by the list of their fields, that is labels associated with a type.
-            A label may be absent (denoted by <tt><kbd>:?</kbd></tt>). Open record types end their field list with
-            <tt><kbd>..</kbd></tt>.
-            Polymorphic types can be instantiated by giving a list of type parameters.
+        <p>
+            Parametric types can be instantiated by giving a list of type parameters.
             Basic types consists of <a href="#literals">literals</a> (which denote their own singleton type),
             augmented with integer interval types, and set of builtin type identifiers.
         </p>
+        <p> Record types are given by the list of their fields, that is labels associated with a field
+            type <var>f</var> (a Boolean combination of row variables and types, optionally marked with <tt><kbd>?</kbd></tt> to allow the field to
+            be absent). The tail of the field list constrains the unlisted fields:
+        </p>
+        <ul>
+            <li>by default (no tail given), the record type is <i>closed</i>: unlisted fields must be absent;</li>
+            <li>ending the field list with <tt><kbd>..</kbd></tt> makes the record type <i>open</i>:
+                unlisted fields are unconstrained;</li>
+            <li>more generally, an explicit tail <var>f</var> can be given after <tt><kbd>;;</kbd></tt>,
+                possibly involving a <var>rvar</var> &mdash; see the
+                <a href="https://github.com/E-Sh4rk/sstt/blob/main/manual/ROWPOLY.md">SSTT manual</a>
+                for a full account of row polymorphism.</li>
+        </ul>
         <p>Some meta type operators (given below) can be used inside type expressions,
             even though they are not type constructors. To be computed, these type operators must inspect
             the top-level structure of the type on which they are applied:
@@ -222,7 +248,7 @@
         </p>
     <code>
     <var>t</var> ::= ...
-        | <kbd>{</kbd> <var>t</var> <kbd>with</kbd> <var>id</var> <kbd>:</kbd> <var>t</var> [<kbd>?</kbd>] <kbd>;</kbd>...<kbd>;</kbd> <var>id</var> <kbd>:</kbd> <var>t</var> [<kbd>?</kbd>] <kbd>}</kbd>
+        | <kbd>{</kbd> <var>t</var> <kbd>with</kbd> <var>id</var> <kbd>:</kbd> <var>f</var> <kbd>;</kbd>...<kbd>;</kbd> <var>id</var> <kbd>:</kbd> <var>f</var> <kbd>}</kbd>
         | <var>t</var><kbd>.</kbd><var>id</var>
         | <var>t</var><kbd>.</kbd><var>cid</var>
     </code>
@@ -421,8 +447,9 @@
                 runs the tallying algorithm on the given set of subtype constraints and prints all solutions.</li>
         </ul>
         <p>
-            Note that type variables that are allowed to be substituted (for a tallying or subtyping instance)
-            must start with an underscore (e.g. <kbd>{ '_a <= int | 'b }</kbd> allows substituting <kbd>'_a</kbd> but not <kbd>'b</kbd>).
+            Note that type and row variables that are allowed to be substituted (for a tallying or subtyping instance)
+            must start with an underscore (e.g. <kbd>{ '_a <= int | 'b }</kbd> allows substituting <kbd>'_a</kbd> but not <kbd>'b</kbd>,
+            and similarly <kbd>`_r</kbd> is substitutable while <kbd>`r</kbd> is not).
         </p>
     </div>
 </body>
