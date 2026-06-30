@@ -183,23 +183,6 @@ let partition dom ts =
 module Partitioner = struct
   type t = REnv.t list
 
-  (* let isolate_tuple_comp (n,lst) =
-    lst |>
-    List.filter (function [] -> false | _ -> true) |>
-    List.map (fun atom -> n, [atom])
-  let isolate_tuple_conjuncts t =
-    let (comps, _) = Tuple.decompose t in
-    let comps = comps |> List.concat_map (fun cp -> isolate_tuple_comp cp) in
-    let comps = comps |> List.map (fun cp -> Tuple.recompose ([cp], false)) in
-    comps
-  let isolate_record_conjuncts t =
-    Record.dnf' t |>
-    List.filter (function [], _ -> false | _, _ -> true) |>
-    List.map (fun atom -> Record.of_dnf' [atom])
-  let isolate_conjuncts t =
-    (* Necessary because of pattern matching encoding for uncurrified functions *)
-    t::(isolate_tuple_conjuncts t)@(isolate_record_conjuncts t) *)
-
   let from_refinements rs = Refinements.all rs
   let filter_compatible lst v ty =
     lst |> List.filter (fun renv ->
@@ -207,12 +190,10 @@ module Partitioner = struct
       (Ty.disjoint ty (REnv.find v renv) |> not)
     )
   let decomposition_for t v initial =
-    let initial = if List.is_empty initial then [Ty.any] else initial in
     let tys = t |> List.filter_map (fun renv -> REnv.find_opt v renv) in
-    let part_for_dom dom =
-      tys |> partition dom (*|> List.concat_map isolate_conjuncts |> partition dom*)
-    in
-    List.concat_map part_for_dom initial
+    let part_for_dom dom = tys |> partition dom in
+    let parts = List.concat_map part_for_dom initial in
+    if List.is_empty parts then [Ty.any] else parts
     (* |> (fun tys -> Format.printf "Partition for %a: %a@." Variable.pp v
       (Utils.pp_list Ty.pp) tys ; tys) *)
 end

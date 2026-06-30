@@ -84,7 +84,7 @@ land: (true -> true -> true) & (~true -> any -> false) & (any -> ~true -> false)
 lor: (~true -> ~true -> false) & (any -> true -> true) & (true -> any -> true)
 lnot: (~true -> true) & (true -> false)
 tautology: any -> any -> true
-tautology_ann: any -> any -> true
+tautology_ann: any -> any -> bool
 test_many_params_ann1: any -> any -> any -> any -> any -> any -> false | (int, bool, int, bool, int,
 bool)
 test_many_params_ann2: ∀'a,'b,'c,'d,'e,'f. 'f -> 'e -> 'd -> 'c -> 'b -> 'a -> false | ('f & int,
@@ -212,7 +212,7 @@ test_classes: { data_frame : true ;; false }
 test_class_ok: { c1 : true ;; false }
 test_class_fail: untypeable application
 File "tests/3_records.ml", line 110, characters 22-45
-function: 'I2249 & { c1 : true ;; false } -> 'I2249
+function: 'I2264 & { c1 : true ;; false } -> 'I2264
 argument: { c1 : true ;; bool }
 test_class_ok2: { c1 : true ; c2 : true ;; bool }
 
@@ -220,7 +220,7 @@ test_class_ok2: { c1 : true ; c2 : true ;; bool }
 ref_42: ref(int)
 ref_42_unresolved: the type inferred is not fully resolved
 File "tests/4_imperative.ml", line 24, characters 4-30
-type inferred: ref(42 | 'I2286)
+type inferred: ref(42 | 'I2301)
 mutate_ref: ∀'a. 42 | 'a -> 42 | 'a
 is_ref: (ref -> true) & (~ref -> false)
 is_not_ref: (~ref -> true) & (ref -> false)
@@ -253,7 +253,7 @@ order: Nil | (Nil | int, Nil | int) -> Nil | int | (int, int)
 loop_tricky_narrowing: int -> (any, int)
 loop_invalid: untypeable application
 File "tests/4_imperative.ml", line 174, characters 4-14
-function: (ref('I2659), 'I2659) -> ()
+function: (ref('I2667), 'I2667) -> ()
 argument: ref(int), false
 loop_valid: ∀'a. ('a \ int -> 'a \ int) & (false | 'a -> false | 'a)
 filter_imp: ∀'a,'b,'c. ('a -> bool) & ('b -> false) -> array('b | 'a) -> array('a \ 'b

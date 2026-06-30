@@ -27,7 +27,7 @@ type e =
 | App of t * t
 | Operation of operation * t
 | Projection of projection * t
-| Let of (Ty.t list) * Variable.t * t * t
+| Let of (Ty.t list) (* empty list = no partitioning *) * Variable.t * t * t
 | TypeCast of t * GTy.t * check
 | TypeCoerce of t * GTy.t * check
 | Alt of t * t

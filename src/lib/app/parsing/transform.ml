@@ -6,7 +6,7 @@ let expr_to_ast t =
   let open Mlsem_lang.Ast in
   let sugg = Hashtbl.create 100 in
   let get_sugg v =
-    match Hashtbl.find_opt sugg v with Some lst -> lst | None -> []
+    match Hashtbl.find_opt sugg v with Some lst -> lst | None -> [Ty.any]
   in
   let add_suggs v tys =
     Hashtbl.replace sugg v (tys@(get_sugg v))
