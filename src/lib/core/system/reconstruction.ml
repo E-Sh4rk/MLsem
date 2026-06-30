@@ -418,8 +418,8 @@ and refine_ann r cache env (rid, annot) (id, e) =
         if useless then aux dom lst
         else
           begin match refine' {cache with dom} env ann (id,e) with
-          | Fail -> aux dom lst |> add_to_res coverage None (dummy_i Untyp)
-          (* TODO: the above recursive call should be `aux dom lst` ? *)
+          | Fail when !Config.reexplore_failed_domains -> aux dom lst
+          | Fail -> aux dom' lst |> add_to_res coverage None (dummy_i Untyp)
           | Subst (ss,a,a',r) ->
             let a, a' = { coverage ; ann=a }, { coverage ; ann=a' } in
             Either.right (ss,a::lst,a'::lst,r)

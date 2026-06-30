@@ -221,6 +221,7 @@ let treat (benv,varm,senv,env) (annot, elem) =
       -> Config.type_narrowing := BothNarrowing
       | "allow_implicit_downcast", Bool b -> Config.allow_implicit_downcast := b
       | "infer_overload", Bool b -> Config.infer_overload := b
+      | "reexplore_failed_domains", Bool b -> Config.reexplore_failed_domains := b
       | "normalization", Bool false | "normalization", String "no" ->
         Config.normalization_fun := Fun.id
       | "normalization", String "no_empty_param" ->

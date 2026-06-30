@@ -376,6 +376,16 @@
                 </td>
             </tr>
             <tr>
+                <td>reexplore_failed_domains</td>
+                <td><tt>true</tt> | <tt>false</tt></td>
+                <td><tt>true</tt></td>
+                <td>Allow or prevent the type inference from re-exploring a function domain
+                    that has already been explored, if last attempt failed.
+                    Setting this to <tt>false</tt> will result in a faster but less
+                    exhaustive type inference, in particular in the presence of mutable variables.
+                </td>
+            </tr>
+            <tr>
                 <td>normalization</td>
                 <td><tt>"no_empty_param"</tt> | <tt>"no"</tt></td>
                 <td><tt>"no_empty_param"</tt></td>
