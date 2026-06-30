@@ -120,13 +120,7 @@ let to_system_ast t =
     | Void -> SA.Value (GTy.mk !Config.void_ty |> TyScheme.mk_mono)
     | Voidify e -> SA.Constructor (SA.Voidify !Config.void_ty, [aux e])
     | Value t -> SA.Value t
-    | Var v ->
-      if MVariable.is_mutable v then
-        let arg = Eid.refresh id, SA.Var v in
-        let op = { SA.oname="get" ; ofun=MVariable.ref_get v ; ogen=false } in
-        SA.Operation (OCustom op, arg)
-      else
-        SA.Var v
+    | Var v -> if MVariable.is_mutable v then MVariable.ref_get v else SA.Var v
     | Constructor (c, es) -> SA.Constructor (c, List.map aux es)
     | Lambda (tys, ty, x, e) ->
       if MVariable.is_mutable x then invalid_arg "Variable of Lambda cannot be mutable." ;
@@ -146,28 +140,19 @@ let to_system_ast t =
     | Operation (o, e) -> SA.Operation (o, aux e)
     | Projection (p, e) -> SA.Projection (p, aux e)
     | Declare (x, e) when MVariable.is_mutable x ->
-      let arg = Eid.unique (), SA.Value (Ty.unit |> GTy.mk |> TyScheme.mk_mono) in
-      let op = { SA.oname="ref_uninit" ; ofun=MVariable.ref_uninit x ; ogen=false } in
-      let def = Eid.unique (), SA.Operation (OCustom op, arg) in
+      let def = Eid.unique (), MVariable.ref_uninit x in
       SA.Let ([], x, def, aux e)
     | Declare _ -> invalid_arg "Cannot declare an immutable variable."
     | Let (tys, x, e1, e2) ->
-      let tys, def = if MVariable.is_mutable x
-        then
-          let arg = aux e1 in
-          let op = { SA.oname="ref" ; ofun=MVariable.ref_cons x ; ogen=false } in
-          [], (Eid.refresh (fst e1), SA.Operation (OCustom op, arg))
+      let tys, def =
+        if MVariable.is_mutable x
+        then [], (Eid.refresh (fst e1), MVariable.ref_cons x (aux e1))
         else tys, aux e1
       in
       SA.Let (tys, x, def, aux e2)
     | TypeCast (e, ty, c) -> SA.TypeCast (aux e, ty, c)
     | TypeCoerce (e, ty, c) -> SA.TypeCoerce (aux e, ty, c)
-    | VarAssign (v, e) when MVariable.is_mutable v ->
-      let arg = Eid.refresh (fst e), SA.Constructor (SA.Tuple 2,[
-            (Eid.unique (), SA.Var v) ; aux e
-        ]) in
-      let op = { SA.oname="assign" ; ofun=MVariable.ref_assign v ; ogen=false } in
-      SA.Operation (OCustom op, arg)
+    | VarAssign (v, e) when MVariable.is_mutable v -> MVariable.ref_assign v (aux e)
     | VarAssign _ -> invalid_arg "Cannot assign to an immutable variable."
     | Loop e -> aux e |> snd
     | Seq (e1, e2) -> Let ([], MVariable.create Immut None, aux e1, aux e2)

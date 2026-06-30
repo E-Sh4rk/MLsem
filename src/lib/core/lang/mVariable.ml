@@ -1,5 +1,6 @@
 open Mlsem_common
 open Mlsem_types
+module SA = Mlsem_system.Ast
 
 type t = Variable.t
 type kind = Immut | AnnotMut of GTy.t | Mut
@@ -78,14 +79,31 @@ let mk ty = GTy.mk ty |> TyScheme.mk_poly
 
 let ref_uninit v =
   Arrow.mk Ty.unit (aref v) |> mk
+let ref_uninit v =
+  let arg = Eid.unique (), SA.Value (Ty.unit |> GTy.mk |> TyScheme.mk_mono) in
+  let op = { SA.oname="ref_uninit" ; ofun=ref_uninit v ; ogen=false } in
+  SA.Operation (OCustom op, arg)
 
 let ref_cons v =
   Arrow.mk (aub v) (aref v) |> mk
+let ref_cons v arg =
+  let op = { SA.oname="ref" ; ofun=ref_cons v ; ogen=false } in
+  SA.Operation (OCustom op, arg)
 
 let ref_get v =
   let lb = Arrow.mk (aref v) (alb v) in
   let ub = Arrow.mk (aref v) (aub v) in
   mk_gradual lb ub
+let ref_get v =
+  let arg = Eid.unique (), SA.Var v in
+  let op = { SA.oname="get" ; ofun=ref_get v ; ogen=false } in
+  SA.Operation (OCustom op, arg)
 
 let ref_assign v =
   Arrow.mk (Tuple.mk [aref v ; aub v]) (!Config.void_ty) |> mk
+let ref_assign v arg =
+  let arg = Eid.unique (), SA.Constructor (SA.Tuple 2,[
+          (Eid.unique (), SA.Var v) ; arg
+      ]) in
+  let op = { SA.oname="assign" ; ofun=ref_assign v ; ogen=false } in
+  SA.Operation (OCustom op, arg)
