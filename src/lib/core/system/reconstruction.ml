@@ -194,6 +194,8 @@ let rec seq (f : 'b -> 'c -> ('a,'b) result) (c : 'a->'b) (lst:('b*'c) list)
       end
     end
 
+let dummy_i ann = IAnnot.I { rid = Rid.dummy ; ann ; refinement=REnv.empty }
+
 let rec refine cache env annot (id, e) =
   match annot with
   | IAnnot.A a -> Ok (a, Checker.typeof env a (id, e))
@@ -395,6 +397,15 @@ and refine_ann r cache env (rid, annot) (id, e) =
     | Fail -> Fail
     end
   | e, AInter lst ->
+    let add_to_res coverage a aa res =
+      begin match res, a with
+      | Either.Left lst, None -> Either.Left lst
+      | Either.Left lst, Some a -> Either.Left (a::lst)
+      | Either.Right (ss,lst,lst',r), _ ->
+        let c = { coverage ; ann=aa } in
+        Either.Right (ss,c::lst,c::lst',r)
+      end
+    in
     let rec aux dom lst =
       match lst with
       | [] -> Either.left []
@@ -407,17 +418,12 @@ and refine_ann r cache env (rid, annot) (id, e) =
         if useless then aux dom lst
         else
           begin match refine' {cache with dom} env ann (id,e) with
-          | Fail -> aux dom lst
+          | Fail -> aux dom lst |> add_to_res coverage None (dummy_i Untyp)
+          (* TODO: the above recursive call should be `aux dom lst` ? *)
           | Subst (ss,a,a',r) ->
             let a, a' = { coverage ; ann=a }, { coverage ; ann=a' } in
             Either.right (ss,a::lst,a'::lst,r)
-          | Ok (a,_) ->
-            begin match aux dom' lst with
-            | Either.Left lst -> Either.Left (a::lst)
-            | Either.Right (ss,lst,lst',r) ->
-              let c = { coverage ; ann=A a } in
-              Either.Right (ss,c::lst,c::lst',r)
-            end
+          | Ok (a,_) -> aux dom' lst |> add_to_res coverage (Some a) (A a)
           end
     in
     begin match aux cache.dom lst with
@@ -448,8 +454,7 @@ and refine' cache env annot e =
       { IAnnot.coverage=(Some coverage) ; ann }
       ) in
     let ann = IAnnot.AInter (branches@default) in
-    let ann = IAnnot.I { rid = Rid.dummy ; ann ; refinement=REnv.empty } in
-    refine' cache env ann e
+    refine' cache env (dummy_i ann) e
   | Subst (ss, a1, a2, r) -> Subst (ss, a1, a2, r)
 and refine_b' cache env (rid, bannot) e s tau =
   let with_no_res ss = ss |> List.map (fun (s,_) -> (s, None)) in

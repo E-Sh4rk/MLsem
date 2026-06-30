@@ -235,4 +235,5 @@ module Domain = struct
     let a = renvs |> List.map env_to_typ |> Ty.disj in
     let b = env_to_typ renv in
     Ty.is_empty (Ty.diff b a |> !Config.normalization_fun)
+    (* |> (fun res -> if res then Format.printf "%a covers %a@." Ty.pp a Ty.pp b ; res) *)
 end
