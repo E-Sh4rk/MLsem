@@ -9,6 +9,8 @@
 
 (executable
  (name lsp)
+ (public_name lsp)
+ (package mlsem-lsp)
  (libraries mlsem_lsp)
  (modes
   (best exe))
