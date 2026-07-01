@@ -30,7 +30,7 @@ type e =
 | Let of (Ty.t list) (* empty list = no partitioning *) * Variable.t * t * t
 | TypeCast of t * GTy.t * check
 | TypeCoerce of t * GTy.t * check
-| Alt of t * t
+| Alt of t list
 and t = Eid.t * e
 
 val map : (t -> t) -> t -> t

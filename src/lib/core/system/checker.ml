@@ -43,7 +43,8 @@ let rec is_gen (_,e) =
   | Operation (o, e) -> op_is_gen o && is_gen e
   | LambdaRec lst -> List.for_all (fun (_,_,e) -> is_gen e) lst
   | TypeCast (e, _, _) | TypeCoerce (e, _, _) -> is_gen e
-  | Let (_, _, e1, e2) | Ite (_, _, e1, e2) | Alt (e1, e2) -> is_gen e1 && is_gen e2
+  | Let (_, _, e1, e2) | Ite (_, _, e1, e2) -> is_gen e1 && is_gen e2
+  | Alt es -> List.for_all is_gen es
 
 let generalize ~e env s =
   if not (!Config.value_restriction) || is_gen e then
@@ -101,12 +102,12 @@ let rec typeof' env annot (id,e) =
     let t1 = typeof_b env b1 e1 s tau in
     let t2 = typeof_b env b2 e2 s (GTy.neg tau) in
     GTy.cup t1 t2
-  | Alt _, AAlt (None, None) ->
-    untypeable id ("At least one side of a Alt expr must be typeable.")
-  | Alt (e1, e2), AAlt (a1, a2) ->
-    let t1 = match a1 with None -> GTy.any | Some a1 -> typeof env a1 e1 in
-    let t2 = match a2 with None -> GTy.any | Some a2 -> typeof env a2 e2 in
-    GTy.cap t1 t2
+  | Alt es, AAlt anns ->
+    if List.for_all Option.is_none anns
+    then untypeable id ("At least one branch of a Alt expr must be typeable.")
+    else
+      let aux e a = match a with None -> GTy.any | Some a -> typeof env a e in
+      List.map2 aux es anns |> GTy.conj
   | App (e1, e2), AApp (annot1, annot2, res) ->
     let t1 = typeof env annot1 e1 in
     let t2 = typeof env annot2 e2 in

@@ -40,9 +40,9 @@ type e =
 | TypeCoerce of t * GTy.t * SA.check
 | VarAssign of Variable.t * t
 | Loop of t
-| Try of t * t
 | Seq of t * t
-| Alt of t * t
+| Try of t list
+| Alt of t list
 | Block of blockid * t
 | Ret of blockid * t option
 | If of t * GTy.t * t * t option
@@ -118,9 +118,9 @@ let map_tl f (id,e) =
     | TypeCoerce (e, ty, c) -> TypeCoerce (f e, ty, c)
     | VarAssign (v, e) -> VarAssign (v, f e)
     | Loop e -> Loop (f e)
-    | Try (e1, e2) -> Try (f e1, f e2)
     | Seq (e1, e2) -> Seq (f e1, f e2)
-    | Alt (e1, e2) -> Alt (f e1, f e2)
+    | Try es -> Try (List.map f es)
+    | Alt es -> Alt (List.map f es)
     | Block (bid, e) -> Block (bid, f e)
     | Ret (bid, eo) -> Ret (bid, Option.map f eo)
     | If (e, ty, e1, e2) -> If (f e, ty, f e1, Option.map f e2)

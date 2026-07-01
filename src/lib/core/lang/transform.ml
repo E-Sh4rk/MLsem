@@ -142,7 +142,7 @@ let rec try_elim_ret ~keep_ret bid e =
   let aux' e = try_elim_ret ~keep_ret:true bid e in
   let aux_noret' e = try_elim_ret ~keep_ret:false bid e in
   let rec aux (id,e) cont =
-    let dup_cont cont = cont, cont |> Ast.map (fun (eid,t) -> (Eid.refresh eid, t)) in
+    let refresh_cont cont = cont |> Ast.map (fun (eid,t) -> (Eid.refresh eid, t)) in
     let cont' e = fill cont e in
     match e with
     (* Base cases *)
@@ -150,7 +150,7 @@ let rec try_elim_ret ~keep_ret bid e =
     (* Do-not-traverse cases *)
     | Isolate e -> (id, Isolate (aux' e)) |> cont'
     | Constructor (c,es) -> (id, Constructor (c, List.map aux' es)) |> cont'
-    | Alt (e1, e2) -> (id, Alt (aux' e1, aux' e2)) |> cont'
+    | Alt es -> (id, Alt (List.map aux' es)) |> cont'
     | App (e1, e2) -> (id, App (aux' e1, aux' e2)) |> cont'
     | Operation (o,e) -> (id, Operation (o, aux' e)) |> cont'
     | Projection (p,e) -> (id, Projection (p, aux' e)) |> cont'
@@ -168,17 +168,17 @@ let rec try_elim_ret ~keep_ret bid e =
       (id, TypeCast (hole, tau, c)) |> cont' |> aux e
     | TypeCoerce (e, ty, c) ->
       (id, TypeCoerce (hole, ty, c)) |> cont' |> aux e
-    | Try (e1, e2) when not (has_eliminable_ret bid e1) && not (has_eliminable_ret bid e2) ->
+    | Try es when List.for_all (fun e -> not (has_eliminable_ret bid e)) es ->
       (* Do not duplicate the continuation if unnecessary *)
-      (id, Try (aux' e1, aux' e2)) |> cont'
-    | Try (e1, e2) ->
-      let cont1, cont2 = dup_cont cont in
-      (id, Try (aux e1 cont1, aux e2 cont2))
+      (id, Try (List.map aux' es)) |> cont'
+    | Try es ->
+      let conts = List.map (fun _ -> refresh_cont cont) es in 
+      (id, Try (List.map2 aux es conts))
     | Ite (e, tau, e1, e2) when not (has_eliminable_ret bid e1) && not (has_eliminable_ret bid e2) ->
       (* Do not duplicate the continuation if unnecessary *)
       (id, Ite (hole, tau, aux' e1, aux' e2)) |> cont' |> aux e
     | Ite (e, tau, e1, e2) ->
-      let cont1, cont2 = dup_cont cont in
+      let cont1, cont2 = refresh_cont cont, refresh_cont cont in
       (id, Ite (hole, tau, aux e1 cont1, aux e2 cont2)) |> aux e
     | Seq (e1,e2) -> (id, Seq (hole, aux e2 cont)) |> aux e1
     | Ret (bid', e) when bid'=bid && keep_ret ->
@@ -274,7 +274,7 @@ let eliminate_cf t =
       let aux (ty,x,e) = (ty, x, aux e) in
       MAst.LambdaRec (List.map aux lst)
     | Ite (e,t,e1,e2) -> MAst.Ite (aux e, t, aux e1, aux e2)
-    | Try (e1,e2) -> MAst.Try (aux e1, aux e2)
+    | Try es -> MAst.Try (List.map aux es)
     | App (e1,e2) -> MAst.App (aux e1, aux e2)
     | Operation (o, e) -> MAst.Operation (o, aux e)
     | Projection (p, e) -> MAst.Projection (p, aux e)
@@ -285,7 +285,7 @@ let eliminate_cf t =
     | VarAssign (v, e) -> MAst.VarAssign (v, aux e)
     | Loop e -> MAst.Loop (aux e)
     | Seq (e1, e2) -> MAst.Seq (aux e1, aux e2)
-    | Alt (e1, e2) -> MAst.Alt (aux e1, aux e2)
+    | Alt es -> MAst.Alt (List.map aux es)
     | Exc -> Exc
     | PatMatch _ | If _ | While _ | Break | Return _ | Block _ -> assert false
     | Ret _ -> invalid_arg "Expression contains an orphan ret expression."

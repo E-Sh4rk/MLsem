@@ -48,7 +48,7 @@ let initial ?(direct_narrowing=true) ?(partition_narrowing=true) refinements e =
     | Projection (_, e) -> AProj (initial r e, new_result ()) |> right
     | TypeCast (e, ty, _) -> ACast (ty, initial r e) |> right
     | TypeCoerce (e, ty, _) -> ACoerce (ty, initial r e) |> right
-    | Alt (e1, e2) -> AAlt (Some (initial r e1), Some (initial r e2)) |> right
+    | Alt es -> AAlt (List.map (fun e -> Some (initial r e)) es) |> right
     | Let (suggs, v, e1, e2) ->
       let a1 = initial r e1 in
       let tys = Refinement.Partitioner.decomposition_for r v suggs in
@@ -194,6 +194,13 @@ let rec seq (f : 'b -> 'c -> ('a,'b) result) (c : 'a->'b) (lst:('b*'c) list)
       end
     end
 
+let add_to_res a c res =
+  begin match res, a with
+  | Either.Left lst, None -> Either.Left lst
+  | Either.Left lst, Some a -> Either.Left (a::lst)
+  | Either.Right (ss,lst,lst',r), _ -> Either.Right (ss,c::lst,c::lst',r)
+  end
+
 let dummy_i ann = IAnnot.I { rid = Rid.dummy ; ann ; refinement=REnv.empty }
 
 let rec refine cache env annot (id, e) =
@@ -303,21 +310,22 @@ and refine_ann r cache env (rid, annot) (id, e) =
         end  
       end
     end
-  | Alt _, AAlt (None, None) -> Fail
-  | Alt _, AAlt (Some (A a1), None) -> retry_with (ac (Annot.AAlt(Some a1,None)))
-  | Alt _, AAlt (None, Some (A a2)) -> retry_with (ac (Annot.AAlt(None,Some a2)))
-  | Alt _, AAlt (Some (A a1), Some (A a2)) -> retry_with (ac (Annot.AAlt(Some a1,Some a2)))
-  | Alt (_, e2), AAlt ((None | Some (A _) as a1), Some a2) ->
-    begin match refine' cache env a2 e2 with
-    | Ok (a2, _) -> retry_with (AAlt (a1, Some (A a2))|>ic)
-    | Subst (ss,a2,a2',r) -> Subst (ss,AAlt (a1,Some a2)|>ic,AAlt (a1,Some a2')|>ic,r)
-    | Fail -> retry_with (AAlt (a1, None)|>ic)
-    end
-  | Alt (e1, _), AAlt (Some a1, a2) ->
-    begin match refine' cache env a1 e1 with
-    | Ok (a1, _) -> retry_with (AAlt (Some (A a1), a2)|>ic)
-    | Subst (ss,a1,a1',r) -> Subst (ss,AAlt (Some a1,a2)|>ic,AAlt (Some a1',a2)|>ic,r)
-    | Fail -> retry_with (AAlt (None, a2)|>ic)
+  | Alt es, AAlt anns ->
+    let rec aux es anns =
+      match es, anns with
+      | [], [] -> Either.left []
+      | e::es, ann::anns ->
+        begin match refine_opt' cache env ann e with
+        | Fail -> aux es anns |> add_to_res (Some None) None
+        | Subst (ss,a,a',r) ->  Either.right (ss,(Some a)::anns,(Some a')::anns,r)
+        | Ok (a,_) -> aux es anns |> add_to_res (Some (Some a)) (Some (A a))
+        end
+      | _, _ -> assert false
+    in
+    begin match aux es anns with
+    | Either.Left lst when List.for_all Option.is_none lst -> Fail
+    | Either.Left lst -> retry_with (ac (Annot.AAlt lst))
+    | Either.Right (ss,a,a',r) -> Subst (ss,AAlt(a)|>ic,AAlt(a')|>ic,r)
     end
   | App (e1, e2), AApp (a1,a2,res) ->
     begin match refine_seq' cache env [(a1,e1);(a2,e2)] with
@@ -397,15 +405,6 @@ and refine_ann r cache env (rid, annot) (id, e) =
     | Fail -> Fail
     end
   | e, AInter lst ->
-    let add_to_res coverage a aa res =
-      begin match res, a with
-      | Either.Left lst, None -> Either.Left lst
-      | Either.Left lst, Some a -> Either.Left (a::lst)
-      | Either.Right (ss,lst,lst',r), _ ->
-        let c = { coverage ; ann=aa } in
-        Either.Right (ss,c::lst,c::lst',r)
-      end
-    in
     let rec aux dom lst =
       match lst with
       | [] -> Either.left []
@@ -417,13 +416,13 @@ and refine_ann r cache env (rid, annot) (id, e) =
         in
         if useless then aux dom lst
         else
-          begin match refine' {cache with dom} env ann (id,e) with
+          begin match refine_opt' {cache with dom} env ann (id,e) with
           | Fail when !Config.reexplore_failed_domains -> aux dom lst
-          | Fail -> aux dom' lst |> add_to_res coverage None (dummy_i Untyp)
+          | Fail -> aux dom' lst |> add_to_res None { coverage ; ann=None }
           | Subst (ss,a,a',r) ->
-            let a, a' = { coverage ; ann=a }, { coverage ; ann=a' } in
+            let a, a' = { coverage ; ann=Some a }, { coverage ; ann=Some a' } in
             Either.right (ss,a::lst,a'::lst,r)
-          | Ok (a,_) -> aux dom' lst |> add_to_res coverage (Some a) (A a)
+          | Ok (a,_) -> aux dom' lst |> add_to_res (Some a) { coverage ; ann=Some (A a) }
           end
     in
     begin match aux cache.dom lst with
@@ -446,16 +445,20 @@ and refine' cache env annot e =
     let default =
       (* Don't add default branch if already covered (also important for error msg) *)
       if ss |> List.exists (fun (s,_) -> Subst.is_identity s)
-      then [] else [{ IAnnot.coverage=(Some (None, r)) ; ann=a2 }]
+      then [] else [{ IAnnot.coverage=(Some (None, r)) ; ann=Some a2 }]
     in
     let branches = ss |> List.map (fun (s,res) ->
-      let ann = IAnnot.substitute s a1 in
+      let ann = Some (IAnnot.substitute s a1) in
       let coverage = res, REnv.substitute s r in
       { IAnnot.coverage=(Some coverage) ; ann }
       ) in
     let ann = IAnnot.AInter (branches@default) in
     refine' cache env (dummy_i ann) e
   | Subst (ss, a1, a2, r) -> Subst (ss, a1, a2, r)
+and refine_opt' cache env ann e =
+  match ann with
+  | None -> Fail
+  | Some ann -> refine' cache env ann e
 and refine_b' cache env (rid, bannot) e s tau =
   let with_no_res ss = ss |> List.map (fun (s,_) -> (s, None)) in
   let retry_with bannot = refine_b' cache env (rid, bannot) e s tau in

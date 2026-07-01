@@ -18,7 +18,7 @@ module Annot : sig
   | AIte of t * GTy.t * branch * branch
   | ALambda of GTy.t * t
   | ALambdaRec of (GTy.t * t) list
-  | AAlt of t option * t option
+  | AAlt of t option list
   | AInter of inter
   and t = { mutable cache: GTy.t option ; ann: a ; refinement: REnv.t }
 
@@ -40,7 +40,7 @@ module rec IAnnot : sig
   type res = (Rid.t * Ty.t) option
   type coverage = res * REnv.t
   type branch = BMaybe of t | BType of t | BSkip
-  and inter_branch = { coverage: coverage option ; ann: t }
+  and inter_branch = { coverage: coverage option ; ann: t option }
   and inter = inter_branch list
   and part = (Ty.t * LazyIAnnot.t option) list
   and a =
@@ -56,7 +56,7 @@ module rec IAnnot : sig
   | AIte of t * GTy.t * branch * branch
   | ALambda of GTy.t * t
   | ALambdaRec of (GTy.t * t) list
-  | AAlt of t option * t option
+  | AAlt of t option list
   | AInter of inter
   and t =
   | A of Annot.t

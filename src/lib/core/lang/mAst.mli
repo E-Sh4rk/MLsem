@@ -31,10 +31,10 @@ type e =
 (** An expression that may be evaluated multiple times. Used to encode While expressions. *)
 | Seq of t * t
 (** Evaluate the first expression, then the second. *)
-| Try of t * t
+| Try of t list
 (** May jump from a branch to another. Used to model try-with expressions. *)
-| Alt of t * t
-(** Evaluate both branches independently. The result is (the intersection of) the result of the branches that do not fail. *)
+| Alt of t list
+(** Evaluate branches independently. The result is (the intersection of) the result of the branches that do not fail. *)
 and t = Eid.t * e
 
 val map : (t -> t) -> t -> t

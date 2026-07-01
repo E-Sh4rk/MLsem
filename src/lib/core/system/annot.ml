@@ -21,7 +21,7 @@ module Annot = struct
   | AIte of t * GTy.t * branch * branch
   | ALambda of GTy.t * t
   | ALambdaRec of (GTy.t * t) list
-  | AAlt of t option * t option
+  | AAlt of t option list
   | AInter of inter
   [@@deriving show]
   and t = { mutable cache: GTy.t option ; ann: a ; refinement: REnv.t }
@@ -42,7 +42,7 @@ module Annot = struct
       | AIte (t,ty,b1,b2) -> AIte (aux t, GTy.substitute s ty, aux_b b1, aux_b b2)
       | ALambda (ty, t) -> ALambda (GTy.substitute s ty, aux t)
       | ALambdaRec lst -> ALambdaRec (List.map (fun (ty,t) -> (GTy.substitute s ty, aux t)) lst)
-      | AAlt (t1, t2) -> AAlt (Option.map aux t1, Option.map aux t2)
+      | AAlt ts -> AAlt (List.map (Option.map aux) ts)
       | AInter ts -> AInter (List.map aux ts)
     in { cache=Option.map (GTy.substitute s) t.cache ; ann ;
          refinement=REnv.substitute s t.refinement }
@@ -68,7 +68,7 @@ module rec IAnnot : sig
   type res = (Rid.t * Ty.t) option
   type coverage = res * REnv.t
   type branch = BMaybe of t | BType of t | BSkip
-  and inter_branch = { coverage: coverage option ; ann: t }
+  and inter_branch = { coverage: coverage option ; ann: t option }
   and inter = inter_branch list
   and part = (Ty.t * LazyIAnnot.t option) list
   and a =
@@ -84,7 +84,7 @@ module rec IAnnot : sig
   | AIte of t * GTy.t * branch * branch
   | ALambda of GTy.t * t
   | ALambdaRec of (GTy.t * t) list
-  | AAlt of t option * t option
+  | AAlt of t option list
   | AInter of inter
   and t =
   | A of Annot.t
@@ -102,7 +102,7 @@ end = struct
   [@@deriving show]
   type branch = BMaybe of t | BType of t | BSkip
   [@@deriving show]
-  and inter_branch = { coverage: coverage option ; ann: t }
+  and inter_branch = { coverage: coverage option ; ann: t option }
   [@@deriving show]
   and inter = inter_branch list
   [@@deriving show]
@@ -121,7 +121,7 @@ end = struct
   | AIte of t * GTy.t * branch * branch
   | ALambda of GTy.t * t
   | ALambdaRec of (GTy.t * t) list
-  | AAlt of t option * t option
+  | AAlt of t option list
   | AInter of inter
   [@@deriving show]
   and t =
@@ -145,7 +145,7 @@ end = struct
       | AIte (t,ty,b1,b2) -> AIte (aux t, GTy.substitute s ty, aux_b b1, aux_b b2)
       | ALambda (ty, t) -> ALambda (GTy.substitute s ty, aux t)
       | ALambdaRec lst -> ALambdaRec (List.map (fun (ty,t) -> (GTy.substitute s ty, aux t)) lst)
-      | AAlt (t1, t2) -> AAlt (Option.map aux t1, Option.map aux t2)
+      | AAlt ts -> AAlt (List.map (Option.map aux) ts)
       | AInter bs -> AInter (List.map aux_ib bs)
     and aux t =
       match t with
@@ -163,7 +163,7 @@ end = struct
         (o, renv)
       in
       let coverage = Option.map aux_coverage coverage in
-      let ann = aux ann in
+      let ann = Option.map aux ann in
       { coverage ; ann }
     in
     aux

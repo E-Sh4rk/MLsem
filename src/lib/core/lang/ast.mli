@@ -50,12 +50,12 @@ type e =
 (** The variable provided must be mutable (cf. {!MVariable.create}) *)
 | Loop of t
 (** An expression that may be evaluated multiple times. Used to encode While expressions. *)
-| Try of t * t
-(** May jump from a branch to another. Used to model try-with expressions. *)
 | Seq of t * t
 (** Evaluate the first expression, then the second. *)
-| Alt of t * t
-(** Evaluate both branches independently. The result is (the intersection of) the result of the branches that do not fail. *)
+| Try of t list
+(** May jump from a branch to another. Used to model try-with expressions. *)
+| Alt of t list
+(** Evaluate branches independently. The result is (the intersection of) the result of the branches that do not fail. *)
 | Block of blockid * t
 (** Identifies a block to which a Ret can refer to. *)
 | Ret of blockid * t option

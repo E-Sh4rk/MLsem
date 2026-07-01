@@ -21,8 +21,8 @@ type e =
 | VarAssign of Variable.t * t
 | Loop of t
 | Seq of t * t
-| Try of t * t
-| Alt of t * t
+| Try of t list
+| Alt of t list
 [@@deriving show]
 and t = Eid.t * e
 [@@deriving show]
@@ -50,8 +50,8 @@ let map_tl f (id,e) =
     | VarAssign (v, e) -> VarAssign (v, f e)
     | Loop e -> Loop (f e)
     | Seq (e1, e2) -> Seq (f e1, f e2)
-    | Try (e1, e2) -> Try (f e1, f e2)
-    | Alt (e1, e2) -> Alt (f e1, f e2)
+    | Try es -> Try (List.map f es)
+    | Alt es -> Alt (List.map f es)
   in
   (id,e)
 
@@ -156,8 +156,8 @@ let to_system_ast t =
     | VarAssign _ -> invalid_arg "Cannot assign to an immutable variable."
     | Loop e -> aux e |> snd
     | Seq (e1, e2) -> Let ([], MVariable.create Immut None, aux e1, aux e2)
-    | Try (e1, e2) -> SA.Constructor (SA.Join 2, [aux e1 ; aux e2])
-    | Alt (e1, e2) -> SA.Alt (aux e1, aux e2)
+    | Try es -> SA.Constructor (SA.Join (List.length es), List.map aux es)
+    | Alt es -> SA.Alt (List.map aux es)
     | Hole _ -> invalid_arg "Expression should not contain a hole."
     in
     (id, e)

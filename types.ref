@@ -338,11 +338,12 @@ typeof_app: Int -> 0
 typeof_app': Int -> 0
 [Warning] File "tests/5_misc.ml", line 282, characters 7-27 Unreachable code
 [Warning] File "tests/5_misc.ml", line 280, characters 43-48 Unreachable code
-[Warning] File "tests/5_misc.ml", line 277, characters 10-156 Unreachable code
-[Warning] File "tests/5_misc.ml", line 278, characters 36-45 Unreachable code
-[Warning] File "tests/5_misc.ml", line 278, characters 24-33 Unreachable code
-[Warning] File "tests/5_misc.ml", line 278, characters 12-21 Unreachable code
-[Warning] File "tests/5_misc.ml", line 277, characters 48-57 Unreachable code
-[Warning] File "tests/5_misc.ml", line 277, characters 36-45 Unreachable code
-[Warning] File "tests/5_misc.ml", line 277, characters 24-33 Unreachable code
 [Warning] File "tests/5_misc.ml", line 277, characters 12-21 Unreachable code
+[Warning] File "tests/5_misc.ml", line 277, characters 24-33 Unreachable code
+[Warning] File "tests/5_misc.ml", line 277, characters 36-45 Unreachable code
+[Warning] File "tests/5_misc.ml", line 277, characters 48-57 Unreachable code
+[Warning] File "tests/5_misc.ml", line 278, characters 12-21 Unreachable code
+[Warning] File "tests/5_misc.ml", line 278, characters 24-33 Unreachable code
+[Warning] File "tests/5_misc.ml", line 278, characters 36-45 Unreachable code
+[Warning] File "tests/5_misc.ml", line 279, characters 12-21 Unreachable code
+[Warning] File "tests/5_misc.ml", line 279, characters 24-34 Unreachable code

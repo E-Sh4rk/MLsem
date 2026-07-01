@@ -53,7 +53,7 @@ and ('a, 'typ, 'gty, 'enu, 'tag, 'v) ast =
 | Cond of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'gty * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t option
 | While of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'gty * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | Seq of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
-| Alt of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Alt of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t list
 | Return of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | Break | Continue
 

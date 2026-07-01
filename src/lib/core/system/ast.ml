@@ -38,7 +38,7 @@ type e =
 | Let of (Ty.t list) * Variable.t * t * t
 | TypeCast of t * GTy.t * check
 | TypeCoerce of t * GTy.t * check
-| Alt of t * t
+| Alt of t list
 [@@deriving show]
 and t = Eid.t * e
 [@@deriving show]
@@ -58,7 +58,7 @@ let map_tl f (id,e) =
     | Let (ta, v, e1, e2) -> Let (ta, v, f e1, f e2)
     | TypeCast (e, ty, c) -> TypeCast (f e, ty, c)
     | TypeCoerce (e, ty, c) -> TypeCoerce (f e, ty, c)
-    | Alt (e1, e2) -> Alt (f e1, f e2)
+    | Alt es -> Alt (List.map f es)
   in
   (id,e)
 
@@ -411,6 +411,7 @@ and pp_e fmt e = match e with
   | TypeCoerce (e, ty, check) ->
     Format.fprintf fmt "@[(%a :>%a %a)@]"
       (pp_prio 0) e pp_check check GTy.pp ty
-  | Alt (e1, e2) ->
-    Format.fprintf fmt "@[<hov>%a@ |@ %a@]"
-      (pp_prio 51) e1 (pp_prio 50) e2
+  | Alt es ->
+    Format.fprintf fmt "@[<hov 1>[%a]@]"
+      (Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt "@ |@ ")
+        (pp_prio 51)) es

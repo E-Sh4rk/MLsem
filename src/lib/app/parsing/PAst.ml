@@ -51,7 +51,7 @@ and ('a, 'typ, 'gty, 'enu, 'tag, 'v) ast =
 | Cond of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'gty * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t option
 | While of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'gty * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | Seq of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
-| Alt of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Alt of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t list
 | Return of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | Break | Continue
 
@@ -171,7 +171,7 @@ let to_expr benv env e =
             Cond (aux env e, aux_cond t, aux env e1, Option.map (aux env) e2)
         | While (e, t, e') -> While (aux env e, aux_cond t, aux env e')
         | Seq (e1, e2) -> Seq (aux env e1, aux env e2)
-        | Alt (e1, e2) -> Alt (aux env e1, aux env e2)
+        | Alt es -> Alt (List.map (aux env) es)
         | Return e -> Return (aux env e)
         | Break -> Break | Continue -> Continue
         in

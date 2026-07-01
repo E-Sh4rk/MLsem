@@ -73,7 +73,7 @@ let expr_to_ast t =
     | Cond (e,t,e1,e2) -> If (aux e, t, aux e1, Option.map aux e2)
     | While (e,t,e1) -> While (aux e, t, aux e1)
     | Seq (e1, e2) -> Seq (aux e1, aux e2)
-    | Alt (e1, e2) -> Alt (aux e1, aux e2)
+    | Alt es -> Alt (List.map aux es)
     | Return e -> Return (aux e)
     | Break | Continue -> Break
   and aux (id, e) =

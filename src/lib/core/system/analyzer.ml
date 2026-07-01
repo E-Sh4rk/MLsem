@@ -14,7 +14,9 @@ let rec iter_ann f (id,e) a =
       List.combine es anns
     | Let (_, _, e1, e2), ALet (a1, anns) ->
       (e1,a1)::(List.filter_map (function (_,Some a2) -> Some (e2, a2) | (_, None) -> None) anns)
-    | App (e1,e2), AApp (a1,a2,_) | Alt (e1,e2), AAlt (Some a1, Some a2) -> [(e1,a1) ; (e2,a2)]
+    | App (e1,e2), AApp (a1,a2,_) -> [(e1,a1) ; (e2,a2)]
+    | Alt es, AAlt anns -> List.combine es anns |> List.filter_map
+      (function (_,None) -> None | (e,Some a) -> Some (e,a))
     | Projection (_, e), AProj a | TypeCast (e, _, _), ACast (_, a)
     | TypeCoerce (e, _, _), ACoerce (_, a) | Lambda (_, _, e), ALambda (_, a)
     | Operation (_, e), AOp (_, a,_) -> [(e,a)]
@@ -23,7 +25,6 @@ let rec iter_ann f (id,e) a =
         match b with Annot.BSkip -> None | BType a -> Some (e,a)))
     | LambdaRec lst, ALambdaRec anns when List.length lst = List.length anns ->
       List.combine lst anns |> List.map (fun ((_,_,e), (_, a)) -> (e,a))
-    | Alt (e, _), AAlt (Some a, None) | Alt (_, e), AAlt (None, Some a) -> [e,a]
     | _, AInter anns -> anns |> List.map (fun a -> ((id,e), a))
     | _, _ -> assert false
   in
