@@ -378,6 +378,8 @@ and pp_e fmt e = match e with
     Format.fprintf fmt "@[recupd_%s(%a)@]" lbl (pp_prio 0) arg
   | Operation (RecDel lbl, e) ->
     Format.fprintf fmt "@[%a\\%s@]" (pp_prio 90) e lbl
+  | Operation (OCustom { oname; ofun ; _ }, e) when String.equal oname String.empty ->
+    Format.fprintf fmt "@[<hov 2><%a>@ %a@]" TyScheme.pp_short ofun (pp_prio 90) e
   | Operation (OCustom { oname; _ }, e) ->
     Format.fprintf fmt "@[<hov 2>%s@ %a@]" oname (pp_prio 90) e
   | Projection (PiField lbl, e) ->
@@ -413,7 +415,8 @@ and pp_e fmt e = match e with
   | TypeCoerce (e, ty, check) ->
     Format.fprintf fmt "@[(%a :>%a %a)@]"
       (pp_prio 0) e pp_check check GTy.pp ty
-  | Alt (settings, _) -> Format.pp_print_string fmt settings.aname
-    (* Format.fprintf fmt "@[<hov 1>[%a]@]"
+  | Alt ({ aname ; _ }, es) when String.equal String.empty aname ->
+    Format.fprintf fmt "@[<hov 1>[%a]@]"
       (Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt "@ |@ ")
-        (pp_prio 51)) es *)
+        (pp_prio 51)) es
+  | Alt ({ aname ; _ }, _) -> Format.pp_print_string fmt aname
