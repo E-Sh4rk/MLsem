@@ -84,7 +84,7 @@ module rec IAnnot : sig
   | AIte of t * GTy.t * branch * branch
   | ALambda of GTy.t * t
   | ALambdaRec of (GTy.t * t) list
-  | AAlt of t option list
+  | AAlt of bool (* masked *) * t option list
   | AInter of inter
   and t =
   | A of Annot.t
@@ -121,7 +121,7 @@ end = struct
   | AIte of t * GTy.t * branch * branch
   | ALambda of GTy.t * t
   | ALambdaRec of (GTy.t * t) list
-  | AAlt of t option list
+  | AAlt of bool (* masked *) * t option list
   | AInter of inter
   [@@deriving show]
   and t =
@@ -145,7 +145,7 @@ end = struct
       | AIte (t,ty,b1,b2) -> AIte (aux t, GTy.substitute s ty, aux_b b1, aux_b b2)
       | ALambda (ty, t) -> ALambda (GTy.substitute s ty, aux t)
       | ALambdaRec lst -> ALambdaRec (List.map (fun (ty,t) -> (GTy.substitute s ty, aux t)) lst)
-      | AAlt ts -> AAlt (List.map (Option.map aux) ts)
+      | AAlt (b,ts) -> AAlt (b, List.map (Option.map aux) ts)
       | AInter bs -> AInter (List.map aux_ib bs)
     and aux t =
       match t with

@@ -23,6 +23,8 @@ type operation =
 | RecUpd of string | RecDel of string
 | OCustom of ocustom
 [@@deriving show]
+type alt_settings = { aname: string ; amask: Env.t -> bool list ; aerror: Env.t -> string }
+[@@deriving show]
 type param_annot = GTy.t option
 [@@deriving show]
 type e =
@@ -38,7 +40,7 @@ type e =
 | Let of (Ty.t list) * Variable.t * t * t
 | TypeCast of t * GTy.t * check
 | TypeCoerce of t * GTy.t * check
-| Alt of t list
+| Alt of alt_settings * t list
 [@@deriving show]
 and t = Eid.t * e
 [@@deriving show]
@@ -58,7 +60,7 @@ let map_tl f (id,e) =
     | Let (ta, v, e1, e2) -> Let (ta, v, f e1, f e2)
     | TypeCast (e, ty, c) -> TypeCast (f e, ty, c)
     | TypeCoerce (e, ty, c) -> TypeCoerce (f e, ty, c)
-    | Alt es -> Alt (List.map f es)
+    | Alt (settings, es) -> Alt (settings, List.map f es)
   in
   (id,e)
 
@@ -411,7 +413,7 @@ and pp_e fmt e = match e with
   | TypeCoerce (e, ty, check) ->
     Format.fprintf fmt "@[(%a :>%a %a)@]"
       (pp_prio 0) e pp_check check GTy.pp ty
-  | Alt es ->
-    Format.fprintf fmt "@[<hov 1>[%a]@]"
+  | Alt (settings, _) -> Format.pp_print_string fmt settings.aname
+    (* Format.fprintf fmt "@[<hov 1>[%a]@]"
       (Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt "@ |@ ")
-        (pp_prio 51)) es
+        (pp_prio 51)) es *)

@@ -150,7 +150,7 @@ let rec try_elim_ret ~keep_ret bid e =
     (* Do-not-traverse cases *)
     | Isolate e -> (id, Isolate (aux' e)) |> cont'
     | Constructor (c,es) -> (id, Constructor (c, List.map aux' es)) |> cont'
-    | Alt es -> (id, Alt (List.map aux' es)) |> cont'
+    | Alt (settings, es) -> (id, Alt (settings, List.map aux' es)) |> cont'
     | App (e1, e2) -> (id, App (aux' e1, aux' e2)) |> cont'
     | Operation (o,e) -> (id, Operation (o, aux' e)) |> cont'
     | Projection (p,e) -> (id, Projection (p, aux' e)) |> cont'
@@ -285,7 +285,7 @@ let eliminate_cf t =
     | VarAssign (v, e) -> MAst.VarAssign (v, aux e)
     | Loop e -> MAst.Loop (aux e)
     | Seq (e1, e2) -> MAst.Seq (aux e1, aux e2)
-    | Alt es -> MAst.Alt (List.map aux es)
+    | Alt (settings,es) -> MAst.Alt (settings, List.map aux es)
     | Exc -> Exc
     | PatMatch _ | If _ | While _ | Break | Return _ | Block _ -> assert false
     | Ret _ -> invalid_arg "Expression contains an orphan ret expression."

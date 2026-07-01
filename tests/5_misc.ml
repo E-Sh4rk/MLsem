@@ -280,3 +280,5 @@ let typeof_app' x =
   if to_bool (if t is "int" then true else false)
   then return 0
   else fail "invalid input"
+
+let alt_fail (x:int) = [ typeof1 x | typeof10 x ]

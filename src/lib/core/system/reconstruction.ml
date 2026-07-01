@@ -48,7 +48,7 @@ let initial ?(direct_narrowing=true) ?(partition_narrowing=true) refinements e =
     | Projection (_, e) -> AProj (initial r e, new_result ()) |> right
     | TypeCast (e, ty, _) -> ACast (ty, initial r e) |> right
     | TypeCoerce (e, ty, _) -> ACoerce (ty, initial r e) |> right
-    | Alt es -> AAlt (List.map (fun e -> Some (initial r e)) es) |> right
+    | Alt (_,es) -> AAlt (false, List.map (fun e -> Some (initial r e)) es) |> right
     | Let (suggs, v, e1, e2) ->
       let a1 = initial r e1 in
       let tys = Refinement.Partitioner.decomposition_for r v suggs in
@@ -310,7 +310,11 @@ and refine_ann r cache env (rid, annot) (id, e) =
         end  
       end
     end
-  | Alt es, AAlt anns ->
+  | Alt (settings,_), AAlt (false, anns) ->
+    let mask = settings.amask env in
+    let anns = List.map2 (fun ann b -> if b then ann else None) anns mask in
+    retry_with (ic (AAlt (true, anns)))
+  | Alt (settings,es), AAlt (true, anns) ->
     let rec aux es anns =
       match es, anns with
       | [], [] -> Either.left []
@@ -323,9 +327,11 @@ and refine_ann r cache env (rid, annot) (id, e) =
       | _, _ -> assert false
     in
     begin match aux es anns with
-    | Either.Left lst when List.for_all Option.is_none lst -> Fail
+    | Either.Left lst when List.for_all Option.is_none lst ->
+      log "untypeable encoding" (fun fmt -> Format.fprintf fmt "%s" (settings.aerror env)) ;
+      Fail
     | Either.Left lst -> retry_with (ac (Annot.AAlt lst))
-    | Either.Right (ss,a,a',r) -> Subst (ss,AAlt(a)|>ic,AAlt(a')|>ic,r)
+    | Either.Right (ss,a,a',r) -> Subst (ss,AAlt(true,a)|>ic,AAlt(true,a')|>ic,r)
     end
   | App (e1, e2), AApp (a1,a2,res) ->
     begin match refine_seq' cache env [(a1,e1);(a2,e2)] with

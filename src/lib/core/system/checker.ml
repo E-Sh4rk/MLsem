@@ -44,7 +44,7 @@ let rec is_gen (_,e) =
   | LambdaRec lst -> List.for_all (fun (_,_,e) -> is_gen e) lst
   | TypeCast (e, _, _) | TypeCoerce (e, _, _) -> is_gen e
   | Let (_, _, e1, e2) | Ite (_, _, e1, e2) -> is_gen e1 && is_gen e2
-  | Alt es -> List.for_all is_gen es
+  | Alt (_,es) -> List.for_all is_gen es
 
 let generalize ~e env s =
   if not (!Config.value_restriction) || is_gen e then
@@ -102,7 +102,7 @@ let rec typeof' env annot (id,e) =
     let t1 = typeof_b env b1 e1 s tau in
     let t2 = typeof_b env b2 e2 s (GTy.neg tau) in
     GTy.cup t1 t2
-  | Alt es, AAlt anns ->
+  | Alt (_,es), AAlt anns ->
     if List.for_all Option.is_none anns
     then untypeable id ("At least one branch of a Alt expr must be typeable.")
     else

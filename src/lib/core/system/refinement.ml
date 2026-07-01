@@ -35,7 +35,8 @@ let rec typeof env (_,e) =
   | Let (_, v, e1, e2) -> typeof (Env.add v (typeof_def env e1) env) e2
   | TypeCast (e, ty, _) -> GTy.cap (typeof env e) ty
   | TypeCoerce (_, ty, _) -> ty
-  | Alt es -> List.map (typeof env) es |> GTy.conj
+  | Alt (settings, es) ->
+    List.map2 (fun e b -> if b then typeof env e else GTy.any) es (settings.amask env) |> GTy.conj
   | Lambda _ | LambdaRec _ | App _ | Operation _ -> GTy.any
 and typeof_def env e = Checker.generalize ~e env (typeof env e)
 
@@ -84,7 +85,8 @@ let sufficient_refinements env e t =
       let r1 = combine (aux env e (GTy.ub s)) (aux env e1 t) in
       let r2 = combine (aux env e (GTy.neg s |> GTy.ub)) (aux env e2 t) in
       r1@r2
-    | Alt es -> List.concat_map (fun e -> aux env e t) es
+    | Alt (settings,es) ->
+      List.map2 (fun e b -> if b then aux env e t else []) es (settings.amask env) |> List.concat
     | Let (_, v, e1, e2) ->
       aux (Env.add v (typeof_def env e1) env) e2 t
       |> List.concat_map (fun renv ->
@@ -153,7 +155,7 @@ let refinements
       end ;
       aux env e ; aux env e1 ; aux env e2
     | App (e1, e2) -> aux env e1 ; aux env e2
-    | Alt es -> List.iter (aux env) es
+    | Alt (_,es) -> List.iter (aux env) es
     | Let (_, v, e1, e2) ->
       aux env e1 ; aux (Env.add v (typeof_def env e1) env) e2 ;
       let res' =

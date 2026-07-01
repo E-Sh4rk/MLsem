@@ -187,9 +187,9 @@ let optimize_dataflow e =
     | Try es ->
       let env, ctx, es = aux_parallel env es in
       env, ctx, (id, Try es)
-    | Alt es ->
+    | Alt (settings, es) ->
       let envs, es = List.map (aux' env) es |> List.split in
-      merge_envs' env envs, hole, (id, Alt es)
+      merge_envs' env envs, hole, (id, Alt (settings, es))
     in
     env, ctx, e
   and aux_parallel env es =
@@ -291,10 +291,10 @@ let rec clean_unused_assigns e =
     | Try es ->
       let es, rv = aux_parallel cv rv es in
       (id, Try es), rv
-    | Alt es ->
+    | Alt (settings, es) ->
       let es, rvs = List.map (aux cv rv) es |> List.split in
       let rv = List.fold_left VarSet.union VarSet.empty rvs in
-      (id, Alt es), rv
+      (id, Alt (settings, es)), rv
   and aux_parallel cv rv es =
     let es, rvs = es
       |> List.map (fun e -> e, read_vars e)
@@ -331,7 +331,7 @@ let rec can_fail (_,e) =
   | Voidify e | TypeCast (e, _, NoCheck) | TypeCoerce (e, _, NoCheck) -> can_fail e
   | Loop e | Declare (_, e)  -> can_fail e
   | Let (_, _, e1, e2) | Seq (e1, e2) -> can_fail e1 || can_fail e2
-  | Try es | Alt es -> List.exists can_fail es
+  | Try es | Alt (_, es) -> List.exists can_fail es
   | Ite (e,_,e1,e2) -> can_fail e || can_fail e1 || can_fail e2
   | _ -> true
 let rec can_empty (_,e) =
@@ -341,7 +341,7 @@ let rec can_empty (_,e) =
   | Value _ (* user should use Exc if they want to diverge *) -> false
   | Loop e | Declare (_, e)  -> can_empty e
   | Let (_, _, e1, e2) | Seq (e1, e2) -> can_empty e1 || can_empty e2
-  | Try es | Alt es -> List.exists can_empty es
+  | Try es | Alt (_, es) -> List.exists can_empty es
   | _ -> true
 let is_alias (_,e) =
   match e with

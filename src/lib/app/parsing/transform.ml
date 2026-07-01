@@ -1,6 +1,7 @@
 open Mlsem_common
 open Mlsem_types
 module MVariable = Mlsem_lang.MVariable
+module SA = Mlsem_system.Ast
 
 let expr_to_ast t =
   let open Mlsem_lang.Ast in
@@ -73,7 +74,11 @@ let expr_to_ast t =
     | Cond (e,t,e1,e2) -> If (aux e, t, aux e1, Option.map aux e2)
     | While (e,t,e1) -> While (aux e, t, aux e1)
     | Seq (e1, e2) -> Seq (aux e1, aux e2)
-    | Alt es -> Alt (List.map aux es)
+    | Alt es ->
+      let amask _ = List.init (List.length es) (Fun.const true) in
+      let aerror _ = "Could not find any typeable alternative." in
+      let settings = { SA.aname="alternatives" ; amask ; aerror } in
+      Alt (settings, List.map aux es)
     | Return e -> Return (aux e)
     | Break | Continue -> Break
   and aux (id, e) =

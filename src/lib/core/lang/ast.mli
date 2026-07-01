@@ -54,7 +54,7 @@ type e =
 (** Evaluate the first expression, then the second. *)
 | Try of t list
 (** May jump from a branch to another. Used to model try-with expressions. *)
-| Alt of t list
+| Alt of SA.alt_settings * t list
 (** Evaluate branches independently. The result is (the intersection of) the result of the branches that do not fail. *)
 | Block of blockid * t
 (** Identifies a block to which a Ret can refer to. *)

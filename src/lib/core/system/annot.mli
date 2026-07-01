@@ -56,7 +56,7 @@ module rec IAnnot : sig
   | AIte of t * GTy.t * branch * branch
   | ALambda of GTy.t * t
   | ALambdaRec of (GTy.t * t) list
-  | AAlt of t option list
+  | AAlt of bool (* masked *) * t option list
   | AInter of inter
   and t =
   | A of Annot.t

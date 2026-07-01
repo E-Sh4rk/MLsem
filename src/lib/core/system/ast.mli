@@ -16,6 +16,7 @@ type constructor = (* Constructors must be monotonic operations *)
 type operation =
 | RecUpd of string | RecDel of string
 | OCustom of ocustom
+type alt_settings = { aname: string ; amask: Env.t -> bool list ; aerror: Env.t -> string }
 type param_annot = GTy.t option
 type e =
 | Value of TyScheme.t
@@ -30,7 +31,7 @@ type e =
 | Let of (Ty.t list) (* empty list = no partitioning *) * Variable.t * t * t
 | TypeCast of t * GTy.t * check
 | TypeCoerce of t * GTy.t * check
-| Alt of t list
+| Alt of alt_settings * t list
 and t = Eid.t * e
 
 val map : (t -> t) -> t -> t
@@ -48,6 +49,7 @@ val pp_check : Format.formatter -> check -> unit
 val pp_projection : Format.formatter -> projection -> unit
 val pp_constructor : Format.formatter -> constructor -> unit
 val pp_operation : Format.formatter -> operation -> unit
+val pp_alt_settings : Format.formatter -> alt_settings -> unit
 val pp_param_annot : Format.formatter -> param_annot -> unit
 val pp_pcustom : Format.formatter -> pcustom -> unit
 val pp_ccustom : Format.formatter -> ccustom -> unit

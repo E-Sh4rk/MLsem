@@ -347,3 +347,6 @@ typeof_app': Int -> 0
 [Warning] File "tests/5_misc.ml", line 278, characters 36-45 Unreachable code
 [Warning] File "tests/5_misc.ml", line 279, characters 12-21 Unreachable code
 [Warning] File "tests/5_misc.ml", line 279, characters 24-34 Unreachable code
+alt_fail: untypeable encoding
+File "tests/5_misc.ml", line 284, characters 23-49
+Could not find any typeable alternative.
