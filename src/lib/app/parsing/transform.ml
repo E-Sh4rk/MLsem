@@ -24,12 +24,12 @@ let expr_to_ast t =
     | PatAnd (p1, p2) -> PAnd (aux_pat p1, aux_pat p2)
     | PatOr (p1, p2) -> POr (aux_pat p1, aux_pat p2)
     | PatAssign ((_,v), c) ->
-      PAssign (get_sugg v, v, Mlsem_lang.Const.typeof c |> GTy.mk |> TyScheme.mk_mono)
+      PAssign (get_sugg v, v, Mlsem_lang.Const.typeof c |> GTy.mk)
   in
   let rec aux_e id e =
     match e with
-    | PAst.Magic t -> Value (TyScheme.mk_mono t)
-    | Const c -> Value (Mlsem_lang.Const.typeof c |> GTy.mk |> TyScheme.mk_mono)
+    | PAst.Magic t -> Value t
+    | Const c -> Value (Mlsem_lang.Const.typeof c |> GTy.mk)
     | Var v -> Var v
     | Enum e -> Constructor (Enum e, [])
     | Tag (t, e) -> Constructor (Tag t, [aux e])

@@ -80,14 +80,14 @@ let mk ty = GTy.mk ty |> TyScheme.mk_poly
 let ref_uninit v =
   Arrow.mk Ty.unit (aref v) |> mk
 let ref_uninit v =
-  let arg = Eid.unique (), SA.Value (Ty.unit |> GTy.mk |> TyScheme.mk_mono) in
-  let op = { SA.oname="ref_uninit" ; ofun=ref_uninit v ; ogen=false } in
+  let arg = Eid.unique (), SA.Value (GTy.mk Ty.unit) in
+  let op = { SA.oname="ref_uninit" ; ofun=Fun.const (ref_uninit v) ; ogen=false } in
   SA.Operation (OCustom op, arg)
 
 let ref_cons v =
   Arrow.mk (aub v) (aref v) |> mk
 let ref_cons v arg =
-  let op = { SA.oname="ref" ; ofun=ref_cons v ; ogen=false } in
+  let op = { SA.oname="ref" ; ofun=Fun.const (ref_cons v) ; ogen=false } in
   SA.Operation (OCustom op, arg)
 
 let ref_get v =
@@ -96,7 +96,7 @@ let ref_get v =
   mk_gradual lb ub
 let ref_get v =
   let arg = Eid.unique (), SA.Var v in
-  let op = { SA.oname="get" ; ofun=ref_get v ; ogen=false } in
+  let op = { SA.oname="get" ; ofun=Fun.const (ref_get v) ; ogen=false } in
   SA.Operation (OCustom op, arg)
 
 let ref_assign v =
@@ -105,5 +105,5 @@ let ref_assign v arg =
   let arg = Eid.unique (), SA.Constructor (SA.Tuple 2,[
           (Eid.unique (), SA.Var v) ; arg
       ]) in
-  let op = { SA.oname="assign" ; ofun=ref_assign v ; ogen=false } in
+  let op = { SA.oname="assign" ; ofun=Fun.const (ref_assign v) ; ogen=false } in
   SA.Operation (OCustom op, arg)

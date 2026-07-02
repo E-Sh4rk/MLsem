@@ -18,13 +18,13 @@ type pattern =
 | PConstructor of pattern_constructor * pattern list
 | PAnd of pattern * pattern
 | POr of pattern * pattern
-| PAssign of Ty.t list * Variable.t * TyScheme.t
+| PAssign of Ty.t list * Variable.t * GTy.t
 [@@deriving show]
 type e =
 | Hole of int
 | Exc | Void | Voidify of t
 | Isolate of t
-| Value of TyScheme.t
+| Value of GTy.t
 | Var of Variable.t
 | Constructor of SA.constructor * t list
 | Lambda of Ty.t list * SA.param_annot * Variable.t * t

@@ -5,7 +5,7 @@ type pcustom = { pname: string ; pdom: Ty.t -> Ty.t ; proj: Ty.t -> Ty.t ; pgen:
 let pp_pcustom fmt pc = Format.fprintf fmt "%s" pc.pname
 type ccustom = { cname: string ; cdom: Ty.t -> Ty.t list list ; cons: Ty.t list -> Ty.t ; cgen: bool }
 let pp_ccustom fmt cc = Format.fprintf fmt "%s" cc.cname
-type ocustom = { oname: string ; ofun: TyScheme.t ; ogen: bool }
+type ocustom = { oname: string ; ofun: Env.t -> TyScheme.t ; ogen: bool }
 let pp_ocustom fmt oc = Format.fprintf fmt "%s" oc.oname
 type check = Check | CheckStatic | NoCheck
 [@@deriving show]
@@ -28,7 +28,7 @@ type alt_settings = { aname: string ; amask: Env.t -> bool list ; aerror: Env.t 
 type param_annot = GTy.t option
 [@@deriving show]
 type e =
-| Value of TyScheme.t
+| Value of GTy.t
 | Var of Variable.t
 | Constructor of constructor * t list
 | Lambda of param_annot * Variable.t * t
@@ -109,7 +109,7 @@ let vars e = VarSet.union (uv e) (bv e)
 let apply_subst s e =
   let aux (id,e) =
     let e = match e with
-    | Value t -> Value (TyScheme.substitute s t)
+    | Value t -> Value (GTy.substitute s t)
     | Lambda (ty,v,e) -> Lambda (Option.map (GTy.substitute s) ty,v,e)
     | LambdaRec lst -> LambdaRec (List.map (fun (ty,v,e) -> (Option.map (GTy.substitute s) ty, v, e)) lst)
     | Let (ts, v, e1, e2) -> Let (List.map (Subst.apply s) ts, v, e1, e2)
@@ -200,7 +200,7 @@ let construct (c:constructor) tys =
 
 let rv = RVar.mk KNoInfer None
 let tv = TVar.mk KNoInfer None
-let fun_of_operation o =
+let fun_of_operation env o =
   match o with
   | RecUpd lbl ->
     let dom1, dom2 = Record.mk' (RVar.fty rv) [], TVar.typ tv in
@@ -210,7 +210,7 @@ let fun_of_operation o =
     let dom = Record.mk' (RVar.fty rv) [] in
     let codom = Record.mk' (RVar.fty rv) [(lbl, FTy.of_oty (Ty.empty, true))] in
     Arrow.mk dom codom |> GTy.mk |> TyScheme.mk_poly
-  | OCustom { ofun ; _ } -> ofun
+  | OCustom { ofun ; _ } -> ofun env
 
 let coerce ?coercion_id c ty t =
   let mono = TVOp.all_vars KNoInfer in
@@ -309,7 +309,7 @@ and pp_param fmt (v,annot) =
   | Some dom -> Format.fprintf fmt "(%a :@ %a)" Variable.pp_uniq v GTy.pp dom
 
 and pp_e fmt e = match e with
-  | Value ts -> Format.fprintf fmt "@[<hov><%a>@]" TyScheme.pp ts
+  | Value ty -> Format.fprintf fmt "@[<hov><%a>@]" GTy.pp ty
   | Var v -> Variable.pp_uniq fmt v
   | Constructor (Tuple _, []) -> Format.pp_print_string fmt "()"
   | Constructor (Tuple _, es) ->
@@ -379,7 +379,7 @@ and pp_e fmt e = match e with
   | Operation (RecDel lbl, e) ->
     Format.fprintf fmt "@[%a\\%s@]" (pp_prio 90) e lbl
   | Operation (OCustom { oname; ofun ; _ }, e) when String.equal oname String.empty ->
-    Format.fprintf fmt "@[<hov 2><%a>@ %a@]" TyScheme.pp_short ofun (pp_prio 90) e
+    Format.fprintf fmt "@[<hov 2><%a>@ %a@]" TyScheme.pp_short (ofun Env.empty) (pp_prio 90) e
   | Operation (OCustom { oname; _ }, e) ->
     Format.fprintf fmt "@[<hov 2>%s@ %a@]" oname (pp_prio 90) e
   | Projection (PiField lbl, e) ->

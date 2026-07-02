@@ -49,7 +49,7 @@ module rec IAnnot : sig
   | AConstruct of t list
   | ALet of t * part
   | AApp of t * t * Ty.t (* result *)
-  | AOp of GTy.t * t * Ty.t (* result *)
+  | AOp of (MVarSet.t -> Subst.t) * t * Ty.t (* result *)
   | AProj of t * Ty.t (* result *)
   | ACast of GTy.t * t
   | ACoerce of GTy.t * t

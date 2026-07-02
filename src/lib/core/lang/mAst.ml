@@ -5,7 +5,7 @@ module SA = Mlsem_system.Ast
 type e =
 | Hole of int
 | Exc | Void | Voidify of t
-| Value of TyScheme.t
+| Value of GTy.t
 | Var of Variable.t
 | Constructor of SA.constructor * t list
 | Lambda of Ty.t list * SA.param_annot * Variable.t * t
@@ -116,8 +116,8 @@ let rename_fv v v' =
 let to_system_ast t =
   let rec aux (id, e) =
     let e = match e with
-    | Exc -> SA.Value (GTy.empty |> TyScheme.mk_mono)
-    | Void -> SA.Value (GTy.mk !Config.void_ty |> TyScheme.mk_mono)
+    | Exc -> SA.Value GTy.empty
+    | Void -> SA.Value (GTy.mk !Config.void_ty)
     | Voidify e -> SA.Constructor (SA.Voidify !Config.void_ty, [aux e])
     | Value t -> SA.Value t
     | Var v -> if MVariable.is_mutable v then MVariable.ref_get v else SA.Var v

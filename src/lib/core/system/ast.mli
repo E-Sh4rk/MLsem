@@ -3,7 +3,7 @@ open Mlsem_types
 
 type pcustom = { pname: string ; pdom: Ty.t -> Ty.t ; proj: Ty.t -> Ty.t ; pgen: bool }
 type ccustom = { cname: string ; cdom: Ty.t -> Ty.t list list ; cons: Ty.t list -> Ty.t ; cgen: bool }
-type ocustom = { oname: string ; ofun: TyScheme.t ; ogen: bool }
+type ocustom = { oname: string ; ofun: Env.t -> TyScheme.t ; ogen: bool }
 type check = Check | CheckStatic | NoCheck
 type projection = (* Projections must be monotonic operations *)
 | Pi of int * int | PiField of string | PiFieldOpt of string
@@ -19,7 +19,7 @@ type operation =
 type alt_settings = { aname: string ; amask: Env.t -> bool list ; aerror: Env.t -> string }
 type param_annot = GTy.t option
 type e =
-| Value of TyScheme.t
+| Value of GTy.t
 | Var of Variable.t
 | Constructor of constructor * t list
 | Lambda of param_annot * Variable.t * t
@@ -61,7 +61,7 @@ val proj : projection -> Ty.t -> Ty.t
 val domains_of_construct : constructor -> Ty.t -> Ty.t list list
 val construct : constructor -> Ty.t list -> Ty.t
 
-val fun_of_operation : operation -> TyScheme.t
+val fun_of_operation : Env.t -> operation -> TyScheme.t
 
 val coerce : ?coercion_id:Eid.t -> check -> GTy.t -> t -> t
 val push_coercions : t -> t

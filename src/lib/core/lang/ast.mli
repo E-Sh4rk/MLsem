@@ -17,7 +17,7 @@ type pattern =
 | PConstructor of pattern_constructor * pattern list
 | PAnd of pattern * pattern
 | POr of pattern * pattern
-| PAssign of Ty.t list * Variable.t * TyScheme.t
+| PAssign of Ty.t list * Variable.t * GTy.t
 (** The first parameter is a suggested type decomposition, similarly to let-bindings *)
 
 type e =
@@ -27,7 +27,7 @@ type e =
 (** Evaluate the expression inside, but give it the [void] type, even if it diverges *)
 | Isolate of t
 (** Prevent duplications of the outer context when eliminating control flow inside *)
-| Value of TyScheme.t
+| Value of GTy.t
 | Var of Variable.t
 | Constructor of SA.constructor * t list
 | Lambda of Ty.t list * SA.param_annot * Variable.t * t
