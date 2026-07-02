@@ -343,18 +343,11 @@ let rec can_empty (_,e) =
   | Let (_, _, e1, e2) | Seq (e1, e2) -> can_empty e1 || can_empty e2
   | Try es | Alt (_, es) -> List.exists can_empty es
   | _ -> true
-let is_alias (_,e) =
-  match e with
-  | Value _ -> true
-  | Var v -> MVariable.is_mutable v |> not
-  | _ -> false
 let clean e =
   let rec f (id,e) =
     match e with
     | Voidify e when can_fail e |> not -> id, Void
     | Seq (e1, e2) when (can_fail e1 |> not) && (can_empty e1 |> not) -> e2
-    | Let ([], v, e1, e2) when MVariable.is_mutable v |> not && is_alias e1 ->
-      map (function (id', Var v') when Variable.equal v v' -> id', snd e1 | e -> e) e2
     | Declare (v, e) when VarSet.mem v (fv e) |> not -> e
     | Let (_, v, e1, e2) when VarSet.mem v (fv e2) |> not -> f (id, Seq (e1, e2))
     | e -> id, e
