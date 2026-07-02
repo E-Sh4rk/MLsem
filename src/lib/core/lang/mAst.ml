@@ -125,11 +125,8 @@ let to_system_ast t =
     | Lambda (tys, ty, x, e) ->
       if MVariable.is_mutable x then invalid_arg "Variable of Lambda cannot be mutable." ;
       let x' = MVariable.refresh Immut x in
-      let body =
-        Eid.refresh (fst e),
-        Let (tys, x', (Eid.unique (), Var x), rename_fv x x' e)
-      in
-      SA.Lambda (ty, x, aux body)
+      let body = Eid.refresh (fst e), Let (tys, x, (Eid.unique (), Var x'), e) in
+      SA.Lambda (ty, x', aux body)
     | LambdaRec lst ->
       let aux (ty,x,e) = (ty, x, aux e) in
       if lst |> List.exists (fun (_,v,_) -> MVariable.is_mutable v)
