@@ -49,12 +49,17 @@ let initial ?(direct_narrowing=true) ?(partition_narrowing=true) refinements e =
     | Let (suggs, v, e1, e2) ->
       let a1 = initial r e1 in
       let tys = Refinement.Partitioner.decomposition_for r v suggs in
-      (* Format.printf "Part for %a: %a@." Variable.pp v (Utils.pp_list Ty.pp) tys ; *)
-      let parts = tys |> List.map (fun ty -> ty, Some ((fun () ->
-          let r = Refinement.Partitioner.filter_compatible r v ty in
-          initial r e2
-        ) |> LazyIAnnot.mk_lazy)) in
-      ALet (a1, parts) |> right
+      if List.is_empty tys
+      then
+        let a2 = initial r e2 in
+        ALet' (a1, a2) |> right
+      else
+        (* Format.printf "Part for %a: %a@." Variable.pp v (Utils.pp_list Ty.pp) tys ; *)
+        let parts = tys |> List.map (fun ty -> ty, Some ((fun () ->
+            let r = Refinement.Partitioner.filter_compatible r v ty in
+            initial r e2
+          ) |> LazyIAnnot.mk_lazy)) in
+        ALet (a1, parts) |> right
     in
     let refinement =
       if direct_narrowing
@@ -374,6 +379,19 @@ and refine_ann r cache env (rid, annot) (id, e) =
       | OneFail -> Fail
       | OneSubst (ss,p,p',r) -> Subst (ss,ALet(A annot1,p)|>ic,ALet(A annot1,p')|>ic,r)
       | AllOk (p,_) -> retry_with (ac (Annot.ALet (annot1, p)))
+      end
+    end
+  | Let (_,v,e1,e2), ALet'(annot1,annot2) ->
+    begin match refine' cache env annot1 e1 with
+    | Fail -> Fail
+    | Subst (ss,a,a',r) -> Subst (ss,ALet' (a,annot2)|>ic,ALet' (a',annot2)|>ic,r)
+    | Ok (annot1, s) ->
+      let t = Checker.generalize ~e:e1 env s in
+      let env = Env.add v t env in
+      begin match refine' cache env annot2 e2 with
+      | Fail -> Fail
+      | Subst (ss,a2,a2',r) -> Subst (ss,ALet'(A annot1,a2)|>ic,ALet'(A annot1,a2')|>ic,r)
+      | Ok (a2,_) -> retry_with (ac (Annot.ALet' (annot1, a2)))
       end
     end
   | TypeCast (e', _, c), ACast (t,annot') ->

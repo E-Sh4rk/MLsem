@@ -194,8 +194,7 @@ module Partitioner = struct
   let decomposition_for t v initial =
     let tys = t |> List.filter_map (fun renv -> REnv.find_opt v renv) in
     let part_for_dom dom = tys |> partition dom in
-    let parts = List.concat_map part_for_dom initial in
-    if List.is_empty parts then [Ty.any] else parts
+    List.concat_map part_for_dom initial
     (* |> (fun tys -> Format.printf "Partition for %a: %a@." Variable.pp v
       (Utils.pp_list Ty.pp) tys ; tys) *)
 end

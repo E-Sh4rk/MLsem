@@ -138,6 +138,9 @@ let rec typeof' env annot (id,e) =
         untypeable id ("Partition of "^(Variable.show v)^" contains generalized variables.")
     in
     List.map aux annots2 |> GTy.disj
+  | Let (_, v, e1, e2), ALet' (annot1, annot2) ->
+    let ty = typeof_def env annot1 e1 in
+    typeof (Env.add v ty env) annot2 e2
   | TypeCast (e, _, c), ACast (ty, annot) ->
     let t = typeof env annot e in
     if (c = Check && GTy.leq t ty)

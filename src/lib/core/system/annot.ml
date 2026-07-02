@@ -13,6 +13,7 @@ module Annot = struct
   | AVar of Subst.t 
   | AConstruct of t list
   | ALet of t * part
+  | ALet' of t * t
   | AApp of t * t * Ty.t (* result *)
   | AOp of GTy.t * t * Ty.t (* result *)
   | AProj of t
@@ -34,6 +35,7 @@ module Annot = struct
       | AVar s' -> AVar (Subst.compose_restr s s')
       | AConstruct ts -> AConstruct (List.map aux ts)
       | ALet (t, ps) -> ALet (aux t, List.map (fun (ty, t) -> Subst.apply s ty, Option.map aux t) ps)
+      | ALet' (t1, t2) -> ALet' (aux t1, aux t2)
       | AApp (t1, t2, ty) -> AApp (aux t1, aux t2, Subst.apply s ty)
       | AOp (gty, t, ty) -> AOp (GTy.substitute s gty, aux t, Subst.apply s ty)
       | AProj t -> AProj (aux t)
@@ -76,6 +78,7 @@ module rec IAnnot : sig
   | AVar of (MVarSet.t -> Subst.t)
   | AConstruct of t list
   | ALet of t * part
+  | ALet' of t * t
   | AApp of t * t * Ty.t (* result *)
   | AOp of (MVarSet.t -> Subst.t) * t * Ty.t (* result *)
   | AProj of t * Ty.t (* result *)
@@ -113,6 +116,7 @@ end = struct
   | AVar of (MVarSet.t -> Subst.t)
   | AConstruct of t list
   | ALet of t * part
+  | ALet' of t * t
   | AApp of t * t * Ty.t (* result *)
   | AOp of (MVarSet.t -> Subst.t) * t * Ty.t (* result *)
   | AProj of t * Ty.t (* result *)
@@ -137,6 +141,7 @@ end = struct
       | AConstruct ts -> AConstruct (List.map aux ts)
       | ALet (t, ps) ->
         ALet (aux t, List.map (fun (ty, t) -> Subst.apply s ty, Option.map (LazyIAnnot.substitute s) t) ps)
+      | ALet' (t1, t2) -> ALet' (aux t1, aux t2)
       | AApp (t1, t2, ty) -> AApp (aux t1, aux t2, Subst.apply s ty)
       | AOp (f, t, ty) -> AOp (f, aux t, Subst.apply s ty)
       | AProj (t, ty) -> AProj (aux t, Subst.apply s ty)
