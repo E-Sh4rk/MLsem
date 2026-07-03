@@ -33,7 +33,7 @@ let read_vars e =
   in
   iter aux e ; VarSet.inter (fv e) !rv
 
-type env = { captured:VarSet.t ; immut:Variable.t VarMap.t ; mut:Variable.t list VarMap.t }
+type env = { captured:VarSet.t ; immut:Variable.t VarMap.t ; mut:Variable.t list VarMap.t ; partitions:Ty.t list VarMap.t }
 
 let optimize_dataflow e =
   let hole = Eid.dummy, Hole 0 in
@@ -42,7 +42,8 @@ let optimize_dataflow e =
     let captured = VarSet.elements env.captured in
     { immut = List.fold_right VarMap.remove captured env.immut ;
       mut = List.fold_right VarMap.remove captured env.mut ;
-      captured = env.captured }
+      captured = env.captured ;
+      partitions = env.partitions }
   in
   let add_captured env vs =
     { env with captured=VarSet.union env.captured vs } |> norm
@@ -59,7 +60,8 @@ let optimize_dataflow e =
     ) benv.immut nenv.immut in
     let mut = benv.mut in
     let captured = VarSet.union benv.captured nenv.captured in
-    { captured ; immut ; mut } |> norm
+    let partitions = VarMap.union (fun _ _ _ -> None) benv.partitions nenv.partitions in
+    { captured ; immut ; mut ; partitions } |> norm
   in
   let merge_envs' benv nenvs =
     List.fold_left merge_envs benv nenvs
@@ -76,9 +78,10 @@ let optimize_dataflow e =
     { env with mut = VarMap.add v (v'::(get_muts env v)) env.mut }|> norm
   in
   let get_preferred_mut env v = match get_muts env v with hd::_ -> hd | [] -> v in
-  let add_immut_def (env, ctx) tys v e =
+  let add_immut_def (env, ctx) v e =
     let vimmut = MVariable.refresh MVariable.Immut v in
     let env = add_immut env v vimmut in
+    let tys = VarMap.find_opt v env.partitions |> Option.value ~default:[] in
     let ctx = fill ctx (Eid.unique (), Let (tys, vimmut, e, hole)) in
     (env,ctx,vimmut)
   in
@@ -86,7 +89,7 @@ let optimize_dataflow e =
     if has_immut env v then
       (env,ctx,get_immut env v)
     else
-      add_immut_def (env, ctx) [Ty.any] v (Eid.unique (), Var (get_preferred_mut env v))
+      add_immut_def (env, ctx) v (Eid.unique (), Var (get_preferred_mut env v))
   in
   let add_mut_alias (env,ctx) v =
     if has_immut env v then
@@ -99,7 +102,7 @@ let optimize_dataflow e =
       (env,ctx)
   in
   let reset_env env =
-    { captured=env.captured ; mut=VarMap.empty ; immut=VarMap.empty }
+    { captured=env.captured ; mut=VarMap.empty ; immut=VarMap.empty ; partitions=env.partitions }
   in
   let rec aux env (id, e) =
     let env, ctx, e = match e with
@@ -150,7 +153,8 @@ let optimize_dataflow e =
       env, (id, Declare (v, ctx)), e
     | Let (tys, v, e1, e2) when MVariable.is_mutable v ->
       let env, ctx1, e1 = aux env e1 in
-      let env,ctx1,v' = add_immut_def (env,ctx1) tys v e1 in
+      let env = { env with partitions=VarMap.add v tys env.partitions } in
+      let env,ctx1,v' = add_immut_def (env,ctx1) v e1 in
       let ctx1 = fill ctx1 (Eid.unique (), Let ([], v, (Eid.unique (), Var v'), hole)) in
       let env, ctx2, e2 = aux env e2 in
       env, fill ctx1 ctx2, e2
@@ -166,7 +170,7 @@ let optimize_dataflow e =
       env, ctx, (id, TypeCoerce (e, ty, c))
     | VarAssign (v, e) ->
       let env, ctx, e = aux env e in
-      let env,ctx,vimmut = add_immut_def (env,ctx) [Ty.any] v e in
+      let env,ctx,vimmut = add_immut_def (env,ctx) v e in
       let vmuts = get_muts env v in
       let env,ctx = add_mut_alias (env,ctx) v in
       let e = Eid.refresh id, VarAssign (v, (Eid.unique (), Var vimmut)) in
@@ -222,7 +226,7 @@ let optimize_dataflow e =
     merge_envs env env', fill ctx e
   in
   (* We consider the free variables captured because they may be mutated by external functions *)
-  aux' { captured=fv e ; immut=VarMap.empty ; mut=VarMap.empty } e |> snd
+  aux' { captured=fv e ; immut=VarMap.empty ; mut=VarMap.empty ; partitions=VarMap.empty } e |> snd
 
 (* === Cleaning === *)
 
