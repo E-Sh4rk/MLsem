@@ -116,6 +116,9 @@ let optimize_dataflow e =
       let env,ctx,v' = add_immut_alias (env,hole) v in
       env, ctx, (id, Var v')
     | Constructor (c, es) ->
+      (* Note: if a constructor does not evaluate all its arguments,
+        it must be flagged as Config.UnknownOrder,
+        otherwise a diverging expression could be moved outside. *)
       let env, ctx, es = aux_order (eval_order_of_constructor c) env es in
       env, ctx, (id, Constructor (c, es))
     | Lambda (tys, ty, v, e) ->
@@ -252,8 +255,8 @@ let rec clean_unused_assigns e =
       let e, rv = aux cv rv e in (id, Voidify e), rv
     | Var v -> (id, Var v), VarSet.add v rv
     | Constructor (c, es) ->
-      (* Note: unlike Voidify, we consider that a diverging argument makes the
-         constructor diverge (which is technically not true for the Ignore constructor) *)
+      (* Unlike for Voidify,
+         we assume that constructor arguments do not exit (exception) before the end *)
       let es, rv = aux_order (eval_order_of_constructor c) cv rv es in
       (id, Constructor (c, es)), rv
     | Lambda (tys, ty, v, e) ->
@@ -284,7 +287,9 @@ let rec clean_unused_assigns e =
     | VarAssign (v, e) when VarSet.mem v (VarSet.union cv rv) ->
       let rv = VarSet.remove v rv in
       let e, rv = aux cv rv e in (id, VarAssign (v, e)), rv
-    | VarAssign (_, e) -> let e, rv = aux cv rv e in (Eid.unique (), Voidify e), rv
+    | VarAssign (_, e) ->
+      let e, rv = aux cv rv e in
+      (Eid.unique (), Voidify e), rv (* TODO: Ignore instead of Voidify *)
     | Loop e ->
       let rv = VarSet.union rv (read_vars e) in
       let e, rv = aux cv rv e in
