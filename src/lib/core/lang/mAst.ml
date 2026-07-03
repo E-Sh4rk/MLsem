@@ -151,7 +151,7 @@ let to_system_ast t =
     | TypeCoerce (e, ty, c) -> SA.TypeCoerce (aux e, ty, c)
     | VarAssign (v, e) when MVariable.is_mutable v -> MVariable.ref_assign v (aux e)
     | VarAssign _ -> invalid_arg "Cannot assign to an immutable variable."
-    | Loop e -> aux e |> snd
+    | Loop e -> aux e |> snd (* TODO: encode Loop as a Voidify (less error prone) *)
     | Seq (e1, e2) -> Let ([Ty.any], MVariable.create Immut None, aux e1, aux e2)
     | Try es -> SA.Constructor (SA.Join (List.length es), List.map aux es)
     | Alt (settings, es) -> SA.Alt (settings, List.map aux es)
