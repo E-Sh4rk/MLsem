@@ -1,6 +1,7 @@
 open MAst
 open Mlsem_common
 open Mlsem_utils
+open Mlsem_types
 module SA = Mlsem_system.Ast
 
 let eval_order_of_constructor c =
@@ -85,7 +86,7 @@ let optimize_dataflow e =
     if has_immut env v then
       (env,ctx,get_immut env v)
     else
-      add_immut_def (env, ctx) [] v (Eid.unique (), Var (get_preferred_mut env v))
+      add_immut_def (env, ctx) [Ty.any] v (Eid.unique (), Var (get_preferred_mut env v))
   in
   let add_mut_alias (env,ctx) v =
     if has_immut env v then
@@ -165,7 +166,7 @@ let optimize_dataflow e =
       env, ctx, (id, TypeCoerce (e, ty, c))
     | VarAssign (v, e) ->
       let env, ctx, e = aux env e in
-      let env,ctx,vimmut = add_immut_def (env,ctx) [] v e in
+      let env,ctx,vimmut = add_immut_def (env,ctx) [Ty.any] v e in
       let vmuts = get_muts env v in
       let env,ctx = add_mut_alias (env,ctx) v in
       let e = Eid.refresh id, VarAssign (v, (Eid.unique (), Var vimmut)) in
