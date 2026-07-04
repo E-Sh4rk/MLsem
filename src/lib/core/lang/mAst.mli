@@ -28,7 +28,7 @@ type e =
 | VarAssign of Variable.t * t
 (** The variable provided must be mutable (cf. {!MVariable.create}) *)
 | Loop of t
-(** An expression that may be evaluated multiple times. Used to encode While expressions. *)
+(** A void expression that may be evaluated multiple times. *)
 | Seq of t * t
 (** Evaluate the first expression, then the second. *)
 | Try of t list

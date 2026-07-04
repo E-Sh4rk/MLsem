@@ -113,7 +113,6 @@ let eliminate_if_while_break_return e =
     | While (e,t,e1) ->
       let body = id, Ite (e, t, e1, (Eid.unique (), Exc)) in
       let block = Eid.unique (), Block (BLoop, body) in
-      let block = Eid.unique (), Voidify block in
       Eid.unique (), Loop block
     | Break -> id, Ret (BLoop, None)
     | Return e -> id, Ret (BFun, Some e)

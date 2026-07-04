@@ -251,8 +251,8 @@ let rec clean_unused_assigns e =
     | Exc | Void | Value _ -> (id, e), rv
     | Voidify e ->
       (* rv is now considered captured, because e may exit (exception) before the end *)
-      let cv, rv = VarSet.union cv rv, VarSet.empty in
-      let e, rv = aux cv rv e in (id, Voidify e), rv
+      let e, rv' = aux (VarSet.union cv rv) VarSet.empty e in
+      (id, Voidify e), VarSet.union rv rv'
     | Var v -> (id, Var v), VarSet.add v rv
     | Constructor (c, es) ->
       (* Unlike for Voidify,
@@ -291,9 +291,9 @@ let rec clean_unused_assigns e =
       let e, rv = aux cv rv e in
       (Eid.unique (), Voidify e), rv (* TODO: Ignore instead of Voidify *)
     | Loop e ->
-      let rv = VarSet.union rv (read_vars e) in
-      let e, rv = aux cv rv e in
-      (id, Loop e), rv
+      (* rv is now considered captured, because e may exit (exception) before the end *)
+      let e, rv' = aux (VarSet.union cv rv) (read_vars e) e in
+      (id, Loop e), VarSet.union rv rv'
     | Seq (e1, e2) ->
       let e2, rv = aux cv rv e2 in
       let e1, rv = aux cv rv e1 in
@@ -338,7 +338,7 @@ let rec clean_unused_assigns e =
 let rec can_fail (_,e) =
   match e with
   | Exc | Void | Value _ | Var _ -> false
-  | Voidify e | TypeCast (e, _, NoCheck) | TypeCoerce (e, _, NoCheck) -> can_fail e
+  | Voidify e | TypeCast (e, _, NoCheck) | TypeCoerce (e, _, NoCheck)
   | Loop e | Declare (_, e)  -> can_fail e
   | Let (_, _, e1, e2) | Seq (e1, e2) -> can_fail e1 || can_fail e2
   | Try es | Alt (_, es) -> List.exists can_fail es
@@ -346,10 +346,9 @@ let rec can_fail (_,e) =
   | _ -> true
 let rec can_empty (_,e) =
   match e with
-  | Void | Voidify _
-  | Var _ (* would already be skipped if it was empty *)
+  | Void | Voidify _ | Loop _
   | Value _ (* user should use Exc if they want to diverge *) -> false
-  | Loop e | Declare (_, e)  -> can_empty e
+  | Declare (_, e)  -> can_empty e
   | Let (_, _, e1, e2) | Seq (e1, e2) -> can_empty e1 || can_empty e2
   | Try es | Alt (_, es) -> List.exists can_empty es
   | _ -> true
