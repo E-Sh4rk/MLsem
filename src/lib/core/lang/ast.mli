@@ -25,6 +25,8 @@ type e =
 | Exc (** Expression of type [empty] *) | Void (** Expression of type [void] *)
 | Voidify of t
 (** Evaluate the expression inside, but give it the [void] type, even if it diverges *)
+| Ignore of t
+(** Evaluate the expression inside, but give it the [void] type, or [empty] if it diverges *)
 | Isolate of t
 (** Prevent duplications of the outer context when eliminating control flow inside *)
 | Value of GTy.t

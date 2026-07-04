@@ -32,7 +32,7 @@ let constr_is_gen c =
   | CCustom c -> c.cgen
 let op_is_gen o =
   match o with
-  | RecUpd _ | RecDel _ -> true
+  | RecUpd _ | RecDel _ | Ignore _ -> true
   | OCustom c -> c.ogen
 let rec is_gen (_,e) =
   match e with

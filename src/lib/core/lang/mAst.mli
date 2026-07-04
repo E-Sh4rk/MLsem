@@ -7,6 +7,8 @@ type e =
 | Exc (** Expression of type [empty] *) | Void (** Expression of type [void] *)
 | Voidify of t
 (** Evaluate the expression inside, but give it the [void] type, even if it diverges *)
+| Ignore of t
+(** Evaluate the expression inside, but give it the [void] type, or [empty] if it diverges *)
 | Value of GTy.t
 | Var of Variable.t
 | Constructor of SA.constructor * t list

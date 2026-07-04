@@ -4,7 +4,7 @@ module SA = Mlsem_system.Ast
 
 type e =
 | Hole of int
-| Exc | Void | Voidify of t
+| Exc | Void | Voidify of t | Ignore of t
 | Value of GTy.t
 | Var of Variable.t
 | Constructor of SA.constructor * t list
@@ -33,6 +33,7 @@ let map_tl f (id,e) =
     | Hole n -> Hole n
     | Exc -> Exc | Void -> Void
     | Voidify e -> Voidify (f e)
+    | Ignore e -> Ignore (f e)
     | Value t -> Value t
     | Var v -> Var v
     | Constructor (c,es) -> Constructor (c, List.map f es)
@@ -119,6 +120,7 @@ let to_system_ast t =
     | Exc -> SA.Value GTy.empty
     | Void -> SA.Value (GTy.mk !Config.void_ty)
     | Voidify e -> SA.Constructor (SA.Voidify !Config.void_ty, [aux e])
+    | Ignore e -> SA.Operation (SA.Ignore !Config.void_ty, aux e)
     | Value t -> SA.Value t
     | Var v -> if MVariable.is_mutable v then MVariable.ref_get v else SA.Var v
     | Constructor (c, es) -> SA.Constructor (c, List.map aux es)

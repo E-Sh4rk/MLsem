@@ -14,7 +14,7 @@ type constructor = (* Constructors must be monotonic operations *)
 | Voidify of Ty.t (* Should not contain type vars *)
 | Normalize | CCustom of ccustom
 type operation =
-| RecUpd of string | RecDel of string
+| RecUpd of string | RecDel of string | Ignore of Ty.t
 | OCustom of ocustom
 type alt_settings = { aname: string ; amask: Env.t -> bool list ; aerror: Env.t -> string }
 type param_annot = GTy.t option

@@ -22,7 +22,7 @@ type pattern =
 [@@deriving show]
 type e =
 | Hole of int
-| Exc | Void | Voidify of t
+| Exc | Void | Voidify of t | Ignore of t
 | Isolate of t
 | Value of GTy.t
 | Var of Variable.t
@@ -99,6 +99,7 @@ let map_tl f (id,e) =
     | Exc -> Exc
     | Void -> Void
     | Voidify e -> Voidify (f e)
+    | Ignore e -> Ignore (f e)
     | Isolate e -> Isolate (f e)
     | Value t -> Value t
     | Var v -> Var v

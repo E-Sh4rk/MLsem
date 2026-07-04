@@ -160,6 +160,7 @@ let rec try_elim_ret ~keep_ret bid e =
       (* Sound even when e is empty, because the continuation
          is always called at least once for non-ret expr *)
       (id, Voidify hole) |> cont' |> aux e
+    | Ignore e -> (id, Ignore hole) |> cont' |> aux e
     | Declare (v, e) -> (id, Declare (v, aux e cont))
     | Let (tys, v, e1, e2) ->
       (id, Let (tys, v, hole, aux e2 cont)) |> aux e1
@@ -264,6 +265,7 @@ let eliminate_cf t =
     | Hole n -> MAst.Hole n
     | Void -> MAst.Void
     | Voidify e -> MAst.Voidify (aux e)
+    | Ignore e -> MAst.Ignore (aux e)
     | Isolate e -> aux e |> snd
     | Value t -> MAst.Value t
     | Var v -> MAst.Var v

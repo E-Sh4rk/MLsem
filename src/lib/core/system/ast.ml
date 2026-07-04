@@ -20,7 +20,7 @@ type constructor =
 | Normalize | CCustom of ccustom
 [@@deriving show]
 type operation =
-| RecUpd of string | RecDel of string
+| RecUpd of string | RecDel of string | Ignore of Ty.t
 | OCustom of ocustom
 [@@deriving show]
 type alt_settings = { aname: string ; amask: Env.t -> bool list ; aerror: Env.t -> string }
@@ -210,6 +210,7 @@ let fun_of_operation env o =
     let dom = Record.mk' (RVar.fty rv) [] in
     let codom = Record.mk' (RVar.fty rv) [(lbl, FTy.of_oty (Ty.empty, true))] in
     Arrow.mk dom codom |> GTy.mk |> TyScheme.mk_poly
+  | Ignore ty -> Arrow.mk Ty.any ty |> GTy.mk |> TyScheme.mk_mono
   | OCustom { ofun ; _ } -> ofun env
 
 let coerce ?coercion_id c ty t =
@@ -378,6 +379,8 @@ and pp_e fmt e = match e with
     Format.fprintf fmt "@[recupd_%s(%a)@]" lbl (pp_prio 0) arg
   | Operation (RecDel lbl, e) ->
     Format.fprintf fmt "@[%a\\%s@]" (pp_prio 90) e lbl
+  | Operation (Ignore _, e) ->
+    Format.fprintf fmt "@[<hov 2>ignore@ %a@]" (pp_prio 90) e
   | Operation (OCustom { oname; ofun ; _ }, e) when String.equal oname String.empty ->
     Format.fprintf fmt "@[<hov 2><%a>@ %a@]" TyScheme.pp_short (ofun Env.empty) (pp_prio 90) e
   | Operation (OCustom { oname; _ }, e) ->
