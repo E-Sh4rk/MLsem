@@ -120,7 +120,8 @@ let debug benv d =
     in
     let benv, cs = List.fold_left build_constraint (benv,[]) cs in
     let res = TVOp.tally (TVOp.all_vars KNoInfer) cs in
-    let msg = Format.asprintf "@[<v>%a@]" (Format.pp_print_list Subst.pp_full) res in
+    let pp_subst fmt s = Sstt.Printer.print_subst (PEnv.printer_params ()) fmt s in
+    let msg = Format.asprintf "@[<v>%a@]" (Format.pp_print_list pp_subst) res in
     msg, benv
   | DCmp (t1, op, t2) ->
     let t1, benv = type_expr_to_typ benv t1 in

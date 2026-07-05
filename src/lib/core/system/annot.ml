@@ -10,7 +10,7 @@ module Annot = struct
   [@@deriving show]
   and a =
   | AValue of GTy.t
-  | AVar of Subst.t 
+  | AVar of Subst.t [@printer fun fmt _ -> Format.fprintf fmt "_"]
   | AConstruct of t list
   | ALet of t * part
   | ALet' of t * t

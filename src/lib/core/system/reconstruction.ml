@@ -160,7 +160,7 @@ let tally_simpl mono tvars res cs =
   )
   |> Utils.filter_among_others not_redundant
   |> tsort (fun (_,r1) (_,r2) -> Ty.leq r1 r2)
-  (* |> List.map (fun (s,r) -> Format.printf "%a@.%a@." Subst.pp_raw s Ty.pp r ; s,r) *)
+  (* |> List.map (fun (s,r) -> Format.printf "%a@.%a@." Sstt.Printer.print_subst' s Ty.pp r ; s,r) *)
 
 let tally_simpl env res cs =
   let mono = TVOp.all_vars KNoInfer in
