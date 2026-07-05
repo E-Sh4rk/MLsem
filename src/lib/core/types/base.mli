@@ -12,6 +12,8 @@ module PrinterCfg : sig
         (Sstt.Tag.t -> int -> Sstt.Prec.assoc -> Format.formatter -> descr Abstracts.t -> unit) -> unit
     val set_unit_printer : string -> unit
     val set_dyn_printer : string -> unit
+    val set_tvar_prefix : string -> unit
+    val set_rvar_prefix : string -> unit
     val set_descr_printer : (int -> Sstt.Prec.assoc -> Format.formatter -> descr -> unit) -> unit
     val set_printer : (Format.formatter -> descr t -> unit) -> unit
 
@@ -23,6 +25,8 @@ module PrinterCfg : sig
     val print_descr : Format.formatter -> descr -> unit
     val print : Format.formatter -> descr t -> unit
     val print_dyn : Format.formatter -> unit -> unit
+    val tvar_prefix : unit -> string
+    val rvar_prefix : unit -> string
 end
 
 (** @canonical Mlsem_types.PEnv *)

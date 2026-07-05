@@ -39,14 +39,15 @@ module type VarSet = sig
     val pp : Format.formatter -> t -> unit
 end
 
-module Var(V:Sstt.NamedIdentifier)(VS:Set.S with type elt=V.t)(P:sig val prefix:string end) = struct
+module Var(V:Sstt.NamedIdentifier)(VS:Set.S with type elt=V.t)(P:sig val prefix:unit -> string end) = struct
   type t = V.t
 
   module VH = Hashtbl.Make(V)
 
   type vardata = {
     kind: kind ;
-    name: string
+    name: string ;
+    prefix: string
   }
 
   let data = VH.create 100
@@ -61,14 +62,15 @@ module Var(V:Sstt.NamedIdentifier)(VS:Set.S with type elt=V.t)(P:sig val prefix:
   let name t =
     try (VH.find data t).name
     with Not_found -> invalid_arg "Variable is not found."
-  let prefix _ = P.prefix
+  let prefix t =
+    try (VH.find data t).prefix
+    with Not_found -> invalid_arg "Variable is not found."
 
   let unique_id =
     let last = ref 0 in
     (fun () ->
       last := !last + 1 ; !last)
 
-  (* TODO: make it possible to change the prefix *)
   let mk kind name =
     let id = unique_id () in
     let norm_name = (match kind with
@@ -77,8 +79,9 @@ module Var(V:Sstt.NamedIdentifier)(VS:Set.S with type elt=V.t)(P:sig val prefix:
       | KTemporary -> "T"
       )^(string_of_int id) in
     let name = match name with None -> norm_name | Some str -> str in
-    let var = V.mk (P.prefix^name) in
-    VH.add data var {kind ; name} ;
+    let prefix = P.prefix () in
+    let var = V.mk (prefix^name) in
+    VH.add data var {kind ; name ; prefix} ;
     Hashtbl.replace allvars kind (all_vars kind |> VS.add var) ;
     var
 
@@ -86,12 +89,12 @@ module Var(V:Sstt.NamedIdentifier)(VS:Set.S with type elt=V.t)(P:sig val prefix:
 end
 
 module TVar = struct
-  include Var(Sstt.Var)(Sstt.VarSet)(struct let prefix="'" end)
+  include Var(Sstt.Var)(Sstt.VarSet)(struct let prefix=PrinterCfg.tvar_prefix end)
   let typ v = Sstt.VDescr.mk_var v |> Sstt.Ty.of_def
 end
 
 module RVar = struct
-  include Var(Sstt.RowVar)(Sstt.RowVarSet)(struct let prefix="`" end)
+  include Var(Sstt.RowVar)(Sstt.RowVarSet)(struct let prefix=PrinterCfg.rvar_prefix end)
   let row v = Row.id_for v
   let fty v = Sstt.Ty.F.mk_var v
 end

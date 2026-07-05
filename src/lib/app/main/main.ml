@@ -266,7 +266,6 @@ let treat (benv,varm,senv,env) (annot, elem) =
       retrieve_time time); msg=[] }
 
 let treat (benv,varm,senv,env,penv) e =
-  (* TODO: optimize aliases by tracking dependencies *)
   let ((benv,varm,senv,env),r), penv = PEnv.sequential_handler penv (treat (benv,varm,senv,env)) e in
   (benv,varm,senv,env,penv),r
 
