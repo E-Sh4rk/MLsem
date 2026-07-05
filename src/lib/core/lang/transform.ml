@@ -107,11 +107,11 @@ let eliminate_if_while_break_return e =
       let block = Eid.unique (), Block (BFun, e) in
       id, Lambda (tys, ty, v, block)
     | If (e,t,e1,e2) ->
-      let e2 = match e2 with None -> Eid.unique (), Exc | Some e2 -> e2 in
+      let e2 = match e2 with None -> Eid.unique (), Void | Some e2 -> e2 in
       let body = id, Ite (e, t, e1, e2) in
-      Eid.unique (), Voidify body
+      Eid.unique (), Ignore body
     | While (e,t,e1) ->
-      let body = id, Ite (e, t, e1, (Eid.unique (), Exc)) in
+      let body = id, Ite (e, t, e1, (Eid.unique (), Void)) in
       let block = Eid.unique (), Block (BLoop, body) in
       Eid.unique (), Loop block
     | Break -> id, Ret (BLoop, None)
@@ -183,7 +183,7 @@ let rec try_elim_ret ~keep_ret bid e =
     | Seq (e1,e2) -> (id, Seq (hole, aux e2 cont)) |> aux e1
     | Ret (bid', e) when bid'=bid && keep_ret ->
       id, Ret (bid', Option.map aux_noret' e)
-    | Ret (bid', None) when bid'=bid -> id, Exc
+    | Ret (bid', None) when bid'=bid -> id, Void
     | Ret (bid', Some e) when bid'=bid -> aux_noret' e
     | Ret (bid', None) -> (id, Ret (bid', None)) |> cont'
     | Ret (bid', Some e) -> (id, Ret (bid', Some hole)) |> cont' |> aux e
@@ -219,7 +219,7 @@ and treat_rets bid v e =
   | (_, Block _) -> assert false
   | (id, Ret (bid', Some e)) when bid'=bid ->
     let e = treat_rets bid v e in
-    Some (id, Seq ((Eid.refresh id, VarAssign (v, e)), (Eid.refresh id, Ret (bid, None))))
+    Some (id, Seq ((Eid.refresh id, VarAssign (v, e)), (Eid.unique (), Exc)))
   | _ -> None
   in
   map' f e
@@ -229,7 +229,7 @@ let elim_all_ret_noarg bid e =
   | (id,Lambda (tys, ty, v, e)) -> Some (id, Lambda (tys, ty, v, e))
   | (id,LambdaRec lst) -> Some (id, LambdaRec lst)
   | (_, Block _) -> assert false
-  | (id, Ret (bid', None)) when bid'=bid -> Some (id, Exc)
+  | (id, Ret (bid', None)) when bid'=bid -> Some (id, Void)
   | _ -> None
   in
   map' f e

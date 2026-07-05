@@ -61,7 +61,7 @@ type e =
 | Block of blockid * t
 (** Identifies a block to which a Ret can refer to. *)
 | Ret of blockid * t option
-(** Evaluate the expression specified ([Exc] if not specified), and use it as the value of block specified.
+(** Evaluate the expression (if specified), and use it as the value of block specified.
     Used to encode [Return] and [Break]. *)
 | If of t * GTy.t * t * t option
 (** If-else block statement. Returns void. *)

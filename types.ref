@@ -253,9 +253,9 @@ order: Nil | (Nil | int, Nil | int) -> Nil | int | (int, int)
 loop_tricky_narrowing: int -> (any, int)
 loop_invalid: untypeable application
 File "tests/4_imperative.ml", line 174, characters 4-14
-function: (ref('I2682), 'I2682) -> ()
-argument: ref(int), false
-loop_valid: ∀'a. ('a \ int -> 'a \ int) & (int | false | 'a -> int | false | 'a)
+function: (ref('I2704), 'I2704) -> ()
+argument: ref('x & int), false
+loop_valid: ∀'a. ('a \ int -> 'a \ int) & (false | 'a -> false | 'a)
 filter_imp: ∀'a,'b,'c. ('a -> bool) & ('b -> false) -> array('b | 'a) -> array('a \ 'b
 | 'c)
 filter_imp_test: array(13 | 42 | "abc")
@@ -325,8 +325,7 @@ eval: expr -> int
 obj: obj
 typeof_cf: (int -> "int") & (() -> "unit") & (~(int | bool | char | string | ()) ->
 "object") & (string -> "string") & (bool -> "bool") & (char -> "char")
-break_return_cf: ∀'a. ('a & (0 | false) -> ()) & (() | 'a \ (0 | false) -> () | 'a \ (0 |
-false))
+break_return_cf: ∀'a. ('a & (0 | false) -> ()) & ('a \ (0 | false) -> 'a \ (0 | false))
 weird_return: (true -> 69) & (~true -> (42, 69))
 test_alt: (Nil -> Nil) & (int -> int) & (() -> ()) & (char -> char) & (string ->
 string) & (bool -> bool)

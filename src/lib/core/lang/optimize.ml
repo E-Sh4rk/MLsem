@@ -259,7 +259,7 @@ let rec clean_unused_assigns e =
     | Ignore e -> let e, rv = aux cv rv e in (id, Ignore e), rv
     | Var v -> (id, Var v), VarSet.add v rv
     | Constructor (c, es) ->
-      (* Unlike for Voidify,
+      (* Unlike for Voidify or Try,
          we assume that constructor arguments do not exit (exception) before the end *)
       let es, rv = aux_order (eval_order_of_constructor c) cv rv es in
       (id, Constructor (c, es)), rv
@@ -295,20 +295,28 @@ let rec clean_unused_assigns e =
       let e, rv = aux cv rv e in
       (Eid.unique (), Ignore e), rv
     | Loop e ->
-      (* rv is now considered captured, because e may exit (exception) before the end *)
-      let e, rv' = aux (VarSet.union cv rv) (read_vars e) e in
+      let e, rv' = aux cv (VarSet.union rv (read_vars e)) e in
       (id, Loop e), VarSet.union rv rv'
     | Seq (e1, e2) ->
       let e2, rv = aux cv rv e2 in
       let e1, rv = aux cv rv e1 in
       (id, Seq (e1, e2)), rv
     | Try es ->
-      let es, rv = aux_parallel cv rv es in
+      let es, rv = aux_parallel_captured cv rv es in
       (id, Try es), rv
     | Alt (settings, es) ->
       let es, rvs = List.map (aux cv rv) es |> List.split in
       let rv = List.fold_left VarSet.union VarSet.empty rvs in
       (id, Alt (settings, es)), rv
+  and aux_parallel_captured cv rv es =
+    (* rv is considered captured, because expressions may exit before the end *)
+    let es, rvs = es
+      |> List.map (fun e -> e, read_vars e)
+      |> Utils.add_others |> List.map (fun ((e,_), es) ->
+      let cv' = List.map snd es |> List.fold_left VarSet.union rv in
+      aux (VarSet.union cv cv') VarSet.empty e
+      ) |> List.split in
+    es, rvs |> List.fold_left VarSet.union rv
   and aux_parallel cv rv es =
     let es, rvs = es
       |> List.map (fun e -> e, read_vars e)
@@ -350,9 +358,8 @@ let rec can_fail (_,e) =
   | _ -> true
 let rec can_empty (_,e) =
   match e with
-  | Void | Voidify _ | Loop _
-  | Value _ (* user should use Exc if they want to diverge *) -> false
-  | Declare (_, e) | Ignore e -> can_empty e
+  | Void | Voidify _ | Value _ (* user should use Exc if they want to diverge *) -> false
+  | Loop e | Declare (_, e) | Ignore e -> can_empty e
   | Let (_, _, e1, e2) | Seq (e1, e2) -> can_empty e1 || can_empty e2
   | Try es | Alt (_, es) -> List.exists can_empty es
   | _ -> true
