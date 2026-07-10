@@ -35,40 +35,49 @@ let test_merge2 x =
     let y = merge x { y=42 ; z=73 } in
     y.x, y.y, y.z
 
-(* TODO: foo from Section 5.4.1 *)
+(* ===== Collapsing of unions (aka expansion problem) ===== *)
 
-(* ===== R language encodings ===== *)
+(* Function foo from Section 5.4.1 *)
+val foo: { l1:int ;; `R } -> { l1:int ;; `R }
 
-(* Encoding of arguments: typing lapply *)
+let test_foo (x: {l1:42;l2:42;l3:42} | {l1:73;l2:73;l3:73}) =
+  foo x
+
+(* ===== R language encodings (Appendix A) ===== *)
+
+(* Encoding of arguments: typing lapply (A.1) *)
+
 val mean: { x: [(int|Na)*] ; na_rm: true } | { x: [int*] ; na_rm: false? } -> [int*]
 val lapply : { x:['a*] ; y: { x:'a ; y:empty? ;; `r } -> 'b ;; `r } -> ['b*]
-let test_lapply =
+let test_lapply = (* Type inferred: [ [int*]* ] *)
   lapply { x=[[1;2;3;4;5;6;7;8;9;10];[1;Na]] ; y=mean ; na_rm=true }
 
-(* Encoding of lists *)
+(* Encoding of lists (A.2) *)
+
 val set_b : { b:any? ;; `r } -> 'a -> { b:'a ;; `r }
 val set : { ;; `r } -> int -> 'a -> { ;; `r|'a }
 val get : { ;; 'a? } -> int -> 'a
 val concat: { ;; `A1&(empty?) | `C1&any } -> { ;; `A2&(empty?) | `C2&any } -> { ;; (`A1&`A2) | (`C1|`C2) }
 let test_r_lists =
-  let mut xs = { a=1 } in
-  xs := set_b xs 2 ;
-  let mut ys = { c=3 } in
-  let mut zs = concat xs ys in
-  let mut n = get zs 2 in
-  zs := set zs 1 n ;
-  zs
+  let mut xs = { a=1 } in         (* xs <- list(a=1) *)
+  xs := set_b xs 2 ;              (* xs$b <- 2 *)
+  let mut ys = { c=3 } in         (* ys <- list(c=3) *)
+  let mut zs = concat xs ys in    (* zs <- append(xs, ys) *)
+  let mut n = get zs 2 in         (* n <- zs[[2]] *)
+  zs := set zs 1 n ;              (* zs[[1]] <- n *)
+  zs (* Type inferred: { b:(1..3) ; a:(1..3) ; c:(1..3) ;; (1..3)? } *)
 
-(* Encoding of classes *)
+(* Encoding of classes (A.3) *)
+
 val data_frame : () -> { data_frame:true ;; false }
 val group_by : { ;; bool & `c } -> string -> { grouped_df:true ;; bool & `c }
 val ungroup : { grouped_df:true ;; bool & `c } -> { grouped_df:false ;; bool & `c }
 
 let test_classes =
-    let xs = data_frame () in
-    let ys = group_by xs "id" in
-    let zs = ungroup ys in
-    zs
+    let xs = data_frame () in     (* xs <- data.frame(...) *)
+    let ys = group_by xs "id" in  (* ys <- group_by(xs, id) *)
+    let zs = ungroup ys in        (* zs <- ungroup(ys) *)
+    zs (* Type inferred: { data_frame : true ;; false } *)
 
 val c1 : { c1:true ;; false }
 val c1_open : { c1:true ;; bool }
