@@ -10,7 +10,8 @@ let eval_order_of_constructor c =
   | SA.Cons -> !Config.cons_eval_order
   | SA.Rec _ -> !Config.record_eval_order
   | SA.Tag _ | SA.Enum _ -> Config.LeftToRight
-  | SA.Meet _ | SA.Join _ | SA.Ternary _ | SA.Normalize | SA.Voidify _ -> Config.UnknownOrder
+  | SA.Meet _ | SA.Join _ | SA.Ternary _ | SA.Normalize -> Config.UnknownOrder
+  | SA.Voidify _ -> Config.Abortable
   | SA.CCustom c ->
     begin match Hashtbl.find_opt Config.ccustom_eval_order c.cname with
     | None -> Config.UnknownOrder
@@ -109,7 +110,6 @@ let optimize_dataflow e =
     | Hole _ -> failwith "Unsupported hole."
     | Exc | Void | Value _ -> env, hole, (id, e)
     | Voidify e ->
-      (* It would be unsound to move an expr of type empty outside *)
       let env, e = aux' env e in
       env, hole, (id, Voidify e)
     | Ignore e ->
@@ -119,9 +119,6 @@ let optimize_dataflow e =
       let env,ctx,v' = add_immut_alias (env,hole) v in
       env, ctx, (id, Var v')
     | Constructor (c, es) ->
-      (* Note: if a constructor does not evaluate all its arguments,
-        it must be flagged as Config.UnknownOrder,
-        otherwise a diverging expression could be moved outside. *)
       let env, ctx, es = aux_order (eval_order_of_constructor c) env es in
       env, ctx, (id, Constructor (c, es))
     | Lambda (tys, ty, v, e) ->
@@ -226,7 +223,7 @@ let optimize_dataflow e =
     match order with
     | Config.LeftToRight -> aux_sequence
     | Config.RightToLeft -> aux_sequence_rev
-    | Config.UnknownOrder -> aux_parallel
+    | Config.UnknownOrder | Config.Abortable -> aux_parallel
   and aux' env e =
     let env', ctx, e = aux env e in
     merge_envs env env', fill ctx e
@@ -253,14 +250,11 @@ let rec clean_unused_assigns e =
     | Hole _ -> failwith "Unsupported hole."
     | Exc | Void | Value _ -> (id, e), rv
     | Voidify e ->
-      (* rv is now considered captured, because e may exit (exception) before the end *)
       let e, rv' = aux (VarSet.union cv rv) VarSet.empty e in
       (id, Voidify e), VarSet.union rv rv'
     | Ignore e -> let e, rv = aux cv rv e in (id, Ignore e), rv
     | Var v -> (id, Var v), VarSet.add v rv
     | Constructor (c, es) ->
-      (* Unlike for Voidify or Try,
-         we assume that constructor arguments do not exit (exception) before the end *)
       let es, rv = aux_order (eval_order_of_constructor c) cv rv es in
       (id, Constructor (c, es)), rv
     | Lambda (tys, ty, v, e) ->
@@ -337,6 +331,7 @@ let rec clean_unused_assigns e =
     | Config.LeftToRight -> aux_sequence
     | Config.RightToLeft -> aux_sequence_rev
     | Config.UnknownOrder -> aux_parallel
+    | Config.Abortable -> aux_parallel_captured
   and aux_sequence_rev cv rv es =
     let es, rv = aux_sequence cv rv (List.rev es) in
     List.rev es, rv
