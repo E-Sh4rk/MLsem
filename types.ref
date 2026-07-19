@@ -210,7 +210,7 @@ test_classes: { data_frame : true ;; false }
 test_class_ok: { c1 : true ;; false }
 test_class_fail: untypeable application
 File "tests/3_records.ml", line 100, characters 22-45
-function: 'I2242 & { c1 : true ;; false } -> 'I2242
+function: 'I2240 & { c1 : true ;; false } -> 'I2240
 argument: { c1 : true ;; bool }
 test_class_ok2: { c1 : true ; c2 : true ;; bool }
 extract_ellipsis_test: 73 | bool, bool, true
@@ -222,7 +222,7 @@ fun2_with_ellipsis_test: 1, 2, { l3 : 3 ; l4 : 4 ; l5 : 5 }, (3..5)
 ref_42: ref(int)
 ref_42_unresolved: the type inferred is not fully resolved
 File "tests/4_imperative.ml", line 24, characters 4-30
-type inferred: ref(42 | 'I2307)
+type inferred: ref(42 | 'I2305)
 mutate_ref: ∀'a. 42 | 'a -> 42 | 'a
 is_ref: (ref -> true) & (~ref -> false)
 is_not_ref: (~ref -> true) & (ref -> false)
@@ -255,9 +255,9 @@ order: Nil | (Nil | int, Nil | int) -> Nil | int | (int, int)
 loop_tricky_narrowing: int -> (any, int)
 loop_invalid: untypeable application
 File "tests/4_imperative.ml", line 174, characters 4-14
-function: (ref('I2699), 'I2699) -> ()
-argument: ref('x & int), false
-loop_valid: ∀'a. ('a \ int -> 'a \ int) & (false | 'a -> false | 'a)
+function: (ref('I2678), 'I2678) -> ()
+argument: ref(int), false
+loop_valid: ∀'a. ('a \ int -> 'a \ int) & (int | false | 'a -> int | false | 'a)
 filter_imp: ∀'a,'b,'c. ('a -> bool) & ('b -> false) -> array('b | 'a) -> array('a \ 'b
 | 'c)
 filter_imp_test: array(13 | 42 | "abc")

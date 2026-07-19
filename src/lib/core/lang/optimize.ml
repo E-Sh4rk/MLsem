@@ -289,7 +289,7 @@ let rec clean_unused_assigns e =
       let e, rv = aux cv rv e in
       (Eid.unique (), Ignore e), rv
     | Loop e ->
-      let e, rv' = aux cv (VarSet.union rv (read_vars e)) e in
+      let e, rv' = aux (VarSet.union cv rv) (read_vars e) e in
       (id, Loop e), VarSet.union rv rv'
     | Seq (e1, e2) ->
       let e2, rv = aux cv rv e2 in
@@ -363,6 +363,7 @@ let clean e =
     match e with
     | Voidify e when can_fail e |> not -> id, Void
     | Ignore e when can_fail e |> not && can_empty e |> not -> id, Void
+    | Seq ((_, Ignore e1), e2) -> id, Seq (e1, e2)
     | Seq (e1, e2) when (can_fail e1 |> not) && (can_empty e1 |> not) -> e2
     | Declare (v, e) when VarSet.mem v (fv e) |> not -> e
     | Let (_, v, e1, e2) when VarSet.mem v (fv e2) |> not -> f (id, Seq (e1, e2))

@@ -183,7 +183,7 @@ let rec try_elim_ret ~keep_ret bid e =
     | Seq (e1,e2) -> (id, Seq (hole, aux e2 cont)) |> aux e1
     | Ret (bid', e) when bid'=bid && keep_ret ->
       id, Ret (bid', Option.map aux_noret' e)
-    | Ret (bid', None) when bid'=bid -> id, Void
+    | Ret (bid', None) when bid'=bid -> id, Exc
     | Ret (bid', Some e) when bid'=bid -> aux_noret' e
     | Ret (bid', None) -> (id, Ret (bid', None)) |> cont'
     | Ret (bid', Some e) -> (id, Ret (bid', Some hole)) |> cont' |> aux e
@@ -229,7 +229,7 @@ let elim_all_ret_noarg bid e =
   | (id,Lambda (tys, ty, v, e)) -> Some (id, Lambda (tys, ty, v, e))
   | (id,LambdaRec lst) -> Some (id, LambdaRec lst)
   | (_, Block _) -> assert false
-  | (id, Ret (bid', None)) when bid'=bid -> Some (id, Void)
+  | (id, Ret (bid', None)) when bid'=bid -> Some (id, Exc)
   | _ -> None
   in
   map' f e
