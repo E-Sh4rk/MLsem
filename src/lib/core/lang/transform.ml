@@ -192,47 +192,30 @@ let rec try_elim_ret ~keep_ret bid e =
   in
   aux e hole
 
-let has_ret ~incl_noarg bid e =
-  try
+let elim_ret_args bid (id,e) =
+  let need_v = ref false in
+  let v = MVariable.create MVariable.Mut None in
+  let rec treat_rets e =
     let f = function
-    | (_, Lambda _) | (_, LambdaRec _) -> false
+    | (id,Lambda (tys, ty, v, e)) -> Some (id, Lambda (tys, ty, v, e))
+    | (id,LambdaRec lst) -> Some (id, LambdaRec lst)
     | (_, Block _) -> assert false
-    | (_, Ret (bid',None)) when incl_noarg && bid'=bid -> raise Exit
-    | (_, Ret (bid',Some _)) when bid'=bid -> raise Exit
-    | _ -> true
+    | (id, Ret (bid', Some e)) when bid'=bid ->
+      let e = treat_rets e in
+      need_v := true ;
+      Some (id, Seq ((Eid.refresh id, VarAssign (v, e)), (Eid.unique (), Exc)))
+    | (id, Ret (bid', None)) when bid'=bid -> Some (id, Exc)
+    | _ -> None
     in
-    iter' f e ; false
-  with Exit -> true
-
-let rec elim_ret_args bid (id,e) =
-  if has_ret ~incl_noarg:false bid (id,e)
+    map' f e
+  in
+  let e = treat_rets (id,e) in
+  if !need_v
   then
-    let v = MVariable.create MVariable.Mut None in
-    let body = Eid.refresh id, VarAssign (v, treat_rets bid v (id,e)) in
+    let body = Eid.refresh id, VarAssign (v, e) in
     let body = Eid.refresh id, Seq ((Eid.unique (), Voidify body), (Eid.unique (), Var v)) in
     Eid.refresh id, Declare (v, body)
-  else id, e
-and treat_rets bid v e =
-  let f = function
-  | (id,Lambda (tys, ty, v, e)) -> Some (id, Lambda (tys, ty, v, e))
-  | (id,LambdaRec lst) -> Some (id, LambdaRec lst)
-  | (_, Block _) -> assert false
-  | (id, Ret (bid', Some e)) when bid'=bid ->
-    let e = treat_rets bid v e in
-    Some (id, Seq ((Eid.refresh id, VarAssign (v, e)), (Eid.unique (), Exc)))
-  | _ -> None
-  in
-  map' f e
-
-let elim_all_ret_noarg bid e =
-  let f = function
-  | (id,Lambda (tys, ty, v, e)) -> Some (id, Lambda (tys, ty, v, e))
-  | (id,LambdaRec lst) -> Some (id, LambdaRec lst)
-  | (_, Block _) -> assert false
-  | (id, Ret (bid', None)) when bid'=bid -> Some (id, Exc)
-  | _ -> None
-  in
-  map' f e
+  else e
 
 let clean_unreachable e =
   let rec ends_with_exc e =
@@ -252,7 +235,7 @@ let eliminate_blocks e =
   let aux (id,e) =
     match e with
     | Block (bid, e) ->
-      try_elim_ret ~keep_ret:false bid e |> elim_ret_args bid |> elim_all_ret_noarg bid
+      try_elim_ret ~keep_ret:false bid e |> elim_ret_args bid
     | e -> id, e
   in
   map aux e |> clean_unreachable
