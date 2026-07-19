@@ -351,20 +351,26 @@ let rec can_fail (_,e) =
   | Try es | Alt (_, es) -> List.exists can_fail es
   | Ite (e,_,e1,e2) -> can_fail e || can_fail e1 || can_fail e2
   | _ -> true
-let rec can_empty (_,e) =
+let rec can_empty evs (_,e) =
   match e with
   | Void | Voidify _ | Value _ (* user should use Exc if they want to diverge *) -> false
-  | Loop e | Declare (_, e) | Ignore e -> can_empty e
-  | Let (_, _, e1, e2) | Seq (e1, e2) -> can_empty e1 || can_empty e2
-  | Try es | Alt (_, es) -> List.exists can_empty es
+  | Var v -> VarSet.mem v evs
+  | Loop e | Declare (_, e) | Ignore e -> can_empty evs e
+  | Let (_, _, e1, e2) | Seq (e1, e2) -> can_empty evs e1 || can_empty evs e2
+  | Try es | Alt (_, es) -> List.exists (can_empty evs) es
   | _ -> true
 let clean e =
+  let evs = ref VarSet.empty in
+  e |> iter (function
+    | (_, Let ([], v, _, _)) -> evs := VarSet.add v !evs
+    | _ -> ()) ;
+  let evs = !evs in
   let rec f (id,e) =
     match e with
     | Voidify e when can_fail e |> not -> id, Void
-    | Ignore e when can_fail e |> not && can_empty e |> not -> id, Void
+    | Ignore e when (can_fail e |> not) && (can_empty evs e |> not) -> id, Void
     | Seq ((_, Ignore e1), e2) -> id, Seq (e1, e2)
-    | Seq (e1, e2) when (can_fail e1 |> not) && (can_empty e1 |> not) -> e2
+    | Seq (e1, e2) when (can_fail e1 |> not) && (can_empty evs e1 |> not) -> e2
     | Declare (v, e) when VarSet.mem v (fv e) |> not -> e
     | Let (_, v, e1, e2) when VarSet.mem v (fv e2) |> not -> f (id, Seq (e1, e2))
     | e -> id, e
