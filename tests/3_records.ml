@@ -13,6 +13,26 @@ let record_test =
   let r3 = record_delete r2 in
   (r1,r2,r3)
 
+let pair_app f g x = (f x, g x)
+let upd1 x = {x with l1=42}
+let upd2 x = {x with l2=42}
+let upd x = pair_app upd1 upd2 x
+let test_upd = upd { l=42 }
+
+let get_id r =
+    match r with
+    | { kind="book"   ; title ..} -> title 
+    | { kind="author" ; name ..} -> name 
+    end
+
+val set_id : ({ kind : "book" ; title : any? ;; `b }  -> 'a -> { kind : "book" ; title : 'a ;; `b }) &
+             ({ kind : "author" ; name : any? ;; `a } -> 'b -> { kind : "author" ; name : 'b ;; `a })
+let set_id r id =
+    match r with
+    | { kind="book" ..} -> { r with title=id } 
+    | { kind="author" ..} -> { r with name=id } 
+    end
+
 (* ===== Record type meta-operators ===== *)
 
 type ra('a) = { a:'a }

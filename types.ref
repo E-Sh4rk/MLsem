@@ -196,6 +196,17 @@ empty? ; l3 : empty? ;; `a }
 record_update_ann: ∀`a. { l1 : any? ; l2 : any? ; l3 : any? ;; `a } -> { l1 : 1 ; l2 : 2 ;
 l3 : 3 ;; `a }
 record_test: { l3 : 33 ; l4 : 44 }, { l1 : 1 ; l2 : 2 ; l3 : 3 ; l4 : 44 }, { l4 : 44 }
+pair_app: ∀'a,'b,'c. ('a -> 'b) -> ('a -> 'c) -> 'a -> ('b, 'c)
+upd1: ∀`a. { l1 : any? ;; `a } -> { l1 : 42 ;; `a }
+upd2: ∀`a. { l2 : any? ;; `a } -> { l2 : 42 ;; `a }
+upd: ∀`a,`b. { l1 : `b ; l2 : `a ;; `b & `a } -> ({ l1 : 42 ;; `a }, { l2 : 42
+;; `b })
+test_upd: { l1 : 42 ; l : 42 }, { l2 : 42 ; l : 42 }
+get_id: ∀'a,'b. ({ kind : "book" ; title : 'a ..} -> 'a) & ({ kind : "author" ;
+name : 'b ..} -> 'b)
+set_id: ∀'a,'b,`a,`b. ({ kind : "book" ; title : any? ;; `a } -> 'a -> { kind :
+"book" ; title : 'a ;; `a }) & ({ kind : "author" ; name : any? ;; `b } -> 'b
+-> { kind : "author" ; name : 'b ;; `b })
 test_rac: rac(int, bool) -> (int, bool)
 test_rec_proj: a_or_b
 test_mix: { l1 : 42? ; l2 : 33 | true ; l4 : false? }
@@ -209,8 +220,8 @@ test_r_lists: { a : (1..3) ; c : (1..3) ; b : (1..3) ;; (1..3)? }
 test_classes: { data_frame : true ;; false }
 test_class_ok: { c1 : true ;; false }
 test_class_fail: untypeable application
-File "tests/3_records.ml", line 100, characters 22-45
-function: 'I2240 & { c1 : true ;; false } -> 'I2240
+File "tests/3_records.ml", line 120, characters 22-45
+function: 'I2291 & { c1 : true ;; false } -> 'I2291
 argument: { c1 : true ;; bool }
 test_class_ok2: { c1 : true ; c2 : true ;; bool }
 extract_ellipsis_test: 73 | bool, bool, true
@@ -222,7 +233,7 @@ fun2_with_ellipsis_test: 1, 2, { l3 : 3 ; l4 : 4 ; l5 : 5 }, (3..5)
 ref_42: ref(int)
 ref_42_unresolved: the type inferred is not fully resolved
 File "tests/4_imperative.ml", line 24, characters 4-30
-type inferred: ref(42 | 'I2305)
+type inferred: ref(42 | 'I2356)
 mutate_ref: ∀'a. 42 | 'a -> 42 | 'a
 is_ref: (ref -> true) & (~ref -> false)
 is_not_ref: (~ref -> true) & (ref -> false)
@@ -255,7 +266,7 @@ order: Nil | (Nil | int, Nil | int) -> Nil | int | (int, int)
 loop_tricky_narrowing: int -> (any, int)
 loop_invalid: untypeable application
 File "tests/4_imperative.ml", line 174, characters 4-14
-function: (ref('I2698), 'I2698) -> ()
+function: (ref('I2749), 'I2749) -> ()
 argument: ref(int), false
 loop_valid: ∀'a. ('a \ int -> 'a) & (int | false | 'a -> int | false | 'a)
 filter_imp: ∀'a,'b,'c. ('a -> bool) & ('b -> false) -> array('b | 'a) -> array('a \ 'b
