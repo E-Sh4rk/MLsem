@@ -365,14 +365,13 @@ let clean e =
     | (_, Let ([], v, _, _)) -> evs := VarSet.add v !evs
     | _ -> ()) ;
   let evs = !evs in
-  let rec f (id,e) =
+  let f (id,e) =
     match e with
     | Voidify e when can_fail e |> not -> id, Void
     | Ignore e when (can_fail e |> not) && (can_empty evs e |> not) -> id, Void
     | Seq ((_, Ignore e1), e2) -> id, Seq (e1, e2)
     | Seq (e1, e2) when (can_fail e1 |> not) && (can_empty evs e1 |> not) -> e2
     | Declare (v, e) when VarSet.mem v (fv e) |> not -> e
-    | Let (_, v, e1, e2) when VarSet.mem v (fv e2) |> not -> f (id, Seq (e1, e2))
     | e -> id, e
   in
   map f e
