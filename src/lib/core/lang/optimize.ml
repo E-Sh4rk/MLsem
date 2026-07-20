@@ -92,12 +92,17 @@ let optimize_dataflow e =
     else
       add_immut_def (env, ctx) v (Eid.unique (), Var (get_preferred_mut env v))
   in
+  let mut_declare v def =
+    let assign = Eid.unique (), VarAssign (v, def) in
+    let body = Eid.unique (), Seq (assign, hole) in
+    Eid.unique (), Declare (v, body)
+  in
   let add_mut_alias (env,ctx) v =
     if has_immut env v then
       let vdef = get_immut env v in
       let vmut = MVariable.refresh (MVariable.kind v) v in
       let env = add_mut env v vmut in
-      let ctx = fill ctx (Eid.unique (), Let ([], vmut, (Eid.unique (), Var vdef), hole)) in
+      let ctx = fill ctx (mut_declare vmut (Eid.unique (), Var vdef)) in
       (env,ctx)
     else
       (env,ctx)
@@ -158,7 +163,7 @@ let optimize_dataflow e =
       let env, ctx1, e1 = aux env e1 in
       let env = { env with partitions=VarMap.add v tys env.partitions } in
       let env,ctx1,v' = add_immut_def (env,ctx1) v e1 in
-      let ctx1 = fill ctx1 (Eid.unique (), Let ([], v, (Eid.unique (), Var v'), hole)) in
+      let ctx1 = fill ctx1 (mut_declare v (Eid.unique (), Var v')) in
       let env, ctx2, e2 = aux env e2 in
       env, fill ctx1 ctx2, e2
     | Let (tys, v, e1, e2) ->
