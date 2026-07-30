@@ -147,7 +147,7 @@ let tally_simpl mono tvars res cs =
   (* Format.printf "with tvars=%a@." (Utils.pp_list TVar.pp)
     (TVarSet.destruct tvars) ; *)
   (* Format.printf "with env=%a@." Env.pp env ; *)
-  tally_fields mono cs
+  tally_const_rows mono cs
   |> !Config.subst_normalization_fun { mono ; tvars ; res }
   |> List.map (minimize_new_tvars (MVarSet.union mono tvars))
   |> List.map (fun s -> s, Subst.apply s res)
@@ -165,12 +165,15 @@ let tally_simpl mono tvars res cs =
 let tally_simpl env res cs =
   let mono = TVOp.all_vars KNoInfer in
   let tvars = Env.tvars env in
-  let fc = TVOp.get_field_ctx (MVarSet.proj2 mono) (cs |> List.concat_map (fun (a,b) -> [a;b])) in
-  let tvars = MVarSet.elements2 tvars |> List.fold_left
-    (fun acc rv -> MVarSet.union acc (TVOp.fvars_associated_with fc rv |> MVarSet.of_set2)) tvars in
-  cs |> List.map (fun (a,b) -> (TVOp.decorrelate_fields fc a, TVOp.decorrelate_fields fc b))
-     |> tally_simpl mono tvars (TVOp.decorrelate_fields fc res)
-     |> List.map (fun (s,r) -> TVOp.recombine_fields' fc s, TVOp.recombine_fields fc r)
+  let fc = TVOp.FieldCtx.of_tys (MVarSet.proj2 mono) (cs |> List.concat_map (fun (a,b) -> [a;b])) in
+  let new_tvars = TVOp.FieldCtx.fresh_vars fc |> RVarSet.filter (fun rv ->
+    let rv = TVOp.FieldCtx.fvar_of_fresh_var fc rv |> Option.get |> fst in
+    MVarSet.mem2 rv tvars
+    ) |> MVarSet.of_set2 in
+  let tvars = MVarSet.union tvars new_tvars in
+  cs |> List.map (fun (a,b) -> (TVOp.FieldCtx.decorrelate fc a, TVOp.FieldCtx.decorrelate fc b))
+     |> tally_simpl mono tvars (TVOp.FieldCtx.decorrelate fc res)
+     |> List.map (fun (s,r) -> TVOp.FieldCtx.recombine' fc s, TVOp.FieldCtx.recombine fc r)
 
 (* Reconstruction algorithm *)
 

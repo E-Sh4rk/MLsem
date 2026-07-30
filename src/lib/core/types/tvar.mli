@@ -93,18 +93,19 @@ module TVOp : sig
     val top_instance : MVarSet.t -> Ty.t -> Ty.t
 
     val tally : ?record:bool -> MVarSet.t -> (Ty.t * Ty.t) list -> Subst.t list
+    val tally_const_rows : ?record:bool -> MVarSet.t -> (Ty.t * Ty.t) list -> Subst.t list
     val decompose : MVarSet.t -> Subst.t -> Subst.t -> Subst.t list
 
     val factorize : TVarSet.t * TVarSet.t -> Ty.t -> Ty.t * Ty.t
 
-    (** Operations on row and field variables *)
-
-    type field_ctx
-    val get_field_ctx : RVarSet.t -> Ty.t list -> field_ctx
-    val decorrelate_fields : field_ctx -> Ty.t -> Ty.t
-    val recombine_fields : field_ctx -> Ty.t -> Ty.t
-    val recombine_fields' : field_ctx -> Subst.t -> Subst.t
-    val fvars_associated_with : field_ctx -> RVar.t -> RVarSet.t
-    val rvar_associated_with : field_ctx -> RVar.t -> (RVar.t * string) option
-    val tally_fields : ?record:bool -> MVarSet.t -> (Ty.t * Ty.t) list -> Subst.t list
+    module FieldCtx : sig
+        type fvar = RVar.t * string
+        type t
+        val of_tys : RVarSet.t -> Ty.t list -> t
+        val decorrelate : t -> Ty.t -> Ty.t
+        val recombine : t -> Ty.t -> Ty.t
+        val recombine' : t -> Subst.t -> Subst.t
+        val fresh_vars : t -> RVarSet.t
+        val fvar_of_fresh_var : t -> RVar.t -> fvar option
+    end
 end

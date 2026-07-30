@@ -120,15 +120,18 @@ module MVarSet = Sstt.MixVarSet
 module Subst = Sstt.Subst
 
 module TVOp = struct
-  type field_ctx = Sstt.Tallying.field_ctx
-  let get_field_ctx = Sstt.Tallying.get_field_ctx
-  let decorrelate_fields = Sstt.Tallying.decorrelate_fields
-  let recombine_fields = Sstt.Tallying.recombine_fields
-  let recombine_fields' = Sstt.Tallying.recombine_fields'
-  let fvars_associated_with = Sstt.Tallying.fvars_associated_with
-  let rvar_associated_with ctx rv =
-    Sstt.Tallying.rvar_associated_with ctx rv |>
-      Option.map (fun (rv,lbl) -> rv, Record.from_label lbl)
+  module FieldCtx = struct
+    type fvar = RVar.t * string
+    type t = Sstt.Tallying.FieldCtx.t
+    let of_tys = Sstt.Tallying.FieldCtx.of_tys
+    let decorrelate = Sstt.Tallying.FieldCtx.decorrelate
+    let recombine = Sstt.Tallying.FieldCtx.recombine
+    let recombine' = Sstt.Tallying.FieldCtx.recombine'
+    let fresh_vars = Sstt.Tallying.FieldCtx.fresh_vars
+    let fvar_of_fresh_var t rv =
+      Sstt.Tallying.FieldCtx.fvar_of_fresh_var t rv |>
+        Option.map (fun (rv,lbl) -> rv, Record.from_label lbl)
+  end
 
   let all_vars kind = MVarSet.of_set (TVar.all_vars kind) (RVar.all_vars kind)
   let vars = Sstt.Ty.all_vars
@@ -280,23 +283,23 @@ module TVOp = struct
     clean' ~pos1 ~neg1 ~pos2 ~neg2 mono [t] |> List.hd
 
   let bot_instance mono ty =
-    let fc = get_field_ctx (MVarSet.proj2 mono) [ty] in
-    decorrelate_fields fc ty
+    let fc = FieldCtx.of_tys (MVarSet.proj2 mono) [ty] in
+    FieldCtx.decorrelate fc ty
     |> clean ~pos1:Ty.empty ~neg1:Ty.any ~pos2:Row.empty ~neg2:Row.any mono
-    |> recombine_fields fc
+    |> FieldCtx.recombine fc
 
   let top_instance mono ty =
-    let fc = get_field_ctx (MVarSet.proj2 mono) [ty] in
-    decorrelate_fields fc ty
+    let fc = FieldCtx.of_tys (MVarSet.proj2 mono) [ty] in
+    FieldCtx.decorrelate fc ty
     |> clean ~pos1:Ty.any ~neg1:Ty.empty ~pos2:Row.any ~neg2:Row.empty mono
-    |> recombine_fields fc
+    |> FieldCtx.recombine fc
 
   let tally ?(record=true) mono cs =
     if record then Recording_internal.record mono cs ;
     Sstt.Tallying.tally mono cs
-  let tally_fields ?(record=true) mono cs =
+  let tally_const_rows ?(record=true) mono cs =
     if record then Recording_internal.record mono cs ;
-    Sstt.Tallying.tally_fields mono cs
+    Sstt.Tallying.tally_const_rows mono cs
   let decompose mono t1 t2 =
     Sstt.Tallying.decompose mono t1 t2
 
