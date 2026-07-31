@@ -130,6 +130,9 @@ module FieldCtx = struct
   let fvar_of_fresh_var t rv =
     Sstt.FieldCtx.fvar_of_fresh_var t rv |>
       Option.map (fun (rv,lbl) -> rv, Record.from_label lbl)
+  let empty = Sstt.FieldCtx.empty
+  let merge = Sstt.FieldCtx.merge
+  let merge_many = Sstt.FieldCtx.merge_many
 end
 
 module TVOp = struct

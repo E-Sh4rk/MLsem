@@ -68,6 +68,9 @@ module FieldCtx : sig
     val recombine' : t -> Subst.t -> Subst.t
     val fresh_vars : t -> RVarSet.t
     val fvar_of_fresh_var : t -> RVar.t -> fvar option
+    val empty : t
+    val merge : t -> t -> t
+    val merge_many : t list -> t
 end
 
 (** @canonical Mlsem_types.TVOp *)

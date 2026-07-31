@@ -165,7 +165,8 @@ let tally_simpl mono tvars res cs =
 let tally_simpl env res cs =
   let mono = TVOp.all_vars KNoInfer in
   let tvars = Env.tvars env in
-  let fc = FieldCtx.of_tys (MVarSet.proj2 mono) (cs |> List.concat_map (fun (a,b) -> [a;b])) in
+  let mono2 = MVarSet.proj2 mono in
+  let fc = cs |> List.map (fun (a,b) -> FieldCtx.of_tys mono2 [a;b]) |> FieldCtx.merge_many in
   let new_tvars = FieldCtx.fresh_vars fc |> RVarSet.filter (fun rv ->
     let rv = FieldCtx.fvar_of_fresh_var fc rv |> Option.get |> fst in
     MVarSet.mem2 rv tvars
