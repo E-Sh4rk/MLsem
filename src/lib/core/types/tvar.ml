@@ -119,20 +119,20 @@ module MVarSet = Sstt.MixVarSet
 
 module Subst = Sstt.Subst
 
-module TVOp = struct
-  module FieldCtx = struct
-    type fvar = RVar.t * string
-    type t = Sstt.Tallying.FieldCtx.t
-    let of_tys = Sstt.Tallying.FieldCtx.of_tys
-    let decorrelate = Sstt.Tallying.FieldCtx.decorrelate
-    let recombine = Sstt.Tallying.FieldCtx.recombine
-    let recombine' = Sstt.Tallying.FieldCtx.recombine'
-    let fresh_vars = Sstt.Tallying.FieldCtx.fresh_vars
-    let fvar_of_fresh_var t rv =
-      Sstt.Tallying.FieldCtx.fvar_of_fresh_var t rv |>
-        Option.map (fun (rv,lbl) -> rv, Record.from_label lbl)
-  end
+module FieldCtx = struct
+  type fvar = RVar.t * string
+  type t = Sstt.FieldCtx.t
+  let of_tys = Sstt.FieldCtx.of_tys
+  let decorrelate = Sstt.FieldCtx.decorrelate
+  let recombine = Sstt.FieldCtx.recombine
+  let recombine' = Sstt.FieldCtx.recombine'
+  let fresh_vars = Sstt.FieldCtx.fresh_vars
+  let fvar_of_fresh_var t rv =
+    Sstt.FieldCtx.fvar_of_fresh_var t rv |>
+      Option.map (fun (rv,lbl) -> rv, Record.from_label lbl)
+end
 
+module TVOp = struct
   let all_vars kind = MVarSet.of_set (TVar.all_vars kind) (RVar.all_vars kind)
   let vars = Sstt.Ty.all_vars
   let vars' ts = List.map vars ts |> List.fold_left MVarSet.union MVarSet.empty

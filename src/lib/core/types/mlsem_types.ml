@@ -10,6 +10,7 @@ module MVarSet = Tvar.MVarSet
 type kind = Tvar.kind = KNoInfer | KInfer | KTemporary
 module Row = Tvar.Row
 module Subst = Tvar.Subst
+module FieldCtx = Tvar.FieldCtx
 module TVOp = Tvar.TVOp
 
 module GTy = GTy

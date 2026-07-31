@@ -58,6 +58,18 @@ module MVarSet = Sstt.MixVarSet
 (** @canonical Mlsem_types.Subst *)
 module Subst = Sstt.Subst
 
+(** @canonical Mlsem_types.FieldCtx *)
+module FieldCtx : sig
+    type fvar = RVar.t * string
+    type t
+    val of_tys : RVarSet.t -> Ty.t list -> t
+    val decorrelate : t -> Ty.t -> Ty.t
+    val recombine : t -> Ty.t -> Ty.t
+    val recombine' : t -> Subst.t -> Subst.t
+    val fresh_vars : t -> RVarSet.t
+    val fvar_of_fresh_var : t -> RVar.t -> fvar option
+end
+
 (** @canonical Mlsem_types.TVOp *)
 module TVOp : sig
     val all_vars : kind -> MVarSet.t
@@ -97,15 +109,4 @@ module TVOp : sig
     val decompose : MVarSet.t -> Subst.t -> Subst.t -> Subst.t list
 
     val factorize : TVarSet.t * TVarSet.t -> Ty.t -> Ty.t * Ty.t
-
-    module FieldCtx : sig
-        type fvar = RVar.t * string
-        type t
-        val of_tys : RVarSet.t -> Ty.t list -> t
-        val decorrelate : t -> Ty.t -> Ty.t
-        val recombine : t -> Ty.t -> Ty.t
-        val recombine' : t -> Subst.t -> Subst.t
-        val fresh_vars : t -> RVarSet.t
-        val fvar_of_fresh_var : t -> RVar.t -> fvar option
-    end
 end
