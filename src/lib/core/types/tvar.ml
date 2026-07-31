@@ -122,6 +122,9 @@ module Subst = Sstt.Subst
 module FieldCtx = struct
   type fvar = RVar.t * string
   type t = Sstt.FieldCtx.t
+  let of_ty mono ty =
+    let rvs = RVarSet.diff (Sstt.Ty.row_vars ty) mono in
+    Sstt.FieldCtx.mk (Sstt.FieldCtx.labels ty) rvs
   let of_tys = Sstt.FieldCtx.of_tys
   let decorrelate = Sstt.FieldCtx.decorrelate
   let recombine = Sstt.FieldCtx.recombine
@@ -286,13 +289,13 @@ module TVOp = struct
     clean' ~pos1 ~neg1 ~pos2 ~neg2 mono [t] |> List.hd
 
   let bot_instance mono ty =
-    let fc = FieldCtx.of_tys (MVarSet.proj2 mono) [ty] in
+    let fc = FieldCtx.of_ty (MVarSet.proj2 mono) ty in
     FieldCtx.decorrelate fc ty
     |> clean ~pos1:Ty.empty ~neg1:Ty.any ~pos2:Row.empty ~neg2:Row.any mono
     |> FieldCtx.recombine fc
 
   let top_instance mono ty =
-    let fc = FieldCtx.of_tys (MVarSet.proj2 mono) [ty] in
+    let fc = FieldCtx.of_ty (MVarSet.proj2 mono) ty in
     FieldCtx.decorrelate fc ty
     |> clean ~pos1:Ty.any ~neg1:Ty.empty ~pos2:Row.any ~neg2:Row.empty mono
     |> FieldCtx.recombine fc

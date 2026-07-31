@@ -62,6 +62,7 @@ module Subst = Sstt.Subst
 module FieldCtx : sig
     type fvar = RVar.t * string
     type t
+    val of_ty : RVarSet.t -> Ty.t -> t
     val of_tys : RVarSet.t -> Ty.t list -> t
     val decorrelate : t -> Ty.t -> Ty.t
     val recombine : t -> Ty.t -> Ty.t
