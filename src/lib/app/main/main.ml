@@ -262,7 +262,7 @@ let treat (benv,varm,senv,env) (annot, elem) =
   | UnresolvedType (var,ty) ->
     (benv,varm,senv,env), { res=TFailure (Some var, Variable.get_location var,
       "the type inferred is not fully resolved",
-      Some (Format.asprintf "type inferred: @[<hov>%a@]" TyScheme.pp_short ty),
+      Some (Format.asprintf "type inferred: @[<h>%a@]" TyScheme.pp_short ty),
       retrieve_time time); msg=[] }
 
 let treat (benv,varm,senv,env,penv) e =
@@ -314,7 +314,7 @@ type envs = Builder.benv * Variable.t NameMap.t * Signature.t VarMap.t * Env.t *
 
 let print_ty pp (_,_,_,_,penv) ty =
   PEnv.sequential_handler penv
-    (fun () -> Format.asprintf "@[<hov>%a@]" pp ty) ()
+    (fun () -> Format.asprintf "@[<h>%a@]" pp ty) ()
   |> fst
 let display envs ty = print_ty TyScheme.pp_short envs ty
 let signature envs sigs = sigs |> List.map (print_ty Signature.pp_overload envs)
