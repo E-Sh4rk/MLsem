@@ -88,7 +88,7 @@ module Ty : sig
     val disjoint : t -> t -> bool
     val equiv : t -> t -> bool
 
-    val normalize : t -> t
+    val factorize : t -> t
     val simplify : t -> t
 end
 

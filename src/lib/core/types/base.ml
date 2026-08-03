@@ -186,7 +186,7 @@ module Ty = struct
   let disjoint = Sstt.Ty.disjoint
   let equiv = Sstt.Ty.equiv
 
-  let normalize = Sstt.Ty.factorize
+  let factorize = Sstt.Ty.factorize
   let simplify ty = Sstt.Transform.simplify ty
 end
 

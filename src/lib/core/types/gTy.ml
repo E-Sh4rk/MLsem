@@ -73,7 +73,7 @@ let equiv = test2 Ty.equiv
 let non_gradual { eq ; _ } = eq
 
 let simplify = map Ty.simplify
-let normalize = map Ty.normalize
+let factorize = map Ty.factorize
 
 let pp' s fmt t =
   let pp = TVOp.pp_typ_subst s in

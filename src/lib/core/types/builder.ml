@@ -311,8 +311,7 @@ module Builder = struct
             try Sstt.Ty.of_eqs !eqs |> VarMap.of_list
             with Invalid_argument str -> raise (TypeDefinitionError str)
         in
-        let res = res |> List.map (fun (n,p,node) ->
-            n,p,VarMap.find node tys |> Ty.normalize) in
+        let res = res |> List.map (fun (n,p,node) -> n,p,VarMap.find node tys |> Ty.factorize) in
         let vtenv, rvenv, tenv = map_of venv, map_of rvenv, !tenv in
         res, { tenv ; vtenv={ tv=vtenv ; rv=rvenv } }
 

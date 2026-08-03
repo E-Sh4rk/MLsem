@@ -3,7 +3,7 @@ open Mlsem_types
 type overload = Ty.t (* Unbuilt gradual type *)
 type t = overload list
 
-let simplify_tyscheme ty = ty |> TyScheme.bot_instance |> TyScheme.norm_and_simpl
+let simplify_tyscheme ty = ty |> TyScheme.bot_instance |> TyScheme.simplify_factorize
 let simplify_overload o =
   o |> GTy.mk |> TyScheme.mk_poly_except (GTy.Builder.all_dyn_vars () |> MVarSet.of_set1)
   |> simplify_tyscheme |> TyScheme.get |> snd |> GTy.lb

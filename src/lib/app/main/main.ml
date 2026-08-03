@@ -104,7 +104,7 @@ let debug benv d =
   match d with
   | PAst.DTy ty ->
     let ty, benv = type_expr_to_typ benv ty in
-    let ty = ty |> Ty.simplify |> Ty.normalize in
+    let ty = ty |> Ty.simplify |> Ty.factorize in
     let msg = Format.asprintf "@[<h>%a@]" Ty.pp ty in
     msg, benv
   | DTally cs ->

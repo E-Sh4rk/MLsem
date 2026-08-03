@@ -35,7 +35,7 @@ val equiv : t -> t -> bool
 val non_gradual : t -> bool
 
 val simplify : t -> t
-val normalize : t -> t
+val factorize : t -> t
 
 val pp : Format.formatter -> t -> unit
 val pp' : Subst.t -> Format.formatter -> t -> unit
