@@ -17,7 +17,7 @@ concat: ∀'a. [ [ 'a* ]* ] -> [ 'a* ]
 map: ∀'a,'b. ('a -> 'b) -> [ 'a* ] -> [ 'b* ]
 mapi_aux: ∀'a,'b. int -> (int -> 'a -> 'b) -> [ 'a* ] -> [ 'b* ]
 mapi: ∀'a,'b. (int -> 'a -> 'b) -> [ 'a* ] -> [ 'b* ]
-fold_left: ∀'a,'b. (('a -> 'b -> empty) -> 'a -> [ !('b any*)? ] -> 'a) & (('a -> 'b -> 'a) -> 'a -> [ 'b* ] -> 'a)
+fold_left: ∀'a,'b. (('a -> 'b -> 'a) -> 'a -> [ 'b* ] -> 'a) & (('a -> 'b -> empty) -> 'a -> [ !('b any*)? ] -> 'a)
 fold_right: ∀'a,'b. ('b -> 'a -> 'a) -> [ 'b* ] -> 'a -> 'a
 height: x1 -> int where x1 = Nil | Node(x1, Key, any, x1, int)
 create: ∀'a,'b,'c,'d. 'a & (Nil | Node(x1)) -> 'b -> 'c -> 'd & (Nil | Node(x1)) -> Node('a & (Nil | Node(x1)), 'b, 'c, 'd & (Nil | Node(x1)), int) where x1 = Nil | Node(x1), Key, any, Nil | Node(x1), int
@@ -37,33 +37,33 @@ succ': any -> (0..25)
 test2': (5..15) -> (0..25)
 f: int | string -> int
 test: (10..15) -> int
-succ: (3 -> 4) & (2 -> 3) & (4 -> 5) & (5 -> 6) & (6 -> 7) & (7 -> 8) & (8 -> 9) & (9 -> 10) & (10 -> 11) & (11 -> 12) & (12 -> 13) & (13 -> 14) & (14 -> 15) & (15 -> 16) & (16 -> 17) & (17 -> 18) & (18 -> 19) & (19 -> 20) & (20 -> 21) & (21 -> 22) & (22 -> 23) & (23 -> 24) & (24 -> 25) & (1 -> 2) & (~(0..24) -> 0) & (0 -> 1)
+succ: (2 -> 3) & (3 -> 4) & (4 -> 5) & (5 -> 6) & (6 -> 7) & (7 -> 8) & (8 -> 9) & (9 -> 10) & (10 -> 11) & (11 -> 12) & (12 -> 13) & (13 -> 14) & (14 -> 15) & (15 -> 16) & (16 -> 17) & (17 -> 18) & (18 -> 19) & (19 -> 20) & (20 -> 21) & (21 -> 22) & (22 -> 23) & (23 -> 24) & (24 -> 25) & (1 -> 2) & (~(0..24) -> 0) & (0 -> 1)
 test2: (5..15) -> (10..20)
 to_bool: (int \ 0 | true | ('\001'-'\255') | string \ "" -> true) & (0 | false | '\000' | "" -> false) & (float -> bool)
-and_: ((~true, any) | (any, ~true) -> false) & ((true, true) -> true)
-&&: ((0 | false | '\000' | "", int | bool | char | float | string) | (int | bool | char | float | string, 0 | false | '\000' | "") -> false) & ((int | bool | char | float | string, int | bool | char | float | string) -> bool) & ((int \ 0 | true | ('\001'-'\255') | string \ "", int \ 0 | true | ('\001'-'\255') | string \ "") -> true)
+and_: ((true, true) -> true) & ((any, ~true) | (~true, any) -> false)
+&&: ((int \ 0 | true | ('\001'-'\255') | string \ "", int \ 0 | true | ('\001'-'\255') | string \ "") -> true) & ((int | bool | char | float | string, int | bool | char | float | string) -> bool) & ((int | bool | char | float | string, 0 | false | '\000' | "") | (0 | false | '\000' | "", int | bool | char | float | string) -> false)
 and1: false
 and2: false
 and3: true
 and4: bool
 and5: true
 not_: (~true -> true) & (true -> false)
-or_: ((any, true) | (true, any) -> true) & ((~true, ~true) -> false)
+or_: ((~true, ~true) -> false) & ((any, true) | (true, any) -> true)
 impossible_branch: int -> int
 [Warning] File "tests/1_union_inter.ml", line 103, characters 32-36 Unreachable code
 impossible_branch2: (any -> int -> int) & (int -> any -> int)
 switch1: ∀'a,'b,'c,'d. (('a -> 'b) -> true -> 'a -> any -> 'b) & (('c -> 'd) -> ~true -> any -> 'c -> 'd)
 switch2: ∀'a,'b,'c,'d. (true -> ('a -> 'b) -> 'a -> any -> 'b) & (~true -> ('c -> 'd) -> any -> 'c -> 'd)
 typeof: (bool -> "Boolean") & (~(int | bool | char | [  ] | string | ()) -> "Object") & ([  ] | () -> "[]") & (string -> "String") & (char -> "Character") & (int -> "Number")
-typeof_patterns: (~(int | bool | char | [  ] | string | ()) -> "Object") & ([  ] | () -> "[]") & (string -> "String") & (char -> "Character") & (bool -> "Boolean") & (int -> "Number")
-land: (true -> true -> true) & (~true -> any -> false) & (any -> ~true -> false)
+typeof_patterns: (~(int | bool | char | [  ] | string | ()) -> "Object") & ([  ] | () -> "[]") & (string -> "String") & (char -> "Character") & (int -> "Number") & (bool -> "Boolean")
+land: (true -> true -> true) & (any -> ~true -> false) & (~true -> any -> false)
 lor: (~true -> ~true -> false) & (any -> true -> true) & (true -> any -> true)
 lnot: (~true -> true) & (true -> false)
 tautology: any -> any -> true
 tautology_ann: any -> any -> bool
 test_many_params_ann1: any -> any -> any -> any -> any -> any -> false | (int, bool, int, bool, int, bool)
 test_many_params_ann2: ∀'a,'b,'c,'d,'e,'f. 'f -> 'e -> 'd -> 'c -> 'b -> 'a -> false | ('f & int, 'e & bool, 'd & int, 'c & bool, 'b & int, 'a & bool)
-test_many_params: ∀'a,'b,'c,'d,'e,'f. (('f & int, 'e & bool, 'd & int, 'c & bool, 'b & int, 'a & bool) -> ('f & int, 'e & bool, 'd & int, 'c & bool, 'b & int, 'a & bool)) & ((~int, any, any, any, any, any) | (any, ~bool, any, any, any, any) | (any, any, ~int, any, any, any) | (any, any, any, ~bool, any, any) | (any, any, any, any, ~int, any) | (any, any, any, any, any, ~bool) -> false)
+test_many_params: ∀'a,'b,'c,'d,'e,'f. (('f & int, 'e & bool, 'd & int, 'c & bool, 'b & int, 'a & bool) -> ('f & int, 'e & bool, 'd & int, 'c & bool, 'b & int, 'a & bool)) & ((any, ~bool, any, any, any, any) | (any, any, any, ~bool, any, any) | (any, any, any, any, any, ~bool) | (any, any, any, any, ~int, any) | (any, any, ~int, any, any, any) | (~int, any, any, any, any, any) -> false)
 match_pair: any -> any -> false | (int, bool)
 type_narrowing_fail: untypeable application
 File "tests/1_union_inter.ml", line 160, characters 21-31
@@ -86,7 +86,7 @@ implicit2: int | string -> int
 example3: any -> false | (~false, ~false)
 implicit3: ∀'a. ('a \ false -> ('a \ false, 'a \ false)) & ('a & false -> false)
 example4: any -> int | 'A' | string
-implicit4: ∀'a. ('a & string -> 'a & string) & ('a \ (int | string) -> 'A') & ('a & int -> 'a & int)
+implicit4: ∀'a. ('a & string -> 'a & string) & ('a & int -> 'a & int) & ('a \ (int | string) -> 'A')
 example5: any -> any -> int
 implicit5: (int -> (~string -> 0) & (any -> int)) & (~int -> any -> 0)
 example6_invalid: untypeable application
@@ -102,15 +102,15 @@ implicit8: (int | string -> true) & (~(int | string) -> false)
 example9: any -> int
 implicit9: (~(int | string) -> 0) & (any -> int)
 example10: tuple2 -> int
-implicit10: (tuple2 -> int) & ((~int, any) -> 7)
+implicit10: ((~int, any) -> 7) & (tuple2 -> int)
 example11: tuple2 -> No | int
-implicit11: ((~int, any) | (any, ~int) -> No) & ((int, int) -> int)
+implicit11: ((int, int) -> int) & ((any, ~int) | (~int, any) -> No)
 example12: tuple2 -> bool
 implicit12: ((~int, any) -> false) & ((int, any) -> true)
 example13: any -> any -> (1..3)
 implicit13: (int -> (string -> 1) & (~string -> 2)) & (~int -> any -> 3)
 example14: int | string -> tuple2 -> int
-implicit14: (int | string -> (tuple2 -> int) & ((~int, any) -> 0)) & (~int -> (~int, any) -> 0)
+implicit14: (int | string -> ((~int, any) -> 0) & (tuple2 -> int)) & (~int -> (~int, any) -> 0)
 connectives: int | bool | string -> int
 
 ===== Processing tests/2_dyn.ml =====
@@ -166,13 +166,13 @@ upd2: ∀`a. { l2 : any? ;; `a } -> { l2 : 42 ;; `a }
 upd: ∀`a,`b. { l1 : `b ; l2 : `a ;; `b & `a } -> ({ l1 : 42 ;; `a }, { l2 : 42 ;; `b })
 test_upd: { l1 : 42 ; l : 42 }, { l2 : 42 ; l : 42 }
 get_id: ∀'a,'b. ({ kind : "book" ; title : 'a ..} -> 'a) & ({ kind : "author" ; name : 'b ..} -> 'b)
-set_id: ∀'a,'b,`a,`b. ({ kind : "book" ; title : any? ;; `a } -> 'a -> { kind : "book" ; title : 'a ;; `a }) & ({ kind : "author" ; name : any? ;; `b } -> 'b -> { kind : "author" ; name : 'b ;; `b })
+set_id: ∀'a,'b,`a,`b. ({ kind : "author" ; name : any? ;; `b } -> 'b -> { kind : "author" ; name : 'b ;; `b }) & ({ kind : "book" ; title : any? ;; `a } -> 'a -> { kind : "book" ; title : 'a ;; `a })
 test_rac: rac(int, bool) -> (int, bool)
 test_rec_proj: a_or_b
 test_mix: { l1 : 42? ; l2 : 33 | true ; l4 : false? }
 test_merge: { l1 : 42 ; l2 : 33 | true ; l4 : false }
 test_merge2: ∀'a,'b,'c. { x : 'a ; y : (42 | 'b)? ; z : (73 | 'c)? ..} -> ('a, 42 | 'b, 73 | 'c)
-test_foo: { l1 : 42 ; l2 : 42 ; l3 : 42 } | { l1 : 73 ; l2 : 73 ; l3 : 73 } -> { l1 : int ; l2 : 42 | 73 ; l3 : 42 | 73 }
+test_foo: { l1 : 73 ; l2 : 73 ; l3 : 73 } | { l1 : 42 ; l2 : 42 ; l3 : 42 } -> { l1 : int ; l2 : 42 | 73 ; l3 : 42 | 73 }
 test_lapply: [ [ int* ]* ]
 test_r_lists: { a : (1..3) ; c : (1..3) ; b : (1..3) ;; (1..3)? }
 test_classes: { data_frame : true ;; false }
@@ -200,7 +200,7 @@ test_arr: ∀'a,'b. bool | 'a -> array('a & int | 'b)
 test_double_array: 42
 arr_dict_assign: ∀'a,'b. dict((0..1) | 'b, 'a) | array('a) -> ()
 nested: ∀'a. any -> 'a -> 'a
-swap: ∀'a,'b. ('a -> 'a -> dict('a, 'b) -> ()) & ('a & int -> int -> array('b) -> ())
+swap: ∀'a,'b. ('a & int -> int -> array('b) -> ()) & ('a -> 'a -> dict('a, 'b) -> ())
 mx: 42
 mut_invalid: untypeable application
 File "tests/4_imperative.ml", line 92, characters 2-12
@@ -265,7 +265,7 @@ or_js: ∀'a,'b. ('a & truthy -> any -> 'a & truthy) & ('a & falsy -> 'b -> 'b)
 identity_js: ∀'a. 'a -> 'a
 and_pair: ∀'a,'b. ('a & falsy -> any -> 'a & falsy) & ('a & int & ~0 -> 'b -> ('b, int))
 test_pair: (int \ 0, any) | (0, int) -> int
-ifthenelse: ∀'a,'b. (tt('a, 'b) -> tt('a, 'b)) & (ff('a, 'b) -> ff('a, 'b))
+ifthenelse: ∀'a,'b. (ff('a, 'b) -> ff('a, 'b)) & (tt('a, 'b) -> tt('a, 'b))
 test1_patterns: ∀'a. ('a, any) -> 'a
 test2_patterns: ∀'a,'b. ('b, 'a) -> ('b, 'a)
 test3_patterns: ∀'a,'b. 'a -> 'b -> ('b, 'a)
@@ -276,19 +276,19 @@ foo: any -> empty
 bar: any -> empty
 filter: ∀'a,'b. ('a -> any) & ('b -> ~true) -> [ ('b | 'a)* ] -> [ ('a \ 'b)* ]
 filter2: ∀'a,'b. ('b -> ~true) & ('a -> any) -> [ ('b | 'a)* ] -> [ ('a \ 'b)* ]
-filter_noannot: ∀'a. (('a -> any) -> ([ 'a ] -> [ 'a? ]) & ([ 'a+ ] -> [ 'a* ]) & ([  ] -> [  ])) & (('a -> true) -> ([ 'a+ ] -> [ 'a+ ]) & ([  ] -> [  ])) & (('a -> ~true) -> [ 'a* ] -> [  ]) & (any -> [  ] -> [  ])
-filtermap: ∀'a,'b. (('b -> false | (true, 'a), [ 'b* ]) -> [ 'a* ]) & (('b -> bool | (true, 'a), [ 'b* ]) -> [ ('b | 'a)* ])
+filter_noannot: ∀'a. (('a -> any) -> ([ 'a+ ] -> [ 'a* ]) & ([ 'a ] -> [ 'a? ]) & ([  ] -> [  ])) & (('a -> true) -> ([ 'a+ ] -> [ 'a+ ]) & ([  ] -> [  ])) & (('a -> ~true) -> [ 'a* ] -> [  ]) & (any -> [  ] -> [  ])
+filtermap: ∀'a,'b. (('b -> bool | (true, 'a), [ 'b* ]) -> [ ('b | 'a)* ]) & (('b -> false | (true, 'a), [ 'b* ]) -> [ 'a* ])
 member: ∀'a. (('a, [ (~'a)+ ]) | (any, [  ]) -> false) & ((any, [ any+ ]) -> bool)
 call_f: ∀'a. objF('a) -> () | 'a
 deep_flatten: ∀'a. tree('a) -> [ ('a \ [ any* ])* ]
 eval: expr -> int
 obj: obj
-typeof_cf: (() -> "unit") & (~(int | bool | char | string | ()) -> "object") & (string -> "string") & (bool -> "bool") & (char -> "char") & (int -> "int")
+typeof_cf: (() -> "unit") & (~(int | bool | char | string | ()) -> "object") & (string -> "string") & (bool -> "bool") & (int -> "int") & (char -> "char")
 break_return_cf: ∀'a. ('a & (0 | false) -> ()) & (() | 'a \ (0 | false) -> () | 'a \ (0 | false))
 weird_return: (true -> 69) & (~true -> (42, 69))
-test_alt: (() -> ()) & (char -> char) & (string -> string) & (bool -> bool) & (Nil -> Nil) & (int -> int)
-fall: (() -> ()) & (char -> char) & (string -> string) & (bool -> bool) & (Nil -> Nil) & (int -> int)
-test_noalt: (string -> string) & (char -> char) & (bool -> bool) & (() -> ()) & (Nil -> Nil) & (int -> int)
+test_alt: (Nil -> Nil) & (() -> ()) & (char -> char) & (string -> string) & (bool -> bool) & (int -> int)
+fall: (Nil -> Nil) & (() -> ()) & (char -> char) & (string -> string) & (bool -> bool) & (int -> int)
+test_noalt: (char -> char) & (bool -> bool) & (string -> string) & (Nil -> Nil) & (() -> ()) & (int -> int)
 typeof_app: Int -> 0
 [Warning] File "tests/5_misc.ml", line 262, characters 9-29 Unreachable code
 typeof_app': Int -> 0
