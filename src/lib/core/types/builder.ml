@@ -293,7 +293,9 @@ module Builder = struct
                     let t1 = aux_field lcl t1 in
                     let t2 = aux_field lcl t2 in
                     FTy.diff t1 t2
-                | TNeg t -> FTy.neg (aux_field lcl t)
+                (* Having a negation operator over fields would be too confusing
+                   with the regular type negation *)
+                (* | TNeg t -> FTy.neg (aux_field lcl t) *)
                 | t -> FTy.of_oty (aux lcl t, false)
             and aux_re lcl re =
                 re |> reg_to_sstt (aux lcl) |> Sstt.Extensions.Lists.build
