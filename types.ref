@@ -202,10 +202,10 @@ arr_dict_assign: ∀'a,'b. dict((0..1) | 'b, 'a) | array('a) -> ()
 nested: ∀'a. any -> 'a -> 'a
 swap: ∀'a,'b. ('a & int -> int -> array('b) -> ()) & ('a -> 'a -> dict('a, 'b) -> ())
 mx: 42
-mut_invalid: untypeable application
-File "tests/4_imperative.ml", line 92, characters 2-12
-function: (any, int) -> ()
-argument: int, true
+mut_invalid: untypeable cast
+File "tests/4_imperative.ml", line 92, characters 8-12
+expected: int
+given: true
 mut_valid: int
 counter: 0
 incr: () -> ()
