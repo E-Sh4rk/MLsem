@@ -13,8 +13,9 @@ type pattern_constructor =
 
 (** Patterns must be linear and their alternatives must agree on the variables
     they bind: a variable must occur in at most one component of a [PAnd] or of
-    a [PConstructor], and in both sides of a [POr]. A [PatMatch] over a pattern
-    that violates this raises [Invalid_argument] when transformed. *)
+    a [PConstructor], and in both sides of a [POr]. Transforming a [PatMatch]
+    over a pattern that violates this raises [Invalid_argument] (see
+    {!Transform.eliminate_cf}). *)
 type pattern =
 | PType of Ty.t
 | PVar of Ty.t list * Variable.t

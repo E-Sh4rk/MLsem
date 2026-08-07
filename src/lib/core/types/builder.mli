@@ -45,6 +45,11 @@ end
 (** @canonical Mlsem_types.Builder *)
 module Builder : sig
     exception TypeDefinitionError of string
+    (** Raised by every function below that elaborates a type expression, for
+        any way in which the expression can be ill-formed: an undefined or
+        misapplied type name, a non-regular recursive definition, a type
+        operator applied to something it cannot inspect, a [dyn] where none is
+        allowed. The payload is a message meant for the user. *)
 
     type type_env
     type var_type_env
@@ -61,14 +66,35 @@ module Builder : sig
     val type_base_to_typ : TyExpr.base -> Ty.t
 
     val type_expr_to_typ : ?allow_gradual:bool -> benv -> TyExpr.t -> Ty.t * benv
+    (** Elaborates a type expression into a static type. With
+        [~allow_gradual:true] the expression may contain [dyn] occurrences, as
+        long as none of them is in an invariant position.
+        @raise TypeDefinitionError if the expression is ill-formed. *)
+
     val type_exprs_to_typs : ?allow_gradual:bool -> benv -> TyExpr.t list -> Ty.t list * benv
+    (** @raise TypeDefinitionError if one of the expressions is ill-formed. *)
+
     val type_expr_to_gty : benv -> TyExpr.t -> GTy.t * benv
+    (** Elaborates a type expression into a gradual type, [dyn] occurrences
+        becoming the bounds of the interval.
+        @raise TypeDefinitionError if the expression is ill-formed, in
+        particular if a [dyn] occurs in an invariant position. *)
+
     val type_exprs_to_gtys : benv -> TyExpr.t list -> GTy.t list * benv
+    (** @raise TypeDefinitionError if one of the expressions is ill-formed. *)
 
     val define_abstract : benv -> string -> int -> benv
+    (** @raise TypeDefinitionError if the abstract type is already defined. *)
+
     val define_aliases : benv -> (string * string list * TyExpr.t) list -> benv
+    (** Defines a group of mutually recursive type aliases.
+        @raise TypeDefinitionError if one of the definitions is ill-formed. *)
+
     val get_enum : benv -> string -> Enum.t * benv
+    (** The enum of that name, defining it if it does not exist yet. *)
+
     val get_tag : benv -> string -> Tag.t * benv
+    (** The tag of that name, defining it if it does not exist yet. *)
 
     val is_test_type : Ty.t -> bool
 end

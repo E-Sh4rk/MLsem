@@ -49,6 +49,11 @@ val vars : t -> VarSet.t
 val rename_fv : Variable.t -> Variable.t -> t -> t
 
 val to_system_ast : t -> SA.t
+(** Encodes the remaining mutable variables as operations on an abstract
+    reference type, yielding a term of the functional core language.
+    @raise Invalid_argument if a binder other than a [Declare] binds a mutable
+    variable, if a [Declare] or a [VarAssign] targets an immutable one, or if
+    the term still contains a hole. *)
 
 val pp_e : Format.formatter -> e -> unit
 val pp : Format.formatter -> t -> unit

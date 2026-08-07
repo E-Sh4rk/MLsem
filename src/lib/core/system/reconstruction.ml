@@ -75,6 +75,16 @@ let initial ?(direct_narrowing=true) ?(partition_narrowing=true) refinements e =
 
 (* ===== Annotation Reconstruction ===== *)
 
+(* Outcome of refining a node.
+   - [Ok (a, ty)]: the sub-derivation [a] is complete and proves type [ty].
+   - [Fail]: the node cannot be typed, whatever is done elsewhere.
+   - [Subst (ss, a1, a2, r)]: the node needs one of the substitutions of [ss] to
+     be applied. [a1] is the derivation to continue with in the branches where
+     one of them is applied, [a2] the one for the default branch where none is;
+     both are strictly more decided than the derivation given as input, which is
+     what makes the search terminate. Each substitution comes with the result it
+     was computed for, and [r] records the refinement of the environment under
+     which the requirement arose — together they form the branch's coverage. *)
 type ('a,'b) result =
 | Ok of 'a * GTy.t
 | Fail
@@ -464,6 +474,16 @@ and refine_ann r cache env (rid, annot) (id, e) =
   | e, a ->
     Format.printf "e:@.%a@.@.a:@.%a@.@." Ast.pp_e e IAnnot.pp_a a ;
     assert false
+(* Decides what to do with a [Subst] requirement. A substitution touching a
+   variable of the environment cannot be applied here — the environment would no
+   longer agree with the derivation — so the requirement is propagated outwards.
+   Otherwise the substitutions only concern variables local to this expression,
+   and the node becomes an intersection with one branch per substitution (plus a
+   default one), each branch being explored independently.
+
+   Disjointness is also what keeps the cached types of the derivation valid
+   under [IAnnot.substitute]: the environment is left untouched, so the types
+   already computed for its sub-derivations remain the right ones. *)
 and refine' cache env annot e =
   let tvars = Env.tvars env in
   let subst_disjoint s =

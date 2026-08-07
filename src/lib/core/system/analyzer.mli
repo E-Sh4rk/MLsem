@@ -14,7 +14,10 @@ end
 
 val analyze : Ast.t -> Annot.t -> msg list * Visited.t
 (** [analyze e a] reports the notices raised by the annotated expression [e],
-    together with the sub-expressions of [e] that [a] covers. *)
+    together with the sub-expressions of [e] that [a] covers. The annotation
+    must already have been type-checked, since the analysis reads the types
+    cached in it.
+    @raise Failure if a node of the annotation has no cached type. *)
 
 val get_unreachable : Visited.t -> Ast.t -> msg list
 (** [get_unreachable visited e] reports the sub-expressions of [e] that are not

@@ -98,6 +98,20 @@ let rec def_of_var_pat pat v e =
     def_of_var_pat (List.nth ps i) v
       (Eid.refresh (fst e), Projection (proj_of_patconstr c i, e))
 
+(* Encodes a pattern matching as a [let] binding the scrutinee, followed by a
+   chain of typecases testing the successive patterns.
+
+   The [let] is partitioned along the patterns' types, refined so that cell [i]
+   excludes the patterns before it — matching is first-match-wins, so branch [i]
+   only sees the values the earlier branches did not take. The last cell is what
+   no pattern matches.
+
+   The chain ends with a default branch that must never be reachable: it casts
+   [x] to [empty], which succeeds exactly when the type system can prove no
+   value reaches it — that is how non-exhaustive matches are rejected. It goes
+   through [Normalize] so that the emptiness test uses the configured
+   normalization, and its notices are disabled so the branch, which the user did
+   not write, is never reported as unreachable code. *)
 let encode_pattern_matching e pats =
   pats |> List.iter (fun (pat,_) -> check_pattern pat) ;
   let x = MVariable.create Immut None in
@@ -174,6 +188,26 @@ let has_eliminable_ret bid e =
     iter' f e ; false
   with Exit -> true
 
+(* Eliminates the [Ret]s of block [bid] by pushing the *continuation* — the code
+   that would run after the current sub-expression — inwards, until it reaches
+   the leaves. A [Ret] then simply discards the continuation it was handed,
+   which is exactly its semantics.
+
+   The continuation is represented as an expression containing [Hole 0], filled
+   with whatever should run before it. The cases split in three groups:
+   - base cases, where the continuation is simply appended;
+   - "do-not-traverse" cases (lambdas, loops, applications, ...), whose
+     sub-expressions cannot exit the block, so the continuation stays outside
+     and only [~keep_ret:true] recursion happens inside;
+   - "do-traverse" cases, where the continuation is pushed into the
+     sub-expressions. When a construct has several such sub-expressions the
+     continuation is *duplicated*, and each copy must get fresh expression ids
+     (cf. [refresh_eids]); the duplication is skipped when no branch actually
+     contains an eliminable [Ret].
+
+   [~keep_ret:false] eliminates the [Ret]s of [bid]; [~keep_ret:true] leaves
+   them in place, for the sub-expressions this scheme cannot reach, where
+   [elim_ret_args] takes over. *)
 let rec try_elim_ret ~keep_ret bid e =
   let hole = Eid.dummy, Hole 0 in
   let fill e elt = fill_hole 0 elt e in
@@ -231,6 +265,12 @@ let rec try_elim_ret ~keep_ret bid e =
   in
   aux e hole
 
+(* Fallback for the [Ret]s of [bid] that [try_elim_ret] left in place: each of
+   them writes its argument to a mutable variable and then diverges, and the
+   block reads that variable back at the end. Less precise than pushing the
+   continuation, but it reaches arbitrarily deep inside a lambda or a loop.
+   The variable is allocated on demand: creating one registers it globally
+   (cf. [MVariable.create]), so we must not do it when no [Ret] needs it. *)
 let elim_ret_args bid (id,e) =
   let v = lazy (MVariable.create MVariable.Mut None) in
   let rec treat_rets e =

@@ -46,7 +46,10 @@ let combine rs1 rs2 =
 let combine' rss =
   Utils.cartesian_prod' rss |> List.map REnv.conj
 
-let is_empty renv =
+(* An [REnv] is a conjunction of constraints, so it is unsatisfiable as soon as
+   one of them is. Not to be confused with [REnv.is_empty], which tests for the
+   absence of constraints, i.e. for the trivially *true* refinement. *)
+let is_unsatisfiable renv =
   REnv.bindings renv |> List.exists (fun (_,ty) -> Ty.is_empty ty)
 
 let sufficient_refinements env e t =
@@ -95,7 +98,7 @@ let sufficient_refinements env e t =
           List.map (REnv.cap renv) renvs
         )
     in
-    renvs |> List.filter (fun renv -> is_empty renv |> not)
+    renvs |> List.filter (fun renv -> is_unsatisfiable renv |> not)
   in
   aux env e t
 

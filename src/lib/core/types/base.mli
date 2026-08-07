@@ -29,24 +29,56 @@ module PrinterCfg : sig
     val rvar_prefix : unit -> string
 end
 
-(** @canonical Mlsem_types.PEnv *)
+(** Printing environment: the type aliases to fold back when printing a type,
+    so that a type built from [type list('a) = …] prints as [list(int)] rather
+    than as its expansion.
+
+    The environment is carried as an {b effect} rather than threaded explicitly:
+    [register] performs an [Update], and printing performs a [Get]. Both are
+    therefore only usable inside a [sequential_handler], and raise
+    [Effect.Unhandled] outside one.
+
+    @canonical Mlsem_types.PEnv *)
 module PEnv : sig
     type t (* Printing environment *)
     type _ Effect.t += Update: t -> unit Effect.t
     type _ Effect.t += Get: t Effect.t
+
     val sequential_handler : t -> ('a -> 'b) -> 'a -> 'b * t
+    (** [sequential_handler penv f x] runs [f x] with [penv] as the ambient
+        printing environment, and returns its result together with the
+        environment as the registrations performed by [f] left it. *)
 
     val empty : t
+
     val merge : t -> t -> t
+    (** Adds the aliases of the second environment to the first, dropping any
+        earlier alias that has the same name or denotes an equivalent type. *)
+
     val merge' : t list -> t
 
     (* Alias registering (for pretty printing) *)
+
     val register : string -> Sstt.Ty.t -> unit
+    (** Registers a name for a type. Must be called under a
+        [sequential_handler]. *)
+
     val register_parametrized : string -> Sstt.Ty.t list -> Sstt.Ty.t -> unit
+    (** [register_parametrized name args ty] registers [ty] under the display
+        form [name(args)]. Type variables occurring in [args] are recorded as
+        holes, so that the alias still prints correctly when those variables are
+        renamed at printing time. Must be called under a
+        [sequential_handler]. *)
 
     (* Pretty-printing *)
+
     val printer_params : unit -> Sstt.Printer.params
+    (** Printer parameters for the ambient environment. Must be called under a
+        [sequential_handler]. *)
+
     val printer_params' : Sstt.Subst.t -> Sstt.Printer.params
+    (** Like {!printer_params}, for printing types to which the given
+        substitution is applied — the aliases are substituted accordingly. *)
 end
 
 (** @canonical Mlsem_types.Ty *)
@@ -89,7 +121,13 @@ module Ty : sig
     val equiv : t -> t -> bool
 
     val factorize : t -> t
+    (** Rewrites the type by putting in common the parts shared by the lines of
+        its disjunctive normal form. Preserves the denotation. *)
+
     val simplify : t -> t
+    (** Searches for a smaller representation of the type by removing redundant
+        parts of its normal form. Preserves the denotation, and is more thorough
+        — and more expensive — than {!factorize}. *)
 end
 
 (** @canonical Mlsem_types.FTy *)
@@ -125,28 +163,50 @@ module Tag : sig
     val pp : Format.formatter -> t -> unit
     val compare : t -> t -> int
     val define : string -> t
+    (** Creates a {b fresh} tag; two calls with the same name yield distinct
+        tags that print identically. *)
+
     val any : Ty.t
     val mk : t -> Ty.t -> Ty.t
     val proj : t -> Ty.t -> Ty.t
+    (** The type carried by the tag. Only meaningful on a type all of whose
+        values carry that tag, i.e. below [mk tag Ty.any]. *)
+
     val tag : t -> Sstt.Tag.t
 end
 
-(** @canonical Mlsem_types.Abstract *)
+(** Abstract types: opaque parameterized type constructors, such as [ref('a)],
+    whose parameters are {b invariant}.
+
+    @canonical Mlsem_types.Abstract *)
 module Abstract : sig
     type t
+
     val define : string -> int -> t
+    (** [define name arity] creates a {b fresh} abstract type constructor. *)
+
     val arity : t -> int
     val any : t -> Ty.t
     val mk : t -> Ty.t list -> Ty.t
+
     val dnf : t -> Ty.t -> (Ty.t list) list list
+    (** The disjunctive normal form of the given abstract type's part of a type:
+        a disjunction of conjunctions of parameter tuples. *)
+
     val top_transform :
         (t * (Ty.t list list * Ty.t list list) list
           -> (Ty.t list list * Ty.t list list) list)
         -> Ty.t -> Ty.t
+    (** Rewrites the abstract atoms occurring at the {b top level} of a type.
+        The function receives, for one abstract constructor, its normal form as
+        a list of (positive tuples, negative tuples) pairs. *)
+
     val transform :
         (t * (Ty.t list list * Ty.t list list) list
           -> (Ty.t list list * Ty.t list list) list)
         -> Ty.t -> Ty.t
+    (** Like {!top_transform}, but rewrites abstract atoms at {b every} depth,
+        including under other constructors and inside recursive types. *)
 end
 
 (** @canonical Mlsem_types.Tuple *)
@@ -174,23 +234,57 @@ end
 (** @canonical Mlsem_types.Record *)
 module Record : sig
     type oty = Ty.t*bool
+    (** A field type together with a flag saying whether the field may be
+        absent. *)
+
     val mk : oty (* tail *) -> (string * oty) list -> Ty.t
+    (** [mk tail fields] is the record type with the given fields; [tail] is the
+        type of every field {e not} listed. *)
+
     val mk_open : (string * oty) list -> Ty.t
+    (** {!mk} with an unconstrained tail: other fields may be present, with any
+        type. *)
+
     val mk_closed : (string * oty) list -> Ty.t
+    (** {!mk} with an empty tail: no other field may be present. *)
+
     val mk' : FTy.t -> (string * FTy.t) list -> Ty.t
+    (** Like {!mk}, taking field types that may involve row variables. *)
+
     val any : Ty.t
     val any_with : string -> Ty.t
     val any_without : string -> Ty.t
+
     val dnf : Ty.t -> ((string * oty) list * oty) list
+    (** The record part of a type, as a disjunction of [(fields, tail)]. *)
+
     val dnf' : Ty.t -> ((string * FTy.t) list * FTy.t) list
+    (** Like {!dnf}, preserving row variables in the field types. *)
+
     val of_dnf : ((string * oty) list * oty) list -> Ty.t
     val of_dnf' : ((string * FTy.t) list * FTy.t) list -> Ty.t
+
     val proj : Ty.t -> string -> Ty.t
+    (** The type of a field. Only meaningful on a type whose values all have
+        that field. *)
+
     val merge : Ty.t -> Ty.t -> Ty.t
+    (** Record concatenation: the fields of the second override those of the
+        first. Returns [Ty.empty] if either argument has no record part. *)
+
     val remove_field : Ty.t -> string -> Ty.t
+    (** The type with the given field removed. Returns [Ty.empty] if the
+        argument has no record part. *)
 
     val from_label : Sstt.Label.t -> string
+    (** The name a label was created from. Labels that entered the type
+        representation through another route have no name here, and are given a
+        synthetic one of the form [__reservedN] — so a name obtained from
+        {!dnf} is not necessarily a name the user ever wrote. *)
+
     val to_label : string -> Sstt.Label.t
+    (** The label of a field name; the same name always yields the same
+        label. *)
 end
 
 (** @canonical Mlsem_types.Arrow *)

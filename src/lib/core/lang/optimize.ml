@@ -34,6 +34,18 @@ let read_vars e =
   in
   iter aux e ; VarSet.inter (fv e) !rv
 
+(* State of the SSA-like conversion at a given program point.
+   - [captured]: mutable variables that may be written from somewhere we cannot
+     see (a closure, or the outside for a free variable). Their value is never
+     known statically, so they get no snapshot.
+   - [immut]: for a mutable variable, the immutable snapshot currently holding
+     its value. A read can be redirected to it; the absence of an entry means
+     the value is not statically known here.
+   - [mut]: for a mutable variable, the mutable aliases created to let a test
+     narrow it inside a branch. An assignment must be propagated to all of them.
+   - [partitions]: the suggested type decomposition attached to the declaration
+     of a mutable variable, carried along so that each new snapshot can inherit
+     it. *)
 type env = { captured:VarSet.t ; immut:Variable.t VarMap.t ; mut:Variable.t list VarMap.t ; partitions:Ty.t list VarMap.t }
 
 let optimize_dataflow e =
@@ -341,6 +353,12 @@ let rec clean_unused_assigns e =
     | Config.LeftToRight -> aux_sequence
     | Config.RightToLeft -> aux_sequence_rev
     | Config.UnknownOrder -> aux_parallel
+    (* Unlike in [optimize_dataflow], abortable evaluation needs more than
+       order-insensitivity here. This analysis is backward: a write kills the
+       reads that follow it. If evaluation may stop early the write may not
+       happen, so those reads must be kept alive — hence the stronger
+       [aux_parallel_captured]. The forward analysis has no such issue: fewer
+       writes can only invalidate fewer snapshots. *)
     | Config.Abortable -> aux_parallel_captured
   and aux_sequence_rev cv rv es =
     let es, rv = aux_sequence cv rv (List.rev es) in
@@ -352,6 +370,9 @@ let rec clean_unused_assigns e =
 
 (* === Generic cleaning === *)
 
+(* Static over-approximation: [true] means "the type system may reject this
+   sub-expression". Only a sub-expression that cannot fail may be dropped, since
+   dropping it would also drop the check. *)
 let rec can_fail (_,e) =
   match e with
   | Exc | Void | Value _ | Var _ -> false
@@ -361,9 +382,19 @@ let rec can_fail (_,e) =
   | Try es | Alt (_, es) -> List.exists can_fail es
   | Ite (e,_,e1,e2) -> can_fail e || can_fail e1 || can_fail e2
   | _ -> true
+(* Static over-approximation: [true] means "this sub-expression may have type
+   [empty]", i.e. the type system may conclude that evaluation does not return.
+   Such a sub-expression must not be dropped either, as that would turn a
+   diverging program into a returning one.
+
+   [evs] is the set of variables that may have type [empty]: exactly those bound
+   by a *non-partitioned* [Let], since a partitioned one makes all its cells —
+   and hence the whole expression — vanish when its definition is empty.
+   [Value] is deemed non-empty by convention: a caller that wants to express
+   divergence uses [Exc] rather than a value of type [empty]. *)
 let rec can_empty evs (_,e) =
   match e with
-  | Void | Voidify _ | Value _ (* user should use Exc if they want to diverge *) -> false
+  | Void | Voidify _ | Value _ -> false
   | Var v -> VarSet.mem v evs
   | Loop e | Declare (_, e) | Ignore e -> can_empty evs e
   | Let (_, _, e1, e2) | Seq (e1, e2) -> can_empty evs e1 || can_empty evs e2

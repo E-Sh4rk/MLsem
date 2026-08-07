@@ -104,8 +104,13 @@ module Make(T:T) = struct
     let env = filter (fun v _ -> List.mem (Variable.show v) names) env in
     pp fmt env
 
+  (* [replace] is defined before [add] is shadowed, so it uses the unchecked
+     one. *)
   let replace v t e = rm v e |> add v t
-  let add v t e = assert (mem v e |> not) ; add v t e
+  let add v t e =
+    if mem v e then
+      invalid_arg ("Variable "^(Variable.show_uniq v)^" is already bound.") ;
+    add v t e
 
   let tvars (_, s) = s
 
