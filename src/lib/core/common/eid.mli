@@ -39,6 +39,7 @@ val show_notices : t -> bool
 (** Whether the analyzer may report notices and unreachability warnings about
     this expression.
     @raise Not_found if the id was not produced by this module. *)
+
 val hash : t -> int
 val equal : t -> t -> bool
 val compare : t -> t -> int
