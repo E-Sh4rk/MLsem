@@ -5,19 +5,29 @@ type pcustom = { pname: string ; pdom: Ty.t -> Ty.t ; proj: Ty.t -> Ty.t ; pgen:
 type ccustom = { cname: string ; cdom: Ty.t -> Ty.t list list ; cons: Ty.t list -> Ty.t ; cgen: bool }
 type ocustom = { oname: string ; ofun: Env.t -> TyScheme.t ; ogen: bool }
 type check = Check | CheckStatic | NoCheck
+
 type projection = (* Projections must be monotonic operations *)
 | Pi of int * int | PiField of string | PiFieldOpt of string
 | Hd | Tl | PiTag of Tag.t | PCustom of pcustom
+
 type constructor = (* Constructors must be monotonic operations *)
 | Tuple of int | Cons | Rec of string list * bool | Tag of Tag.t | Enum of Enum.t 
 | Join of int | Meet of int | Ternary of Ty.t (* Should not contain type vars *)
 | Voidify of Ty.t (* Should not contain type vars *)
 | Normalize | CCustom of ccustom
+
 type operation =
 | RecUpd of string | RecDel of string | Ignore of Ty.t
 | OCustom of ocustom
+
 type alt_settings = { aname: string ; amask: Env.t -> bool list ; aerror: Env.t -> string }
+(** Settings of an [Alt] expression. [amask env] selects the branches that may be
+    typed under [env]: it must return exactly one boolean per branch of the
+    [Alt], in the same order.
+    [aerror env] builds the error message reported when no branch could be typed. *)
+
 type param_annot = GTy.t option
+
 type e =
 | Value of GTy.t
 | Var of Variable.t

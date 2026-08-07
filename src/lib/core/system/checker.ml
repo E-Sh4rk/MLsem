@@ -103,7 +103,7 @@ let rec typeof' env annot (id,e) =
     let t1 = typeof_b env b1 e1 s tau in
     let t2 = typeof_b env b2 e2 s (GTy.neg tau) in
     GTy.cup t1 t2
-  | Alt (_,es), AAlt anns ->
+  | Alt (_,es), AAlt anns when List.length es = List.length anns ->
     if List.for_all Option.is_none anns
     then untypeable id ("At least one branch of a Alt expr must be typeable.")
     else

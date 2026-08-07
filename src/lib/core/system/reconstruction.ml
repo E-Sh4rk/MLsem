@@ -247,7 +247,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
       let tvs, _ = TyScheme.get ty in
       retry_with (ac (Annot.AVar (f tvs)))
     end
-  | Constructor (c, es), AConstruct annots ->
+  | Constructor (c, es), AConstruct annots when List.length es = List.length annots ->
     begin match refine_seq' cache env (List.combine annots es) with
     | OneFail -> Fail
     | OneSubst (ss, a, a',r) -> Subst (ss,AConstruct a |> ic,AConstruct a' |> ic,r)
@@ -273,7 +273,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
       Subst (ss,ALambda(ty, a)|>ic,ALambda(ty, a')|>ic,REnv.add v (GTy.lb ty) r)
     | Fail -> Fail
     end
-  | LambdaRec lst, ALambdaRec anns ->
+  | LambdaRec lst, ALambdaRec anns when List.length lst = List.length anns ->
     let lst = List.combine lst anns in
     let env' = lst |> List.fold_left
       (fun env ((_,v,_),(ty,_)) -> Env.add v (TyScheme.mk_mono ty) env) env in
