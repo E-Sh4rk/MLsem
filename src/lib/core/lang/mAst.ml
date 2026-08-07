@@ -157,7 +157,7 @@ let to_system_ast t =
       (* A Loop is encoded as a Voidify (the body may not be executed at all,
          so an empty body should still yield a unit type) *)
       SA.Constructor (SA.Voidify !Config.void_ty, [aux e])
-    | Seq (e1, e2) -> Let ([Ty.any], MVariable.create Immut None, aux e1, aux e2)
+    | Seq (e1, e2) -> SA.Let ([Ty.any], MVariable.create Immut None, aux e1, aux e2)
     | Try es -> SA.Constructor (SA.Join (List.length es), List.map aux es)
     | Alt (settings, es) -> SA.Alt (settings, List.map aux es)
     | Hole _ -> invalid_arg "Expression should not contain a hole."

@@ -45,6 +45,8 @@ type e =
 and t = Eid.t * e
 [@@deriving show]
 
+let pp_raw = pp
+
 let map_tl f (id,e) =
   let e =
     match e with
@@ -279,8 +281,6 @@ let push_coercions t =
   map f t
 
 (* ===== PRETTY PRINTER ===== *)
-
-let pp_raw = pp
 
 let pp_check fmt c = match c with
   | Check -> ()

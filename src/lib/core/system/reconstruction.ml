@@ -85,7 +85,10 @@ type cache = { dom : Domain.t ; logs : log list ref }
 
 (* Auxiliary *)
 
-let tsort leq lst =
+(* Insertion sort with respect to the possibly *partial* order [leq]: each
+   element is inserted before the first element it is below, so elements that
+   [leq] does not relate keep an arbitrary (but deterministic) relative order. *)
+let sort_partial leq lst =
   let rec add_elt lst ne =
     match lst with
     | [] -> [ne]
@@ -159,7 +162,7 @@ let tally_simpl mono tvars res cs =
     (Subst.compose clean s, Subst.apply clean r)
   )
   |> Utils.filter_among_others not_redundant
-  |> tsort (fun (_,r1) (_,r2) -> Ty.leq r1 r2)
+  |> sort_partial (fun (_,r1) (_,r2) -> Ty.leq r1 r2)
   (* |> List.map (fun (s,r) -> Format.printf "%a@.%a@." Sstt.Printer.print_subst' s Ty.pp r ; s,r) *)
 
 let tally_simpl env res cs =

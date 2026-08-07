@@ -76,9 +76,6 @@ let find_among_others pred lst =
 let find_map_among_others f lst =
   lst |> add_others |> List.find_map (fun (a,o) -> f a o)  
 
-(* let filter_among_others pred lst =
-  lst |> add_others |> List.filter (fun (a,o) -> pred a o) |> List.map fst *)
-
 let fold_acc_rem f lst =
   let rec aux acc rem =
     match rem with
@@ -89,17 +86,6 @@ let fold_acc_rem f lst =
 
 let filter_among_others pred =
   fold_acc_rem (fun c acc rem -> if pred c (acc@rem) then c::acc else acc)
-
-(* let map_among_others f =
-  fold_acc_rem (fun c acc rem -> (f c (acc@rem))::acc)
-
-let map_among_others' f lst =
-  let rec aux acc left right =
-    match left with
-    | [] -> acc
-    | c::left -> aux ((f c (left@right))::acc) left (c::right)
-  in
-  aux [] (List.rev lst) [] *)
 
 let merge_when_possible merge_opt lst =
   let merge_opt a b others =

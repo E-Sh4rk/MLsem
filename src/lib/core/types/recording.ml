@@ -38,4 +38,3 @@ let save_to_file file tallys =
     with e ->
         close_out_noerr oc;
         raise e
-    (* to_file ~suf:"" file (`List instances) *)

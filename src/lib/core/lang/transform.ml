@@ -38,6 +38,9 @@ let rec type_of_pat pat =
   | POr (p1, p2) -> Ty.cup (type_of_pat p1) (type_of_pat p2)
   | PAssign _ -> Ty.any
 
+(* Only meaningful on well-formed patterns (cf. {!check_pattern}), for which the
+   two sides of a [POr] bind the same variables and the components of a
+   conjunctive position bind disjoint ones. *)
 let rec vars_of_pat pat =
   match pat with
   | PType _ -> VarSet.empty
@@ -46,6 +49,28 @@ let rec vars_of_pat pat =
     List.fold_left VarSet.union VarSet.empty (List.map vars_of_pat args)
   | POr (p1, p2) -> VarSet.inter (vars_of_pat p1) (vars_of_pat p2)
   | PAnd (p1, p2) -> VarSet.union (vars_of_pat p1) (vars_of_pat p2)
+
+let check_pattern pat =
+  let error msg = invalid_arg ("Ill-formed pattern: "^msg^".") in
+  let disjoint_union vss =
+    List.fold_left (fun acc vs ->
+      if VarSet.disjoint acc vs |> not then
+        error "a variable is bound in several components of a conjunctive pattern" ;
+      VarSet.union acc vs) VarSet.empty vss
+  in
+  let rec aux pat =
+    match pat with
+    | PType _ -> VarSet.empty
+    | PVar (_,x) | PAssign (_,x,_) -> VarSet.singleton x
+    | PConstructor (_, args) -> List.map aux args |> disjoint_union
+    | PAnd (p1, p2) -> disjoint_union [aux p1 ; aux p2]
+    | POr (p1, p2) ->
+      let vs1, vs2 = aux p1, aux p2 in
+      if VarSet.equal vs1 vs2 |> not then
+        error "a variable is bound in only one side of a disjunctive pattern" ;
+      vs1
+  in
+  aux pat |> ignore
 
 (* Duplicating a sub-expression must refresh its expression ids: several analyses
    are indexed by [Eid.t] (in particular [Refinement.Refinements], which
@@ -59,6 +84,7 @@ let rec def_of_var_pat pat v e =
   | PAssign (tys,v', ty) when Variable.equal v v' -> tys,(Eid.unique (), Value ty)
   | PVar _ | PAssign _ | PType _ -> assert false
   | PAnd (p1, p2) ->
+    (* [v] is bound in exactly one of the two sides, cf. {!check_pattern} *)
     if vars_of_pat p1 |> VarSet.mem v
     then def_of_var_pat p1 v e
     else def_of_var_pat p2 v e
@@ -73,6 +99,7 @@ let rec def_of_var_pat pat v e =
       (Eid.refresh (fst e), Projection (proj_of_patconstr c i, e))
 
 let encode_pattern_matching e pats =
+  pats |> List.iter (fun (pat,_) -> check_pattern pat) ;
   let x = MVariable.create Immut None in
   let ts = pats |> List.map fst |> List.map type_of_pat in
   let dom, ts = List.fold_left (fun (dom,res) ty -> (Ty.diff dom ty, (Ty.cap dom ty)::res)) (Ty.any,[]) ts in
@@ -205,8 +232,7 @@ let rec try_elim_ret ~keep_ret bid e =
   aux e hole
 
 let elim_ret_args bid (id,e) =
-  let need_v = ref false in
-  let v = MVariable.create MVariable.Mut None in
+  let v = lazy (MVariable.create MVariable.Mut None) in
   let rec treat_rets e =
     let f = function
     | (id,Lambda (tys, ty, v, e)) -> Some (id, Lambda (tys, ty, v, e))
@@ -214,7 +240,7 @@ let elim_ret_args bid (id,e) =
     | (_, Block _) -> assert false
     | (id, Ret (bid', Some e)) when bid'=bid ->
       let e = treat_rets e in
-      need_v := true ;
+      let v = Lazy.force v in
       Some (id, Seq ((Eid.refresh id, VarAssign (v, e)), (Eid.unique (), Exc)))
     | (id, Ret (bid', None)) when bid'=bid -> Some (id, Exc)
     | _ -> None
@@ -222,8 +248,9 @@ let elim_ret_args bid (id,e) =
     map' f e
   in
   let e = treat_rets (id,e) in
-  if !need_v
+  if Lazy.is_val v
   then
+    let v = Lazy.force v in
     let body = Eid.refresh id, VarAssign (v, e) in
     let body = Eid.refresh id, Seq ((Eid.unique (), Voidify body), (Eid.unique (), Var v)) in
     Eid.refresh id, Declare (v, body)

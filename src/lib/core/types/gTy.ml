@@ -59,8 +59,6 @@ let fv t =
   if t.eq then TVOp.vars t.lb else MVarSet.union (TVOp.vars t.lb) (TVOp.vars t.ub)
 let substitute s = map (Subst.apply s)
 
-(* let test f t =
-  if t.eq then f t.lb else (f t.lb) && (f t.ub) *)
 let test2 f t1 t2 =
   if t1.eq && t2.eq then
     f t1.lb t2.lb

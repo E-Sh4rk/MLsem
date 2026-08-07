@@ -10,6 +10,11 @@ type pattern_constructor =
 | PCTag of Tag.t
 | PCEnum of Enum.t
 | PCCustom of SA.ccustom * SA.pcustom list
+
+(** Patterns must be linear and their alternatives must agree on the variables
+    they bind: a variable must occur in at most one component of a [PAnd] or of
+    a [PConstructor], and in both sides of a [POr]. A [PatMatch] over a pattern
+    that violates this raises [Invalid_argument] when transformed. *)
 type pattern =
 | PType of Ty.t
 | PVar of Ty.t list * Variable.t
