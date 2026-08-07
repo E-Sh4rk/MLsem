@@ -69,7 +69,8 @@ let rec def_of_var_pat pat v e =
     tys1@tys2, (Eid.unique (), case)
   | PConstructor (c, ps) ->
     let i = List.find_index (fun p -> vars_of_pat p |> VarSet.mem v) ps |> Option.get in
-    def_of_var_pat (List.nth ps i) v (Eid.unique (), Projection (proj_of_patconstr c i, e))
+    def_of_var_pat (List.nth ps i) v
+      (Eid.refresh (fst e), Projection (proj_of_patconstr c i, e))
 
 let encode_pattern_matching e pats =
   let x = MVariable.create Immut None in
@@ -78,7 +79,12 @@ let encode_pattern_matching e pats =
   let ts = List.rev (dom::ts) in
   let body_of_pat pat e =
     let add_def acc v =
-      let tys,d = def_of_var_pat pat v (Eid.unique (), Var x) in
+      (* The projections extracting [v] out of [x] are generated code, but a
+         failure in them is best reported on [v] itself. Notices stay disabled,
+         as for any generated node. *)
+      let eid = Eid.unique_with_pos (Variable.get_location v) in
+      Eid.set_show_notices eid false ;
+      let tys,d = def_of_var_pat pat v (eid, Var x) in
       (Eid.refresh (fst acc), Let (tys, v, d, acc))
     in
     List.fold_left add_def e (vars_of_pat pat |> VarSet.elements)

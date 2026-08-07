@@ -92,17 +92,17 @@ let optimize_dataflow e =
     else
       add_immut_def (env, ctx) v (Eid.unique (), Var (get_preferred_mut env v))
   in
-  let mut_declare v def =
-    let assign = Eid.unique (), VarAssign (v, def) in
+  let mut_declare eid v def =
+    let assign = Eid.refresh eid, VarAssign (v, def) in
     let body = Eid.unique (), Seq (assign, hole) in
     Eid.unique (), Declare (v, body)
   in
-  let add_mut_alias (env,ctx) v =
+  let add_mut_alias eid (env,ctx) v =
     if has_immut env v then
       let vdef = get_immut env v in
       let vmut = MVariable.refresh (MVariable.kind v) v in
       let env = add_mut env v vmut in
-      let ctx = fill ctx (mut_declare vmut (Eid.unique (), Var vdef)) in
+      let ctx = fill ctx (mut_declare eid vmut (Eid.unique (), Var vdef)) in
       (env,ctx)
     else
       (env,ctx)
@@ -142,8 +142,10 @@ let optimize_dataflow e =
       let narrowed_vars e =
         read_vars e |> VarSet.filter MVariable.is_mutable |> VarSet.elements
       in
-      let (env1, ctx1) = List.fold_left add_mut_alias (env, hole) (narrowed_vars e1) in
-      let (env2, ctx2) = List.fold_left add_mut_alias (env, hole) (narrowed_vars e2) in
+      let (env1, ctx1) =
+        List.fold_left (add_mut_alias (fst e1)) (env, hole) (narrowed_vars e1) in
+      let (env2, ctx2) =
+        List.fold_left (add_mut_alias (fst e2)) (env, hole) (narrowed_vars e2) in
       let (env1, e1), (env2, e2) = aux' env1 e1, aux' env2 e2 in
       let e1, e2 = fill ctx1 e1, fill ctx2 e2 in
       merge_envs' env [env1 ; env2], ctx, (id, Ite (e, ty, e1, e2))
@@ -163,7 +165,7 @@ let optimize_dataflow e =
       let env, ctx1, e1 = aux env e1 in
       let env = { env with partitions=VarMap.add v tys env.partitions } in
       let env,ctx1,v' = add_immut_def (env,ctx1) v e1 in
-      let ctx1 = fill ctx1 (mut_declare v (Eid.unique (), Var v')) in
+      let ctx1 = fill ctx1 (mut_declare id v (Eid.unique (), Var v')) in
       let env, ctx2, e2 = aux env e2 in
       env, fill ctx1 ctx2, e2
     | Let (tys, v, e1, e2) ->
@@ -180,7 +182,7 @@ let optimize_dataflow e =
       let env, ctx, e = aux env e in
       let env,ctx,vimmut = add_immut_def (env,ctx) v e in
       let vmuts = get_muts env v in
-      let env,ctx = add_mut_alias (env,ctx) v in
+      let env,ctx = add_mut_alias id (env,ctx) v in
       let e = Eid.refresh id, VarAssign (v, (Eid.unique (), Var vimmut)) in
       let add_assign e v =
         Eid.refresh id, Seq (
