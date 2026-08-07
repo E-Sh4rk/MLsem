@@ -113,4 +113,10 @@ module TVOp : sig
     val decompose : MVarSet.t -> Subst.t -> Subst.t -> Subst.t list
 
     val factorize : TVarSet.t * TVarSet.t -> Ty.t -> Ty.t * Ty.t
+    (** [factorize (pvs,nvs) t] splits [t] into a part that can be factorized by
+        [pvs] and [nvs], and a remainder: it returns [(t1,t2)] such that
+        [t] is equivalent to [(/\pvs /\ ~\/nvs /\ t1) \/ t2].
+        The factorized part gathers the DNF lines of [t] in which every variable
+        of [pvs] occurs positively and every variable of [nvs] occurs
+        negatively, with those occurrences removed. *)
 end

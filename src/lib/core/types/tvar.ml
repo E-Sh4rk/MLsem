@@ -313,13 +313,16 @@ module TVOp = struct
     let dnf = Sstt.Ty.def t |> Sstt.VDescr.dnf in
     let factor (pvs',nvs',descr) =
       let pvs', nvs' = TVarSet.of_list pvs', TVarSet.of_list nvs' in
-      if TVarSet.subset pvs pvs' then
+      if TVarSet.subset pvs pvs' && TVarSet.subset nvs nvs' then
         let pvs', nvs' = TVarSet.diff pvs' pvs, TVarSet.diff nvs' nvs in
         Some (TVarSet.elements pvs', TVarSet.elements nvs', descr)
       else
         None
     in
-    let fact = dnf |> List.filter_map factor in
-    let nfact = dnf |> List.filter (fun line -> factor line = None) in
+    let fact, nfact = dnf |> List.partition_map (fun line ->
+      match factor line with
+      | Some line -> Either.Left line
+      | None -> Either.Right line)
+    in
     Sstt.VDescr.of_dnf fact |> Sstt.Ty.of_def, Sstt.VDescr.of_dnf nfact |> Sstt.Ty.of_def
 end
