@@ -1,6 +1,11 @@
 
 type t
+
 val dummy : t
+(** Placeholder id, for expressions that do not correspond to any source
+    location. It has no location and no notices, and [refresh dummy] is
+    [dummy]. *)
+
 val unique : unit -> t
 val unique_with_pos : Position.t -> t
 val refresh : t -> t

@@ -99,9 +99,8 @@ module Builder = struct
   let is_valid ty =
     dynvars_of_ty ty |> TVarSet.elements |> List.for_all (fun v ->
       match TVOp.polarity1 v ty with
-      | `None -> assert false
       | `Both -> false
-      | `Pos | `Neg -> true
+      | `None | `Pos | `Neg -> true
     )
   let refresh ty =
     let s = dynvars_of_ty ty |> TVarSet.elements
@@ -110,9 +109,9 @@ module Builder = struct
   let build ty =
     let sub, slb = dynvars_of_ty ty |> TVarSet.elements |> List.map (fun v ->
       match TVOp.polarity1 v ty with
-      | `None -> assert false
       | `Both -> invalid_arg "Dyn occurs in an invariant position."
-      | `Pos -> (v, Ty.any), (v, Ty.empty)
+      (* [`None] is treated as [`Pos]: the choice is irrelevant. *)
+      | `None | `Pos -> (v, Ty.any), (v, Ty.empty)
       | `Neg -> (v, Ty.empty), (v, Ty.any)
     ) |> List.split in
     let ub = Subst.apply (Subst.of_list1 sub) ty in

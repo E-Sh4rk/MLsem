@@ -10,6 +10,8 @@ let unique_id =
 
 type info = { loc : Position.t ; show_notices : bool }
 let eid_infos = Hashtbl.create 1000
+(* [dummy] must have an entry like any other id, so that the accessors below are total on it. *)
+let () = Hashtbl.add eid_infos dummy { loc=Position.dummy ; show_notices=false }
 let unique_with_pos pos =
   let eid = unique_id () in
   Hashtbl.add eid_infos eid { loc=pos ; show_notices=true } ; eid

@@ -60,11 +60,12 @@ let rec typeof' env annot (id,e) =
     else untypeable id ("Invalid substitution.")
   in
   let app t1 t2 res =
-    if Ty.leq (GTy.lb t1) (Arrow.mk (GTy.lb t2) res)
-    then
-      if GTy.non_gradual t1 && GTy.non_gradual t2 then GTy.mk res
-      else GTy.mk_gradual res (Arrow.apply (GTy.ub t1) (GTy.ub t2))
-    else untypeable id "Invalid application."
+    if Ty.leq (GTy.lb t1) (Arrow.mk (GTy.lb t2) res) |> not
+    then untypeable id "Invalid application."
+    else if GTy.non_gradual t1 && GTy.non_gradual t2 then GTy.mk res
+    else
+      let ub = Arrow.apply (GTy.ub t1) (GTy.ub t2) in
+      if Ty.leq res ub then GTy.mk_gradual res ub else GTy.mk res
   in
   match e, annot with
   | Value _, AValue ty -> ty
