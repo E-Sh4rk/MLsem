@@ -135,7 +135,11 @@ module Builder = struct
             let t = Tag.define name in
             t, { tenv with tags=StrMap.add name t tenv.tags }
 
-    let equations_max = 20
+    (* Maximum number of distinct instantiations of a same type name. A regular
+       type only has finitely many, and few in practice; exceeding this bound
+       means the definition is (most likely) not regular. The bound is per name,
+       so it does not limit the number of types defined in a same group. *)
+    let instantiations_max = 10
     let derecurse_types env defs =
         let hashtbl_of x =
             let h = Hashtbl.create 16 in
@@ -145,7 +149,7 @@ module Builder = struct
         let venv, rvenv = hashtbl_of env.vtenv.tv, hashtbl_of env.vtenv.rv in
         let tenv = ref env.tenv in
         let henv = Hashtbl.create 16 in
-        let eqs, n = ref [], ref 0 in
+        let eqs = ref [] in
         let get_enum name =
             let enum, tenv' = get_enum !tenv name in
             tenv := tenv' ; enum
@@ -164,13 +168,13 @@ module Builder = struct
                         try List.for_all2 Ty.equiv args args' with Invalid_argument _ -> false) in
                     begin match cached with
                     | None ->
+                        if List.length lst >= instantiations_max then
+                            raise (TypeDefinitionError (Printf.sprintf
+                                "Too many instantiations of type %s: is it a regular type?" name)) ;
                         begin try
                             let v = TVar.mk KTemporary None in
                             Hashtbl.replace henv name (def, params, (args, v)::lst);
                             let local = List.combine params args |> List.to_seq |> StrMap.of_seq in
-                            n := !n+1 ;
-                            if !n > equations_max then
-                                raise (TypeDefinitionError ("Maximum number of equations exceeded: is the type regular?")) ;
                             let t = aux local def in
                             eqs := (v,t)::!eqs ;
                             Some v
