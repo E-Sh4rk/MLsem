@@ -47,6 +47,12 @@ let rec vars_of_pat pat =
   | POr (p1, p2) -> VarSet.inter (vars_of_pat p1) (vars_of_pat p2)
   | PAnd (p1, p2) -> VarSet.union (vars_of_pat p1) (vars_of_pat p2)
 
+(* Duplicating a sub-expression must refresh its expression ids: several analyses
+   are indexed by [Eid.t] (in particular [Refinement.Refinements], which
+   intersects the refinements registered under a same id), so sharing ids
+   between copies would conflate unrelated program points. *)
+let refresh_eids e = Ast.map (fun (eid,t) -> (Eid.refresh eid, t)) e
+
 let rec def_of_var_pat pat v e =
   match pat with
   | PVar (tys,v') when Variable.equal v v' -> tys,e
@@ -57,8 +63,8 @@ let rec def_of_var_pat pat v e =
     then def_of_var_pat p1 v e
     else def_of_var_pat p2 v e
   | POr (p1, p2) ->
-    let tys1, e1 = def_of_var_pat p1 v e in
-    let tys2, e2 = def_of_var_pat p2 v e in
+    let tys1, e1 = def_of_var_pat p1 v (refresh_eids e) in
+    let tys2, e2 = def_of_var_pat p2 v (refresh_eids e) in
     let case = Ite (e, type_of_pat p1 |> GTy.mk, e1, e2) in
     tys1@tys2, (Eid.unique (), case)
   | PConstructor (c, ps) ->
@@ -141,7 +147,7 @@ let rec try_elim_ret ~keep_ret bid e =
   let aux' e = try_elim_ret ~keep_ret:true bid e in
   let aux_noret' e = try_elim_ret ~keep_ret:false bid e in
   let rec aux (id,e) cont =
-    let refresh_cont cont = cont |> Ast.map (fun (eid,t) -> (Eid.refresh eid, t)) in
+    let refresh_cont cont = refresh_eids cont in
     let cont' e = fill cont e in
     match e with
     (* Base cases *)
