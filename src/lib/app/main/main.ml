@@ -65,8 +65,8 @@ let infer var env e =
   let ty = Mlsem_system.Checker.typeof_def env annot e in
   let (tvs, ty) = TyScheme.get ty in
   let ty = TyScheme.mk tvs (GTy.ub ty |> GTy.mk) |> Signature.simplify_tyscheme in
-  let msg = Mlsem_system.Analyzer.analyze e annot in
-  ty, msg
+  let msg, visited = Mlsem_system.Analyzer.analyze e annot in
+  ty, msg, visited
 
 let type_check_with_sigs env (var,e,sigs,aty) =
   let e, id = Transform.expr_to_ast e, Eid.refresh (fst e) in
@@ -74,9 +74,13 @@ let type_check_with_sigs env (var,e,sigs,aty) =
   let es = sigs |> List.concat_map (Signature.decompose ~recursive:true) |> List.map (fun s ->
     id, TypeCoerce (e, Signature.to_gty s, c)
     ) |> List.map push_coercions in
-  let tys, msg = List.map (infer (Some var) env) es |> List.split in
+  let tys, msg, visited =
+    List.map (infer (Some var) env) es |> Mlsem_utils.Utils.split3 in
   List.iter (check_resolved ~allow_mono:false var env) tys ;
-  let msg = (List.concat msg)@(Mlsem_system.Analyzer.get_unreachable e) in
+  (* Each signature is inferred separately, but they all annotate the same [e]:
+     a sub-expression is unreachable only if no signature reached it. *)
+  let visited = Mlsem_system.Analyzer.Visited.union_many visited in
+  let msg = (List.concat msg)@(Mlsem_system.Analyzer.get_unreachable visited e) in
   (var,(aty,sigs)),msg
 
 let type_check_recs pos env lst =
@@ -84,8 +88,8 @@ let type_check_recs pos env lst =
     Eid.unique_with_pos pos,
     PAst.LambdaRec (List.map (fun (v,e) -> (v,None,e)) lst) in
   let e = Transform.expr_to_ast e |> push_coercions in
-  let ty, msg = infer None env e in
-  let msg = msg@(Mlsem_system.Analyzer.get_unreachable e) in
+  let ty, msg, visited = infer None env e in
+  let msg = msg@(Mlsem_system.Analyzer.get_unreachable visited e) in
   let tvs, ty = ty |> TyScheme.get in
   let n = List.length lst in
   List.mapi (fun i (var,_) ->

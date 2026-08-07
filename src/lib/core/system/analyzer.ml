@@ -31,7 +31,16 @@ let rec iter_ann f (id,e) a =
   in
   f (id,e) a ; children |> List.iter (fun (e, a) -> iter_ann f e a)
 
-let visited = Hashtbl.create 1000
+module Visited = struct
+  module ESet = Set.Make(Eid)
+  type t = ESet.t
+  let empty = ESet.empty
+  let union = ESet.union
+  let union_many = List.fold_left union empty
+  let add = ESet.add
+  let mem = ESet.mem
+end
+
 let analyze e a =
   let tyof a =
     match a.Annot.cache with
@@ -39,9 +48,10 @@ let analyze e a =
     | Some ty -> ty
   in
   let res = ref [] in
+  let visited = ref Visited.empty in
   let msg m = res := m::!res in
   let aux e a =
-    Hashtbl.replace visited (fst e) () ;
+    visited := Visited.add (fst e) !visited ;
     let msg s t d = msg { eid=fst e ; severity=s ; title=t ; descr=Some d } in
     if Eid.show_notices (fst e) then
     match snd e, a.Annot.ann with
@@ -58,14 +68,14 @@ let analyze e a =
     | _, _ -> ()
   in
   iter_ann aux e a ;
-  List.rev !res
+  List.rev !res, !visited
 
-let get_unreachable e =
+let get_unreachable visited e =
   let res = ref [] in
   let msg m = res := m::!res in
   let aux e =
     let msg s t = msg { eid=fst e ; severity=s ; title=t ; descr=None } in
-    if Hashtbl.mem visited (fst e) || not (Eid.show_notices (fst e)) then true
+    if Visited.mem (fst e) visited || not (Eid.show_notices (fst e)) then true
     else (msg Warning "Unreachable code" ; false)
   in
   iter' aux e ;

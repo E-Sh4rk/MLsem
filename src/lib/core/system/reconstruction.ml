@@ -290,10 +290,10 @@ and refine_ann r cache env (rid, annot) (id, e) =
       let tys' = List.map GTy.lb tys' in
       let cs = List.combine tys' (List.map GTy.lb tys) in
       let ss = tally_simpl env (Tuple.mk tys') cs in
-      let ok_ann = ac (Annot.ALambdaRec (List.combine tys annots)) in
       log "untypeable recursive function" (fun fmt ->
         Format.fprintf fmt "cannot unify the body with self"
         ) ;
+      let ok_ann = ac (Annot.ALambdaRec (List.combine tys annots)) in
       Subst (with_res ss, ok_ann, ic Untyp, REnv.empty)
     end
   | Ite (e0,_,e1,e2), AIte (a0,tau,a1,a2) ->
