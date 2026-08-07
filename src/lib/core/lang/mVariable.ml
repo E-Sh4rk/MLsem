@@ -74,8 +74,11 @@ let aref v =
   | None -> invalid_arg "Variable must be mutable."
   | Some None -> TVar.typ a |> mk_ref
   | Some (Some _) -> Ty.any
-let mk_gradual lb ub = GTy.mk_gradual lb ub |> TyScheme.mk_poly
-let mk ty = GTy.mk ty |> TyScheme.mk_poly
+(* The type variables that an [AnnotMut] annotation may contain are bound by the
+   enclosing scope and must remain monomorphic. *)
+let quantified = MVarSet.of_list [a] []
+let mk_gradual lb ub = GTy.mk_gradual lb ub |> TyScheme.mk quantified
+let mk ty = GTy.mk ty |> TyScheme.mk quantified
 
 let ref_uninit v =
   Arrow.mk Ty.unit (aref v) |> mk
