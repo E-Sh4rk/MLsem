@@ -61,7 +61,10 @@ let optimize_dataflow e =
     ) benv.immut nenv.immut in
     let mut = benv.mut in
     let captured = VarSet.union benv.captured nenv.captured in
-    let partitions = VarMap.union (fun _ _ _ -> None) benv.partitions nenv.partitions in
+    (* A variable is bound by a single [Let], so the two maps cannot associate
+       different decompositions to a same variable: keeping either is correct. *)
+    let partitions = VarMap.union (fun _ tys _ -> Some tys)
+      benv.partitions nenv.partitions in
     { captured ; immut ; mut ; partitions } |> norm
   in
   let merge_envs' benv nenvs =

@@ -220,7 +220,7 @@ order: Nil | (Nil | int, Nil | int) -> Nil | int | (int, int)
 loop_tricky_narrowing: int -> (any, int)
 loop_invalid: untypeable application
 File "tests/4_imperative.ml", line 174, characters 4-14
-function: (ref('I2749), 'I2749) -> ()
+function: (ref('I2746), 'I2746) -> ()
 argument: ref(int), false
 loop_valid: ∀'a. (int | false | 'a -> int | false | 'a) & ('a \ int -> 'a)
 filter_imp: ∀'a,'b,'c. ('b -> false) & ('a -> bool) -> array('b | 'a) -> array('a \ 'b | 'c)
