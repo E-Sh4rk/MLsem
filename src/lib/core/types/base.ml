@@ -71,8 +71,8 @@ module PEnv = struct
       penv.paliases |> List.map (fun (ty, (str,holes)) ->
           let ty = Sstt.Subst.apply s ty in
           let replace acc (str,v) =
-            Str.global_replace (Str.regexp str)
-              (Sstt.Subst.find1 s v |> Format.asprintf "@[<h>%a@]" Sstt.Printer.print_ty') acc
+            let repl = Sstt.Subst.find1 s v |> Format.asprintf "@[<h>%a@]" Sstt.Printer.print_ty' in
+            Str.global_substitute (Str.regexp_string str) (fun _ -> repl) acc
           in
           let str = List.fold_left replace str holes in
           ty, str
