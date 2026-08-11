@@ -217,13 +217,19 @@ let fun_of_operation env o =
   | Ignore ty -> Arrow.mk Ty.any ty |> GTy.mk |> TyScheme.mk_mono
   | OCustom { ofun ; _ } -> ofun env
 
-let to_single_arrow ty =
-  let d = GTy.map' Arrow.domain ty in
-  let cd = GTy.map2 Arrow.apply ty d in
-  let ty' = GTy.mk_gradual (Arrow.mk (GTy.ub d) (GTy.lb cd)) (Arrow.mk (GTy.lb d) (GTy.ub cd)) in
-  d,cd,ty'
-let coerce ?coercion_id c ty t =
+let coerce ?coercion_id ?(duplicate_arrows=false) c ty t =
   let mono = TVOp.all_vars KNoInfer in
+  let decompose ty =
+    match Arrow.dnf ty with
+    | [arrs] -> arrs |> List.map (fun (a,b) -> Arrow.mk a b)
+    | _ -> [ty]
+  in
+  let to_single_arrow ty =
+    let d = GTy.map' Arrow.domain ty in
+    let cd = GTy.map2 Arrow.apply ty d in
+    let ty' = GTy.mk_gradual (Arrow.mk (GTy.ub d) (GTy.lb cd)) (Arrow.mk (GTy.lb d) (GTy.ub cd)) in
+    d,cd,ty'
+  in
   let rec aux ?coercion_id ty (id,t) =
     let unify ty1 ty2 =
       match TVOp.tally mono
@@ -249,15 +255,22 @@ let coerce ?coercion_id c ty t =
         let tys_ub = domains_of_construct (GTy.ub ty) in
         let tys = List.map2 GTy.mk_gradual tys_lb tys_ub in
         Constructor (cons, List.map2 aux tys es)
-      | Lambda (da,v,e) ->
+      | Lambda (da,v,e) as expr ->
         let d, cd, ty' = to_single_arrow ty in
-        if GTy.leq ty' ty |> not then raise Exit ;
-        begin match da with
-        | Some da ->
-          let s = unify d da in
-          Lambda (Some (GTy.substitute s d), v, aux (GTy.substitute s cd) (apply_subst s e))
-        | None -> Lambda (Some d, v, aux cd e)
-        end
+        if GTy.leq ty' ty |> not then begin
+          if duplicate_arrows && GTy.non_gradual ty then
+            (* TODO: what for gradual types? *)
+            let ts = GTy.lb ty |> decompose |> List.map
+              (fun ty -> aux (GTy.mk ty) (refresh (id, expr))) in
+              Constructor (Meet (List.length ts), ts)
+          else raise Exit
+        end else
+          begin match da with
+          | Some da ->
+            let s = unify d da in
+            Lambda (Some (GTy.substitute s d), v, aux (GTy.substitute s cd) (apply_subst s e))
+          | None -> Lambda (Some d, v, aux cd e)
+          end
       | LambdaRec lst ->
         let n = List.length lst in
         let tys = List.mapi (fun i _ -> GTy.map (Tuple.proj n i) ty) lst in
@@ -277,35 +290,13 @@ let coerce ?coercion_id c ty t =
   in
   aux ?coercion_id ty t
 
-let push_coercions t =
+let push_coercions ?(duplicate_arrows=false) t =
   let f t =
     match t with
-    | id, TypeCoerce (t, ty, c) -> coerce ~coercion_id:id c ty t
+    | id, TypeCoerce (t, ty, c) -> coerce ~coercion_id:id ~duplicate_arrows c ty t
     | t -> t
   in
   map f t
-
-let rec push_multi_coercions t =
-  let is_lambda (_,e) = match e with Lambda _ -> true | _ -> false in
-  let decompose ty =
-    match Arrow.dnf ty with
-    | [arrs] -> arrs |> List.map (fun (a,b) -> Arrow.mk a b)
-    | _ -> [ty]
-  in
-  let f t =
-    match t with
-    | id, TypeCoerce (t, ty, c) when is_lambda t ->
-      let _, _, ty' = to_single_arrow ty in
-      if GTy.leq ty' ty then None
-      else
-        let ts = GTy.lb ty |> decompose |> List.map (fun ty ->
-          coerce ~coercion_id:(Eid.refresh id) c (GTy.mk ty) (refresh t) |> push_multi_coercions) in
-        let t = Eid.refresh id, Constructor (Meet (List.length ts), ts) in
-        Some (id, TypeCoerce (t, ty, CheckStatic))
-    | _ -> None
-  in
-  map' f t
-let push_coercions' t = t |> push_coercions |> push_multi_coercions
 
 (* ===== PRETTY PRINTER ===== *)
 

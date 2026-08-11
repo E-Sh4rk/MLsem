@@ -148,7 +148,7 @@ val fun_of_operation : Env.t -> operation -> TyScheme.t
 
 (** {2 Coercions} *)
 
-val coerce : ?coercion_id:Eid.t -> check -> GTy.t -> t -> t
+val coerce : ?coercion_id:Eid.t -> ?duplicate_arrows:bool -> check -> GTy.t -> t -> t
 (** [coerce c ty e] wraps [e] in a [TypeCoerce] to [ty], {e pushing} the coercion
     inwards as far as the shape of [e] allows: coercing a lambda to an arrow
     type coerces its body and annotates its parameter, coercing a constructor
@@ -156,12 +156,9 @@ val coerce : ?coercion_id:Eid.t -> check -> GTy.t -> t -> t
     the reconstruction inside a definition instead of only constraining its
     result. The outer coercion is always kept as well, under [coercion_id] if
     given and under a refreshed id otherwise; sub-terms whose shape does not
-    match the target type are simply left alone. *)
+    match the target type are simply left alone. If [duplicate_arrows] is set
+    to true, [Lambda] expressions may be duplicated when necessary to allow
+    pushing coercions inside (for intersections of arrows). *)
 
-val push_coercions : t -> t
+val push_coercions : ?duplicate_arrows:bool -> t -> t
 (** Applies {!coerce} to every [TypeCoerce] already present in the term. *)
-
-val push_coercions' : t -> t
-(** Applies {!coerce} to every [TypeCoerce] already present in the term,
-    and duplicates [Lambda] expressions that are coerced into an intersection
-    of arrows, so that it is possible to push the coercion inside. *)
