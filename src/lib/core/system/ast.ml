@@ -219,16 +219,30 @@ let fun_of_operation env o =
 
 let coerce ?coercion_id ?(duplicate_arrows=false) c ty t =
   let mono = TVOp.all_vars KNoInfer in
-  let decompose ty =
-    match Arrow.dnf ty with
-    | [arrs] -> arrs |> List.map (fun (a,b) -> Arrow.mk a b)
-    | _ -> [ty]
-  in
   let to_single_arrow ty =
     let d = GTy.map' Arrow.domain ty in
     let cd = GTy.map2 Arrow.apply ty d in
     let ty' = GTy.mk_gradual (Arrow.mk (GTy.ub d) (GTy.lb cd)) (Arrow.mk (GTy.lb d) (GTy.ub cd)) in
     d,cd,ty'
+  in
+  let decompose ty =
+    match Arrow.dnf ty with
+    | [arrs] -> arrs |> List.map (fun (a,b) -> Arrow.mk a b)
+    | _ -> raise Exit
+  in
+  let decompose_gradual gty = (* best effort *)
+    match Arrow.dnf (GTy.lb gty), Arrow.dnf (GTy.ub gty) with
+    | [lb_arrs], [ub_arrs] ->
+      let gtys =
+        Mlsem_utils.Utils.cartesian_prod lb_arrs ub_arrs
+        |> List.filter_map (fun ((d_ub,cd_lb), (d_lb,cd_ub)) ->
+          if Ty.leq d_lb d_ub && Ty.leq cd_lb cd_ub then
+            Some (GTy.mk_gradual (Arrow.mk d_ub cd_lb) (Arrow.mk d_lb cd_ub))
+          else None
+          )
+      in
+      if GTy.leq (GTy.conj gtys) gty then gtys else raise Exit
+    | _, _ -> raise Exit
   in
   let rec aux ?coercion_id ty (id,t) =
     let unify ty1 ty2 =
@@ -258,11 +272,14 @@ let coerce ?coercion_id ?(duplicate_arrows=false) c ty t =
       | Lambda (da,v,e) as expr ->
         let d, cd, ty' = to_single_arrow ty in
         if GTy.leq ty' ty |> not then begin
-          if duplicate_arrows && GTy.non_gradual ty then
-            (* TODO: what for gradual types? *)
-            let ts = GTy.lb ty |> decompose |> List.map
-              (fun ty -> aux (GTy.mk ty) (refresh (id, expr))) in
-              Constructor (Meet (List.length ts), ts)
+          if duplicate_arrows then
+            let tys =
+              if GTy.non_gradual ty
+              then GTy.lb ty |> decompose |> List.map GTy.mk
+              else decompose_gradual ty
+            in
+            let ts = tys |> List.map (fun ty -> aux ty (refresh (id, expr))) in
+            Constructor (Meet (List.length ts), ts)
           else raise Exit
         end else
           begin match da with

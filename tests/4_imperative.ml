@@ -240,3 +240,8 @@ let test_ann_mut4 =
   let mut f : ('a -> 'a) & (() -> ()) in
   f := (fun x ->  f () ; x) ;
   f 42, f 73
+
+let test_ann_mut5 =
+  let mut f : (dyn\() -> dyn\()) & (() -> ()) in
+  f := (fun x ->  f () ; x) ;
+  f 42, f 73

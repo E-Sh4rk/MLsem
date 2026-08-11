@@ -234,6 +234,10 @@ File "tests/4_imperative.ml", line 236, characters 18-22
 function: 'a -> 'a
 argument: ()
 test_ann_mut4: 42, 73
+test_ann_mut5: untypeable application
+File "tests/4_imperative.ml", line 247, characters 2-6
+function: () -> ()
+argument: 42
 
 ===== Processing tests/5_misc.ml =====
 valint: untypeable coercion
