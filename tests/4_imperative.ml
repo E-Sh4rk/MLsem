@@ -228,8 +228,8 @@ let test_ann_mut2 =
   f := (fun x -> x) ;
   f 42, f 73
 
-(* In the two examples below, mutability cannot be eliminated,
-   so f stays monomorphic. *)
+(* In the two examples below, mutability cannot be eliminated in f's assignment,
+   so f stays monomorphic: thus it must be annotated with all the needed instances.  *)
 
 let test_ann_mut3 =
   let mut f : 'a -> 'a in

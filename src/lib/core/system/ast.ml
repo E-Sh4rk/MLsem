@@ -123,6 +123,8 @@ let apply_subst s e =
   in
   map aux e
 
+let refresh t = map (fun (eid,t) -> (Eid.refresh eid, t)) t
+
 (* Projections and constructors *)
 
 let domain_of_proj p ty =
@@ -215,6 +217,11 @@ let fun_of_operation env o =
   | Ignore ty -> Arrow.mk Ty.any ty |> GTy.mk |> TyScheme.mk_mono
   | OCustom { ofun ; _ } -> ofun env
 
+let to_single_arrow ty =
+  let d = GTy.map' Arrow.domain ty in
+  let cd = GTy.map2 Arrow.apply ty d in
+  let ty' = GTy.mk_gradual (Arrow.mk (GTy.ub d) (GTy.lb cd)) (Arrow.mk (GTy.lb d) (GTy.ub cd)) in
+  d,cd,ty'
 let coerce ?coercion_id c ty t =
   let mono = TVOp.all_vars KNoInfer in
   let rec aux ?coercion_id ty (id,t) =
@@ -243,9 +250,7 @@ let coerce ?coercion_id c ty t =
         let tys = List.map2 GTy.mk_gradual tys_lb tys_ub in
         Constructor (cons, List.map2 aux tys es)
       | Lambda (da,v,e) ->
-        let d = GTy.map' Arrow.domain ty in
-        let cd = GTy.map2 Arrow.apply ty d in
-        let ty' = GTy.mk_gradual (Arrow.mk (GTy.ub d) (GTy.lb cd)) (Arrow.mk (GTy.lb d) (GTy.ub cd)) in
+        let d, cd, ty' = to_single_arrow ty in
         if GTy.leq ty' ty |> not then raise Exit ;
         begin match da with
         | Some da ->
@@ -279,6 +284,28 @@ let push_coercions t =
     | t -> t
   in
   map f t
+
+let rec push_multi_coercions t =
+  let is_lambda (_,e) = match e with Lambda _ -> true | _ -> false in
+  let decompose ty =
+    match Arrow.dnf ty with
+    | [arrs] -> arrs |> List.map (fun (a,b) -> Arrow.mk a b)
+    | _ -> [ty]
+  in
+  let f t =
+    match t with
+    | id, TypeCoerce (t, ty, c) when is_lambda t ->
+      let _, _, ty' = to_single_arrow ty in
+      if GTy.leq ty' ty then None
+      else
+        let ts = GTy.lb ty |> decompose |> List.map (fun ty ->
+          coerce ~coercion_id:(Eid.refresh id) c (GTy.mk ty) (refresh t) |> push_multi_coercions) in
+        let t = Eid.refresh id, Constructor (Meet (List.length ts), ts) in
+        Some (id, TypeCoerce (t, ty, CheckStatic))
+    | _ -> None
+  in
+  map' f t
+let push_coercions' t = t |> push_coercions |> push_multi_coercions
 
 (* ===== PRETTY PRINTER ===== *)
 

@@ -104,6 +104,10 @@ val apply_subst : Subst.t -> t -> t
     / [ocustom] closures are {b not} traversed: they are required to be free of
     type variables. *)
 
+val refresh : t -> t
+(** Refreshes all Eid.t, preserving localization data.
+    Useful when duplicating an expression. *)
+
 val pp_raw : Format.formatter -> t -> unit
 (** Prints the term as a data structure, annotations included; {!pp} prints it
     as source-like syntax. *)
@@ -156,3 +160,8 @@ val coerce : ?coercion_id:Eid.t -> check -> GTy.t -> t -> t
 
 val push_coercions : t -> t
 (** Applies {!coerce} to every [TypeCoerce] already present in the term. *)
+
+val push_coercions' : t -> t
+(** Applies {!coerce} to every [TypeCoerce] already present in the term,
+    and duplicates [Lambda] expressions that are coerced into an intersection
+    of arrows, so that it is possible to push the coercion inside. *)

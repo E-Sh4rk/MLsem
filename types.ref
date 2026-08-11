@@ -233,10 +233,7 @@ test_ann_mut3: untypeable application
 File "tests/4_imperative.ml", line 236, characters 18-22
 function: 'a -> 'a
 argument: ()
-test_ann_mut4: untypeable coercion
-File "tests/4_imperative.ml", line 241, characters 8-26
-expected: ('a -> 'a) & (() -> ())
-given: 'x -> 'x
+test_ann_mut4: 42, 73
 
 ===== Processing tests/5_misc.ml =====
 valint: untypeable coercion
