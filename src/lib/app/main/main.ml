@@ -71,9 +71,8 @@ let infer var env e =
 let type_check_with_sigs env (var,e,sigs,aty) =
   let e, id = Transform.expr_to_ast e, Eid.refresh (fst e) in
   let c = if !Config.allow_implicit_downcast then CheckStatic else Check in
-  let es = sigs |> List.concat_map (Signature.decompose ~recursive:true) |> List.map (fun s ->
-    id, TypeCoerce (e, Signature.to_gty s, c)
-    ) |> List.map push_coercions' in
+  let es = sigs |> List.concat_map (Signature.decompose ~recursive:true) |> List.map
+    (fun s -> (id, TypeCoerce (e, Signature.to_gty s, c)) |> push_coercions') in
   let tys, msg, visited =
     List.map (infer (Some var) env) es |> Mlsem_utils.Utils.split3 in
   List.iter (check_resolved ~allow_mono:false var env) tys ;
