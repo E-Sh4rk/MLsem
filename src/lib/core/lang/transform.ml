@@ -115,10 +115,8 @@ let encode_pattern_matching e pats =
   let body_of_pat pat e =
     let add_def acc v =
       (* The projections extracting [v] out of [x] are generated code, but a
-         failure in them is best reported on [v] itself. Notices stay disabled,
-         as for any generated node. *)
-      let eid = Eid.unique_with_pos (Variable.get_location v) in
-      Eid.set_show_notices eid false ;
+         failure in them is best reported on [v] itself. *)
+      let eid = Eid.generated_with_pos (Variable.get_location v) in
       let tys,d = def_of_var_pat pat v (eid, Var x) in
       (Eid.refresh (fst acc), Let (tys, v, d, acc))
     in
@@ -129,8 +127,7 @@ let encode_pattern_matching e pats =
   in
   let pats = pats |> List.map (fun (pat, e) ->
     (type_of_pat pat, body_of_pat pat e)) |> List.rev in
-  let default_eid = Eid.refresh (fst e) in
-  let () = Eid.set_show_notices default_eid false in
+  let default_eid = Eid.generated_with_pos (fst e |> Eid.loc) in
   let default = Eid.unique (), Constructor (SA.Normalize, [Eid.unique (), Var x]) in
   let default = default_eid, TypeCast (default, GTy.empty, CheckStatic) in
   let body = List.fold_left add_branch default pats in

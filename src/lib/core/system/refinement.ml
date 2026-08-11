@@ -5,7 +5,7 @@ open TVOp
 open Mlsem_utils
 
 module Refinements = struct
-  module EMap = Map.Make(Eid)
+  module EMap = Eid.Map
   type t = REnv.t EMap.t * REnv.t list
   let empty = EMap.empty, []
   let get (t,_) e =

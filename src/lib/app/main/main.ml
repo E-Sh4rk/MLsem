@@ -87,8 +87,8 @@ let type_check_recs pos env lst =
   let e =
     Eid.unique_with_pos pos,
     PAst.LambdaRec (List.map (fun (v,e) -> (v,None,e)) lst) in
-  let e = Transform.expr_to_ast e |> push_coercions' in
-  let ty, msg, visited = infer None env e in
+  let e = Transform.expr_to_ast e in
+  let ty, msg, visited = e |> push_coercions' |> infer None env in
   let msg = msg@(Mlsem_system.Analyzer.get_unreachable visited e) in
   let tvs, ty = ty |> TyScheme.get in
   let n = List.length lst in

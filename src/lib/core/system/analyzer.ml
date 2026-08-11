@@ -32,12 +32,12 @@ let rec iter_ann f (id,e) a =
   f (id,e) a ; children |> List.iter (fun (e, a) -> iter_ann f e a)
 
 module Visited = struct
-  module ESet = Set.Make(Eid)
+  module ESet = Eid.Set
   type t = ESet.t
   let empty = ESet.empty
   let union = ESet.union
   let union_many = List.fold_left union empty
-  let add = ESet.add
+  let add e t = ESet.union (Eid.eq_class e) t
   let mem = ESet.mem
 end
 

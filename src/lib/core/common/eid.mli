@@ -10,6 +10,9 @@
 
 type t
 
+module Set : Set.S with type elt=t
+module Map : Map.S with type key=t
+
 val dummy : t
 (** Placeholder id, for expressions that do not correspond to any source
     location. It has no location and no notices, and [refresh dummy] is
@@ -20,19 +23,23 @@ val unique : unit -> t
     Only appropriate on nodes that cannot be blamed for a type error. *)
 
 val unique_with_pos : Position.t -> t
-(** Fresh id located at [pos], with notices {e enabled}. Combine with
-    [set_show_notices] to locate a generated node without making it eligible
-    for the analyzer's reports. *)
+(** Fresh id located at [pos], with notices {e enabled}. *)
+
+val generated_with_pos : Position.t -> t
+(** Fresh id located at [pos], with notices {e disabled}. *)
 
 val refresh : t -> t
 (** Fresh id inheriting the location and the notice flag of its argument. This
     is how a duplicated sub-expression keeps its diagnostics while getting the
-    distinct ids the analyses require. *)
+    distinct ids the analyses require. Refreshed ids form an equivalence class,
+    accessible by calling [eq_class].
+    @raise Not_found if the argument was not produced by this module. *)
+
+val eq_class : t -> Set.t
+(** Equivalence class of an id (cf. [refresh]).
+    @raise Not_found if the id was not produced by this module. *)
 
 val loc : t -> Position.t
-(** @raise Not_found if the id was not produced by this module. *)
-
-val set_show_notices : t -> bool -> unit
 (** @raise Not_found if the id was not produced by this module. *)
 
 val show_notices : t -> bool
