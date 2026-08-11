@@ -188,3 +188,5 @@ let rename_fv v v' =
     (id, e)
   in
   map aux
+
+let refresh t = map (fun (eid,e) -> (Eid.refresh eid, e)) t

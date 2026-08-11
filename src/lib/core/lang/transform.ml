@@ -72,12 +72,6 @@ let check_pattern pat =
   in
   aux pat |> ignore
 
-(* Duplicating a sub-expression must refresh its expression ids: several analyses
-   are indexed by [Eid.t] (in particular [Refinement.Refinements], which
-   intersects the refinements registered under a same id), so sharing ids
-   between copies would conflate unrelated program points. *)
-let refresh_eids e = Ast.map (fun (eid,t) -> (Eid.refresh eid, t)) e
-
 let rec def_of_var_pat pat v e =
   match pat with
   | PVar (tys,v') when Variable.equal v v' -> tys,e
@@ -89,8 +83,8 @@ let rec def_of_var_pat pat v e =
     then def_of_var_pat p1 v e
     else def_of_var_pat p2 v e
   | POr (p1, p2) ->
-    let tys1, e1 = def_of_var_pat p1 v (refresh_eids e) in
-    let tys2, e2 = def_of_var_pat p2 v (refresh_eids e) in
+    let tys1, e1 = def_of_var_pat p1 v (refresh e) in
+    let tys2, e2 = def_of_var_pat p2 v (refresh e) in
     let case = Ite (e, type_of_pat p1 |> GTy.mk, e1, e2) in
     tys1@tys2, (Eid.unique (), case)
   | PConstructor (c, ps) ->
@@ -202,7 +196,7 @@ let has_eliminable_ret bid e =
    - "do-traverse" cases, where the continuation is pushed into the
      sub-expressions. When a construct has several such sub-expressions the
      continuation is *duplicated*, and each copy must get fresh expression ids
-     (cf. [refresh_eids]); the duplication is skipped when no branch actually
+     (cf. [refresh]); the duplication is skipped when no branch actually
      contains an eliminable [Ret].
 
    [~keep_ret:false] eliminates the [Ret]s of [bid]; [~keep_ret:true] leaves
@@ -214,7 +208,7 @@ let rec try_elim_ret ~keep_ret bid e =
   let aux' e = try_elim_ret ~keep_ret:true bid e in
   let aux_noret' e = try_elim_ret ~keep_ret:false bid e in
   let rec aux (id,e) cont =
-    let refresh_cont cont = refresh_eids cont in
+    let refresh_cont cont = refresh cont in
     let cont' e = fill cont e in
     match e with
     (* Base cases *)

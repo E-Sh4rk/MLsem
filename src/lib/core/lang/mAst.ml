@@ -112,6 +112,8 @@ let rename_fv v v' =
   in
   map aux
 
+let refresh t = map (fun (eid,e) -> (Eid.refresh eid, e)) t
+
 (* === Encoding to System.Ast === *)
 
 let to_system_ast t =

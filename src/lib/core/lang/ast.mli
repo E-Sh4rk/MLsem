@@ -92,6 +92,7 @@ val fill_hole : int -> t -> t -> t
 val fv : t -> VarSet.t
 val vars : t -> VarSet.t
 val rename_fv : Variable.t -> Variable.t -> t -> t
+val refresh : t -> t
 
 val pp_blockid : Format.formatter -> blockid -> unit
 val pp_pattern_constructor : Format.formatter -> pattern_constructor -> unit

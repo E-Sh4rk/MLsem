@@ -47,6 +47,7 @@ val fill_hole : int -> t -> t -> t
 val fv : t -> VarSet.t
 val vars : t -> VarSet.t
 val rename_fv : Variable.t -> Variable.t -> t -> t
+val refresh : t -> t
 
 val to_system_ast : t -> SA.t
 (** Encodes the remaining mutable variables as operations on an abstract
