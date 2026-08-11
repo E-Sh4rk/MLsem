@@ -230,20 +230,7 @@ let coerce ?coercion_id ?(duplicate_arrows=false) c ty t =
     | [arrs] -> arrs |> List.map (fun (a,b) -> Arrow.mk a b)
     | _ -> raise Exit
   in
-  let decompose_gradual gty = (* best effort *)
-    match Arrow.dnf (GTy.lb gty), Arrow.dnf (GTy.ub gty) with
-    | [lb_arrs], [ub_arrs] ->
-      let gtys =
-        Mlsem_utils.Utils.cartesian_prod lb_arrs ub_arrs
-        |> List.filter_map (fun ((d_ub,cd_lb), (d_lb,cd_ub)) ->
-          if Ty.leq d_lb d_ub && Ty.leq cd_lb cd_ub then
-            Some (GTy.mk_gradual (Arrow.mk d_ub cd_lb) (Arrow.mk d_lb cd_ub))
-          else None
-          )
-      in
-      if GTy.leq (GTy.conj gtys) gty then gtys else raise Exit
-    | _, _ -> raise Exit
-  in
+  let decompose_gradual _ = (* not implemented *) raise Exit in
   let rec aux ?coercion_id ty (id,t) =
     let unify ty1 ty2 =
       match TVOp.tally mono

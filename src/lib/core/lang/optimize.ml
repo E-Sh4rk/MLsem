@@ -428,8 +428,11 @@ let clean e =
 let materialize_annot_obligations e =
   let obligation v e =
     match MVariable.kind v with
+    | MVariable.AnnotMut gty when GTy.non_gradual gty ->
+      Eid.refresh (fst e), TypeCoerce (e, gty, SA.CheckStatic)
     | MVariable.AnnotMut gty ->
-      (Eid.refresh (fst e), TypeCoerce (e, GTy.ub gty |> GTy.mk, SA.CheckStatic))
+      let e = (Eid.refresh (fst e), TypeCoerce (e, GTy.ub gty |> GTy.mk, SA.CheckStatic)) in
+      Eid.unique (), TypeCoerce (e, gty, SA.NoCheck)
     | MVariable.Immut | MVariable.Mut -> e
   in
   let f (id,e) =
