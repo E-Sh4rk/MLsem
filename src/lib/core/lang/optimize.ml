@@ -423,13 +423,13 @@ let clean e =
    written value must be a subtype of the declared type. That obligation is
    normally discharged by the type of [MVariable.ref_assign], but the passes
    below may replace every read of the variable by an immutable snapshot and
-   then delete the mutable cell altogether, taking the obligation with it. So we
-   materialize it as a cast beforehand. *)
+   then delete the mutable cell altogether, taking the obligation with it.
+   So we materialize it as a checked coercion beforehand. *)
 let materialize_annot_obligations e =
   let obligation v e =
     match MVariable.kind v with
     | MVariable.AnnotMut gty ->
-      (Eid.refresh (fst e), TypeCast (e, GTy.ub gty |> GTy.mk, SA.CheckStatic))
+      (Eid.refresh (fst e), TypeCoerce (e, GTy.ub gty |> GTy.mk, SA.CheckStatic))
     | MVariable.Immut | MVariable.Mut -> e
   in
   let f (id,e) =

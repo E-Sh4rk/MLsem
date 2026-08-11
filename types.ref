@@ -202,7 +202,7 @@ arr_dict_assign: ∀'a,'b. dict((0..1) | 'b, 'a) | array('a) -> ()
 nested: ∀'a. any -> 'a -> 'a
 swap: ∀'a,'b. ('a & int -> int -> array('b) -> ()) & ('a -> 'a -> dict('a, 'b) -> ())
 mx: 42
-mut_invalid: untypeable cast
+mut_invalid: untypeable coercion
 File "tests/4_imperative.ml", line 92, characters 8-12
 expected: int
 given: true
@@ -227,6 +227,16 @@ filter_imp: ∀'a,'b,'c. ('b -> false) & ('a -> bool) -> array('b | 'a) -> array
 filter_imp_test: array(13 | 42 | "abc")
 rec_and_imp: ∀'a,'b. dict(int | 'a, int | 'b) | array(int | 'b) -> int -> int -> int -> ()
 interval: ∀'a. int -> int -> array(int | 'a)
+test_ann_mut1: 42, 73
+test_ann_mut2: 42, 73
+test_ann_mut3: untypeable application
+File "tests/4_imperative.ml", line 236, characters 18-22
+function: 'a -> 'a
+argument: ()
+test_ann_mut4: untypeable coercion
+File "tests/4_imperative.ml", line 241, characters 8-26
+expected: ('a -> 'a) & (() -> ())
+given: 'x -> 'x
 
 ===== Processing tests/5_misc.ml =====
 valint: untypeable coercion

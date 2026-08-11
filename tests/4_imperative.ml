@@ -213,3 +213,30 @@ let rec_and_imp arr k i n =
 let interval i j =
   let arr = array () in
   rec_and_imp arr 0 i ((j-i)+1) ; arr
+
+(* ========= Annotated mutable variables ========= *)
+
+(* In the two examples below, mutability can be eliminated,
+   so f can be generalized. *)
+
+let test_ann_mut1 =
+  let mut f : 'a -> 'a = fun x -> x in
+  f 42, f 73
+
+let test_ann_mut2 =
+  let mut f : 'a -> 'a in
+  f := (fun x -> x) ;
+  f 42, f 73
+
+(* In the two examples below, mutability cannot be eliminated,
+   so f stays monomorphic. *)
+
+let test_ann_mut3 =
+  let mut f : 'a -> 'a in
+  f := (fun x ->  f () ; x) ;
+  f 42, f 73
+
+let test_ann_mut4 =
+  let mut f : ('a -> 'a) & (() -> ()) in
+  f := (fun x ->  f () ; x) ;
+  f 42, f 73
