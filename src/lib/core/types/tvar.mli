@@ -233,9 +233,10 @@ module TVOp : sig
         introduce new fields. *)
 
     val decompose : MVarSet.t -> Subst.t -> Subst.t -> Subst.t list
-    (** [decompose mono s1 s2] returns the substitutions [s] such that applying
-        [s] after [s2] is at least as precise as [s1]; the empty list when [s1]
-        is not an instance of [s2]. Used to compare candidate solutions. *)
+    (** [decompose mono s1 s2] returns the substitutions [s] whose domains is disjoint
+        from [mono], and such that the composition of [s] and [s1] yields [s2].
+        A non-empty result means that [s1] is more general than [s2], which is used
+        to compare candidate solutions of tallying instances. *)
 
     val factorize : TVarSet.t * TVarSet.t -> Ty.t -> Ty.t * Ty.t
     (** [factorize (pvs,nvs) t] splits [t] into a part that can be factorized by
