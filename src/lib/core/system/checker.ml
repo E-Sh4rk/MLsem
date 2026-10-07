@@ -31,26 +31,13 @@ exception Untypeable of error
 
 let untypeable id msg = raise (Untypeable { eid=id ; kind=InvalidAnnot ; title=msg ; descr=None })
 
-let proj_is_gen p =
-  match p with
-  | Pi _ | PiField _ | PiFieldOpt _ | Hd | Tl | PiTag _ -> true
-  | PCustom c -> c.pgen
-let constr_is_gen c =
-  match c with
-  | Tuple _ | Cons | Rec _ | Tag _ | Enum _
-  | Join _ | Meet _ | Ternary _ | Normalize | Voidify _ -> true
-  | CCustom c -> c.cgen
-let op_is_gen o =
-  match o with
-  | RecUpd _ | RecDel _ | Ignore _ -> true
-  | OCustom c -> c.ogen
 let rec is_gen (_,e) =
   match e with
-  | Lambda _ | Value _ -> true
-  | Var _ | App _ -> false
-  | Constructor (c, es) -> constr_is_gen c && List.for_all is_gen es
-  | Projection (p, e) -> proj_is_gen p && is_gen e
-  | Operation (o, e) -> op_is_gen o && is_gen e
+  | Lambda _ | Value _ | Var _ -> true
+  | App _ -> false
+  | Constructor (c, es) -> Ast.is_construct_generalizable c && List.for_all is_gen es
+  | Projection (p, e) -> Ast.is_proj_generalizable p && is_gen e
+  | Operation (o, e) -> Ast.is_operation_generalizable o && is_gen e
   | LambdaRec lst -> List.for_all (fun (_,_,e) -> is_gen e) lst
   | TypeCast (e, _, _) | TypeCoerce (e, _, _) -> is_gen e
   | Let (_, _, e1, e2) | Ite (_, _, e1, e2) -> is_gen e1 && is_gen e2
