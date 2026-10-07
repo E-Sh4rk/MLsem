@@ -5,9 +5,10 @@
 
 open Mlsem_types
 
-(** Whether generalization is restricted to expressions whose evaluation cannot
-    have an effect (cf. [Checker.generalize]). Disabling it makes inference
-    more permissive but unsound in the presence of mutable state. *)
+(** When [true], the type of applications is not generalized
+    as their evaluation may be effectful (cf. [Checker.generalize]).
+    Disabling it makes inference more permissive but unsound
+    in the presence of mutable state. *)
 let value_restriction = ref true
 
 (** Whether the reconstruction should try to infer intersection (overloaded)

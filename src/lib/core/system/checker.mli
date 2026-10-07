@@ -48,9 +48,8 @@ val typeof : Env.t -> Annot.t -> Ast.t -> GTy.t
 val generalize : e:Ast.t -> Env.t -> GTy.t -> TyScheme.t
 (** [generalize ~e env ty] quantifies the variables of [ty] that do not occur in
     [env], then simplifies the result with [TyScheme.bot_instance]. Under the
-    value restriction (see {!Config.value_restriction}) nothing is quantified
-    unless [e] is a generalizable expression, i.e. one whose evaluation cannot
-    have an effect. *)
+    value restriction (see {!Config.value_restriction}), applications are not
+    generalized as their evaluation may be effectful. *)
 
 val typeof_def : Env.t -> Annot.t -> Ast.t -> TyScheme.t
 (** {!typeof} followed by {!generalize}. *)

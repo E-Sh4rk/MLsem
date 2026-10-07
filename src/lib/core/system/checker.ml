@@ -34,7 +34,7 @@ let untypeable id msg = raise (Untypeable { eid=id ; kind=InvalidAnnot ; title=m
 let rec is_gen (_,e) =
   match e with
   | Lambda _ | Value _ | Var _ -> true
-  | App _ -> false
+  | App _ -> not (!Config.value_restriction)
   | Constructor (c, es) -> Ast.is_construct_generalizable c && List.for_all is_gen es
   | Projection (p, e) -> Ast.is_proj_generalizable p && is_gen e
   | Operation (o, e) -> Ast.is_operation_generalizable o && is_gen e
@@ -44,7 +44,7 @@ let rec is_gen (_,e) =
   | Alt (_,es) -> List.for_all is_gen es
 
 let generalize ~e env s =
-  if not (!Config.value_restriction) || is_gen e then
+  if is_gen e then
     TyScheme.mk_poly_except (Env.tvars env) s |> TyScheme.bot_instance
   else
     TyScheme.mk_mono s
