@@ -151,6 +151,11 @@ let proj p ty =
   | PiTag tag -> Tag.proj tag ty
   | PCustom r -> r.proj ty
 
+let is_proj_generalizable p =
+  match p with
+  | Pi _ | PiField _ | PiFieldOpt _ | Hd | Tl | PiTag _ -> true
+  | PCustom c -> c.pgen
+
 let domains_of_construct (c:constructor) ty =
   match c with
   | Tuple n ->
@@ -202,6 +207,12 @@ let construct (c:constructor) tys =
   | CCustom r, tys -> r.cons tys
   | _ -> raise (Invalid_argument "Invalid arity for constructor.")
 
+let is_construct_generalizable c =
+  match c with
+  | Tuple _ | Cons | Rec _ | Tag _ | Enum _
+  | Join _ | Meet _ | Ternary _ | Normalize | Voidify _ -> true
+  | CCustom c -> c.cgen
+
 let rv = RVar.mk KNoInfer None
 let tv = TVar.mk KNoInfer None
 let fun_of_operation env o =
@@ -216,6 +227,11 @@ let fun_of_operation env o =
     Arrow.mk dom codom |> GTy.mk |> TyScheme.mk_poly
   | Ignore ty -> Arrow.mk Ty.any ty |> GTy.mk |> TyScheme.mk_mono
   | OCustom { ofun ; _ } -> ofun env
+
+let is_operation_generalizable o =
+  match o with
+  | RecUpd _ | RecDel _ | Ignore _ -> true
+  | OCustom c -> c.ogen
 
 let coerce ?coercion_id ?(duplicate_arrows=false) c ty t =
   let mono = TVOp.all_vars KNoInfer in

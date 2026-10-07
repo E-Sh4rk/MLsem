@@ -133,6 +133,10 @@ val proj : projection -> Ty.t -> Ty.t
 (** The type of the projection of an argument of the given type. Monotonic;
     only meaningful on a type within the projection's domain. *)
 
+val is_proj_generalizable : projection -> bool
+(** Returns [true] if and only if the projection operation is generalizable.
+    Does not enter subexpressions recursively. *)
+
 val domains_of_construct : constructor -> Ty.t -> Ty.t list list
 (** [domains_of_construct c t] returns the alternative argument-type tuples
     whose construction by [c] is below [t]; the empty list means [c] cannot
@@ -142,9 +146,17 @@ val construct : constructor -> Ty.t list -> Ty.t
 (** The type of the construction of arguments of the given types. Monotonic.
     @raise Invalid_argument if the number of arguments does not match [c]. *)
 
+val is_construct_generalizable : constructor -> bool
+(** Returns [true] if and only if the construct operation is generalizable.
+    Does not enter subexpressions recursively. *)
+
 val fun_of_operation : Env.t -> operation -> TyScheme.t
 (** The arrow scheme an operation is typed with; an operation is applied like a
     function whose type is fixed rather than inferred. *)
+
+val is_operation_generalizable : operation -> bool
+(** Returns [true] if and only if the operation is generalizable.
+    Does not enter subexpressions recursively. *)
 
 (** {2 Coercions} *)
 
