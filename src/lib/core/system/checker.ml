@@ -33,8 +33,8 @@ let untypeable id msg = raise (Untypeable { eid=id ; kind=InvalidAnnot ; title=m
 
 let rec is_gen (_,e) =
   match e with
-  | Lambda _ | Value _ -> true
-  | Var _ | App _ -> false
+  | Lambda _ | Value _ | Var _ -> true
+  | App _ -> false
   | Constructor (c, es) -> Ast.is_construct_generalizable c && List.for_all is_gen es
   | Projection (p, e) -> Ast.is_proj_generalizable p && is_gen e
   | Operation (o, e) -> Ast.is_operation_generalizable o && is_gen e
