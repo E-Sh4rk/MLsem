@@ -26,6 +26,7 @@ type ('a, 'typ, 'gty, 'tag, 'v) pattern =
 and ('a, 'typ, 'gty, 'enu, 'tag, 'v) ast =
 | Magic of 'gty
 | Const of Const.t
+| NoGen of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | Var of 'v
 | Enum of 'enu
 | Tag of 'tag * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
@@ -115,6 +116,7 @@ let to_expr benv env e =
         let e = match e with
         | Magic t -> Magic (aux_gty t)
         | Const c -> Const c
+        | NoGen e -> NoGen (aux env e)
         | Var str -> Var (aux_var env str)
         | Enum str -> Enum (get_enum str)
         | Tag (str, e) -> Tag (get_tag str, aux env e)
