@@ -38,7 +38,7 @@ type constructor = (* Constructors must be monotonic operations *)
 | Tuple of int | Cons | Rec of string list * bool | Tag of Tag.t | Enum of Enum.t 
 | Join of int | Meet of int | Ternary of Ty.t (* Should not contain type vars *)
 | Voidify of Ty.t (* Should not contain type vars *)
-| Normalize | CCustom of ccustom
+| NoGen | Normalize | CCustom of ccustom
 
 type operation =
 | RecUpd of string | RecDel of string | Ignore of Ty.t

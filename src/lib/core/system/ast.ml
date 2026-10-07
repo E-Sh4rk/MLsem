@@ -17,7 +17,7 @@ type constructor =
 | Tuple of int | Cons | Rec of string list * bool | Tag of Tag.t | Enum of Enum.t 
 | Join of int | Meet of int | Ternary of Ty.t (* Should not contain type vars *)
 | Voidify of Ty.t (* Should not contain type vars *)
-| Normalize | CCustom of ccustom
+| NoGen | Normalize | CCustom of ccustom
 [@@deriving show]
 type operation =
 | RecUpd of string | RecDel of string | Ignore of Ty.t
@@ -162,6 +162,7 @@ let domains_of_construct (c:constructor) ty =
     Tuple.dnf n ty
     |> List.filter (fun b -> Ty.leq (Tuple.mk b) ty)
   | Join n | Meet n -> [List.init n (fun _ -> ty)]
+  | NoGen -> [ [ty] ]
   | Normalize when Ty.is_any ty -> [ [Ty.any] ]
   | Normalize -> [ ]
   | Voidify ty' when Ty.leq ty' ty -> [ [Ty.any] ]
@@ -191,6 +192,7 @@ let construct (c:constructor) tys =
   | Tuple n, tys when List.length tys = n -> Tuple.mk tys
   | Join n, tys when List.length tys = n -> Ty.disj tys
   | Meet n, tys when List.length tys = n -> Ty.conj tys
+  | NoGen, [ty] -> ty
   | Normalize, [ty] -> !Config.normalization_fun ty
   | Voidify ty, [_] -> ty
   | Ternary tau, [t;t1;t2] ->
@@ -211,6 +213,7 @@ let is_construct_generalizable c =
   match c with
   | Tuple _ | Cons | Rec _ | Tag _ | Enum _
   | Join _ | Meet _ | Ternary _ | Normalize | Voidify _ -> true
+  | NoGen -> false
   | CCustom c -> c.cgen
 
 let rv = RVar.mk KNoInfer None
@@ -378,6 +381,8 @@ and pp_e fmt e = match e with
   | Constructor (Ternary ty, [cond; e1; e2]) ->
     Format.fprintf fmt "@[<hov 2>ternary(%a,@ %a,@ %a,@ %a)@]"
       Ty.pp ty (pp_prio 0) cond (pp_prio 0) e1 (pp_prio 0) e2
+  | Constructor (NoGen, [e]) ->
+    Format.fprintf fmt "@[nogen(%a)@]" (pp_prio 0) e
   | Constructor (Normalize, [e]) ->
     Format.fprintf fmt "@[normalize(%a)@]" (pp_prio 0) e
   | Constructor (Voidify _, [e]) ->
