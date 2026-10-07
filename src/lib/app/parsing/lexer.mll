@@ -128,6 +128,8 @@ rule token = parse
 | "}"     { RBRACE }
 | "["     { LBRACKET }
 | "]"     { RBRACKET }
+| "<|"    { LTBAR }
+| "|>"    { GTBAR }
 | ";"     { SEMICOLON }
 | ";;"    { DOUBLESEMICOLON }
 | "*"     { TIMES }

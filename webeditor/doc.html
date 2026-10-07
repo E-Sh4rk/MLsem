@@ -259,6 +259,7 @@
             | <var>cid</var> [<kbd>(</kbd><var>e</var><kbd>)</kbd>]
             | <kbd>(</kbd><var>e</var> <kbd>:</kbd> <var>t</var><kbd>)</kbd>
             | <kbd>(</kbd><var>e</var> <kbd>:&gt;</kbd> <var>t</var><kbd>)</kbd> | <kbd>(</kbd><var>e</var> <kbd>:&gt;&gt;</kbd> <var>t</var><kbd>)</kbd> | <kbd>(</kbd><var>e</var> <kbd>:&gt;&gt;&gt;</kbd> <var>t</var><kbd>)</kbd>
+            | <kbd>&lt;|</kbd><var>e</var><kbd>|&gt;</kbd>
             | <kbd>{</kbd> [<var>e</var> <kbd>with</kbd>] <var>id</var><kbd>=</kbd><var>e</var><kbd>;</kbd>...<kbd>;</kbd><var>id</var><kbd>=</kbd><var>e</var> <kbd>}</kbd>
             | <kbd>[</kbd> <var>e</var><kbd>;</kbd> ... <kbd>;</kbd><var>e</var> <kbd>]</kbd>
             | <var>e</var> <kbd>,</kbd>...<kbd>,</kbd> <var>e</var>
@@ -298,6 +299,8 @@
             can be used locally to coerce the type of an expression into
             a supertype. Similarly to casts, the variants <kbd>(x :>! int)</kbd> and <kbd>(x :>!! int)</kbd>
             are also available.</li>
+            <li><kbd>&lt;|<var>e</var><kbd>|&gt;</kbd> prevents the
+            type of <var>e</var> from being generalized.</li>
             <li>constructors for products, lists and records</li>
             <li>anonymous functions</li>
             <li>local let binding (defined using either a variable or a <a href="#pattern">pattern</a>)</li>

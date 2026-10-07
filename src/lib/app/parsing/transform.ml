@@ -30,6 +30,7 @@ let expr_to_ast t =
     match e with
     | PAst.Magic t -> Value t
     | Const c -> Value (Mlsem_lang.Const.typeof c |> GTy.mk)
+    | NoGen e -> Constructor (NoGen, [ aux e ])
     | Var v -> Var v
     | Enum e -> Constructor (Enum e, [])
     | Tag (t, e) -> Constructor (Tag t, [aux e])

@@ -28,6 +28,7 @@ type ('a, 'typ, 'gty, 'tag, 'v) pattern =
 and ('a, 'typ, 'gty, 'enu, 'tag, 'v) ast =
 | Magic of 'gty
 | Const of Const.t
+| NoGen of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | Var of 'v
 | Enum of 'enu
 | Tag of 'tag * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t

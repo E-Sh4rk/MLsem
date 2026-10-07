@@ -132,7 +132,7 @@
 %token INTERROGATION_MARK EXCLAMATION_MARK
 %token ARROW AND OR AAND OOR NEG DIFF DYN
 %token TIMES PLUS MINUS DIV
-%token LBRACE RBRACE DOUBLEPOINT MATCH WITH END POINT LT GT LEQ GEQ
+%token LBRACE RBRACE DOUBLEPOINT MATCH WITH END POINT LT GT LEQ GEQ LTBAR GTBAR
 %token AND_KW OR_KW
 %token TYPE WHERE ABSTRACT
 %token LBRACKET RBRACKET SEMICOLON DOUBLESEMICOLON
@@ -342,6 +342,7 @@ atomic_term:
 { list_of_elts $startpos $endpos lst }
 | LBRACKET t1=term OR ts=separated_nonempty_list(OR, term) RBRACKET
 { annot $startpos $endpos (Alt (t1::ts)) }
+| LTBAR t = term GTBAR { annot $startpos $endpos (NoGen t)}
 
 %inline cast:
   COLON { Check } | CAST_STATIC { CheckStatic } | CAST_NOCHECK { NoCheck }
