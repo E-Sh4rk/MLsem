@@ -73,8 +73,8 @@ val is_any : t -> bool
 (** Whether the whole interval is [any], i.e. whether [lb] is. *)
 
 val leq : t -> t -> bool
-(** Bound-wise inclusion: both [lb] and [ub] must be smaller. This is stricter
-    than consistent subtyping, which only requires the intervals to overlap. *)
+(** Bound-wise inclusion: both [lb] and [ub] must be smaller.
+    This is stricter than consistent subtyping. *)
 
 val equiv : t -> t -> bool
 
