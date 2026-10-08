@@ -228,9 +228,8 @@ module Domain = struct
     match res1, res2 with
     | _, None -> true
     | None, _ -> false
-    | Some (rid1,ty1), Some (rid2,ty2) when Rid.equal rid1 rid2 ->
-      Ty.leq ty1 ty2
-    | Some _, Some _ -> false
+    | Some (rid1,ty1), Some (rid2,ty2) ->
+      Rid.equal rid1 rid2 && Ty.leq ty1 ty2
 
   let covers t (res,renv) =
     let renvs = t
@@ -239,6 +238,6 @@ module Domain = struct
     in
     let a = renvs |> List.map env_to_typ |> Ty.disj in
     let b = env_to_typ renv in
-    Ty.is_empty (Ty.diff b a |> !Config.normalization_fun)
+    Ty.diff b a |> !Config.normalization_fun |> Ty.is_empty
     (* |> (fun res -> if res then Format.printf "%a covers %a@." Ty.pp a Ty.pp b ; res) *)
 end
