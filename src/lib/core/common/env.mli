@@ -113,3 +113,4 @@ end
 
     @canonical Mlsem_common.REnv *)
 module REnv : REnv with type ty:=Ty.t
+module GREnv : REnv with type ty:=GTy.t

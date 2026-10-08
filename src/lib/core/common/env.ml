@@ -138,21 +138,24 @@ module type REnv = sig
   val refine_env : Env.t -> t -> Env.t
 end
 
-module REnv = struct
-  include Make(struct
-    type t = Ty.t
-    let fv = TVOp.vars
-    let leq = Ty.leq
-    let substitute = Subst.apply
-    let pp = Ty.pp
-  end)
+module type RT = sig
+  include T
+  val any : t
+  val neg : t -> t
+  val cap : t -> t -> t
+  val cup : t -> t -> t
+  val to_gty : t -> GTy.t
+end
+
+module RMake(T:RT) = struct
+  include Make(T)
 
   let find' v t =
-    try find v t with Not_found -> Ty.any
+    try find v t with Not_found -> T.any
 
   let cap (m1, s1) (m2, s2) =
     (VarMap.union (fun _ t1 t2 ->
-      Some (Ty.cap t1 t2)
+      Some (T.cap t1 t2)
       ) m1 m2,
     MVarSet.union s1 s2)
     
@@ -160,13 +163,13 @@ module REnv = struct
 
   let neg t =
     bindings t |> List.map
-      (fun (v,ty) -> Ty.neg ty |> singleton v)
+      (fun (v,ty) -> T.neg ty |> singleton v)
 
   let cup_approx (m1, s1) (m2, s2) =
     (VarMap.merge (fun _ t1 t2 -> match t1, t2 with
       | None, None -> None
       | Some _, None | None, Some _ -> None
-      | Some t1, Some t2 -> Some (Ty.cup t1 t2)
+      | Some t1, Some t2 -> Some (T.cup t1 t2)
     ) m1 m2,
     MVarSet.union s1 s2)
 
@@ -186,11 +189,37 @@ module REnv = struct
       | None -> env (* We do not add a var in the domain if it was not there before *)
       | Some ts ->
         let tvs, ty = TyScheme.get ts in
-        if MVarSet.disjoint tvs (TVOp.vars rty)
+        if MVarSet.disjoint tvs (T.fv rty)
         then
-          let ts = TyScheme.mk tvs (GTy.cap ty (GTy.mk rty)) in
+          let ts = TyScheme.mk tvs (GTy.cap ty (T.to_gty rty)) in
           Env.replace v ts env
         else invalid_arg "Cannot refine a universally-quantified type variable."
     in
     List.fold_left aux env (bindings t)
 end
+
+module REnv = RMake(struct
+  type t = Ty.t
+  let fv = TVOp.vars
+  let leq = Ty.leq
+  let substitute = Subst.apply
+  let pp = Ty.pp
+  let any = Ty.any
+  let neg = Ty.neg
+  let cap = Ty.cap
+  let cup = Ty.cup
+  let to_gty = GTy.mk
+end)
+
+module GREnv = RMake(struct
+  type t = GTy.t
+  let fv = GTy.fv
+  let leq = GTy.leq
+  let substitute = GTy.substitute
+  let pp = GTy.pp
+  let any = GTy.any
+  let neg = GTy.neg
+  let cap = GTy.cap
+  let cup = GTy.cup
+  let to_gty = Fun.id
+end)
