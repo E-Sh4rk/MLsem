@@ -126,6 +126,18 @@ module Env = Make(struct
   let pp = TyScheme.pp
 end)
 
+module type REnv = sig
+  include Env
+  val find' : Variable.t -> t -> ty
+  val cap : t -> t -> t
+  val conj : t list -> t
+  val neg : t -> t list
+  val cup_approx : t -> t -> t
+  val disj_approx : t list -> t
+  val neg_approx : t -> t option
+  val refine_env : Env.t -> t -> Env.t
+end
+
 module REnv = struct
   include Make(struct
     type t = Ty.t

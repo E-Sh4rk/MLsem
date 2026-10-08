@@ -1,6 +1,8 @@
 open Var
 open Mlsem_types
 
+(** {2 Type Environment} *)
+
 module type Env = sig
     type t
     type ty
@@ -59,20 +61,12 @@ end
     @canonical Mlsem_common.Env *)
 module Env : Env with type ty:=TyScheme.t
 
-(** Refinement environment: a conjunction of constraints "variable [v] has type
-    [t]", used to narrow a typing environment at a given program point.
+(** {2 Refinement Environments} *)
 
-    Unlike {!Env}, an [REnv] is {b partial}: a variable it does not bind is
-    unconstrained, i.e. implicitly bound to [any] (see {!REnv.find'}). So the
-    empty environment is the trivially true constraint, and an environment
-    binding some variable to [empty] is unsatisfiable. This convention explains
-    the approximations below.
+module type REnv = sig
+  include Env
 
-    @canonical Mlsem_common.REnv *)
-module REnv : sig
-  include Env with type ty:=Ty.t
-
-  val find' : Variable.t -> t -> Ty.t
+  val find' : Variable.t -> t -> ty
   (** Like {!find}, returning [any] instead of raising [Not_found] for an
       unbound variable. This is the reading that matches the partiality of an
       [REnv]. *)
@@ -107,3 +101,15 @@ module REnv : sig
       @raise Invalid_argument if a refined variable has a scheme quantifying a
       variable that occurs in the constraint. *)
 end
+
+(** Refinement environment: a conjunction of constraints "variable [v] has type
+    [t]", used to narrow a typing environment at a given program point.
+
+    Unlike {!Env}, an [REnv] is {b partial}: a variable it does not bind is
+    unconstrained, i.e. implicitly bound to [any] (see {!REnv.find'}). So the
+    empty environment is the trivially true constraint, and an environment
+    binding some variable to [empty] is unsatisfiable. This convention explains
+    the approximations below.
+
+    @canonical Mlsem_common.REnv *)
+module REnv : REnv with type ty:=Ty.t

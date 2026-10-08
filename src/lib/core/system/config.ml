@@ -24,9 +24,8 @@ let reexplore_failed_domains = ref true
 
 (** Normalization applied to a type before its emptiness is tested. It must
     return a type that is empty if and only if the argument is "empty enough" to
-    be considered uninhabited — which is where assumptions about abstract types
-    are injected (cf. [Heuristics.normalize_empty_abstracts]). Use
-    [Fun.id] for no normalization. *)
+    be considered uninhabited (cf. [Heuristics.normalize_empty_abstracts]).
+    Use [Fun.id] for no normalization. *)
 let normalization_fun : (Ty.t -> Ty.t) ref = ref Heuristics.normalize_empty_abstracts
 
 (** Normalization applied to the set of solutions of a tallying instance. It may
