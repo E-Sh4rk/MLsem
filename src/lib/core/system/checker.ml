@@ -6,13 +6,7 @@ open Ast
 (* Auxiliary *)
 
 let is_type_test_unsat ~tau t =
-  let ntau = GTy.neg tau in
-  if GTy.non_gradual ntau && GTy.non_gradual t
-  then Ty.diff (GTy.ub t) (GTy.lb ntau) |> !Config.normalization_fun
-  else
-    let norm1 = Ty.diff (GTy.lb t) (GTy.lb ntau) |> !Config.normalization_fun in
-    let norm2 = Ty.diff (GTy.ub t) (GTy.ub ntau) |> !Config.normalization_fun in
-    Ty.cup norm1 norm2
+  Ty.cap (GTy.ub t) (GTy.ub tau) |> !Config.normalization_fun
 
 (* Expressions *)
 

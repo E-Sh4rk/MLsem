@@ -147,12 +147,19 @@ File "tests/2_dyn.ml", line 76, characters 19-24
 function: 42
 argument: 42
 magic_ok: (any -> empty) | dyn & arrow
+magic_ok2: (any -> int) | dyn & (int -> any)
 test_cast1_ok: int -> int
-[Warning] File "tests/2_dyn.ml", line 85, characters 34-38 Unreachable code
+[Warning] File "tests/2_dyn.ml", line 87, characters 34-38 Unreachable code
 test_cast2_fail: untypeable coercion
-File "tests/2_dyn.ml", line 88, characters 34-38
+File "tests/2_dyn.ml", line 90, characters 34-38
 expected: int
 given: true
+test_typecase: (any -> bool) | dyn & arrow
+test_typecase2: untypeable coercion
+File "tests/2_dyn.ml", line 100, characters 19-23
+expected: empty
+given: true
+test_typecase3: (any -> bool) | dyn & arrow
 
 ===== Processing tests/3_records.ml =====
 record_delete: ∀`a. { l1 : any? ; l2 : any? ; l3 : any? ;; `a } -> { l1 : empty? ; l2 : empty? ; l3 : empty? ;; `a }
@@ -172,14 +179,14 @@ test_rec_proj: a_or_b
 test_mix: { l1 : 42? ; l2 : 33 | true ; l4 : false? }
 test_merge: { l1 : 42 ; l2 : 33 | true ; l4 : false }
 test_merge2: ∀'a,'b,'c. { x : 'a ; y : (42 | 'b)? ; z : (73 | 'c)? ..} -> ('a, 42 | 'b, 73 | 'c)
-test_foo: { l1 : 42 ; l2 : 42 ; l3 : 42 } | { l1 : 73 ; l2 : 73 ; l3 : 73 } -> { l1 : int ; l2 : 42 | 73 ; l3 : 42 | 73 }
+test_foo: { l1 : 73 ; l2 : 73 ; l3 : 73 } | { l1 : 42 ; l2 : 42 ; l3 : 42 } -> { l1 : int ; l2 : 42 | 73 ; l3 : 42 | 73 }
 test_lapply: [ [ int* ]* ]
 test_r_lists: { a : (1..3) ; c : (1..3) ; b : (1..3) ;; (1..3)? }
 test_classes: { data_frame : true ;; false }
 test_class_ok: { c1 : true ;; false }
 test_class_fail: untypeable application
 File "tests/3_records.ml", line 120, characters 22-45
-function: 'I2291 & { c1 : true ;; false } -> 'I2291
+function: 'I2301 & { c1 : true ;; false } -> 'I2301
 argument: { c1 : true ;; bool }
 test_class_ok2: { c1 : true ; c2 : true ;; bool }
 extract_ellipsis_test: 73 | bool, bool, true
@@ -190,7 +197,7 @@ fun2_with_ellipsis_test: 1, 2, { l3 : 3 ; l4 : 4 ; l5 : 5 }, (3..5)
 ref_42: ref(int)
 ref_42_unresolved: the type inferred is not fully resolved
 File "tests/4_imperative.ml", line 24, characters 4-30
-type inferred: ref(42 | 'I2356)
+type inferred: ref(42 | 'I2366)
 mutate_ref: ∀'a. 42 | 'a -> 42 | 'a
 is_ref: (ref -> true) & (~ref -> false)
 is_not_ref: (~ref -> true) & (ref -> false)
@@ -220,7 +227,7 @@ order: Nil | (Nil | int, Nil | int) -> Nil | int | (int, int)
 loop_tricky_narrowing: int -> (any, int)
 loop_invalid: untypeable application
 File "tests/4_imperative.ml", line 174, characters 4-14
-function: (ref('I2748), 'I2748) -> ()
+function: (ref('I2758), 'I2758) -> ()
 argument: ref(int), false
 loop_valid: ∀'a. (int | false | 'a -> int | false | 'a) & ('a \ int -> 'a)
 filter_imp: ∀'a,'b,'c. ('b -> false) & ('a -> bool) -> array('b | 'a) -> array('a \ 'b | 'c)

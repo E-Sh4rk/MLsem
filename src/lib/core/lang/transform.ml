@@ -111,7 +111,7 @@ let encode_pattern_matching e pats =
   let x = MVariable.create Immut None in
   let ts = pats |> List.map fst |> List.map type_of_pat in
   let dom, ts = List.fold_left (fun (dom,res) ty -> (Ty.diff dom ty, (Ty.cap dom ty)::res)) (Ty.any,[]) ts in
-  let ts = List.rev (dom::ts) in
+  let ts = List.rev (if Ty.is_empty dom then ts else dom::ts) in
   let body_of_pat pat e =
     let add_def acc v =
       (* The projections extracting [v] out of [x] are generated code, but a

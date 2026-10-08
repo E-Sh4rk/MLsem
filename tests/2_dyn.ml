@@ -78,6 +78,8 @@ let magic_fail x = 42 42 ; x
 val magic_ok : dyn -> dyn
 let magic_ok x = x
 
+val magic_ok2 : dyn|int -> dyn|int
+let magic_ok2 x = x
 
 (* Cast propagation *)
 
@@ -86,3 +88,17 @@ let test_cast1_ok x =
 
 let test_cast2_fail (x:any) =
   (match x with :int -> 42 | x -> true end :> int)
+
+(* Dyn Typecases *)
+
+val test_typecase : dyn -> bool
+let test_typecase (x:dyn) =
+  if x is int then true else false
+
+val test_typecase2 : dyn -> empty
+let test_typecase2 (x:dyn) =
+  if x is dyn then true else false
+
+val test_typecase3 : dyn -> bool
+let test_typecase3 (x:dyn) =
+  if x is dyn then true else false

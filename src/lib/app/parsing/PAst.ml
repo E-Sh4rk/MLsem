@@ -89,7 +89,7 @@ let to_expr benv env e =
     let aux_a tyo = Option.map aux_gty tyo in
     let aux_cond t =
         let t = aux_gty t in
-        if GTy.non_gradual t && B.is_test_type (GTy.lb t) then t
+        if GTy.test B.is_test_type t then t
         else raise (SymbolError ("typecases should use test types"))
     in
     let aux_var env str =

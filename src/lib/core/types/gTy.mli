@@ -61,6 +61,9 @@ val opl : (Ty.t list -> bool) -> (Ty.t list -> Ty.t) -> t list -> t option
 val map' : (Ty.t -> Ty.t) -> t -> t
 (** Like {!map}, for an {b anti-monotonic} operation (the bounds are swapped). *)
 
+val test : (Ty.t -> bool) -> t -> bool
+(** Test whether both bounds satisfy a predicate. *)
+
 (** {2 Predicates}
 
     These are the {e definite} readings: they hold for every static type in the

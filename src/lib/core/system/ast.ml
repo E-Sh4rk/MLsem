@@ -239,10 +239,11 @@ let is_operation_generalizable o =
 let coerce ?coercion_id ?(duplicate_arrows=false) c ty t =
   let mono = TVOp.all_vars KNoInfer in
   let to_single_arrow ty =
-    let d = GTy.map' Arrow.domain ty in
-    let cd = GTy.map2 Arrow.apply ty d in
-    let ty' = GTy.mk_gradual (Arrow.mk (GTy.ub d) (GTy.lb cd)) (Arrow.mk (GTy.lb d) (GTy.ub cd)) in
-    d,cd,ty'
+    let codom t s = if Ty.is_empty s then Ty.any else Arrow.apply t s in
+    let d_lb, d_ub = GTy.map' Arrow.domain ty |> GTy.destruct in
+    let cd_lb, cd_ub = codom (GTy.lb ty) d_ub, codom (GTy.ub ty) d_lb in
+    if Ty.leq (Arrow.mk d_ub cd_lb) (GTy.lb ty) && Ty.leq (Arrow.mk d_lb cd_ub) (GTy.ub ty)
+    then Some (GTy.mk_gradual d_lb d_ub, GTy.mk_gradual cd_lb cd_ub) else None
   in
   let decompose ty =
     match Arrow.dnf ty with
@@ -276,8 +277,8 @@ let coerce ?coercion_id ?(duplicate_arrows=false) c ty t =
         let tys = List.map2 GTy.mk_gradual tys_lb tys_ub in
         Constructor (cons, List.map2 aux tys es)
       | Lambda (da,v,e) as expr ->
-        let d, cd, ty' = to_single_arrow ty in
-        if GTy.leq ty' ty |> not then begin
+        begin match to_single_arrow ty with
+        | None ->
           if duplicate_arrows then
             let tys =
               if GTy.non_gradual ty
@@ -287,13 +288,14 @@ let coerce ?coercion_id ?(duplicate_arrows=false) c ty t =
             let ts = tys |> List.map (fun ty -> aux ty (refresh (id, expr))) in
             Constructor (Meet (List.length ts), ts)
           else raise Exit
-        end else
+        | Some (d,cd) ->
           begin match da with
           | Some da ->
             let s = unify d da in
             Lambda (Some (GTy.substitute s d), v, aux (GTy.substitute s cd) (apply_subst s e))
           | None -> Lambda (Some d, v, aux cd e)
           end
+        end
       | LambdaRec lst ->
         let n = List.length lst in
         let tys = List.mapi (fun i _ -> GTy.map (Tuple.proj n i) ty) lst in
