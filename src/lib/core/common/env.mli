@@ -113,4 +113,8 @@ end
 
     @canonical Mlsem_common.REnv *)
 module REnv : REnv with type ty:=Ty.t
+
+(** Same as {!REnv}, but holding gradual types.
+
+    @canonical Mlsem_common.GREnv *)
 module GREnv : REnv with type ty:=GTy.t
