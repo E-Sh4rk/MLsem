@@ -52,13 +52,14 @@ let combine' rss =
 let is_unsatisfiable renv =
   REnv.bindings renv |> List.exists (fun (_,ty) -> Ty.is_empty ty)
 
-let sufficient_refinements env e t =
+let sufficient_refinements ~safe env e t =
+  let b, b' = if safe then GTy.ub, GTy.lb else GTy.lb, GTy.ub in
   let rec aux env (_,e) t =
     let app t1 e2 =
       let alpha = TVar.mk KInfer None in
       let (mono, ty) = TyScheme.get_fresh t1 in
       let mono = MVarSet.union mono (vars t) in
-      begin match Arrow.dnf (GTy.ub ty) with
+      begin match Arrow.dnf (b ty) with
       | [] -> []
       | [arrows] ->
         let t1 = Arrow.of_dnf [arrows] in
@@ -77,16 +78,16 @@ let sufficient_refinements env e t =
     | Constructor (c, es) ->
       Ast.domains_of_construct c t |> List.concat_map
         (fun ts -> List.map2 (fun e t -> aux env e t) es ts |> combine')
-    | TypeCoerce (_, s, _) when Ty.leq (GTy.ub s) t -> [REnv.empty]
-    | Value s when Ty.leq (GTy.ub s) t -> [REnv.empty]
+    | TypeCoerce (_, s, _) when Ty.leq (b s) t -> [REnv.empty]
+    | Value s when Ty.leq (b s) t -> [REnv.empty]
     | Value _ | TypeCoerce _ -> []
     | Projection (p, e) -> aux env e (Ast.domain_of_proj p t)
     | TypeCast (e, _, _) -> aux env e t
     | App (e1, e2) -> app (typeof_def env e1) e2
     | Operation (o, e) -> app (Ast.fun_of_operation env o) e
     | Ite (e, s, e1, e2) ->
-      let r1 = combine (aux env e (GTy.ub s)) (aux env e1 t) in
-      let r2 = combine (aux env e (GTy.neg s |> GTy.ub)) (aux env e2 t) in
+      let r1 = combine (aux env e (b' s)) (aux env e1 t) in
+      let r2 = combine (aux env e (GTy.neg s |> b')) (aux env e2 t) in
       r1@r2
     | Alt (settings,es) ->
       List.map2 (fun e b -> if b then aux env e t else []) es (settings.amask env) |> List.concat
@@ -100,18 +101,19 @@ let sufficient_refinements env e t =
     in
     renvs |> List.filter (fun renv -> is_unsatisfiable renv |> not)
   in
-  aux env e t
+  aux env e (b' t)
 
-let refine env e t =
+let refine ~safe env e t =
   let base_renv = REnv.empty in
-  let renvs = sufficient_refinements env e (Ty.neg t) in
+  let renvs = sufficient_refinements ~safe env e (GTy.neg t) in
   let rec aux renv renvs =
     let renvs = renvs |> List.map (fun renv' ->
       renv' |> REnv.filter (fun v ty ->
         let ty' =
           match Env.find_opt v env with
           | None -> Ty.any
-          | Some ty -> ty |> TyScheme.get_fresh |> snd |> GTy.ub
+          | Some ty -> ty |> TyScheme.get_fresh |> snd
+            |> if safe then GTy.ub else GTy.lb
         in
         let ty'' = REnv.find' v renv in
         Ty.leq (Ty.cap ty' ty'') ty |> not
@@ -122,6 +124,28 @@ let refine env e t =
     if REnv.leq renv renv' then renv else aux renv' renvs
   in
   aux base_renv renvs
+
+let refine env e t =
+  let fvs = Ast.fv e in
+  let non_gradual = GTy.non_gradual t &&
+    Env.bindings env |> List.for_all (fun (v, ts) ->
+      let _, gty = TyScheme.get ts in (* TODO: TyScheme.non_gradual *)
+      VarSet.mem v fvs |> not || GTy.non_gradual gty
+  ) in
+  if non_gradual
+  then
+    refine ~safe:true env e t |> REnv.bindings
+    |> List.map (fun (v, ty) -> v, GTy.mk ty) |> GREnv.construct
+  else
+    let res_ub = refine ~safe:true env e t in
+    let res_lb = refine ~safe:false env e t in
+    let dom = VarSet.union
+      (REnv.domain res_lb |> VarSet.of_list)
+      (REnv.domain res_ub |> VarSet.of_list) in
+    dom |> VarSet.elements |> List.map (fun v ->
+      let lb, ub = REnv.find' v res_lb, REnv.find' v res_ub in
+      (v, GTy.mk_gradual lb ub)
+      ) |> GREnv.construct
 
 let refinements
   ?(extra_checks=[]) ?(refine_on_typecases=true) ?(refine_on_casts=false) env e =
