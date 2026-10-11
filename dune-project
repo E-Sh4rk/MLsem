@@ -18,31 +18,31 @@
 (package
  (name mlsem-types)
  (synopsis "Type bindings for MLsem")
- (depends (ocaml (>= 5.3.0)) dune (sstt (>= 0.1.0)) zarith yojson)
+ (depends (ocaml (>= 5.5.0)) dune (sstt (>= 0.1.0)) zarith yojson)
 )
 
 (package
  (name mlsem-common)
  (synopsis "Common definitions for MLsem")
- (depends (ocaml (>= 5.3.0)) dune mlsem-types ppx_deriving)
+ (depends (ocaml (>= 5.5.0)) dune mlsem-types ppx_deriving)
 )
 
 (package
  (name mlsem-system)
  (synopsis "Type-checker for MLsem")
- (depends (ocaml (>= 5.3.0)) dune mlsem-types mlsem-common ppx_deriving)
+ (depends (ocaml (>= 5.5.0)) dune mlsem-types mlsem-common ppx_deriving)
 )
 
 (package
  (name mlsem-lang)
  (synopsis "Language for MLsem")
- (depends (ocaml (>= 5.3.0)) dune mlsem-types mlsem-common mlsem-system ppx_deriving)
+ (depends (ocaml (>= 5.5.0)) dune mlsem-types mlsem-common mlsem-system ppx_deriving)
 )
 
 (package
  (name mlsem)
  (synopsis "A type-checker for dynamic languages")
- (depends (ocaml (>= 5.3.0)) dune mlsem-types mlsem-common mlsem-system mlsem-lang)
+ (depends (ocaml (>= 5.5.0)) dune mlsem-types mlsem-common mlsem-system mlsem-lang)
 )
 
 (package
