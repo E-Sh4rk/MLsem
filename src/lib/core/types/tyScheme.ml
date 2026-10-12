@@ -33,6 +33,7 @@ let top_instance (tvs,t) =
   let mono = MVarSet.diff (GTy.fv t) tvs in
   let t = GTy.map (TVOp.top_instance mono) t in
   mk tvs t
+let non_gradual (_,t) = GTy.non_gradual t
 let simplify (tvs,ty) = (tvs, GTy.simplify ty)
 let factorize (tvs,ty) = (tvs, GTy.factorize ty)
 let simplify_factorize ts = ts |> simplify |> factorize

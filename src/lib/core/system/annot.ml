@@ -25,7 +25,7 @@ module Annot = struct
   | AAlt of t option list
   | AInter of inter
   [@@deriving show]
-  and t = { mutable cache: GTy.t option ; ann: a ; refinement: REnv.t }
+  and t = { mutable cache: GTy.t option ; ann: a ; refinement: GREnv.t }
   [@@deriving show]
 
   let substitute s t =
@@ -47,7 +47,7 @@ module Annot = struct
       | AAlt ts -> AAlt (List.map (Option.map aux) ts)
       | AInter ts -> AInter (List.map aux ts)
     in { cache=Option.map (GTy.substitute s) t.cache ; ann ;
-         refinement=REnv.substitute s t.refinement }
+         refinement=GREnv.substitute s t.refinement }
     and aux_b b =
       match b with BSkip -> BSkip | BType t -> BType (aux t)  
     in
@@ -91,7 +91,7 @@ module rec IAnnot : sig
   | AInter of inter
   and t =
   | A of Annot.t
-  | I of { rid: Rid.t ; ann: a ; refinement: REnv.t }
+  | I of { rid: Rid.t ; ann: a ; refinement: GREnv.t }
 
   val substitute : Subst.t -> t -> t
   val pp : Format.formatter -> t -> unit
@@ -130,7 +130,7 @@ end = struct
   [@@deriving show]
   and t =
   | A of Annot.t
-  | I of { rid: Rid.t ; ann: a ; refinement: REnv.t }
+  | I of { rid: Rid.t ; ann: a ; refinement: GREnv.t }
   [@@deriving show]
 
   let substitute s =
@@ -155,7 +155,8 @@ end = struct
     and aux t =
       match t with
       | A a -> A (Annot.substitute s a)
-      | I t -> I { rid=t.rid ; ann=aux_ann t.ann ; refinement=REnv.substitute s t.refinement }
+      | I t -> I { rid=t.rid ; ann=aux_ann t.ann ;
+        refinement=GREnv.substitute s t.refinement }
     and aux_b b =
       match b with
       | BMaybe t -> BMaybe (aux t)

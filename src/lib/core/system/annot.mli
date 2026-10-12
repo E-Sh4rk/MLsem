@@ -44,7 +44,7 @@ module Annot : sig
   | ALambdaRec of (GTy.t * t) list
   | AAlt of t option list
   | AInter of inter
-  and t = { mutable cache: GTy.t option ; ann: a ; refinement: REnv.t }
+  and t = { mutable cache: GTy.t option ; ann: a ; refinement: GREnv.t }
   (** [refinement] narrows the environment before typing this node, and [cache]
       memoises the resulting type.
 
@@ -54,7 +54,7 @@ module Annot : sig
       the environment's variables — which is also what keeps a cached type valid
       after [substitute]. *)
 
-  val nc : REnv.t -> a -> t
+  val nc : GREnv.t -> a -> t
   (** Builds a node with an empty cache ("no cache"). *)
 
   val substitute : Subst.t -> t -> t
@@ -114,7 +114,7 @@ module rec IAnnot : sig
   | AInter of inter
   and t =
   | A of Annot.t (** An already completed sub-derivation. *)
-  | I of { rid: Rid.t ; ann: a ; refinement: REnv.t }
+  | I of { rid: Rid.t ; ann: a ; refinement: GREnv.t }
 
   val substitute : Subst.t -> t -> t
   val pp : Format.formatter -> t -> unit

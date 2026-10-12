@@ -64,7 +64,7 @@ let initial ?(direct_narrowing=true) ?(partition_narrowing=true) refinements e =
     let refinement =
       if direct_narrowing
       then Refinement.Refinements.get refinements eid
-      else REnv.empty
+      else GREnv.empty
     in
     (* Format.printf "Refinements:@.%a@." REnv.pp refinement ; *)
     match ann with
@@ -228,7 +228,7 @@ let add_to_res a c res =
   | Either.Right (ss,lst,lst',r), _ -> Either.Right (ss,c::lst,c::lst',r)
   end
 
-let dummy_i ann = IAnnot.I { rid = Rid.dummy ; ann ; refinement=REnv.empty }
+let dummy_i ann = IAnnot.I { rid = Rid.dummy ; ann ; refinement=GREnv.empty }
 
 let rec refine cache env annot (id, e) =
   match annot with
@@ -245,7 +245,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
     let log = { eid ; kind ; title=msg ; descr } in
     cache.logs := log::!(cache.logs)
   in
-  let env = REnv.refine_env env r in
+  let env = GREnv.refine_env env r in
   let retry_with a = refine cache env a (id, e) in
   let with_res ss = ss |> List.map (fun (s,t) -> (s, Some (rid, t))) in
   let ic ann = I { rid ; ann ; refinement=r } in

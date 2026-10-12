@@ -6,17 +6,17 @@ open Mlsem_utils
 
 module Refinements = struct
   module EMap = Eid.Map
-  type t = REnv.t EMap.t * REnv.t list
+  type t = GREnv.t EMap.t * GREnv.t list
   let empty = EMap.empty, []
   let get (t,_) e =
     match EMap.find_opt e t with
-    | None -> REnv.empty
+    | None -> GREnv.empty
     | Some renv -> renv
   let get_anonymous (_,anon) = anon
   let add (t,anon) e renv =
     let prev = get (t,anon) e in
-    let renv = REnv.cap prev renv in
-    let t = if REnv.is_empty renv then EMap.remove e t else EMap.add e renv t in
+    let renv = GREnv.cap prev renv in
+    let t = if GREnv.is_empty renv then EMap.remove e t else EMap.add e renv t in
     t, anon
   let add_anonymous (t,anon) renv = (t,renv::anon)
   let all (t,anon) = (EMap.bindings t |> List.map snd)@anon
@@ -129,8 +129,7 @@ let refine env e t =
   let fvs = Ast.fv e in
   let non_gradual = GTy.non_gradual t &&
     Env.bindings env |> List.for_all (fun (v, ts) ->
-      let _, gty = TyScheme.get ts in (* TODO: TyScheme.non_gradual *)
-      VarSet.mem v fvs |> not || GTy.non_gradual gty
+      VarSet.mem v fvs |> not || TyScheme.non_gradual ts
   ) in
   if non_gradual
   then
@@ -173,12 +172,12 @@ let refinements
       ) env lst in
       lst |> List.map (fun (_,_,e) -> e) |> List.iter (aux env)
     | TypeCast (e, tau, _) ->
-      if refine_on_casts then add_anonymous_refinement env e (GTy.ub tau) ;
+      if refine_on_casts then add_anonymous_refinement env e tau ;
       aux env e
     | Ite (e, tau, e1, e2) ->
       if refine_on_typecases then begin
-        if fv e1 |> VarSet.is_empty |> not then add_refinement (fst e1) env e (GTy.ub tau) ;
-        if fv e2 |> VarSet.is_empty |> not then add_refinement (fst e2) env e (GTy.neg tau |> GTy.ub)
+        if fv e1 |> VarSet.is_empty |> not then add_refinement (fst e1) env e tau ;
+        if fv e2 |> VarSet.is_empty |> not then add_refinement (fst e2) env e (GTy.neg tau)
       end ;
       aux env e ; aux env e1 ; aux env e2
     | App (e1, e2) -> aux env e1 ; aux env e2
@@ -187,9 +186,9 @@ let refinements
       aux env e1 ; aux (Env.add v (typeof_def env e1) env) e2 ;
       let res' =
         !res |> Refinements.map (fun renv ->
-          match REnv.find_opt v renv with
+          match GREnv.find_opt v renv with
           | None -> renv
-          | Some ty -> REnv.cap renv (refine env e1 ty)
+          | Some ty -> GREnv.cap renv (refine env e1 ty)
         )
       in
       res := res'
@@ -210,16 +209,17 @@ let partition dom ts =
   aux dom
 
 module Partitioner = struct
-  type t = REnv.t list
+  type t = GREnv.t list
 
   let from_refinements rs = Refinements.all rs
   let filter_compatible lst v ty =
     lst |> List.filter (fun renv ->
-      (REnv.mem v renv |> not) ||
-      (Ty.disjoint ty (REnv.find v renv) |> not)
+      (GREnv.mem v renv |> not) ||
+      (Ty.disjoint ty (GREnv.find v renv |> GTy.ub) |> not)
     )
   let decomposition_for t v initial =
-    let tys = t |> List.filter_map (fun renv -> REnv.find_opt v renv) in
+    let tys = t |> List.filter_map (fun renv -> GREnv.find_opt v renv)
+      |> List.map GTy.lb in
     let part_for_dom dom = tys |> partition dom in
     List.concat_map part_for_dom initial
     (* |> (fun tys -> Format.printf "Partition for %a: %a@." Variable.pp v
