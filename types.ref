@@ -160,6 +160,17 @@ File "tests/2_dyn.ml", line 100, characters 19-23
 expected: empty
 given: true
 test_typecase3: (any -> bool) | dyn & arrow
+narr1: untypeable coercion
+File "tests/2_dyn.ml", line 111, characters 31-32
+expected: empty
+given: any
+narr1': any -> empty
+[Notice] File "tests/2_dyn.ml", line 116, characters 32-33 Unchecked dynamic coercion
+expected: empty
+given: any
+[Notice] File "tests/2_dyn.ml", line 116, characters 39-40 Unchecked dynamic coercion
+expected: empty
+given: any
 
 ===== Processing tests/3_records.ml =====
 record_delete: ∀`a. { l1 : any? ; l2 : any? ; l3 : any? ;; `a } -> { l1 : empty? ; l2 : empty? ; l3 : empty? ;; `a }
@@ -186,7 +197,7 @@ test_classes: { data_frame : true ;; false }
 test_class_ok: { c1 : true ;; false }
 test_class_fail: untypeable application
 File "tests/3_records.ml", line 120, characters 22-45
-function: 'I2321 & { c1 : true ;; false } -> 'I2321
+function: 'I2324 & { c1 : true ;; false } -> 'I2324
 argument: { c1 : true ;; bool }
 test_class_ok2: { c1 : true ; c2 : true ;; bool }
 extract_ellipsis_test: 73 | bool, bool, true
@@ -197,7 +208,7 @@ fun2_with_ellipsis_test: 1, 2, { l3 : 3 ; l4 : 4 ; l5 : 5 }, (3..5)
 ref_42: ref(int)
 ref_42_unresolved: the type inferred is not fully resolved
 File "tests/4_imperative.ml", line 24, characters 4-30
-type inferred: ref(42 | 'I2386)
+type inferred: ref(42 | 'I2391)
 mutate_ref: ∀'a. 42 | 'a -> 42 | 'a
 is_ref: (ref -> true) & (~ref -> false)
 is_not_ref: (~ref -> true) & (ref -> false)
@@ -227,7 +238,7 @@ order: Nil | (Nil | int, Nil | int) -> Nil | int | (int, int)
 loop_tricky_narrowing: int -> (any, int)
 loop_invalid: untypeable application
 File "tests/4_imperative.ml", line 174, characters 4-14
-function: (ref('I2778), 'I2778) -> ()
+function: (ref('I2783), 'I2783) -> ()
 argument: ref(int), false
 loop_valid: ∀'a. (int | false | 'a -> int | false | 'a) & ('a \ int -> 'a)
 filter_imp: ∀'a,'b,'c. ('b -> false) & ('a -> bool) -> array('b | 'a) -> array('a \ 'b | 'c)

@@ -90,9 +90,9 @@ module type REnv = sig
   (** @raise Invalid_argument on the empty list, which has no
       representation. *)
 
-  val neg_approx : t -> t option
-  (** {!neg} followed by {!disj_approx}; [None] represents the unsatisfiable
-      refinement, which {!disj_approx} cannot express. *)
+  val neg_approx : unsat:t -> t -> t
+  (** {!neg} followed by {!disj_approx}; [~unsat] represents the unsatisfiable
+      refinement, whose representation may depend on the variables in scope. *)
 
   val refine_env : Env.t -> t -> Env.t
   (** [refine_env env renv] intersects the type of each variable of [env] with

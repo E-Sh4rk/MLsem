@@ -134,7 +134,7 @@ module type REnv = sig
   val neg : t -> t list
   val cup_approx : t -> t -> t
   val disj_approx : t list -> t
-  val neg_approx : t -> t option
+  val neg_approx : unsat:t -> t -> t
   val refine_env : Env.t -> t -> Env.t
 end
 
@@ -178,10 +178,10 @@ module RMake(T:RT) = struct
     | [] -> raise (Invalid_argument "Argument cannot be the empty list.")
     | hd::tl -> List.fold_left cup_approx hd tl
 
-  let neg_approx t =
+  let neg_approx ~unsat t =
     match neg t with
-    | [] -> None
-    | lst -> Some (disj_approx lst)
+    | [] -> unsat
+    | lst -> disj_approx lst
 
   let refine_env env t =
     let aux env (v,rty) =

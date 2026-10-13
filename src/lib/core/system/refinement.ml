@@ -104,6 +104,8 @@ let sufficient_refinements ~safe env e t =
   aux env e (b' t)
 
 let refine ~safe env e t =
+  let unsat = Ast.fv e |> VarSet.elements
+  |> List.map (fun v -> v, Ty.empty) |> REnv.construct in
   let base_renv = REnv.empty in
   let renvs = sufficient_refinements ~safe env e (GTy.neg t) in
   let rec aux renv renvs =
@@ -120,7 +122,7 @@ let refine ~safe env e t =
       )
     )
     in
-    let renv' = REnv.cap renv (List.filter_map REnv.neg_approx renvs |> REnv.conj) in
+    let renv' = REnv.cap renv (List.map (REnv.neg_approx ~unsat) renvs |> REnv.conj) in
     if REnv.leq renv renv' then renv else aux renv' renvs
   in
   aux base_renv renvs

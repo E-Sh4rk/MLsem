@@ -102,3 +102,15 @@ let test_typecase2 (x:dyn) =
 val test_typecase3 : dyn -> bool
 let test_typecase3 (x:dyn) =
   if x is dyn then true else false
+
+(* Type narrowing *)
+
+# type_narrowing = "partition"
+
+val narr1 : any -> empty
+let narr1 x = if x is dyn then x else x
+
+# type_narrowing = "direct"
+
+val narr1' : any -> empty
+let narr1' x = if x is dyn then x else x
