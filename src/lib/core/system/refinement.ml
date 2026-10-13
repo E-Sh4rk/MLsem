@@ -220,8 +220,7 @@ module Partitioner = struct
       (Ty.disjoint ty (GREnv.find v renv |> GTy.ub) |> not)
     )
   let decomposition_for t v initial =
-    let tys = t |> List.filter_map (fun renv -> GREnv.find_opt v renv)
-      |> List.map GTy.lb in
+    let tys = t |> List.filter_map (GREnv.find_opt v) |> List.map GTy.ub in
     let part_for_dom dom = tys |> partition dom in
     List.concat_map part_for_dom initial
     (* |> (fun tys -> Format.printf "Partition for %a: %a@." Variable.pp v
