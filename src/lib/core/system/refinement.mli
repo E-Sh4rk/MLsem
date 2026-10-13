@@ -18,21 +18,21 @@ module Refinements : sig
   type t
   val empty : t
 
-  val get : t -> Eid.t -> REnv.t
+  val get : t -> Eid.t -> GREnv.t
   (** The refinement holding at a program point; the empty (trivially true)
       environment if none was recorded. *)
 
-  val get_anonymous : t -> REnv.t list
-  val all : t -> REnv.t list
+  val get_anonymous : t -> GREnv.t list
+  val all : t -> GREnv.t list
   (** Every recorded refinement, located or not. *)
 
-  val add : t -> Eid.t -> REnv.t -> t
+  val add : t -> Eid.t -> GREnv.t -> t
   (** Records a refinement at a program point, {b intersecting} it with any
       refinement already recorded there. Distinct program points must therefore
       carry distinct [Eid.t]s, or unrelated refinements get conflated. *)
 
-  val add_anonymous : t -> REnv.t -> t
-  val map : (REnv.t -> REnv.t) -> t -> t
+  val add_anonymous : t -> GREnv.t -> t
+  val map : (GREnv.t -> GREnv.t) -> t -> t
 end
 
 val typeof_def : Env.t -> Ast.t -> TyScheme.t
@@ -41,16 +41,14 @@ val typeof_def : Env.t -> Ast.t -> TyScheme.t
     but it can be more precise for simple constructs (e.g. variables, casts, projections)
     or in the presence of user type annotations (coercions). *)
 
-val refine : Env.t -> Ast.t -> Ty.t -> REnv.t
+val refine : Env.t -> Ast.t -> GTy.t -> GREnv.t
 (** [refine env e t] returns what must hold of the variables in scope for [e] to
-    have type [t]: a {b necessary} condition, obtained as a fixpoint over the
-    negation of the sufficient conditions for [e] to {e not} have type [t]. It
-    is always sound to under-refine, and the analysis does so whenever it cannot
-    invert a construct, so the result may be the empty (trivially true)
-    environment. *)
+    have type [t]: a {b necessary} condition for both for the static and dynamic components.
+    It is always sound to under-refine, and the analysis does so whenever it cannot
+    invert a construct, so the result may be the empty (trivially true) environment. *)
 
 val refinements :
-  ?extra_checks:(Eid.t * Ty.t) list ->
+  ?extra_checks:(Eid.t * GTy.t) list ->
   ?refine_on_typecases:bool ->
   ?refine_on_casts:bool ->
   Env.t -> Ast.t -> Refinements.t

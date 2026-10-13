@@ -47,6 +47,8 @@ val bot_instance : t -> t
 val top_instance : t -> t
 (** Dual of {!bot_instance}: the largest instance. *)
 
+val non_gradual : t -> bool
+
 val factorize : t -> t
 val simplify : t -> t
 val simplify_factorize : t -> t
