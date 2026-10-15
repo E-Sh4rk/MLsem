@@ -5,9 +5,13 @@
 
 (generate_opam_files true)
 
-(authors "Mickael Laurent")
+(authors
+ "Mickaël Laurent"
+ "Kim Nguyễn"
+ "Oliver Tušla"
+)
 
-(maintainers "Mickael Laurent")
+(maintainers "Mickaël Laurent")
 
 (homepage "https://github.com/E-Sh4rk/MLsem")
 

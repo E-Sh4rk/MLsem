@@ -5,8 +5,28 @@
   "creators": [
     {
       "name": "Mickaël Laurent",
-      "affiliation": "Charles University",
+      "affiliation": "Sorbonne Université",
       "orcid": "0000-0003-1590-2392"
+    }
+  ],
+  "contributors": [
+    {
+      "name": "Mickaël Laurent",
+      "affiliation": "Sorbonne Université",
+      "orcid": "0000-0003-1590-2392",
+      "type": "Researcher"
+    },
+    {
+      "name": "Kim Nguyễn",
+      "affiliation": "Université Paris-Saclay",
+      "orcid": "0000-0002-1729-870X",
+      "type": "Researcher"
+    },
+    {
+      "name": "Oliver Tušla",
+      "affiliation": "Czech Technical University",
+      "orcid": "0009-0003-5459-5820",
+      "type": "Researcher"
     }
   ],
   "license": "MIT",
