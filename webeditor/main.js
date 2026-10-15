@@ -1,8 +1,7 @@
 requirejs.config({baseUrl: '.', paths: { vs: 'node_modules/monaco-editor/min/vs' }});
-requirejs(['vs/editor/editor.main','cookie'], function () {
+requirejs(['vs/editor/editor.main'], function () {
 
-	let theme = getCookie("theme");
-	if (!theme) theme = "vs-custom-dark";
+	let theme = localStorage.getItem("theme") || "vs-custom-dark";
 	function updateTheme() {
 		let r = document.querySelector(':root');
 		if (theme == "vs-custom") {
@@ -26,7 +25,7 @@ requirejs(['vs/editor/editor.main','cookie'], function () {
 			r.style.setProperty('--overlay-background', '#1e1e1e');
 		}
 		monaco.editor.setTheme(theme);
-		setCookie("theme", theme, 90);
+		localStorage.setItem("theme", theme);
 	}
 
 	monaco.languages.register({ id: 'stml' });
@@ -56,13 +55,22 @@ requirejs(['vs/editor/editor.main','cookie'], function () {
 			"editorCodeLens.foreground": "#333333",
 		}	
 	});
+	const KEY = "mlsem-buffer";
+	const DEFAULT_TEXT = '(* Press F2 to load an example. *)\n(* Press Ctrl-Enter to type the current buffer. *)\n(* (also accessible via context menu) *)\n\n'
 	let editor = monaco.editor.create(document.getElementById('container'), {
-		value: '(* Press F2 to load an example. *)\n(* Press Ctrl-Enter to type the current buffer. *)\n(* (also accessible via context menu) *)\n\n',
+		value: localStorage.getItem(KEY) || DEFAULT_TEXT,
 		theme: theme,
 		language: 'stml',
 		automaticLayout: true,
 		minimap: { enabled: false }
 	});
+
+	let t;
+	editor.onDidChangeModelContent(() => {
+          clearTimeout(t);
+          t = setTimeout(() => localStorage.setItem(KEY, editor.getValue().trim()), 500);
+	});
+
 	editor.focus();
 	updateTheme();
 
