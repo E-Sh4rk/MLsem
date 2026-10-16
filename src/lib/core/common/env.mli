@@ -30,11 +30,16 @@ module type Env = sig
     (** @raise Not_found if the variable is not bound. *)
 
     val find_opt : Variable.t -> t -> ty option
-    val rm : Variable.t -> t -> t
-    val rms : Variable.t list -> t -> t
-    val restrict : Variable.t list -> t -> t
+
     val map : (ty -> ty) -> t -> t
+
+    val rm : Variable.t -> t -> t
+    (** Removes a binding. The result is not necessarily a weaker environment,
+        as the set of type variables captured [tvars] may decrease. *)
+
     val filter : (Variable.t -> ty -> bool) -> t -> t
+    (** Filters bindings. The result is not necessarily a weaker environment,
+        as the set of type variables captured [tvars] may decrease. *)
 
     val tvars : t -> MVarSet.t
     (** An {b over-approximation} of the type variables occurring in the

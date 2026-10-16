@@ -23,10 +23,8 @@ module type Env = sig
   val mem : Variable.t -> t -> bool
   val find : Variable.t -> t -> ty
   val find_opt : Variable.t -> t -> ty option
-  val rm : Variable.t -> t -> t
-  val rms : Variable.t list -> t -> t
-  val restrict : Variable.t list -> t -> t
   val map : (ty -> ty) -> t -> t
+  val rm : Variable.t -> t -> t
   val filter : (Variable.t -> ty -> bool) -> t -> t
   val tvars : t -> MVarSet.t
   val substitute : Subst.t -> t -> t
@@ -68,14 +66,6 @@ module Make(T:T) = struct
   let find_opt v (m, _) = VarMap.find_opt v m
 
   let filter f (m, _) = VarMap.filter f m |> reconstruct
-
-  let rms vs t =
-    let vs = VarSet.of_list vs in
-    t |> filter (fun v _ -> VarSet.mem v vs |> not)
-
-  let restrict vs t =
-    let vs = VarSet.of_list vs in
-    t |> filter (fun v _ -> VarSet.mem v vs)
 
   let leq (m1,_ as t1) (m2,_ as t2) =
     VarSet.subset (domain t2 |> VarSet.of_list) (domain t1 |> VarSet.of_list) &&
