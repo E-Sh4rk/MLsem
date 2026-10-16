@@ -220,7 +220,11 @@ comp_op:
 | LPAREN MUT id=ID COLON ty=typ RPAREN { (AnnotMut ty, id) }
 
 term:
-  t=simple_term { t }
+  t=simple_term o=option(preceded(SEMICOLON, term)) {
+    match o with
+    None -> t
+    | Some (t2) -> annot $startpos $endpos (Seq (t,t2))
+   }
 | FUN ais=parameter+ ARROW t = terms { abstraction $startpos $endpos ais t }
 | LET id=generalized_identifier ais=parameter* EQUAL td=term IN t=terms
   {
@@ -239,7 +243,6 @@ term:
 
 terms:
   a=term { a }
-| t1=simple_term SEMICOLON t2=terms { annot $startpos $endpos (Seq (t1,t2)) }
 
 simple_term: (* Cannot end with a semi-colon *)
   a=simple_term2 { a }
