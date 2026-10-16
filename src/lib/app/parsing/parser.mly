@@ -163,17 +163,17 @@
 
 program: e=element* EOF { e }
 
-unique_term: t=terms EOF { t }
+unique_term: t=term EOF { t }
 
 unique_ty: ty=typ EOF { ty }
 
 %inline tl_let:
-| id=generalized_identifier ais=parameter* EQUAL t=terms
+| id=generalized_identifier ais=parameter* EQUAL t=term
 {
   let t = abstraction $startpos $endpos ais t in
   (Position.lex_join $startpos $endpos, (Immut,id), t)
 }
-| mid=mid EQUAL t=terms { (Position.lex_join $startpos $endpos, mid, t) }
+| mid=mid EQUAL t=term { (Position.lex_join $startpos $endpos, mid, t) }
 
 %inline mut:
   { false }
@@ -220,32 +220,33 @@ comp_op:
 | LPAREN MUT id=ID COLON ty=typ RPAREN { (AnnotMut ty, id) }
 
 term:
-  t=simple_term { t }
-| FUN ais=parameter+ ARROW t = terms { abstraction $startpos $endpos ais t }
-| LET id=generalized_identifier ais=parameter* EQUAL td=term IN t=terms
+  t=simple_term o=option(preceded(SEMICOLON, term)) {
+    match o with
+    None -> t
+    | Some (t2) -> annot $startpos $endpos (Seq (t,t2))
+   }
+| FUN ais=parameter+ ARROW t = term { abstraction $startpos $endpos ais t }
+| LET id=generalized_identifier ais=parameter* EQUAL td=term IN t=term
   {
     let td = abstraction $startpos $endpos ais td in
     annot $startpos $endpos (Let ((Immut, id), td, t))
   }
-| LET mid=mid EQUAL td=term IN t=terms { annot $startpos $endpos (Let (mid, td, t)) }
-| LET p=ppattern EQUAL td=term IN t=terms { let_pattern $startpos $endpos p td t }
-| LET mid=mid IN t=terms { annot $startpos $endpos (Declare (mid, t)) }
-| SUGGEST id=generalized_identifier IS tys=separated_nonempty_list(OR_KW, typ) IN t=terms
+| LET mid=mid EQUAL td=term IN t=term { annot $startpos $endpos (Let (mid, td, t)) }
+| LET p=ppattern EQUAL td=term IN t=term { let_pattern $startpos $endpos p td t }
+| LET mid=mid IN t=term { annot $startpos $endpos (Declare (mid, t)) }
+| SUGGEST id=generalized_identifier IS tys=separated_nonempty_list(OR_KW, typ) IN t=term
 { annot $startpos $endpos (Suggest (id, tys, t)) }
 | IF t=term ott=optional_test_type THEN t1=term ELSE t2=term { annot $startpos $endpos (Ite (t,ott,t1,t2)) }
 | RETURN t=term { annot $startpos $endpos (Return t) }
 | BREAK { annot $startpos $endpos Break }
 | CONTINUE { annot $startpos $endpos Continue }
 
-terms:
-  a=term { a }
-| t1=simple_term SEMICOLON t2=terms { annot $startpos $endpos (Seq (t1,t2)) }
 
 simple_term: (* Cannot end with a semi-colon *)
   a=simple_term2 { a }
-| IF t=term ott=optional_test_type DO t1=terms END { annot $startpos $endpos (Cond (t,ott,t1,None)) }
-| IF t=term ott=optional_test_type DO t1=terms ELSE t2=terms END { annot $startpos $endpos (Cond (t,ott,t1,Some t2)) }
-| WHILE t=term ott=optional_test_type DO t1=terms END { annot $startpos $endpos (While (t,ott,t1)) }
+| IF t=term ott=optional_test_type DO t1=term END { annot $startpos $endpos (Cond (t,ott,t1,None)) }
+| IF t=term ott=optional_test_type DO t1=term ELSE t2=term END { annot $startpos $endpos (Cond (t,ott,t1,Some t2)) }
+| WHILE t=term ott=optional_test_type DO t1=term END { annot $startpos $endpos (While (t,ott,t1)) }
 | MATCH t=term WITH pats=patterns END { annot $startpos $endpos (PatMatch (t,pats)) }
 | hd=simple_term2 COMMA tl=separated_nonempty_list(COMMA, simple_term2) { annot $startpos $endpos (Tuple (hd::tl)) }
 | id=ID ASSIGN t=simple_term { annot $startpos $endpos (VarAssign (id, t)) }
@@ -309,7 +310,7 @@ simple_term4:
 
 %inline indexed:
 | x=IID t=term { annot $startpos $endpos (Var x), t }
-| LPAREN t1=terms IRPAREN t2=term { t1, t2 }
+| LPAREN t1=term IRPAREN t2=term { t1, t2 }
 
 prefix_term:
   x=prefix { annot $startpos $endpos (Var x) }
@@ -327,8 +328,8 @@ atomic_term:
 | t=PCID RPAREN { annot $startpos $endpos (Tag (t,annot $startpos $endpos (Const Unit))) }
 | l=literal { annot $startpos $endpos (Const l) }
 | LPAREN RPAREN { annot $startpos $endpos (Const Unit) }
-| LPAREN t=terms RPAREN { t }
-| BEGIN t=terms END { t }
+| LPAREN t=term RPAREN { t }
+| BEGIN t=term END { t }
 | LPAREN t=term IS ty=typ RPAREN {
   let annot = annot $startpos $endpos in
   annot (Ite (t,ty,annot (Const (Bool true)),annot (Const (Bool false))))
