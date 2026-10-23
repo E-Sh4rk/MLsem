@@ -26,10 +26,10 @@ Other code directories:
 
 The easiest way to install this library is through [opam](https://opam.ocaml.org/), the OCaml Package Manager.
 
-This library uses algebraic effects and requires at least the version `5.3.0` of the OCaml compiler, which can be installed as follows:
+This library uses algebraic effects and requires at least the version `5.5.0` of the OCaml compiler, which can be installed as follows:
 
 ```
-opam switch create mlsem 5.3.0
+opam switch create mlsem 5.5.0
 eval $(opam env --switch=mlsem)
 ```
 
