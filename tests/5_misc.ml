@@ -216,6 +216,18 @@ let break_return_cf x =
 let weird_return x =
   42, (if x then return 69 else 69)
 
+(* ========= INFERENCE TESTS ========= *)
+
+val id : 'a -> 'a
+let inference_test1 x =
+  id x, id x, id x
+
+val p : C('a) -> 'a
+let inference_test2 x =
+  p x, p x, p x
+let inference_test3 x =
+  fst x, fst x, fst x
+
 (* ========= ALTERNATIVES / INFERENCE TRICKS ========= *)
 
 val f1 : int -> int

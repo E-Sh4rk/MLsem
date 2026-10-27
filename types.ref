@@ -198,7 +198,7 @@ test_rec_proj: a_or_b
 test_mix: { l1 : 42? ; l2 : 33 | true ; l4 : false? }
 test_merge: { l1 : 42 ; l2 : 33 | true ; l4 : false }
 test_merge2: ∀'a,'b,'c. { x : 'a ; y : (42 | 'b)? ; z : (73 | 'c)? ..} -> ('a, 42 | 'b, 73 | 'c)
-test_foo: { l1 : 73 ; l2 : 73 ; l3 : 73 } | { l1 : 42 ; l2 : 42 ; l3 : 42 } -> { l1 : int ; l2 : 42 | 73 ; l3 : 42 | 73 }
+test_foo: { l1 : 42 ; l2 : 42 ; l3 : 42 } | { l1 : 73 ; l2 : 73 ; l3 : 73 } -> { l1 : int ; l2 : 42 | 73 ; l3 : 42 | 73 }
 test_lapply: [ [ int* ]* ]
 test_r_lists: { a : (1..3) ; c : (1..3) ; b : (1..3) ;; (1..3)? }
 test_classes: { data_frame : true ;; false }
@@ -320,23 +320,26 @@ obj: obj
 typeof_cf: (() -> "unit") & (~(int | bool | char | string | ()) -> "object") & (string -> "string") & (bool -> "bool") & (int -> "int") & (char -> "char")
 break_return_cf: ∀'a. ('a & (0 | false) -> ()) & (() | 'a \ (0 | false) -> () | 'a \ (0 | false))
 weird_return: (true -> 69) & (~true -> (42, 69))
+inference_test1: ∀'a. 'a -> ('a, 'a, 'a)
+inference_test2: ∀'a,'b,'c. C('c & 'b & 'a) -> ('a, 'b, 'c)
+inference_test3: ∀'a,'b,'c. ('c & 'b & 'a, any) -> ('a, 'b & 'a, 'c & 'b & 'a)
 test_alt: (Nil -> Nil) & (() -> ()) & (char -> char) & (string -> string) & (bool -> bool) & (int -> int)
 fall: (Nil -> Nil) & (() -> ()) & (char -> char) & (string -> string) & (bool -> bool) & (int -> int)
 test_noalt: (char -> char) & (bool -> bool) & (string -> string) & (Nil -> Nil) & (() -> ()) & (int -> int)
 typeof_app: Int -> 0
-[Warning] File "tests/5_misc.ml", line 262, characters 9-29 Unreachable code
+[Warning] File "tests/5_misc.ml", line 274, characters 9-29 Unreachable code
 typeof_app': Int -> 0
-[Warning] File "tests/5_misc.ml", line 282, characters 7-27 Unreachable code
-[Warning] File "tests/5_misc.ml", line 280, characters 43-48 Unreachable code
-[Warning] File "tests/5_misc.ml", line 277, characters 12-21 Unreachable code
-[Warning] File "tests/5_misc.ml", line 277, characters 24-33 Unreachable code
-[Warning] File "tests/5_misc.ml", line 277, characters 36-45 Unreachable code
-[Warning] File "tests/5_misc.ml", line 277, characters 48-57 Unreachable code
-[Warning] File "tests/5_misc.ml", line 278, characters 12-21 Unreachable code
-[Warning] File "tests/5_misc.ml", line 278, characters 24-33 Unreachable code
-[Warning] File "tests/5_misc.ml", line 278, characters 36-45 Unreachable code
-[Warning] File "tests/5_misc.ml", line 279, characters 12-21 Unreachable code
-[Warning] File "tests/5_misc.ml", line 279, characters 24-34 Unreachable code
+[Warning] File "tests/5_misc.ml", line 294, characters 7-27 Unreachable code
+[Warning] File "tests/5_misc.ml", line 292, characters 43-48 Unreachable code
+[Warning] File "tests/5_misc.ml", line 289, characters 12-21 Unreachable code
+[Warning] File "tests/5_misc.ml", line 289, characters 24-33 Unreachable code
+[Warning] File "tests/5_misc.ml", line 289, characters 36-45 Unreachable code
+[Warning] File "tests/5_misc.ml", line 289, characters 48-57 Unreachable code
+[Warning] File "tests/5_misc.ml", line 290, characters 12-21 Unreachable code
+[Warning] File "tests/5_misc.ml", line 290, characters 24-33 Unreachable code
+[Warning] File "tests/5_misc.ml", line 290, characters 36-45 Unreachable code
+[Warning] File "tests/5_misc.ml", line 291, characters 12-21 Unreachable code
+[Warning] File "tests/5_misc.ml", line 291, characters 24-34 Unreachable code
 alt_fail: untypeable encoding
-File "tests/5_misc.ml", line 284, characters 23-49
+File "tests/5_misc.ml", line 296, characters 23-49
 Could not find any typeable alternative.
