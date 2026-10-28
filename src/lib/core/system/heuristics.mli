@@ -24,8 +24,8 @@ val factorize_abstracts : MVarSet.t -> GTy.t -> Subst.t
     covered by [t2] (whose variables are cleaned first): for
     [(α & dict(int,int)) | (β & ref(int)) | array(int)], this gives [α ↦ dict(int,int)]
     and [β ↦ ref(int)].
-    Used on the types of parameters and non-generalized let-bindings when they are
-    added to the environment, it prevents them from being refined later into
+    Used on the types of parameters and let-bindings when they are added to the
+    environment, it prevents them from being refined later into
     intersections of abstract types such as [array(int) & array(bool)]
     (cf. {!Mlsem_system.Config.factorize_abstracts}). *)
 
@@ -39,5 +39,5 @@ val assimilate_vars : MVarSet.t -> GTy.t -> Subst.t
     with another variable of the same sort, as in ['a & int | 'b & bool], are
     combined by connectives rather than being at the same place: they are never
     assimilated.
-    Used on the types of parameters and non-generalized let-bindings when they
-    are added to the environment (cf. {!Mlsem_system.Config.assimilate_vars}). *)
+    Used on the types of parameters and let-bindings when they are added to the
+    environment (cf. {!Mlsem_system.Config.assimilate_vars}). *)

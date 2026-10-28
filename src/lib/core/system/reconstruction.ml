@@ -234,14 +234,16 @@ let add_to_res a c res =
    (cf. [Heuristics.factorize_abstracts] and [Heuristics.assimilate_vars]).
    Only its inference variables that are neither in [mono] nor bound by the
    environment are concerned (variables of annotations are not inference variables). *)
-let simplify_entry env mono ty =
+let simplify_entry ~is_lambda env mono ty =
   let vs = GTy.fv ty |> MVarSet.filter (TVar.has_kind KInfer) (RVar.has_kind KInfer) in
   let vs = MVarSet.diff vs (MVarSet.union mono (Env.tvars env)) in
-  let s =
-    if !Config.factorize_abstracts then Heuristics.factorize_abstracts vs ty
-    else Subst.identity in
-  if not (Subst.is_identity s) || not !Config.assimilate_vars then s
-  else Heuristics.assimilate_vars vs ty
+  (* The first simplification that does something is applied *)
+  [ !Config.factorize_abstracts, Heuristics.factorize_abstracts ;
+    !Config.assimilate_vars, Heuristics.assimilate_vars ;
+    true, !Config.var_simplification_fun ~is_lambda ]
+  |> List.fold_left (fun s (enabled, f) ->
+    if Subst.is_identity s && enabled then Subst.restrict vs (f vs ty) else s
+  ) Subst.identity
 
 let dummy_i ann = IAnnot.I { rid = Rid.dummy ; ann ; refinement=GREnv.empty }
 
@@ -308,7 +310,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
       Subst (with_res ss, Annot.AConstruct annots |> ac, ic Untyp, REnv.empty)
     end
   | Lambda (_,v,e'), ALambda (ty, annot') ->
-    let s = simplify_entry env MVarSet.empty ty in
+    let s = simplify_entry ~is_lambda:true env MVarSet.empty ty in
     if not (Subst.is_identity s)
     then retry_with (IAnnot.substitute s (ic (ALambda (ty, annot'))))
     else
@@ -425,7 +427,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
     | Subst (ss,a,a',r) -> Subst (ss,ALet (a,parts)|>ic,ALet (a',parts)|>ic,r)
     | Ok (annot1, s) ->
       let tvs, s = Checker.generalize ~e:e1 env s |> TyScheme.get in
-      let sa = simplify_entry env tvs s in
+      let sa = simplify_entry ~is_lambda:false env tvs s in
       if not (Subst.is_identity sa)
       then retry_with (IAnnot.substitute sa (ic (ALet (A annot1, parts))))
       else
@@ -442,7 +444,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
     | Ok (annot1, s) ->
       let t = Checker.generalize ~e:e1 env s in
       let tvs, ty = TyScheme.get t in
-      let sa = simplify_entry env tvs ty in
+      let sa = simplify_entry ~is_lambda:false env tvs ty in
       if not (Subst.is_identity sa)
       then retry_with (IAnnot.substitute sa (ic (ALet' (A annot1, annot2))))
       else
