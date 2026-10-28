@@ -423,12 +423,24 @@
                     <tt>"no"</tt> disables normalization.</td>
             </tr>
             <tr>
-                <td>subst_normalization</td>
-                <td><tt>"no_abstract_inter"</tt> | <tt>"no"</tt></td>
-                <td><tt>"no_abstract_inter"</tt></td>
-                <td>Configure the substitution normalization heuristic applied during tallying.
-                    <tt>"no_abstract_inter"</tt> removes abstract type intersections from substitution results,
-                    <tt>"no"</tt> disables substitution normalization.</td>
+                <td>factorize_abstracts</td>
+                <td><tt>true</tt> | <tt>false</tt></td>
+                <td><tt>true</tt></td>
+                <td>Prevent the inference of intersections of abstract types such as
+                    <tt>array(int) &amp; array(bool)</tt>: when the inferred type of a parameter
+                    or of a let-binding intersects a type variable with
+                    abstract types, the type variable is removed.
+                    Annotated parameters and generalized type variables are not affected.</td>
+            </tr>
+            <tr>
+                <td>assimilate_vars</td>
+                <td><tt>true</tt> | <tt>false</tt></td>
+                <td><tt>true</tt></td>
+                <td>When the inferred type of a parameter or of a let-binding contains several
+                    type variables at the same position and with the same variance,
+                    identify them: for instance, <tt>C('a) &amp; C('b)</tt> becomes
+                    <tt>C('a)</tt>. This yields simpler types, at the cost of some generality.
+                    Annotated parameters and generalized type variables are not affected.</td>
             </tr>
         </table>
 

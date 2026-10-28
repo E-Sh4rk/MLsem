@@ -31,7 +31,37 @@ let normalization_fun : (Ty.t -> Ty.t) ref = ref Heuristics.normalize_empty_abst
 (** Normalization applied to the set of solutions of a tallying instance. It may
     split, reorder or drop solutions, but every returned substitution must be a
     solution of the instance: the reconstruction relies on them being sound, not
-    on them being complete (cf. [Heuristics.normalize_abstract_factors]).
-    Use [fun _ x -> x] for no normalization. *)
+    on them being complete.
+    Use [fun _ x -> x] for no normalization (the default). *)
 let subst_normalization_fun : (Heuristics.tally_context -> Subst.t list -> Subst.t list) ref =
-  ref Heuristics.normalize_abstract_factors
+  ref (fun _ x -> x)
+
+(** Whether, when the (partially inferred) type of a parameter or of a
+    let-binding is added to the environment, its inference variables
+    that occur at the same positions and with the same variance should be identified
+    (cf. [Heuristics.assimilate_vars]). This loses generality, but only for types
+    that are inferred: annotated parameters are not affected. *)
+let assimilate_vars = ref true
+
+(** Whether, when the (partially inferred) type of a parameter or of a
+    let-binding is added to the environment, its inference variables
+    intersected with abstract types should be substituted by the type they are
+    intersected with (cf. [Heuristics.factorize_abstracts]). This prevents the
+    inference of intersections of abstract types such as [array(int) & array(bool)]. *)
+let factorize_abstracts = ref true
+
+(** Custom simplification applied, after the ones above, to the (partially inferred)
+    type of a parameter or of a let-binding when it is added to the environment.
+    It is given whether the type is the one of a parameter ([~is_lambda:true]) or of
+    a let-binding ([~is_lambda:false]), the variables that may be substituted (the
+    inference variables of the type that are neither generalized nor bound by the
+    environment) and the type, and returns a substitution, [Subst.identity] meaning
+    that there is nothing to simplify.
+    Any such substitution yields a valid derivation, but it may lose generality.
+    When the substitution is not the identity, it is applied and the binding is
+    typed again, so the function must eventually return [Subst.identity].
+    For instance, [fun ~is_lambda:_ -> Heuristics.assimilate_vars] reimplements
+    [assimilate_vars]. Use [fun ~is_lambda:_ _ _ -> Subst.identity] for no
+    simplification (the default). *)
+let var_simplification_fun : (is_lambda:bool -> MVarSet.t -> GTy.t -> Subst.t) ref =
+  ref (fun ~is_lambda:_ _ _ -> Subst.identity)

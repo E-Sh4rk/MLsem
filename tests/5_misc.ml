@@ -228,6 +228,13 @@ let inference_test2 x =
 let inference_test3 x =
   fst x, fst x, fst x
 
+val pr : { ;; `a } -> { ;; `a }
+let inference_test4 x =
+  pr x, pr x, pr x
+val pc : C({ ;; `a }) -> { ;; `a }
+let inference_test5 x =
+  pc x, pc x, pc x
+
 (* ========= ALTERNATIVES / INFERENCE TRICKS ========= *)
 
 val f1 : int -> int
