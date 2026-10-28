@@ -31,10 +31,10 @@ let normalization_fun : (Ty.t -> Ty.t) ref = ref Heuristics.normalize_empty_abst
 (** Normalization applied to the set of solutions of a tallying instance. It may
     split, reorder or drop solutions, but every returned substitution must be a
     solution of the instance: the reconstruction relies on them being sound, not
-    on them being complete (cf. [Heuristics.normalize_abstract_factors]).
-    Use [fun _ x -> x] for no normalization. *)
+    on them being complete.
+    Use [fun _ x -> x] for no normalization (the default). *)
 let subst_normalization_fun : (Heuristics.tally_context -> Subst.t list -> Subst.t list) ref =
-  ref Heuristics.normalize_abstract_factors
+  ref (fun _ x -> x)
 
 (** Whether, when the (partially inferred) type of a parameter or of a
     non-generalized let-binding is added to the environment, its inference variables
@@ -42,3 +42,10 @@ let subst_normalization_fun : (Heuristics.tally_context -> Subst.t list -> Subst
     (cf. [Heuristics.assimilate_vars]). This loses generality, but only for types
     that are inferred: annotated parameters are not affected. *)
 let assimilate_vars = ref false
+
+(** Whether, when the (partially inferred) type of a parameter or of a
+    non-generalized let-binding is added to the environment, its inference variables
+    intersected with abstract types should be substituted by the type they are
+    intersected with (cf. [Heuristics.factorize_abstracts]). This prevents the
+    inference of intersections of abstract types such as [array(int) & array(bool)]. *)
+let factorize_abstracts = ref true

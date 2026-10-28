@@ -227,7 +227,7 @@ test_arr: ∀'a,'b. bool | 'a -> array('a & int | 'b)
 test_double_array: 42
 arr_dict_assign: ∀'a,'b. dict((0..1) | 'b, 'a) | array('a) -> ()
 nested: ∀'a. any -> 'a -> 'a
-swap: ∀'a,'b. ('a & int -> int -> array('b) -> ()) & ('a -> 'a -> dict('a, 'b) -> ())
+swap: ∀'a,'b. ('a & int -> 'a & int -> dict('a, 'b) | array('b) -> ()) & ('a -> 'a -> dict('a, 'b) -> ())
 mx: 42
 mut_invalid: untypeable coercion
 File "tests/4_imperative.ml", line 98, characters 8-12

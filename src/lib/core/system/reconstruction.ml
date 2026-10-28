@@ -230,15 +230,18 @@ let add_to_res a c res =
   | Either.Right (ss,lst,lst',r), _ -> Either.Right (ss,c::lst,c::lst',r)
   end
 
-(* Assimilation of the variables of a type about to be added to the environment
-   (cf. [Heuristics.assimilate_vars]). Only its inference variables that are neither
-   in [mono] nor bound by the environment are concerned (variables of annotations
-   are not inference variables). *)
-let assimilate_vars env mono ty =
-  if not !Config.assimilate_vars then Subst.identity
-  else
-    let vs = GTy.fv ty |> MVarSet.filter (TVar.has_kind KInfer) (RVar.has_kind KInfer) in
-    Heuristics.assimilate_vars (MVarSet.diff vs (MVarSet.union mono (Env.tvars env))) ty
+(* Simplification of a type about to be added to the environment
+   (cf. [Heuristics.factorize_abstracts] and [Heuristics.assimilate_vars]).
+   Only its inference variables that are neither in [mono] nor bound by the
+   environment are concerned (variables of annotations are not inference variables). *)
+let simplify_entry env mono ty =
+  let vs = GTy.fv ty |> MVarSet.filter (TVar.has_kind KInfer) (RVar.has_kind KInfer) in
+  let vs = MVarSet.diff vs (MVarSet.union mono (Env.tvars env)) in
+  let s =
+    if !Config.factorize_abstracts then Heuristics.factorize_abstracts vs ty
+    else Subst.identity in
+  if not (Subst.is_identity s) || not !Config.assimilate_vars then s
+  else Heuristics.assimilate_vars vs ty
 
 let dummy_i ann = IAnnot.I { rid = Rid.dummy ; ann ; refinement=GREnv.empty }
 
@@ -305,7 +308,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
       Subst (with_res ss, Annot.AConstruct annots |> ac, ic Untyp, REnv.empty)
     end
   | Lambda (_,v,e'), ALambda (ty, annot') ->
-    let s = assimilate_vars env MVarSet.empty ty in
+    let s = simplify_entry env MVarSet.empty ty in
     if not (Subst.is_identity s)
     then retry_with (IAnnot.substitute s (ic (ALambda (ty, annot'))))
     else
@@ -422,7 +425,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
     | Subst (ss,a,a',r) -> Subst (ss,ALet (a,parts)|>ic,ALet (a',parts)|>ic,r)
     | Ok (annot1, s) ->
       let tvs, s = Checker.generalize ~e:e1 env s |> TyScheme.get in
-      let sa = assimilate_vars env tvs s in
+      let sa = simplify_entry env tvs s in
       if not (Subst.is_identity sa)
       then retry_with (IAnnot.substitute sa (ic (ALet (A annot1, parts))))
       else
@@ -439,7 +442,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
     | Ok (annot1, s) ->
       let t = Checker.generalize ~e:e1 env s in
       let tvs, ty = TyScheme.get t in
-      let sa = assimilate_vars env tvs ty in
+      let sa = simplify_entry env tvs ty in
       if not (Subst.is_identity sa)
       then retry_with (IAnnot.substitute sa (ic (ALet' (A annot1, annot2))))
       else

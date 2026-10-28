@@ -227,14 +227,11 @@ let treat (benv,varm,senv,env) (annot, elem) =
       | "infer_overload", Bool b -> Config.infer_overload := b
       | "reexplore_failed_domains", Bool b -> Config.reexplore_failed_domains := b
       | "assimilate_vars", Bool b -> Config.assimilate_vars := b
+      | "factorize_abstracts", Bool b -> Config.factorize_abstracts := b
       | "normalization", Bool false | "normalization", String "no" ->
         Config.normalization_fun := Fun.id
       | "normalization", String "no_empty_param" ->
         Config.normalization_fun := Mlsem_system.Heuristics.normalize_empty_abstracts
-      | "subst_normalization", Bool false | "subst_normalization", String "no" ->
-        Config.subst_normalization_fun := (fun _ x -> x)
-      | "subst_normalization", String "no_abstract_inter" ->
-        Config.subst_normalization_fun := Mlsem_system.Heuristics.normalize_abstract_factors
       | _ -> failwith ("Invalid command "^str)
       end ;
       (benv,varm,senv,env), { res=TDone ; msg=[] }

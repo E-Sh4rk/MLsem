@@ -1,30 +1,33 @@
-(** Default implementations for the normalization hooks of
-    {!Mlsem_system.Config}. Both encode the same assumption about abstract
-    types: an abstract type with an empty parameter is uninhabited (there is no
-    value of type [ref(empty)], say). This is {e not} a neutral simplification —
-    it is only sound for abstract types whose parameters are genuinely
-    inhabited-by-construction. *)
+(** Heuristics used by the type inference (cf. {!Mlsem_system.Config}). *)
 
 open Mlsem_types
 
 val normalize_empty_abstracts : Ty.t -> Ty.t
 (** Removes from [ty] the abstract-type atoms that have an empty parameter:
     positive occurrences make their whole conjunction empty, negative ones are
-    dropped as vacuous. Suitable as {!Mlsem_system.Config.normalization_fun}. *)
+    dropped as vacuous. This encodes the assumption that an abstract type with an
+    empty parameter is uninhabited (there is no value of type [ref(empty)], say),
+    which is {e not} a neutral simplification: it is only sound for abstract types
+    whose parameters are genuinely inhabited-by-construction.
+    Suitable as {!Mlsem_system.Config.normalization_fun}. *)
 
 type tally_context = { mono: MVarSet.t ; tvars: MVarSet.t ; res: Ty.t }
 (** Context of the tallying call whose solutions are being normalized: the
     monomorphic variables, the variables of the environment, and the type whose
     instance is being computed. *)
 
-val normalize_abstract_factors : tally_context -> Subst.t list -> Subst.t list
-(** Splits each solution that assigns to an environment variable a type
-    containing several abstract-type atoms into one solution per atom, plus one
-    for the remainder. This turns an approximate solution such as
-    [α ↦ ref(int) & array(int)] into the alternatives the reconstruction can
-    actually exploit. Suitable as
-    {!Mlsem_system.Config.subst_normalization_fun}.
-    Has no effect when the parameters are fully annotated. *)
+val factorize_abstracts : MVarSet.t -> GTy.t -> Subst.t
+(** [factorize_abstracts vs ty] substitutes each type variable of [vs] that is
+    intersected at top level with abstract atoms in [ty] by the type it is
+    intersected with, so that it disappears: [α & array(int)] becomes [array(int)].
+    Writing [ty] as [(α & t1) | t2], [α] is substituted by [t1] minus the part already
+    covered by [t2] (whose variables are cleaned first): for
+    [(α & dict(int,int)) | (β & ref(int)) | array(int)], this gives [α ↦ dict(int,int)]
+    and [β ↦ ref(int)].
+    Used on the types of parameters and non-generalized let-bindings when they are
+    added to the environment, it prevents them from being refined later into
+    intersections of abstract types such as [array(int) & array(bool)]
+    (cf. {!Mlsem_system.Config.factorize_abstracts}). *)
 
 val assimilate_vars : MVarSet.t -> GTy.t -> Subst.t
 (** [assimilate_vars vs ty] maps each variable of [vs] to another variable of [vs]
