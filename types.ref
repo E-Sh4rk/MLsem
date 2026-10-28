@@ -216,8 +216,9 @@ fun2_with_ellipsis_test: 1, 2, { l3 : 3 ; l4 : 4 ; l5 : 5 }, (3..5)
 ref_42: ref(int)
 ref_42_unresolved: the type inferred is not fully resolved
 File "tests/4_imperative.ml", line 24, characters 4-30
-type inferred: ref(42 | 'I2416)
+type inferred: ref(42 | 'I2418)
 mutate_ref: ∀'a. 42 | 'a -> 42 | 'a
+inference_let: ∀'a,'b,'c,'d. () -> (ref('a & C('d & 'c & 'b)), 'b, 'c, 'd)
 is_ref: (ref -> true) & (~ref -> false)
 is_not_ref: (~ref -> true) & (ref -> false)
 test_dict: ∀'a,'b. false | "key" | 'a -> (dict(false | "key" | 'a, 0 | 42 | 'b), 0 | 42 | 'b)
@@ -229,7 +230,7 @@ nested: ∀'a. any -> 'a -> 'a
 swap: ∀'a,'b. ('a & int -> int -> array('b) -> ()) & ('a -> 'a -> dict('a, 'b) -> ())
 mx: 42
 mut_invalid: untypeable coercion
-File "tests/4_imperative.ml", line 92, characters 8-12
+File "tests/4_imperative.ml", line 98, characters 8-12
 expected: int
 given: true
 mut_valid: int
@@ -245,8 +246,8 @@ neg_and_pos_ann: Nil | int -> Nil | (int, int)
 order: Nil | (Nil | int, Nil | int) -> Nil | int | (int, int)
 loop_tricky_narrowing: int -> (any, int)
 loop_invalid: untypeable application
-File "tests/4_imperative.ml", line 174, characters 4-14
-function: (ref('I2808), 'I2808) -> ()
+File "tests/4_imperative.ml", line 180, characters 4-14
+function: (ref('I2836), 'I2836) -> ()
 argument: ref(int), false
 loop_valid: ∀'a. (int | false | 'a -> int | false | 'a) & ('a \ int -> 'a)
 filter_imp: ∀'a,'b,'c. ('b -> false) & ('a -> bool) -> array('b | 'a) -> array('a \ 'b | 'c)
@@ -256,7 +257,7 @@ interval: ∀'a. int -> int -> array(int | 'a)
 test_ann_mut1: 42, 73
 test_ann_mut2: 42, 73
 test_ann_mut3: untypeable application
-File "tests/4_imperative.ml", line 236, characters 18-22
+File "tests/4_imperative.ml", line 242, characters 18-22
 function: 'a -> 'a
 argument: ()
 test_ann_mut4: 42, 73
@@ -323,23 +324,25 @@ weird_return: (true -> 69) & (~true -> (42, 69))
 inference_test1: ∀'a. 'a -> ('a, 'a, 'a)
 inference_test2: ∀'a,'b,'c. C('c & 'b & 'a) -> ('a, 'b, 'c)
 inference_test3: ∀'a,'b,'c. ('c & 'b & 'a, any) -> ('a, 'b & 'a, 'c & 'b & 'a)
+inference_test4: ∀`a,`b,`c. {  ;; `c & `b & `a } -> ({  ;; `a }, {  ;; `b }, {  ;; `c })
+inference_test5: ∀`a,`b,`c. C({  ;; `c & `b & `a }) -> ({  ;; `a }, {  ;; `b }, {  ;; `c })
 test_alt: (Nil -> Nil) & (() -> ()) & (char -> char) & (string -> string) & (bool -> bool) & (int -> int)
 fall: (Nil -> Nil) & (() -> ()) & (char -> char) & (string -> string) & (bool -> bool) & (int -> int)
 test_noalt: (char -> char) & (bool -> bool) & (string -> string) & (Nil -> Nil) & (() -> ()) & (int -> int)
 typeof_app: Int -> 0
-[Warning] File "tests/5_misc.ml", line 274, characters 9-29 Unreachable code
+[Warning] File "tests/5_misc.ml", line 281, characters 9-29 Unreachable code
 typeof_app': Int -> 0
-[Warning] File "tests/5_misc.ml", line 294, characters 7-27 Unreachable code
-[Warning] File "tests/5_misc.ml", line 292, characters 43-48 Unreachable code
-[Warning] File "tests/5_misc.ml", line 289, characters 12-21 Unreachable code
-[Warning] File "tests/5_misc.ml", line 289, characters 24-33 Unreachable code
-[Warning] File "tests/5_misc.ml", line 289, characters 36-45 Unreachable code
-[Warning] File "tests/5_misc.ml", line 289, characters 48-57 Unreachable code
-[Warning] File "tests/5_misc.ml", line 290, characters 12-21 Unreachable code
-[Warning] File "tests/5_misc.ml", line 290, characters 24-33 Unreachable code
-[Warning] File "tests/5_misc.ml", line 290, characters 36-45 Unreachable code
-[Warning] File "tests/5_misc.ml", line 291, characters 12-21 Unreachable code
-[Warning] File "tests/5_misc.ml", line 291, characters 24-34 Unreachable code
+[Warning] File "tests/5_misc.ml", line 301, characters 7-27 Unreachable code
+[Warning] File "tests/5_misc.ml", line 299, characters 43-48 Unreachable code
+[Warning] File "tests/5_misc.ml", line 296, characters 12-21 Unreachable code
+[Warning] File "tests/5_misc.ml", line 296, characters 24-33 Unreachable code
+[Warning] File "tests/5_misc.ml", line 296, characters 36-45 Unreachable code
+[Warning] File "tests/5_misc.ml", line 296, characters 48-57 Unreachable code
+[Warning] File "tests/5_misc.ml", line 297, characters 12-21 Unreachable code
+[Warning] File "tests/5_misc.ml", line 297, characters 24-33 Unreachable code
+[Warning] File "tests/5_misc.ml", line 297, characters 36-45 Unreachable code
+[Warning] File "tests/5_misc.ml", line 298, characters 12-21 Unreachable code
+[Warning] File "tests/5_misc.ml", line 298, characters 24-34 Unreachable code
 alt_fail: untypeable encoding
-File "tests/5_misc.ml", line 296, characters 23-49
+File "tests/5_misc.ml", line 303, characters 23-49
 Could not find any typeable alternative.

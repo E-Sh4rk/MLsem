@@ -25,3 +25,16 @@ val normalize_abstract_factors : tally_context -> Subst.t list -> Subst.t list
     actually exploit. Suitable as
     {!Mlsem_system.Config.subst_normalization_fun}.
     Has no effect when the parameters are fully annotated. *)
+
+val assimilate_vars : MVarSet.t -> GTy.t -> Subst.t
+(** [assimilate_vars vs ty] maps each variable of [vs] to another variable of [vs]
+    that occurs in [ty] at exactly the same positions and with the same variance,
+    if any. A position is a path in the sense of [Sstt.Dependencies.Position]: for
+    instance, occurrences in [C('a) & C('b)] or [('a, any) & ('b, any)] are at the
+    same position.
+    Variables occurring at the top level of a node (or of a record field) together
+    with another variable of the same sort, as in ['a & int | 'b & bool], are
+    combined by connectives rather than being at the same place: they are never
+    assimilated.
+    Used on the types of parameters and non-generalized let-bindings when they
+    are added to the environment (cf. {!Mlsem_system.Config.assimilate_vars}). *)

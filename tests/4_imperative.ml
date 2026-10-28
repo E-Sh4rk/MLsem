@@ -26,6 +26,12 @@ let mutate_ref x =
   let y = ref x in
   y <- 42 ; !y
 
+val proj_c : C('a) -> 'a
+val new_ref : () -> ref('a)
+let inference_let () =
+  let y = new_ref () in
+  y, proj_c !y, proj_c !y, proj_c !y
+
 let is_ref x = if x is ref then true else false
 let is_not_ref x = if x is ~ref then true else false
 
