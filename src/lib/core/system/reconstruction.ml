@@ -93,6 +93,8 @@ type ('a,'b) result =
 type log = {
   eid: Eid.t ;
   kind: Checker.error_kind ;
+  env : Env.t ;
+  ann : IAnnot.a ;
   title: string ;
   descr: Format.formatter -> unit }
 
@@ -242,7 +244,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
       | Some (eid, descr) -> eid, Checker.UntypeableEncoding, "untypeable encoding", descr
       | None -> id, kind, msg, descr
     in
-    let log = { eid ; kind ; title=msg ; descr } in
+    let log = { eid ; kind ; ann=annot ; env ; title=msg ; descr } in
     cache.logs := log::!(cache.logs)
   in
   let env = GREnv.refine_env env r in
@@ -568,12 +570,10 @@ let refine env iannot e =
   match refine' cache env iannot e with
   | Fail ->
     begin match !(cache.logs) with
-    | [] ->
-      let err = { Checker.eid=Eid.dummy ; kind=Checker.InvalidAnnot ;
-        title="annotation reconstruction failed" ; descr=None } in
-      raise (Checker.Untypeable err)
+    | [] -> assert false
     | log::_ ->
-      let err = { Checker.eid=log.eid ; title=log.title ; kind=log.kind ;
+      let err = {
+        Checker.eid=log.eid ; title=log.title ; kind=log.kind ; env=log.env ; ann=log.ann ;
         descr=(Some (Format.asprintf "%a" (fun fmt () -> log.descr fmt) ())) } in
       raise (Checker.Untypeable err)
     end

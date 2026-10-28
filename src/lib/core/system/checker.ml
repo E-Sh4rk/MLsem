@@ -20,10 +20,24 @@ type error_kind =
 | UntypeableCast
 | UntypeableCoercion
 | InvalidAnnot
-type error = { eid: Eid.t ; kind: error_kind ; title: string ; descr: string option }
+type error = {
+    eid: Eid.t ;
+    kind: error_kind ;
+    env: Env.t ;
+    ann: IAnnot.a ;
+    title: string ;
+    descr: string option }
 exception Untypeable of error
 
-let untypeable id msg = raise (Untypeable { eid=id ; kind=InvalidAnnot ; title=msg ; descr=None })
+let untypeable eid env ann msg =
+  raise (Untypeable {
+    eid ;
+    kind=InvalidAnnot ;
+    env ;
+    ann ;
+    title=msg ;
+    descr=None
+    })
 
 let rec is_gen (_,e) =
   match e with
@@ -45,14 +59,15 @@ let generalize ~e env s =
 
 let rec typeof' env annot (id,e) =
   let open Annot in
+  let untypeable = untypeable id env Untyp in
   let subst_ts s ts =
     let (tvs, ty) = TyScheme.get ts in
     if MVarSet.subset (Subst.domain s) tvs then GTy.substitute s ty
-    else untypeable id ("Invalid substitution.")
+    else untypeable ("Invalid substitution.")
   in
   let app t1 t2 res =
     if Ty.leq (GTy.lb t1) (Arrow.mk (GTy.lb t2) res) |> not
-    then untypeable id "Invalid application."
+    then untypeable "Invalid application."
     else if GTy.non_gradual t1 && GTy.non_gradual t2 then GTy.mk res
     else
       let ub = Arrow.apply (GTy.ub t1) (GTy.ub t2) in
@@ -62,7 +77,7 @@ let rec typeof' env annot (id,e) =
   | Value _, AValue ty -> ty
   | Var v, AVar s ->
     begin match Env.find_opt v env with
-    | None -> untypeable id ("Undefined variable "^(Variable.show v)^".")
+    | None -> untypeable ("Undefined variable "^(Variable.show v)^".")
     | Some ty -> subst_ts s ty
     end
   | Constructor (c, es), AConstruct annots when List.length es = List.length annots ->
@@ -73,7 +88,7 @@ let rec typeof' env annot (id,e) =
     let tys = List.map2 (fun e a -> typeof env a e) es annots in
     begin match GTy.opl check (construct c) tys with
     | Some ty -> ty
-    | None -> untypeable id ("Invalid domain for constructor.")
+    | None -> untypeable ("Invalid domain for constructor.")
     end
   | Lambda (_, v, e), ALambda (s, annot) ->
     let env = Env.add v (TyScheme.mk_mono s) env in
@@ -88,7 +103,7 @@ let rec typeof' env annot (id,e) =
     let tys = lst |> List.map (fun ((_,_,e),(ty,annot)) -> typeof env annot e, ty) in
     if List.for_all (fun (ty, ty') -> Ty.leq (GTy.lb ty) (GTy.lb ty')) tys
     then tys |> List.map fst |> GTy.mapl Tuple.mk
-    else untypeable id ("Invalid recursive lambda.")
+    else untypeable ("Invalid recursive lambda.")
   | Ite (e, _, e1, e2), AIte (annot, tau, b1, b2) ->
     let s = typeof env annot e in
     let t1 = typeof_b env b1 e1 s tau in
@@ -96,7 +111,7 @@ let rec typeof' env annot (id,e) =
     GTy.cup t1 t2
   | Alt (_,es), AAlt anns when List.length es = List.length anns ->
     if List.for_all Option.is_none anns
-    then untypeable id ("At least one branch of a Alt expr must be typeable.")
+    then untypeable ("At least one branch of a Alt expr must be typeable.")
     else
       let aux e a = match a with None -> GTy.any | Some a -> typeof env a e in
       List.map2 aux es anns |> GTy.conj
@@ -113,7 +128,7 @@ let rec typeof' env annot (id,e) =
     let t = typeof env annot e in
     begin match GTy.op check (proj p) t with
     | Some ty -> ty
-    | None -> untypeable id "Invalid projection."
+    | None -> untypeable "Invalid projection."
     end
   | Let (_, v, e1, e2), ALet (annot1, annots2) ->
     let tvs,s = typeof_def env annot1 e1 |> TyScheme.get in
@@ -121,13 +136,13 @@ let rec typeof' env annot (id,e) =
       if MVarSet.inter tvs (TVOp.vars si) |> MVarSet.is_empty then
         match annot with
         | None when Ty.is_empty (Ty.cap (GTy.ub s) si) -> GTy.empty
-        | None -> untypeable id ("Part of "^(Variable.show v)^" is non-empty and should be typed.")
+        | None -> untypeable ("Part of "^(Variable.show v)^" is non-empty and should be typed.")
         | Some annot ->
             let si = GTy.mk si in
             let s = TyScheme.mk tvs (GTy.cap s si) in
             typeof (Env.add v s env) annot e2
       else
-        untypeable id ("Partition of "^(Variable.show v)^" contains generalized variables.")
+        untypeable ("Partition of "^(Variable.show v)^" contains generalized variables.")
     in
     List.map aux annots2 |> GTy.disj
   | Let (_, v, e1, e2), ALet' (annot1, annot2) ->
@@ -139,14 +154,14 @@ let rec typeof' env annot (id,e) =
     || (c = CheckStatic && Ty.leq (GTy.lb t) (GTy.lb ty))
     || (c = NoCheck)
     then GTy.cap t ty
-    else untypeable id "Type constraint not satisfied."
+    else untypeable "Type constraint not satisfied."
   | TypeCoerce (e, _, c), ACoerce (ty, annot) ->
     let t = typeof env annot e in
     if (c = Check && GTy.leq t ty)
     || (c = CheckStatic && Ty.leq (GTy.lb t) (GTy.lb ty))
     || (c = NoCheck)
     then ty
-    else untypeable id "Impossible type coercion."
+    else untypeable "Impossible type coercion."
   | e, AInter lst ->
     lst |> List.map (fun a -> typeof env a (id,e)) |> GTy.conj
   | e, a ->
@@ -165,7 +180,7 @@ and typeof_b env bannot (id,e) s tau =
   | BType annot -> typeof env annot (id,e)
   | BSkip ->
     if is_type_test_unsat ~tau s |> Ty.is_empty |> not
-    then untypeable id "Branch is reachable and must be typed." ;
-    GTy.empty
+    then untypeable id env Untyp "Branch is reachable and must be typed."
+    else GTy.empty
 and typeof_def env annot e =
   typeof env annot e |> generalize ~e env
