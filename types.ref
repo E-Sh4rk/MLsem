@@ -52,7 +52,7 @@ or_: ((~true, ~true) -> false) & ((any, true) | (true, any) -> true)
 impossible_branch: int -> int
 [Warning] File "tests/1_union_inter.ml", line 103, characters 32-36 Unreachable code
 impossible_branch2: (any -> int -> int) & (int -> any -> int)
-switch1: ∀'a,'b,'c,'d. (('a -> 'b) -> true -> 'a -> any -> 'b) & (('c -> 'd) -> ~true -> any -> 'c -> 'd)
+switch1: ∀'a,'b,'c,'d. (('a -> 'b) -> (true -> 'a -> any -> 'b) & (~true -> any -> 'a -> 'b)) & (('c -> 'd) -> ~true -> any -> 'c -> 'd)
 switch2: ∀'a,'b,'c,'d. (true -> ('a -> 'b) -> 'a -> any -> 'b) & (~true -> ('c -> 'd) -> any -> 'c -> 'd)
 typeof: (bool -> "Boolean") & (~(int | bool | char | [  ] | string | ()) -> "Object") & ([  ] | () -> "[]") & (string -> "String") & (char -> "Character") & (int -> "Number")
 typeof_patterns: (~(int | bool | char | [  ] | string | ()) -> "Object") & ([  ] | () -> "[]") & (string -> "String") & (char -> "Character") & (int -> "Number") & (bool -> "Boolean")
@@ -189,7 +189,7 @@ record_test: { l3 : 33 ; l4 : 44 }, { l1 : 1 ; l2 : 2 ; l3 : 3 ; l4 : 44 }, { l4
 pair_app: ∀'a,'b,'c. ('a -> 'b) -> ('a -> 'c) -> 'a -> ('b, 'c)
 upd1: ∀`a. { l1 : any? ;; `a } -> { l1 : 42 ;; `a }
 upd2: ∀`a. { l2 : any? ;; `a } -> { l2 : 42 ;; `a }
-upd: ∀`a,`b. { l1 : `b ; l2 : `a ;; `b & `a } -> ({ l1 : 42 ;; `a }, { l2 : 42 ;; `b })
+upd: ∀`a. {  ;; `a } -> ({ l1 : 42 ;; `a }, { l2 : 42 ;; `a })
 test_upd: { l1 : 42 ; l : 42 }, { l2 : 42 ; l : 42 }
 get_id: ∀'a,'b. ({ kind : "book" ; title : 'a ..} -> 'a) & ({ kind : "author" ; name : 'b ..} -> 'b)
 set_id: ∀'a,'b,`a,`b. ({ kind : "author" ; name : any? ;; `b } -> 'b -> { kind : "author" ; name : 'b ;; `b }) & ({ kind : "book" ; title : any? ;; `a } -> 'a -> { kind : "book" ; title : 'a ;; `a })
@@ -218,7 +218,7 @@ ref_42_unresolved: the type inferred is not fully resolved
 File "tests/4_imperative.ml", line 24, characters 4-30
 type inferred: ref(42 | 'I2418)
 mutate_ref: ∀'a. 42 | 'a -> 42 | 'a
-inference_let: ∀'a,'b,'c,'d. () -> (ref('a & C('d & 'c & 'b)), 'b, 'c, 'd)
+inference_let: ∀'a,'b. () -> (ref('a & C('b)), 'b, 'b, 'b)
 is_ref: (ref -> true) & (~ref -> false)
 is_not_ref: (~ref -> true) & (ref -> false)
 test_dict: ∀'a,'b. false | "key" | 'a -> (dict(false | "key" | 'a, 0 | 42 | 'b), 0 | 42 | 'b)
@@ -247,7 +247,7 @@ order: Nil | (Nil | int, Nil | int) -> Nil | int | (int, int)
 loop_tricky_narrowing: int -> (any, int)
 loop_invalid: untypeable application
 File "tests/4_imperative.ml", line 180, characters 4-14
-function: (ref('I2836), 'I2836) -> ()
+function: (ref('I2832), 'I2832) -> ()
 argument: ref(int), false
 loop_valid: ∀'a. (int | false | 'a -> int | false | 'a) & ('a \ int -> 'a)
 filter_imp: ∀'a,'b,'c. ('b -> false) & ('a -> bool) -> array('b | 'a) -> array('a \ 'b | 'c)
@@ -293,7 +293,7 @@ true
   '_a: bool | 'b ;
   `_c: { a : `_c ; b : int ;; `d }
 ]
-test: ∀'a,'b. ('b & 'a, any) -> ('a, 'b & 'a)
+test: ∀'a. ('a, any) -> ('a, 'a)
 and_js: ∀'a,'b. ('a & falsy -> any -> 'a & falsy) & ('a & truthy -> 'b -> 'b)
 not_js: (falsy -> 1) & (truthy -> 0)
 or_js: ∀'a,'b. ('a & truthy -> any -> 'a & truthy) & ('a & falsy -> 'b -> 'b)
@@ -322,10 +322,10 @@ typeof_cf: (() -> "unit") & (~(int | bool | char | string | ()) -> "object") & (
 break_return_cf: ∀'a. ('a & (0 | false) -> ()) & (() | 'a \ (0 | false) -> () | 'a \ (0 | false))
 weird_return: (true -> 69) & (~true -> (42, 69))
 inference_test1: ∀'a. 'a -> ('a, 'a, 'a)
-inference_test2: ∀'a,'b,'c. C('c & 'b & 'a) -> ('a, 'b, 'c)
-inference_test3: ∀'a,'b,'c. ('c & 'b & 'a, any) -> ('a, 'b & 'a, 'c & 'b & 'a)
-inference_test4: ∀`a,`b,`c. {  ;; `c & `b & `a } -> ({  ;; `a }, {  ;; `b }, {  ;; `c })
-inference_test5: ∀`a,`b,`c. C({  ;; `c & `b & `a }) -> ({  ;; `a }, {  ;; `b }, {  ;; `c })
+inference_test2: ∀'a. C('a) -> ('a, 'a, 'a)
+inference_test3: ∀'a. ('a, any) -> ('a, 'a, 'a)
+inference_test4: ∀`a. {  ;; `a } -> ({  ;; `a }, {  ;; `a }, {  ;; `a })
+inference_test5: ∀`a. C({  ;; `a }) -> ({  ;; `a }, {  ;; `a }, {  ;; `a })
 test_alt: (Nil -> Nil) & (() -> ()) & (char -> char) & (string -> string) & (bool -> bool) & (int -> int)
 fall: (Nil -> Nil) & (() -> ()) & (char -> char) & (string -> string) & (bool -> bool) & (int -> int)
 test_noalt: (char -> char) & (bool -> bool) & (string -> string) & (Nil -> Nil) & (() -> ()) & (int -> int)

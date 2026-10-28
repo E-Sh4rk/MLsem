@@ -435,10 +435,10 @@
             <tr>
                 <td>assimilate_vars</td>
                 <td><tt>true</tt> | <tt>false</tt></td>
-                <td><tt>false</tt></td>
-                <td>Experimental. When the inferred type of a parameter or of a
-                    let-binding contains several type variables at the same position and with the
-                    same variance, identify them: for instance, <tt>C('a) &amp; C('b)</tt> becomes
+                <td><tt>true</tt></td>
+                <td>When the inferred type of a parameter or of a let-binding contains several
+                    type variables at the same position and with the same variance,
+                    identify them: for instance, <tt>C('a) &amp; C('b)</tt> becomes
                     <tt>C('a)</tt>. This yields simpler types, at the cost of some generality.
                     Annotated parameters and generalized type variables are not affected.</td>
             </tr>

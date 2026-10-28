@@ -41,7 +41,7 @@ let subst_normalization_fun : (Heuristics.tally_context -> Subst.t list -> Subst
     that occur at the same positions and with the same variance should be identified
     (cf. [Heuristics.assimilate_vars]). This loses generality, but only for types
     that are inferred: annotated parameters are not affected. *)
-let assimilate_vars = ref false
+let assimilate_vars = ref true
 
 (** Whether, when the (partially inferred) type of a parameter or of a
     let-binding is added to the environment, its inference variables
