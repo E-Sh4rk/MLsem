@@ -127,3 +127,10 @@ let narr2' x =
   if lkp x is int|dyn
   then lkp x
   else 0
+
+(* Dyn with mutable variables *)
+
+let t_if b x = let mut g = reflect x in if b do g := g end ; g
+let t_seq x  = let mut g = reflect x in g := g ; g
+let t_if_join b x = let mut g = 0 in if b do g := reflect x end ; g
+let t_ann b x = let mut g : dyn = reflect x in if b do g := g end ; g
