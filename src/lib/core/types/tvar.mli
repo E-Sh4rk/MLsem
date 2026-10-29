@@ -111,9 +111,7 @@ module FieldCtx : sig
 
     type t
 
-    val of_ty : RVarSet.t -> Ty.t -> t
-    (** [of_ty mono ty] builds the context splitting the row variables of [ty]
-        that are not in [mono], over the labels [ty] mentions. *)
+    val of_tys_approx : RVarSet.t -> Ty.t list -> t
 
     val of_tys : RVarSet.t -> Ty.t list -> t
 

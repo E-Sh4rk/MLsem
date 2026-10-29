@@ -122,9 +122,14 @@ module Subst = Sstt.Subst
 module FieldCtx = struct
   type fvar = RVar.t * string
   type t = Sstt.FieldCtx.t
-  let of_ty mono ty =
-    let rvs = RVarSet.diff (Sstt.Ty.row_vars ty) mono in
-    Sstt.FieldCtx.mk (Sstt.FieldCtx.labels ty) rvs
+  let of_tys_approx mono tys =
+    let open Sstt in
+    let lbls = List.map FieldCtx.labels tys in
+    let lbls = List.fold_left LabelSet.union LabelSet.empty lbls in
+    let rvs = List.map Ty.row_vars tys in
+    let rvs = List.fold_left RowVarSet.union RowVarSet.empty rvs in
+    let rvs = RVarSet.diff rvs mono in
+    Sstt.FieldCtx.mk lbls rvs
   let of_tys = Sstt.FieldCtx.of_tys
   let decorrelate = Sstt.FieldCtx.decorrelate
   let recombine = Sstt.FieldCtx.recombine
@@ -289,14 +294,14 @@ module TVOp = struct
     clean' ~pos1 ~neg1 ~pos2 ~neg2 mono [t] |> List.hd
 
   let bot_instance' mono tys =
-    let fc = FieldCtx.of_tys (MVarSet.proj2 mono) tys in
+    let fc = FieldCtx.of_tys_approx (MVarSet.proj2 mono) tys in
     List.map (FieldCtx.decorrelate fc) tys
     |> clean' ~pos1:Ty.empty ~neg1:Ty.any ~pos2:Row.empty ~neg2:Row.any mono
     |> List.map (FieldCtx.recombine fc)
   let bot_instance mono ty = bot_instance' mono [ty] |> List.hd
 
   let top_instance' mono tys =
-    let fc = FieldCtx.of_tys (MVarSet.proj2 mono) tys in
+    let fc = FieldCtx.of_tys_approx (MVarSet.proj2 mono) tys in
     List.map (FieldCtx.decorrelate fc) tys
     |> clean' ~pos1:Ty.any ~neg1:Ty.empty ~pos2:Row.any ~neg2:Row.empty mono
     |> List.map (FieldCtx.recombine fc)
