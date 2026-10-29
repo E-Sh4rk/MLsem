@@ -8,6 +8,7 @@ type e =
 | Value of GTy.t
 | Var of Variable.t
 | Constructor of SA.constructor * t list
+| GConstructor of SA.gconstructor * t list
 | Lambda of Ty.t list * SA.param_annot * Variable.t * t
 | LambdaRec of (SA.param_annot * Variable.t * t) list
 | Ite of t * GTy.t * t * t
@@ -37,6 +38,7 @@ let map_tl f (id,e) =
     | Value t -> Value t
     | Var v -> Var v
     | Constructor (c,es) -> Constructor (c, List.map f es)
+    | GConstructor (c,es) -> GConstructor (c, List.map f es)
     | Lambda (tys, d, v, e) -> Lambda (tys, d, v, f e)
     | LambdaRec lst ->
       LambdaRec (List.map (fun (ty,v,e) -> (ty,v,f e)) lst)
@@ -126,6 +128,7 @@ let to_system_ast t =
     | Value t -> SA.Value t
     | Var v -> if MVariable.is_mutable v then MVariable.ref_get v else SA.Var v
     | Constructor (c, es) -> SA.Constructor (c, List.map aux es)
+    | GConstructor (c, es) -> SA.GConstructor (c, List.map aux es)
     | Lambda (tys, ty, x, e) ->
       if MVariable.is_mutable x then invalid_arg "Variable of Lambda cannot be mutable." ;
       let x' = MVariable.refresh Immut x in

@@ -170,7 +170,7 @@ let has_eliminable_ret bid e =
   try
     let f = function
     | (_, Lambda _) | (_, LambdaRec _) | (_, Isolate _) | (_, Loop _) | (_, Alt _)
-    | (_, App _) | (_, Constructor _) | (_, Operation _) | (_, Projection _)
+    | (_, App _) | (_, Constructor _) | (_, GConstructor _) | (_, Operation _) | (_, Projection _)
     | (_, VarAssign _) -> false
     | (_, Block _) -> assert false
     | (_, Ret (bid', _)) when bid=bid' -> raise Exit
@@ -213,6 +213,7 @@ let rec try_elim_ret ~keep_ret bid e =
     (* Do-not-traverse cases *)
     | Isolate e -> (id, Isolate (aux' e)) |> cont'
     | Constructor (c,es) -> (id, Constructor (c, List.map aux' es)) |> cont'
+    | GConstructor (c,es) -> (id, GConstructor (c, List.map aux' es)) |> cont'
     | Alt (settings, es) -> (id, Alt (settings, List.map aux' es)) |> cont'
     | App (e1, e2) -> (id, App (aux' e1, aux' e2)) |> cont'
     | Operation (o,e) -> (id, Operation (o, aux' e)) |> cont'
@@ -323,6 +324,7 @@ let eliminate_cf t =
     | Value t -> MAst.Value t
     | Var v -> MAst.Var v
     | Constructor (c, es) -> MAst.Constructor (c, List.map aux es)
+    | GConstructor (c, es) -> MAst.GConstructor (c, List.map aux es)
     | Lambda (tys, ty, x, e) -> MAst.Lambda (tys, ty, x, aux e)
     | LambdaRec lst ->
       let aux (ty,x,e) = (ty, x, aux e) in

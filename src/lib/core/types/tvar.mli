@@ -220,6 +220,13 @@ module TVOp : sig
     val top_instance : MVarSet.t -> Ty.t -> Ty.t
     (** Dual of {!bot_instance}: the largest instance. *)
 
+    val bot_instance' : MVarSet.t -> Ty.t list -> Ty.t list
+    val top_instance' : MVarSet.t -> Ty.t list -> Ty.t list
+    (** Same as {!bot_instance} and {!top_instance}, but the polarities of the
+        variables are computed over all the types at once, so that the same
+        substitution is applied to each of them. In particular, this preserves
+        subtyping between them (e.g. between the bounds of a gradual type). *)
+
     val tally : ?record:bool -> MVarSet.t -> (Ty.t * Ty.t) list -> Subst.t list
     (** [tally mono cs] returns substitutions — of the variables {e not} in
         [mono] — that make every constraint [(s,t)] of [cs] satisfy [s ≤ t].

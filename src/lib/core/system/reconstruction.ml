@@ -34,7 +34,7 @@ let initial ?(direct_narrowing=true) ?(partition_narrowing=true) refinements e =
     let ann = match e with
     | Value ty -> Annot.AValue ty |> left
     | Var _ -> AVar (new_renaming ()) |> right
-    | Constructor (_,es) -> AConstruct (List.map (initial r) es) |> right
+    | Constructor (_,es) | GConstructor (_,es) -> AConstruct (List.map (initial r) es) |> right
     | Lambda (dom, v, e) -> ALambda (new_param v dom, initial r e) |> right
     | LambdaRec lst ->
       ALambdaRec (lst |> List.map (fun (dom, v, e) -> new_param v dom, initial r e)) |> right
@@ -307,6 +307,26 @@ and refine_ann r cache env (rid, annot) (id, e) =
         Format.fprintf fmt "expected: @[<h>%a@]@.given: @[<h>%a@]"
           (Utils.pp_seq (Utils.pp_seq Ty.pp " ; ") " ;; ") doms
           (Utils.pp_seq Ty.pp " ; ") tys
+        ) ;
+      Subst (with_res ss, Annot.AConstruct annots |> ac, ic Untyp, REnv.empty)
+    end
+  | GConstructor (c, es), AConstruct annots when List.length es = List.length annots ->
+    begin match refine_seq' cache env (List.combine annots es) with
+    | OneFail -> Fail
+    | OneSubst (ss, a, a',r) -> Subst (ss,AConstruct a |> ic,AConstruct a' |> ic,r)
+    | AllOk (annots,tys) ->
+      let doms = Ast.domains_of_gconstruct c in
+      let res = Ast.gconstruct c tys |> GTy.lb in
+      let ss =
+        doms |> List.concat_map (fun doms ->
+        List.combine tys doms
+        |> List.concat_map (fun (t,d) -> [(GTy.lb t, GTy.lb d) ; (GTy.ub t, GTy.ub d)])
+        |> tally_simpl env res
+      ) in
+      log Checker.UntypeableConstructor "untypeable constructor" (fun fmt ->
+        Format.fprintf fmt "expected: @[<h>%a@]@.given: @[<h>%a@]"
+          (Utils.pp_seq (Utils.pp_seq GTy.pp " ; ") " ;; ") doms
+          (Utils.pp_seq GTy.pp " ; ") tys
         ) ;
       Subst (with_res ss, Annot.AConstruct annots |> ac, ic Untyp, REnv.empty)
     end

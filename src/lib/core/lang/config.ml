@@ -34,6 +34,6 @@ let tuple_eval_order = ref LeftToRight
 let record_eval_order = ref LeftToRight
 let cons_eval_order = ref LeftToRight
 
-(** Evaluation order of the arguments of a user-defined constructor, by name.
+(** Evaluation order of the arguments of a user-defined (gradual) constructor, by name.
     Constructors absent from the table default to {!UnknownOrder}. *)
 let ccustom_eval_order : (string, eval_order) Hashtbl.t = Hashtbl.create 10

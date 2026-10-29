@@ -5,6 +5,8 @@ type pcustom = { pname: string ; pdom: Ty.t -> Ty.t ; proj: Ty.t -> Ty.t ; pgen:
 let pp_pcustom fmt pc = Format.fprintf fmt "%s" pc.pname
 type ccustom = { cname: string ; cdom: Ty.t -> Ty.t list list ; cons: Ty.t list -> Ty.t ; cgen: bool }
 let pp_ccustom fmt cc = Format.fprintf fmt "%s" cc.cname
+type gccustom = { gcname: string ; gcdom: GTy.t list list ; gcons: GTy.t list -> GTy.t ; gcgen: bool }
+let pp_gccustom fmt gc = Format.fprintf fmt "%s" gc.gcname
 type ocustom = { oname: string ; ofun: Env.t -> TyScheme.t ; ogen: bool }
 let pp_ocustom fmt oc = Format.fprintf fmt "%s" oc.oname
 type check = Check | CheckStatic | NoCheck
@@ -19,6 +21,9 @@ type constructor =
 | Voidify of Ty.t (* Should not contain type vars *)
 | NoGen | Normalize | CCustom of ccustom
 [@@deriving show]
+type gconstructor =
+| LowerBound | UpperBound | GCCustom of gccustom
+[@@deriving show]
 type operation =
 | RecUpd of string | RecDel of string | Ignore of Ty.t
 | OCustom of ocustom
@@ -31,6 +36,7 @@ type e =
 | Value of GTy.t
 | Var of Variable.t
 | Constructor of constructor * t list
+| GConstructor of gconstructor * t list
 | Lambda of param_annot * Variable.t * t
 | LambdaRec of (param_annot * Variable.t * t) list
 | Ite of t * GTy.t * t * t
@@ -53,6 +59,7 @@ let map_tl f (id,e) =
     | Value t -> Value t
     | Var v -> Var v
     | Constructor (c, es) -> Constructor (c, List.map f es)
+    | GConstructor (c, es) -> GConstructor (c, List.map f es)
     | Lambda (d, v, e) -> Lambda (d, v, f e)
     | LambdaRec lst -> LambdaRec (List.map (fun (ty,v,e) -> (ty,v,f e)) lst)
     | Ite (e, t, e1, e2) -> Ite (f e, t, f e1, f e2)
@@ -215,6 +222,23 @@ let is_construct_generalizable c =
   | NoGen -> false
   | CCustom c -> c.cgen
 
+let domains_of_gconstruct (c:gconstructor) =
+  match c with
+  | LowerBound | UpperBound -> [ [ GTy.any ] ]
+  | GCCustom r -> r.gcdom
+
+let gconstruct (c:gconstructor) tys =
+  match c, tys with
+  | LowerBound, [t] -> GTy.mk (GTy.lb t)
+  | UpperBound, [t] -> GTy.mk (GTy.ub t)
+  | GCCustom r, tys -> r.gcons tys
+  | _ -> raise (Invalid_argument "Invalid arity for constructor.")
+
+let is_gconstruct_generalizable c =
+  match c with
+  | LowerBound | UpperBound -> true
+  | GCCustom c -> c.gcgen
+
 let rv = RVar.mk KNoInfer None
 let tv = TVar.mk KNoInfer None
 let fun_of_operation env o =
@@ -334,7 +358,7 @@ let e_prio = function
   | Constructor (Tuple _, _) | Constructor (Rec _, _) | Constructor (Enum _, _) -> 100
   | Constructor (Tag _, _) -> 90
   | Constructor (Cons, _) -> 70
-  | Constructor _ -> 80
+  | Constructor _ | GConstructor _ -> 80
   | Projection _ -> 90
   | App _ | Operation _ -> 80
   | Alt _ -> 50
@@ -394,6 +418,16 @@ and pp_e fmt e = match e with
         (pp_prio 0)) es
   | Constructor _ ->
     Format.pp_print_string fmt "<malformed-constructor>"
+  | GConstructor (LowerBound, [e]) ->
+    Format.fprintf fmt "@[lb(%a)@]" (pp_prio 0) e
+  | GConstructor (UpperBound, [e]) ->
+    Format.fprintf fmt "@[ub(%a)@]" (pp_prio 0) e
+  | GConstructor (GCCustom { gcname; _ }, es) ->
+    Format.fprintf fmt "@[%s(%a)@]" gcname
+      (Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt ",@ ")
+        (pp_prio 0)) es
+  | GConstructor _ ->
+    Format.pp_print_string fmt "<malformed-gconstructor>"
   | Lambda (dom, v, body) ->
     Format.fprintf fmt "@[<hov 2>fun %a ->@ %a@]"
       pp_param (v,dom) (pp_prio 0) body

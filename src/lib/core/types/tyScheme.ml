@@ -25,14 +25,19 @@ let leq (tvs1,ty1) (tvs2,ty2) =
   MVarSet.subset (GTy.fv ty1 |> MVarSet.inter tvs2) tvs1 &&
   GTy.leq ty1 ty2
 let equiv t1 t2 = leq t1 t2 && leq t2 t1
-let bot_instance (tvs,t) =
+(* Both bounds are instantiated with the same substitution,
+   so that the lower bound remains below the upper bound *)
+let instance f (tvs,t) =
   let mono = MVarSet.diff (GTy.fv t) tvs in
-  let t = GTy.map (TVOp.bot_instance mono) t in
+  let t =
+    if GTy.non_gradual t then GTy.map (fun ty -> f mono [ty] |> List.hd) t
+    else match f mono [GTy.lb t ; GTy.ub t] with
+    | [lb ; ub] -> GTy.mk_gradual lb ub
+    | _ -> assert false
+  in
   mk tvs t
-let top_instance (tvs,t) =
-  let mono = MVarSet.diff (GTy.fv t) tvs in
-  let t = GTy.map (TVOp.top_instance mono) t in
-  mk tvs t
+let bot_instance = instance TVOp.bot_instance'
+let top_instance = instance TVOp.top_instance'
 let non_gradual (_,t) = GTy.non_gradual t
 let simplify (tvs,ty) = (tvs, GTy.simplify ty)
 let factorize (tvs,ty) = (tvs, GTy.factorize ty)

@@ -288,17 +288,19 @@ module TVOp = struct
   let clean ~pos1 ~neg1 ~pos2 ~neg2 mono t =
     clean' ~pos1 ~neg1 ~pos2 ~neg2 mono [t] |> List.hd
 
-  let bot_instance mono ty =
-    let fc = FieldCtx.of_ty (MVarSet.proj2 mono) ty in
-    FieldCtx.decorrelate fc ty
-    |> clean ~pos1:Ty.empty ~neg1:Ty.any ~pos2:Row.empty ~neg2:Row.any mono
-    |> FieldCtx.recombine fc
+  let bot_instance' mono tys =
+    let fc = FieldCtx.of_tys (MVarSet.proj2 mono) tys in
+    List.map (FieldCtx.decorrelate fc) tys
+    |> clean' ~pos1:Ty.empty ~neg1:Ty.any ~pos2:Row.empty ~neg2:Row.any mono
+    |> List.map (FieldCtx.recombine fc)
+  let bot_instance mono ty = bot_instance' mono [ty] |> List.hd
 
-  let top_instance mono ty =
-    let fc = FieldCtx.of_ty (MVarSet.proj2 mono) ty in
-    FieldCtx.decorrelate fc ty
-    |> clean ~pos1:Ty.any ~neg1:Ty.empty ~pos2:Row.any ~neg2:Row.empty mono
-    |> FieldCtx.recombine fc
+  let top_instance' mono tys =
+    let fc = FieldCtx.of_tys (MVarSet.proj2 mono) tys in
+    List.map (FieldCtx.decorrelate fc) tys
+    |> clean' ~pos1:Ty.any ~neg1:Ty.empty ~pos2:Row.any ~neg2:Row.empty mono
+    |> List.map (FieldCtx.recombine fc)
+  let top_instance mono ty = top_instance' mono [ty] |> List.hd
 
   let tally ?(record=true) mono cs =
     if record then Recording_internal.record mono cs ;

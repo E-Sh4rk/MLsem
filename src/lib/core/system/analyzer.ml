@@ -10,7 +10,8 @@ let rec iter_ann f (id,e) a =
   let children =
     match e, a.Annot.ann with
     | _, AValue _ | _, AVar _ -> []
-    | Constructor (_, es), AConstruct anns when List.length es = List.length anns ->
+    | Constructor (_, es), AConstruct anns | GConstructor (_, es), AConstruct anns
+      when List.length es = List.length anns ->
       List.combine es anns
     | Let (_, _, e1, e2), ALet (a1, anns) ->
       (e1,a1)::(List.filter_map (function (_,Some a2) -> Some (e2, a2) | (_, None) -> None) anns)

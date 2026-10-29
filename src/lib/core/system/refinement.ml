@@ -30,6 +30,7 @@ let rec typeof env (_,e) =
   | Var v when Env.mem v env -> Env.find v env |> TyScheme.get_fresh |> snd
   | Var _ -> GTy.any
   | Constructor (v, es) -> GTy.mapl (Ast.construct v) (List.map (typeof env) es)
+  | GConstructor (v, es) -> Ast.gconstruct v (List.map (typeof env) es)
   | Projection (p, e) -> GTy.map (Ast.proj p) (typeof env e)
   | Ite (_, _, e1, e2) -> GTy.cup (typeof env e1) (typeof env e2)
   | Let (_, v, e1, e2) -> typeof (Env.add v (typeof_def env e1) env) e2
@@ -78,6 +79,7 @@ let sufficient_refinements ~safe env e t =
     | Constructor (c, es) ->
       Ast.domains_of_construct c t |> List.concat_map
         (fun ts -> List.map2 (fun e t -> aux env e t) es ts |> combine')
+    | GConstructor _ -> []
     | TypeCoerce (_, s, _) when Ty.leq (b s) t -> [REnv.empty]
     | Value s when Ty.leq (b s) t -> [REnv.empty]
     | Value _ | TypeCoerce _ -> []
@@ -165,7 +167,7 @@ let refinements
     extra |> List.iter (fun ty -> add_anonymous_refinement env (id,e) ty) ;
     match e with
     | Value _ | Var _ -> ()
-    | Constructor (_, es) -> es |> List.iter (aux env)
+    | Constructor (_, es) | GConstructor (_, es) -> es |> List.iter (aux env)
     | Projection (_, e) | TypeCoerce (e, _, _) | Operation (_, e) -> aux env e
     | Lambda (d, v, e) -> aux (Env.add v (d |> param_type) env) e
     | LambdaRec lst ->

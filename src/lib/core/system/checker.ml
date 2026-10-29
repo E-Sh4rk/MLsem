@@ -44,6 +44,7 @@ let rec is_gen (_,e) =
   | Lambda _ | Value _ | Var _ -> true
   | App _ -> not (!Config.value_restriction)
   | Constructor (c, es) -> Ast.is_construct_generalizable c && List.for_all is_gen es
+  | GConstructor (c, es) -> Ast.is_gconstruct_generalizable c && List.for_all is_gen es
   | Projection (p, e) -> Ast.is_proj_generalizable p && is_gen e
   | Operation (o, e) -> Ast.is_operation_generalizable o && is_gen e
   | LambdaRec lst -> List.for_all (fun (_,_,e) -> is_gen e) lst
@@ -90,6 +91,12 @@ let rec typeof' env annot (id,e) =
     | Some ty -> ty
     | None -> untypeable ("Invalid domain for constructor.")
     end
+  | GConstructor (c, es), AConstruct annots when List.length es = List.length annots ->
+    let doms = domains_of_gconstruct c in
+    let tys = List.map2 (fun e a -> typeof env a e) es annots in
+    if doms |> List.exists (fun doms -> List.for_all2 GTy.leq tys doms)
+    then gconstruct c tys
+    else untypeable ("Invalid domain for constructor.")
   | Lambda (_, v, e), ALambda (s, annot) ->
     let env = Env.add v (TyScheme.mk_mono s) env in
     let t = typeof env annot e in

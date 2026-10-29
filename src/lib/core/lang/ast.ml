@@ -27,6 +27,7 @@ type e =
 | Value of GTy.t
 | Var of Variable.t
 | Constructor of SA.constructor * t list
+| GConstructor of SA.gconstructor * t list
 | Lambda of Ty.t list * SA.param_annot * Variable.t * t
 | LambdaRec of (SA.param_annot * Variable.t * t) list
 | Ite of t * GTy.t * t * t
@@ -104,6 +105,7 @@ let map_tl f (id,e) =
     | Value t -> Value t
     | Var v -> Var v
     | Constructor (c,es) -> Constructor (c, List.map f es)
+    | GConstructor (c,es) -> GConstructor (c, List.map f es)
     | Lambda (tys, d, v, e) -> Lambda (tys, d, v, f e)
     | LambdaRec lst ->
       LambdaRec (List.map (fun (ty,v,e) -> (ty,v,f e)) lst)

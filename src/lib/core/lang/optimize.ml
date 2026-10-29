@@ -18,6 +18,15 @@ let eval_order_of_constructor c =
     | Some o -> o
     end
 
+let eval_order_of_gconstructor c =
+  match c with
+  | SA.LowerBound | SA.UpperBound -> Config.LeftToRight
+  | SA.GCCustom c ->
+    begin match Hashtbl.find_opt Config.ccustom_eval_order c.gcname with
+    | None -> Config.UnknownOrder
+    | Some o -> o
+    end
+
 let written_vars e =
   let wv = ref VarSet.empty in
   let aux (_,e) = match e with
@@ -141,6 +150,9 @@ let optimize_dataflow e =
     | Constructor (c, es) ->
       let env, ctx, es = aux_order (eval_order_of_constructor c) env es in
       env, ctx, (id, Constructor (c, es))
+    | GConstructor (c, es) ->
+      let env, ctx, es = aux_order (eval_order_of_gconstructor c) env es in
+      env, ctx, (id, GConstructor (c, es))
     | Lambda (tys, ty, v, e) ->
       let e = aux' (reset_env env) e |> snd in
       let env = add_captured env (written_vars e) in
@@ -279,6 +291,9 @@ let rec clean_unused_assigns e =
     | Constructor (c, es) ->
       let es, rv = aux_order (eval_order_of_constructor c) cv rv es in
       (id, Constructor (c, es)), rv
+    | GConstructor (c, es) ->
+      let es, rv = aux_order (eval_order_of_gconstructor c) cv rv es in
+      (id, GConstructor (c, es)), rv
     | Lambda (tys, ty, v, e) ->
       (id, Lambda (tys, ty, v, clean_unused_assigns e)), rv
     | LambdaRec lst ->

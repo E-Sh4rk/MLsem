@@ -21,6 +21,16 @@ type ccustom = { cname: string ; cdom: Ty.t -> Ty.t list list ; cons: Ty.t list 
     alternative argument-type tuples whose construction is below [t], each of
     which must have the constructor's arity; [cgen] as in {!pcustom}. *)
 
+type gccustom = { gcname: string ; gcdom: GTy.t list list ; gcons: GTy.t list -> GTy.t ; gcgen: bool }
+(** A user-defined gradual constructor: as {!ccustom}, but working directly on
+    gradual types, which gives full control over both bounds of the result.
+    [gcons] must be monotonic with respect to {!Mlsem_types.GTy.leq}; [gcdom] is
+    the fixed domain of the constructor, as alternative argument-type tuples
+    (for {!Mlsem_types.GTy.leq}), each of which must have the constructor's
+    arity; [gcgen] as in {!pcustom}.
+    Unlike other constructors, gradual constructors do not support type
+    refinement (cf. {!Refinement}) nor pushing coercions (cf. {!coerce}). *)
+
 type ocustom = { oname: string ; ofun: Env.t -> TyScheme.t ; ogen: bool }
 (** A user-defined operation, typed by the arrow scheme [ofun] returns.
     [ogen] as in {!pcustom}. *)
@@ -40,6 +50,11 @@ type constructor = (* Constructors must be monotonic operations *)
 | Voidify of Ty.t (* Should not contain type vars *)
 | NoGen | Normalize | CCustom of ccustom
 
+type gconstructor = (* Gradual constructors must be monotonic operations *)
+| LowerBound (** Static type of the lower bound of its argument ({!Mlsem_types.GTy.lb}) *)
+| UpperBound (** Static type of the upper bound of its argument ({!Mlsem_types.GTy.ub}) *)
+| GCCustom of gccustom
+
 type operation =
 | RecUpd of string | RecDel of string | Ignore of Ty.t
 | OCustom of ocustom
@@ -56,6 +71,7 @@ type e =
 | Value of GTy.t
 | Var of Variable.t
 | Constructor of constructor * t list
+| GConstructor of gconstructor * t list
 | Lambda of param_annot * Variable.t * t
 | LambdaRec of (param_annot * Variable.t * t) list
 | Ite of t * GTy.t * t * t
@@ -101,7 +117,7 @@ val vars : t -> VarSet.t
 val apply_subst : Subst.t -> t -> t
 (** Substitutes type variables in the type annotations of the term. The types
     embedded in [Ternary], [Voidify], [Ignore] and in the [pcustom] / [ccustom]
-    / [ocustom] closures are {b not} traversed: they are required to be free of
+    / [gccustom] / [ocustom] closures are {b not} traversed: they are required to be free of
     type variables. *)
 
 val refresh : t -> t
@@ -116,11 +132,13 @@ val pp_e : Format.formatter -> e -> unit
 val pp_check : Format.formatter -> check -> unit
 val pp_projection : Format.formatter -> projection -> unit
 val pp_constructor : Format.formatter -> constructor -> unit
+val pp_gconstructor : Format.formatter -> gconstructor -> unit
 val pp_operation : Format.formatter -> operation -> unit
 val pp_alt_settings : Format.formatter -> alt_settings -> unit
 val pp_param_annot : Format.formatter -> param_annot -> unit
 val pp_pcustom : Format.formatter -> pcustom -> unit
 val pp_ccustom : Format.formatter -> ccustom -> unit
+val pp_gccustom : Format.formatter -> gccustom -> unit
 
 
 (** {2 Typing of the primitives} *)
@@ -149,6 +167,18 @@ val construct : constructor -> Ty.t list -> Ty.t
 val is_construct_generalizable : constructor -> bool
 (** Returns [true] if and only if the construct operation is generalizable.
     Does not enter subexpressions recursively. *)
+
+val domains_of_gconstruct : gconstructor -> GTy.t list list
+(** The domain of a gradual constructor, as alternative argument-type tuples
+    (for {!Mlsem_types.GTy.leq}). Each tuple has the arity of [c]. *)
+
+val gconstruct : gconstructor -> GTy.t list -> GTy.t
+(** Gradual counterpart of {!construct}. Monotonic.
+    @raise Invalid_argument if the number of arguments does not match [c]. *)
+
+val is_gconstruct_generalizable : gconstructor -> bool
+(** Returns [true] if and only if the gradual construct operation is
+    generalizable. Does not enter subexpressions recursively. *)
 
 val fun_of_operation : Env.t -> operation -> TyScheme.t
 (** The arrow scheme an operation is typed with; an operation is applied like a
