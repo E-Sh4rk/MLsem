@@ -90,15 +90,14 @@ let positions ty =
   aux Dependencies.NodeSet.empty [] ty ;
   !tvs, !rvs, !shared
 
-(* The signature of a variable gives, for each type, the paths to its occurrences
-   and its variance. Two variables with the same signature play the same role. *)
+(* The signature of a variable gives the paths to its occurrences and its variance.
+   Two variables with the same signature play the same role. *)
 module Signature = Map.Make(struct
-  type t = (PathSet.t * [ `Both | `Neg | `Pos | `None ]) list
-  let compare =
+  type t = PathSet.t * [ `Both | `Neg | `Pos | `None ]
+  let compare (ps1,v1) (ps2,v2) =
     let rank = function `None -> 0 | `Pos -> 1 | `Neg -> 2 | `Both -> 3 in
-    List.compare (fun (ps1,v1) (ps2,v2) ->
-      let c = PathSet.compare ps1 ps2 in
-      if c <> 0 then c else Int.compare (rank v1) (rank v2))
+    let c = PathSet.compare ps1 ps2 in
+    if c <> 0 then c else Int.compare (rank v1) (rank v2)
 end)
 
 (* Variables with the same signature are mapped to the first one of their group. *)
@@ -113,19 +112,14 @@ let merge_same_signature ~elements ~mk_subst sigs =
   ) groups [] |> mk_subst
 
 let assimilate_vars vs ty =
-  let tys = [GTy.lb ty ; GTy.ub ty] in
-  let occs = tys |> List.map (fun ty -> ty, positions ty) in
-  let shared = occs |> List.fold_left (fun acc (_,(_,_,sh)) -> MVarSet.union acc sh) MVarSet.empty in
+  let ty = GTy.lb ty in
+  let tvs, rvs, shared = positions ty in
   let vs = MVarSet.diff vs shared in
-  let sigs find polarity v = occs |> List.map (fun (ty, occ) ->
-    match find v occ with
-    | None -> PathSet.empty, `None
-    | Some ps -> ps, polarity v ty
-  ) in
+  let occs find v m = find v m |> Option.value ~default:PathSet.empty in
   let s1 = merge_same_signature ~elements:(MVarSet.elements1 vs)
     ~mk_subst:(fun l -> l |> List.map (fun (v,v') -> v, TVar.typ v') |> Subst.of_list1)
-    (sigs (fun v (tvs,_,_) -> Sstt.VarMap.find_opt v tvs) TVOp.polarity1) in
+    (fun v -> occs Sstt.VarMap.find_opt v tvs, TVOp.polarity1 v ty) in
   let s2 = merge_same_signature ~elements:(MVarSet.elements2 vs)
     ~mk_subst:(fun l -> l |> List.map (fun (v,v') -> v, RVar.row v') |> Subst.of_list2)
-    (sigs (fun v (_,rvs,_) -> Sstt.RowVarMap.find_opt v rvs) TVOp.polarity2) in
+    (fun v -> occs Sstt.RowVarMap.find_opt v rvs, TVOp.polarity2 v ty) in
   Subst.combine s1 s2
