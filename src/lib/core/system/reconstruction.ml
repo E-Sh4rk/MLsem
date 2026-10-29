@@ -272,7 +272,8 @@ and refine_ann r cache env (rid, annot) (id, e) =
     let arrow = Arrow.mk t2 res in
     let ss = tally_simpl env res [(t1, arrow)] in
     let ss = if !Config.infer_overload || Ty.is_empty t2 then ss else
-      ss |> List.filter (fun (s, _) -> Subst.apply s t2 |> Ty.non_empty)
+      let ss' = ss |> List.filter (fun (s, _) -> Subst.apply s t2 |> Ty.non_empty) in
+      if List.is_empty ss' then ss else ss'
     in
     log Checker.UntypeableApp "untypeable application" (fun fmt ->
       Format.fprintf fmt "function: @[<h>%a@]@.argument: @[<h>%a@]" Ty.pp t1 Ty.pp t2
