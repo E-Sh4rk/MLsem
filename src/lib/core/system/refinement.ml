@@ -24,64 +24,26 @@ module Refinements = struct
     EMap.map f t, List.map f anon
 end
 
-let check_cast c t ty =
-  match c with
-  | Check -> GTy.leq t ty
-  | CheckStatic -> Ty.leq (GTy.lb t) (GTy.lb ty)
-  | NoCheck -> true
-
-(* Mirrors the conditions of [Checker.typeof'], but without annotations:
-   [None] means that [e] cannot be guaranteed to be typeable. *)
+(* The functions below assume that the expression they are given is typeable:
+   ensuring it is the job of the type system. Expressions whose type cannot be
+   approximated without annotations, such as applications, are given type [any]. *)
 let rec typeof env (_,e) =
-  let ( let* ) = Option.bind in
-  let typeofl es =
-    List.fold_right (fun e acc ->
-      let* tys = acc in
-      let* ty = typeof env e in
-      Some (ty::tys)
-    ) es (Some [])
-  in
   match e with
-  | Value gty -> Some gty
-  | Var v -> Env.find_opt v env |> Option.map (fun ts -> TyScheme.get_fresh ts |> snd)
-  | Constructor (c, es) ->
-    let* tys = typeofl es in
-    let doms = Ast.domains_of_construct c Ty.any in
-    let check tys = doms |> List.exists (fun doms -> List.for_all2 Ty.leq tys doms) in
-    GTy.opl check (Ast.construct c) tys
-  | GConstructor (c, es) ->
-    let* tys = typeofl es in
-    if Ast.domains_of_gconstruct c |> List.exists (fun doms -> List.for_all2 GTy.leq tys doms)
-    then Some (Ast.gconstruct c tys) else None
-  | Projection (p, e) ->
-    let* ty = typeof env e in
-    let dom = Ast.domain_of_proj p Ty.any in
-    GTy.op (fun ty -> Ty.leq ty dom) (Ast.proj p) ty
-  | Ite (e, _, e1, e2) ->
-    let* _ = typeof env e in
-    let* t1 = typeof env e1 in
-    let* t2 = typeof env e2 in
-    Some (GTy.cup t1 t2)
-  | Let (_, v, e1, e2) ->
-    let* s = typeof_def env e1 in
-    typeof (Env.add v s env) e2
-  | TypeCast (e, ty, c) ->
-    let* t = typeof env e in
-    if check_cast c t ty then Some (GTy.cap t ty) else None
-  | TypeCoerce (e, ty, c) ->
-    let* t = typeof env e in
-    if check_cast c t ty then Some ty else None
+  | Value gty -> gty
+  | Var v ->
+    Env.find_opt v env |> Option.fold ~none:GTy.any
+      ~some:(fun ts -> TyScheme.get_fresh ts |> snd)
+  | Constructor (c, es) -> List.map (typeof env) es |> GTy.mapl (Ast.construct c)
+  | GConstructor (c, es) -> List.map (typeof env) es |> Ast.gconstruct c
+  | Projection (p, e) -> typeof env e |> GTy.map (Ast.proj p)
+  | Ite (_, _, e1, e2) -> GTy.cup (typeof env e1) (typeof env e2)
+  | Let (_, v, e1, e2) -> typeof (Env.add v (typeof_def env e1) env) e2
+  | TypeCast (e, ty, _) -> GTy.cap (typeof env e) ty
+  | TypeCoerce (_, ty, _) -> ty
   | Alt (settings, es) ->
-    begin match List.map2 (fun e b -> if b then typeof env e else None) es (settings.amask env)
-                |> List.filter_map Fun.id with
-    | [] -> None
-    | tys -> Some (GTy.conj tys)
-    end
-  | Lambda _ | LambdaRec _ | App _ | Operation _ -> None
-and typeof_def env e = typeof env e |> Option.map (Checker.generalize ~e env)
-
-let typeof_def' env e =
-  typeof_def env e |> Option.value ~default:(TyScheme.mk_mono GTy.any)
+    List.map2 (fun e b -> if b then typeof env e else GTy.any) es (settings.amask env) |> GTy.conj
+  | Lambda _ | LambdaRec _ | App _ | Operation _ -> GTy.any
+and typeof_def env e = typeof env e |> Checker.generalize ~e env
 
 let combine rs1 rs2 =
   Utils.cartesian_prod rs1 rs2
@@ -96,26 +58,14 @@ let is_unsatisfiable renv =
   REnv.bindings renv |> List.exists (fun (_,ty) -> Ty.is_empty ty)
 
 let sufficient_refinements ~safe env e t =
-  (* The mode and the type to refine [e] against so that it passes the check [c]
-     of a cast or coercion to [ty], if there is a check. [CheckStatic] only
-     constrains the lower bound of the type of [e], while [Check] also constrains
-     its upper bound. *)
-  let check_target c ty =
-    match c with
-    | NoCheck -> None
-    | CheckStatic -> Some (false, GTy.lb ty)
-    | Check -> Some (true, GTy.lb ty)
-  in
-  let rec aux' ~safe env (id,e) t =
-    let b, b' = if safe then GTy.ub, GTy.lb else GTy.lb, GTy.ub in
-    let aux = aux' ~safe in
+  let b, b' = if safe then GTy.ub, GTy.lb else GTy.lb, GTy.ub in
+  let rec aux env (id,e) t =
     let app t1 e2 =
       let alpha = TVar.mk KInfer None in
       let (mono, ty) = TyScheme.get_fresh t1 in
       let mono = MVarSet.union mono (vars t) in
-      begin match Arrow.dnf (b ty) with
-      | [] -> []
-      | [arrows] when Ty.leq (b ty) (Arrow.of_dnf [arrows]) ->
+      match Arrow.dnf (b ty) with
+      | [arrows] ->
         let t1 = Arrow.of_dnf [arrows] in
         let res = tally mono [ (t1, Arrow.mk (TVar.typ alpha) t) ] in
         res |> List.concat_map (fun sol ->
@@ -123,40 +73,17 @@ let sufficient_refinements ~safe env e t =
             if MVarSet.subset (vars targ) mono |> not then [] else aux env e2 targ
           )
       | _ -> []
-      end
     in
-    let ok =
-      match typeof_def env (id,e) with
-      | None -> false
-      | Some ty -> Ty.leq (TyScheme.get_fresh ty |> snd |> b) t
-    in
-    if ok then [REnv.empty] else
+    if Ty.leq (typeof_def env (id,e) |> TyScheme.get_fresh |> snd |> b) t
+    then [REnv.empty] else
     let renvs = match e with
     | Var v when Env.mem v env -> [REnv.singleton v t]
     | Constructor (c, es) ->
-      let doms = Ast.domains_of_construct c Ty.any in
       Ast.domains_of_construct c t
-      |> List.filter (fun ts -> doms |> List.exists (List.for_all2 Ty.leq ts))
-      |> List.concat_map
-        (fun ts -> List.map2 (fun e t -> aux env e t) es ts |> combine')
-    | TypeCoerce (e, s, c) when Ty.leq (b s) t ->
-      begin match check_target c s with
-      | None -> aux env e Ty.any
-      | Some (safe, s) -> aux' ~safe env e s
-      end
-    | TypeCast (e, s, c) ->
-      let renvs = aux env e (Ty.cup t (Ty.neg (b s))) in
-      begin match check_target c s with
-      | None -> renvs
-      | Some (safe, s) -> combine renvs (aux' ~safe env e s)
-      end
-    | Projection (p, e) ->
-      aux env e (Ty.cap (Ast.domain_of_proj p t) (Ast.domain_of_proj p Ty.any))
-    | App (e1, e2) ->
-      begin match typeof_def env e1 with
-      | None -> []
-      | Some t1 -> app t1 e2
-      end
+      |> List.concat_map (fun ts -> List.map2 (aux env) es ts |> combine')
+    | TypeCast (e, s, _) -> aux env e (Ty.cup t (Ty.neg (b s)))
+    | Projection (p, e) -> aux env e (Ast.domain_of_proj p t)
+    | App (e1, e2) -> app (typeof_def env e1) e2
     | Operation (o, e) -> app (Ast.fun_of_operation env o) e
     | Ite (e, s, e1, e2) ->
       let r1 = combine (aux env e (b' s)) (aux env e1 t) in
@@ -165,17 +92,17 @@ let sufficient_refinements ~safe env e t =
     | Alt (settings,es) ->
       List.map2 (fun e b -> if b then aux env e t else []) es (settings.amask env) |> List.concat
     | Let (_, v, e1, e2) ->
-      aux (Env.add v (typeof_def' env e1) env) e2 t
+      aux (Env.add v (typeof_def env e1) env) e2 t
       |> List.concat_map (fun renv ->
           let renv, t = REnv.rm v renv, REnv.find' v renv in
           let renvs = aux env e1 t in
           List.map (REnv.cap renv) renvs
         )
-    | Var _ | Lambda _ | LambdaRec _ | Value _ | GConstructor _  | TypeCoerce _ -> []
+    | Var _ | Lambda _ | LambdaRec _ | Value _ | GConstructor _ | TypeCoerce _ -> []
     in
     renvs |> List.filter (fun renv -> is_unsatisfiable renv |> not)
   in
-  aux' ~safe env e t
+  aux env e t
 
 let refine ~safe env e t =
   let unsat = Ast.fv e |> VarSet.elements
@@ -201,7 +128,7 @@ let refine env e t =
   ) in
   if non_gradual
   then
-    refine ~safe:true env e (GTy.lb t) |> REnv.bindings
+    refine ~safe:true env e (GTy.ub t) |> REnv.bindings
     |> List.map (fun (v, ty) -> v, GTy.mk ty) |> GREnv.construct
   else
     let res_ub = refine ~safe:true env e (GTy.ub t) in
@@ -251,8 +178,7 @@ let refinements
     | App (e1, e2) -> aux env e1 ; aux env e2
     | Alt (_,es) -> List.iter (aux env) es
     | Let (_, v, e1, e2) ->
-      let s = typeof_def' env e1 in
-      aux env e1 ; aux (Env.add v s env) e2 ;
+      aux env e1 ; aux (Env.add v (typeof_def env e1) env) e2 ;
       let res' =
         !res |> Refinements.map (fun renv ->
           match GREnv.find_opt v renv with

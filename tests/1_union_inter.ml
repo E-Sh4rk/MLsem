@@ -320,3 +320,13 @@ let implicit14 = fun input ->
 val connectives : (string|int|bool) -> int
 let connectives x =
   if and_ (not_ (is_bool x), not_ (is_int x)) is true then strlen x else 0
+
+(* Some specific examples *)
+
+val currified : int -> int -> int
+let seq_test (x:any) =
+  if currified 5 42 ; x is int then currified x 42 else 0
+let seq_test2 (b:bool) (x:any) =
+  if (if b then currified 5 42; x else x) is int then currified x 42 else 0
+let seq_test3 (b:true) (x:any) =
+  if (if b then currified 5 42; x else x) is int then currified x 42 else 0

@@ -35,16 +35,18 @@ module Refinements : sig
   val map : (GREnv.t -> GREnv.t) -> t -> t
 end
 
-val typeof_def : Env.t -> Ast.t -> TyScheme.t option
+val typeof_def : Env.t -> Ast.t -> TyScheme.t
 (** [typeof_def env e] returns an approximation of the type of the definition [e]
-    under the environment [env]. For complex expressions that cannot be guaranteed
-    to type, such as applications, it returns [None]. *)
+    under the environment [env], {b assuming} that [e] is typeable (this is not
+    checked). For complex expressions whose type cannot be approximated without
+    annotations, such as applications, it returns [any]. *)
 
 val sufficient_refinements : safe:bool -> Env.t -> Ast.t -> Ty.t -> REnv.t list
 (** [sufficient_refinements ~safe env e t] returns refinements under each of which
-    (combined with [env]) [e] is typeable and has type [t]: the upper bound (if [safe])
-    or the lower bound (otherwise) of the type of [e] is a subtype of [t]. Its result
-    is a {b sufficient} condition, and may be empty when none can be found. *)
+    (combined with [env]) [e] has type [t]: the upper bound (if [safe]) or the lower
+    bound (otherwise) of the type of [e] is a subtype of [t]. The typeability of [e]
+    is {b assumed}, not checked. Its result is a {b sufficient} condition, and may be
+    empty when none can be found. *)
 
 val refine : Env.t -> Ast.t -> GTy.t -> GREnv.t
 (** [refine env e t] returns what must hold of the variables in scope for [e] to
