@@ -90,6 +90,7 @@ let ref_uninit v =
 let ref_cons v =
   Arrow.mk (aub v) (aref v) |> mk
 let ref_cons v arg =
+  let arg = Eid.unique (), SA.GConstructor (SA.UpperBound, [arg]) in
   let op = { SA.oname="ref" ; ofun=Fun.const (ref_cons v) ; ogen=false } in
   SA.Operation (OCustom op, arg)
 
@@ -105,6 +106,7 @@ let ref_get v =
 let ref_assign v =
   Arrow.mk (Tuple.mk [aref v ; aub v]) (!Config.void_ty) |> mk
 let ref_assign v arg =
+  let arg = Eid.unique (), SA.GConstructor (SA.UpperBound, [arg]) in
   let arg = Eid.unique (), SA.Constructor (SA.Tuple 2,[
           (Eid.unique (), SA.Var v) ; arg
       ]) in

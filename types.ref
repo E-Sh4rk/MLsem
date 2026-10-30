@@ -186,9 +186,9 @@ narr2': C() -> int
 [Notice] File "tests/2_dyn.ml", line 128, characters 7-12 Unchecked dynamic coercion
 expected: int
 given: any
-t_if: any -> any -> empty
+t_if: any -> any -> any
 t_seq: any -> any
-t_if_join: any -> any -> 0
+t_if_join: (true -> any -> any) & (~true -> any -> 0)
 t_ann: any -> any -> any
 
 ===== Processing tests/3_records.ml =====
