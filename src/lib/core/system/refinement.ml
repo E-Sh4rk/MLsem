@@ -119,7 +119,8 @@ let sufficient_refinements ~safe env e t =
         let t1 = Arrow.of_dnf [arrows] in
         let res = tally mono [ (t1, Arrow.mk (TVar.typ alpha) t) ] in
         res |> List.concat_map (fun sol ->
-            Subst.find1 sol alpha |> top_instance mono |> aux env e2
+            let targ = Subst.find1 sol alpha |> top_instance mono in
+            if MVarSet.subset (vars targ) mono |> not then [] else aux env e2 targ
           )
       | _ -> []
       end
