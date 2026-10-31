@@ -41,7 +41,8 @@ let rec typeof env (_,e) =
   | TypeCast (e, ty, _) -> GTy.cap (typeof env e) ty
   | TypeCoerce (_, ty, _) -> ty
   | Alt (settings, es) ->
-    List.map2 (fun e b -> if b then typeof env e else GTy.any) es (settings.amask env) |> GTy.conj
+    List.map2 (fun e b -> if b then typeof env e else GTy.any)
+      es settings.amask_default |> GTy.conj
   | Lambda _ | LambdaRec _ | App _ | Operation _ -> GTy.any
 and typeof_def env e = typeof env e |> Checker.generalize ~e env
 
@@ -90,7 +91,8 @@ let sufficient_refinements ~safe env e t =
       let r2 = combine (aux env e (GTy.neg s |> b')) (aux env e2 t) in
       r1@r2
     | Alt (settings,es) ->
-      List.map2 (fun e b -> if b then aux env e t else []) es (settings.amask env) |> List.concat
+      List.map2 (fun e b -> if b then aux env e t else [])
+        es settings.amask_default |> List.concat
     | Let (_, v, e1, e2) ->
       aux (Env.add v (typeof_def env e1) env) e2 t
       |> List.concat_map (fun renv ->

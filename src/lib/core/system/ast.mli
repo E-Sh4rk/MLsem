@@ -59,10 +59,13 @@ type operation =
 | RecUpd of string | RecDel of string | Ignore of Ty.t
 | OCustom of ocustom
 
-type alt_settings = { aname: string ; amask: Env.t -> bool list ; aerror: Env.t -> string }
+type alt_settings = { aname: string ; amask: Env.t -> bool list ;
+                      amask_default: bool list ; aerror: Env.t -> string }
 (** Settings of an [Alt] expression. [amask env] selects the branches that may be
     typed under [env]: it must return exactly one boolean per branch of the
     [Alt], in the same order.
+    [amask_default] selects the branches that must be considered outside of
+    type inference (e.g., by the Refinement module).
     [aerror env] builds the error message reported when no branch could be typed. *)
 
 type param_annot = GTy.t option
