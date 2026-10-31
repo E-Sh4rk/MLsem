@@ -39,7 +39,7 @@ module Annot : sig
   | AProj of t
   | ACast of GTy.t * t
   | ACoerce of GTy.t * t
-  | AIte of t * GTy.t * branch * branch
+  | AIte of t * Ty.t * branch * branch
   | ALambda of GTy.t * t
   | ALambdaRec of (GTy.t * t) list
   | AAlt of t option list
@@ -107,7 +107,7 @@ module rec IAnnot : sig
   | AProj of t * Ty.t (* result *)
   | ACast of GTy.t * t
   | ACoerce of GTy.t * t
-  | AIte of t * GTy.t * branch * branch
+  | AIte of t * Ty.t * branch * branch
   | ALambda of GTy.t * t
   | ALambdaRec of (GTy.t * t) list
   | AAlt of bool (* masked *) * t option list

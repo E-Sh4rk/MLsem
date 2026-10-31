@@ -16,7 +16,7 @@ type e =
 | Lambda of Ty.t list * SA.param_annot * Variable.t * t
 (** The first parameter is a suggested type decomposition, similarly to let-bindings *)
 | LambdaRec of (SA.param_annot * Variable.t * t) list
-| Ite of t * GTy.t * t * t
+| Ite of t * Ty.t * t * t
 | App of t * t
 | Operation of SA.operation * t
 | Projection of SA.projection * t

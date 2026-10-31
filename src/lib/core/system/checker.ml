@@ -6,7 +6,7 @@ open Ast
 (* Auxiliary *)
 
 let is_type_test_unsat ~tau t =
-  Ty.cap (GTy.ub t) (GTy.ub tau) |> !Config.normalization_fun
+  Ty.cap (GTy.ub t) tau |> !Config.normalization_fun
 
 (* Expressions *)
 
@@ -114,7 +114,7 @@ let rec typeof' env annot (id,e) =
   | Ite (e, _, e1, e2), AIte (annot, tau, b1, b2) ->
     let s = typeof env annot e in
     let t1 = typeof_b env b1 e1 s tau in
-    let t2 = typeof_b env b2 e2 s (GTy.neg tau) in
+    let t2 = typeof_b env b2 e2 s (Ty.neg tau) in
     GTy.cup t1 t2
   | Alt (_,es), AAlt anns when List.length es = List.length anns ->
     if List.for_all Option.is_none anns

@@ -40,7 +40,7 @@ type e =
 | GConstructor of gconstructor * t list
 | Lambda of param_annot * Variable.t * t
 | LambdaRec of (param_annot * Variable.t * t) list
-| Ite of t * GTy.t * t * t
+| Ite of t * Ty.t * t * t
 | App of t * t
 | Operation of operation * t
 | Projection of projection * t
@@ -123,7 +123,7 @@ let apply_subst s e =
     | Lambda (ty,v,e) -> Lambda (Option.map (GTy.substitute s) ty,v,e)
     | LambdaRec lst -> LambdaRec (List.map (fun (ty,v,e) -> (Option.map (GTy.substitute s) ty, v, e)) lst)
     | Let (ts, v, e1, e2) -> Let (List.map (Subst.apply s) ts, v, e1, e2)
-    | Ite (e, ty, e1, e2) -> Ite (e, GTy.substitute s ty, e1, e2)
+    | Ite (e, ty, e1, e2) -> Ite (e, Subst.apply s ty, e1, e2)
     | TypeCoerce (e, ty, b) -> TypeCoerce (e, GTy.substitute s ty, b)
     | TypeCast (e, ty, b) -> TypeCast (e, GTy.substitute s ty, b)
     | e -> e
@@ -442,12 +442,12 @@ and pp_e fmt e = match e with
           Format.fprintf fmt "@[<hov 2>rec %a ->@ %a@]"
             pp_param (v,dom) (pp_prio 0) body))
       lst
-  | Ite (cond, ty, e1, e2) when GTy.equiv ty (GTy.mk Ty.tt) ->
+  | Ite (cond, ty, e1, e2) when Ty.equiv ty Ty.tt ->
     Format.fprintf fmt "@[<hov>if %a@ then %a@ else %a@]"
       (pp_prio 0) cond (pp_prio 0) e1 (pp_prio 0) e2
   | Ite (cond, ty, e1, e2) ->
     Format.fprintf fmt "@[<hov>if %a@ is %a@ then %a@ else %a@]"
-      (pp_prio 0) cond GTy.pp ty (pp_prio 0) e1 (pp_prio 0) e2
+      (pp_prio 0) cond Ty.pp ty (pp_prio 0) e1 (pp_prio 0) e2
   | App (f, arg) ->
     Format.fprintf fmt "@[<hov 2>%a@ %a@]"
       (pp_prio 80) f (pp_prio 90) arg

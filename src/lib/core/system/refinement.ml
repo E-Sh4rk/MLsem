@@ -59,7 +59,7 @@ let is_unsatisfiable renv =
   REnv.bindings renv |> List.exists (fun (_,ty) -> Ty.is_empty ty)
 
 let sufficient_refinements ~safe env e t =
-  let b, b' = if safe then GTy.ub, GTy.lb else GTy.lb, GTy.ub in
+  let b = if safe then GTy.ub else GTy.lb in
   let rec aux env (id,e) t =
     let app t1 e2 =
       let alpha = TVar.mk KInfer None in
@@ -87,8 +87,8 @@ let sufficient_refinements ~safe env e t =
     | App (e1, e2) -> app (typeof_def env e1) e2
     | Operation (o, e) -> app (Ast.fun_of_operation env o) e
     | Ite (e, s, e1, e2) ->
-      let r1 = combine (aux env e (b' s)) (aux env e1 t) in
-      let r2 = combine (aux env e (GTy.neg s |> b')) (aux env e2 t) in
+      let r1 = combine (aux env e s) (aux env e1 t) in
+      let r2 = combine (aux env e (Ty.neg s)) (aux env e2 t) in
       r1@r2
     | Alt (settings,es) ->
       List.map2 (fun e b -> if b then aux env e t else [])
@@ -173,8 +173,8 @@ let refinements
       aux env e
     | Ite (e, tau, e1, e2) ->
       if refine_on_typecases then begin
-        if fv e1 |> VarSet.is_empty |> not then add_refinement (fst e1) env e tau ;
-        if fv e2 |> VarSet.is_empty |> not then add_refinement (fst e2) env e (GTy.neg tau)
+        if fv e1 |> VarSet.is_empty |> not then add_refinement (fst e1) env e (GTy.mk tau) ;
+        if fv e2 |> VarSet.is_empty |> not then add_refinement (fst e2) env e (Ty.neg tau |> GTy.mk)
       end ;
       aux env e ; aux env e1 ; aux env e2
     | App (e1, e2) -> aux env e1 ; aux env e2

@@ -33,7 +33,8 @@ val cap: t -> t -> t
 val disj : t list -> t
 val conj : t list -> t
 val neg : t -> t
-(** Negation swaps the bounds, as it is anti-monotonic. *)
+(** Negation swaps the bounds, as it is anti-monotonic.
+    Use with care, this may not be the operation you expect (e.g. ~dyn = dyn). *)
 
 val fv : t -> MVarSet.t
 val substitute : Subst.t -> t -> t

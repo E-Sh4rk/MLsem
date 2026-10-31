@@ -89,46 +89,48 @@ let test_cast1_ok x =
 let test_cast2_fail (x:any) =
   (match x with :int -> 42 | x -> true end :> int)
 
-(* Dyn Typecases *)
-
-val test_typecase : dyn -> bool
-let test_typecase (x:dyn) =
-  if x is int then true else false
-
-val test_typecase2 : dyn -> empty
-let test_typecase2 (x:dyn) =
-  if x is dyn then true else false
-
-val test_typecase3 : dyn -> bool
-let test_typecase3 (x:dyn) =
-  if x is dyn then true else false
-
 (* Type narrowing *)
 
 # type_narrowing = "partition"
 
-val narr1 : any -> empty
-let narr1 x = if x is dyn then x else x
+val narr_dyn1 : dyn -> bool
+let narr_dyn1 (x:dyn) =
+  if x is int then true else false
 
 val lkp : C('a) -> 'a | Nil & dyn
-val narr2 : C(any) -> int
-let narr2 x =
-  if lkp x is int|dyn
+val narr_dyn2 : C(any) -> int
+let narr_dyn2 x =
+  if lkp x is int
+  then lkp x
+  else 0
+
+val narr_dyn3 : C(~Nil) -> int
+let narr_dyn3 x =
+  if lkp x is int|Nil
   then lkp x
   else 0
 
 # type_narrowing = "direct"
 
-val narr1' : any -> empty
-let narr1' x = if x is dyn then x else x
+val narr_dyn1' : dyn -> bool
+let narr_dyn1' (x:dyn) =
+  if x is int then true else false
 
-val narr2' : C(any) -> int
-let narr2' x =
-  if lkp x is int|dyn
+val narr_dyn2' : C(any) -> int
+let narr_dyn2' x =
+  if lkp x is int
+  then lkp x
+  else 0
+
+val narr_dyn3' : C(~Nil) -> int
+let narr_dyn3' x =
+  if lkp x is int|Nil
   then lkp x
   else 0
 
 (* Dyn with mutable variables *)
+
+# type_narrowing = true
 
 let t_if b x = let mut g = reflect x in if b do g := g end ; g
 let t_seq x  = let mut g = reflect x in g := g ; g

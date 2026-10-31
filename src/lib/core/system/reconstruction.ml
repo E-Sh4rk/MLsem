@@ -375,7 +375,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
       | Subst (ss, a1, a1',r) ->
         Subst (ss, AIte(A a0,tau,a1,a2)|>ic, AIte(A a0,tau,a1',a2)|>ic,r)
       | Ok (a1,_) ->
-        begin match refine_b' cache env (rid, a2) e2 s (GTy.neg tau) with
+        begin match refine_b' cache env (rid, a2) e2 s (Ty.neg tau) with
         | Fail -> Fail
         | Subst (ss, a2, a2',r) ->
           let to_i = (function

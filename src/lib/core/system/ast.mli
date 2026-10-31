@@ -77,7 +77,7 @@ type e =
 | GConstructor of gconstructor * t list
 | Lambda of param_annot * Variable.t * t
 | LambdaRec of (param_annot * Variable.t * t) list
-| Ite of t * GTy.t * t * t
+| Ite of t * Ty.t * t * t
 | App of t * t
 | Operation of operation * t
 | Projection of projection * t

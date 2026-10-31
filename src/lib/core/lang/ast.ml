@@ -30,7 +30,7 @@ type e =
 | GConstructor of SA.gconstructor * t list
 | Lambda of Ty.t list * SA.param_annot * Variable.t * t
 | LambdaRec of (SA.param_annot * Variable.t * t) list
-| Ite of t * GTy.t * t * t
+| Ite of t * Ty.t * t * t
 | PatMatch of t * (pattern * t) list
 | App of t * t
 | Operation of SA.operation * t
@@ -46,8 +46,8 @@ type e =
 | Alt of SA.alt_settings * t list
 | Block of blockid * t
 | Ret of blockid * t option
-| If of t * GTy.t * t * t option
-| While of t * GTy.t * t
+| If of t * Ty.t * t * t option
+| While of t * Ty.t * t
 | Return of t
 | Break
 [@@deriving show]

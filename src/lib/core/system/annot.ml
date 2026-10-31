@@ -19,7 +19,7 @@ module Annot = struct
   | AProj of t
   | ACast of GTy.t * t
   | ACoerce of GTy.t * t
-  | AIte of t * GTy.t * branch * branch
+  | AIte of t * Ty.t * branch * branch
   | ALambda of GTy.t * t
   | ALambdaRec of (GTy.t * t) list
   | AAlt of t option list
@@ -41,7 +41,7 @@ module Annot = struct
       | AProj t -> AProj (aux t)
       | ACast (ty, t) -> ACast (GTy.substitute s ty, aux t)
       | ACoerce (ty, t) -> ACoerce (GTy.substitute s ty, aux t)
-      | AIte (t,ty,b1,b2) -> AIte (aux t, GTy.substitute s ty, aux_b b1, aux_b b2)
+      | AIte (t,ty,b1,b2) -> AIte (aux t, Subst.apply s ty, aux_b b1, aux_b b2)
       | ALambda (ty, t) -> ALambda (GTy.substitute s ty, aux t)
       | ALambdaRec lst -> ALambdaRec (List.map (fun (ty,t) -> (GTy.substitute s ty, aux t)) lst)
       | AAlt ts -> AAlt (List.map (Option.map aux) ts)
@@ -84,7 +84,7 @@ module rec IAnnot : sig
   | AProj of t * Ty.t (* result *)
   | ACast of GTy.t * t
   | ACoerce of GTy.t * t
-  | AIte of t * GTy.t * branch * branch
+  | AIte of t * Ty.t * branch * branch
   | ALambda of GTy.t * t
   | ALambdaRec of (GTy.t * t) list
   | AAlt of bool (* masked *) * t option list
@@ -122,7 +122,7 @@ end = struct
   | AProj of t * Ty.t (* result *)
   | ACast of GTy.t * t
   | ACoerce of GTy.t * t
-  | AIte of t * GTy.t * branch * branch
+  | AIte of t * Ty.t * branch * branch
   | ALambda of GTy.t * t
   | ALambdaRec of (GTy.t * t) list
   | AAlt of bool (* masked *) * t option list
@@ -147,7 +147,7 @@ end = struct
       | AProj (t, ty) -> AProj (aux t, Subst.apply s ty)
       | ACast (ty, t) -> ACast (GTy.substitute s ty, aux t)
       | ACoerce (ty, t) -> ACoerce (GTy.substitute s ty, aux t)
-      | AIte (t,ty,b1,b2) -> AIte (aux t, GTy.substitute s ty, aux_b b1, aux_b b2)
+      | AIte (t,ty,b1,b2) -> AIte (aux t, Subst.apply s ty, aux_b b1, aux_b b2)
       | ALambda (ty, t) -> ALambda (GTy.substitute s ty, aux t)
       | ALambdaRec lst -> ALambdaRec (List.map (fun (ty,t) -> (GTy.substitute s ty, aux t)) lst)
       | AAlt (b,ts) -> AAlt (b, List.map (Option.map aux) ts)

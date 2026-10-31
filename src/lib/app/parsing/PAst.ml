@@ -34,7 +34,7 @@ and ('a, 'typ, 'gty, 'enu, 'tag, 'v) ast =
 | Suggest of 'v * 'typ list * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | Lambda of 'v * 'gty lambda_annot * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | LambdaRec of ('v * 'gty lambda_annot * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t) list
-| Ite of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'gty * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Ite of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'typ * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | App of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | Let of ('gty,'v) vdef * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | Declare of ('gty,'v) vdef * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
@@ -49,8 +49,8 @@ and ('a, 'typ, 'gty, 'enu, 'tag, 'v) ast =
 | TypeCoerce of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'gty * check
 | VarAssign of 'v * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | PatMatch of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * (('a, 'typ, 'gty, 'tag, 'v) pattern * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t) list
-| Cond of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'gty * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t option
-| While of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'gty * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
+| Cond of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'typ * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t option
+| While of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * 'typ * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | Seq of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t * ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
 | Alt of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t list
 | Return of ('a, 'typ, 'gty, 'enu, 'tag, 'v) t
@@ -88,8 +88,8 @@ let to_expr benv env e =
     in
     let aux_a tyo = Option.map aux_gty tyo in
     let aux_cond t =
-        let t = aux_gty t in
-        if GTy.test B.is_test_type t then t
+        let t = aux_ty t in
+        if B.is_test_type t then t
         else raise (SymbolError ("typecases should use test types"))
     in
     let aux_var env str =

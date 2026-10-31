@@ -42,7 +42,7 @@ type e =
 | Lambda of Ty.t list * SA.param_annot * Variable.t * t
 (** The first parameter is a suggested type decomposition, similarly to let-bindings *)
 | LambdaRec of (SA.param_annot * Variable.t * t) list
-| Ite of t * GTy.t * t * t
+| Ite of t * Ty.t * t * t
 | PatMatch of t * (pattern * t) list
 | App of t * t
 | Operation of SA.operation * t
@@ -70,9 +70,9 @@ type e =
 | Ret of blockid * t option
 (** Evaluate the expression (Exc if not specified), and use it as the value of block specified.
     Used to encode [Return] and [Break]. *)
-| If of t * GTy.t * t * t option
+| If of t * Ty.t * t * t option
 (** If-else block statement. Returns void. *)
-| While of t * GTy.t * t
+| While of t * Ty.t * t
 (** While block statement. Returns void. *)
 | Return of t
 (** Exits the current function. *)

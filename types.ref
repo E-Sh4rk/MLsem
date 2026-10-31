@@ -161,28 +161,21 @@ test_cast2_fail: untypeable coercion
 File "tests/2_dyn.ml", line 90, characters 34-38
 expected: int
 given: true
-test_typecase: (any -> bool) | dyn & arrow
-test_typecase2: untypeable coercion
-File "tests/2_dyn.ml", line 100, characters 19-23
-expected: empty
-given: true
-test_typecase3: (any -> bool) | dyn & arrow
-narr1: untypeable coercion
-File "tests/2_dyn.ml", line 111, characters 31-32
-expected: empty
-given: any
-narr2: untypeable coercion
-File "tests/2_dyn.ml", line 117, characters 7-12
+narr_dyn1: (any -> bool) | dyn & arrow
+narr_dyn2: C() -> int
+[Notice] File "tests/2_dyn.ml", line 104, characters 7-12 Unchecked dynamic coercion
 expected: int
-given: any
-narr1': any -> empty
-[Notice] File "tests/2_dyn.ml", line 123, characters 32-33 Unchecked dynamic coercion
-expected: empty
-given: any
-[Notice] File "tests/2_dyn.ml", line 123, characters 39-40 Unchecked dynamic coercion
-expected: empty
-given: any
-narr2': C() -> int
+given: Nil | int
+narr_dyn3: untypeable coercion
+File "tests/2_dyn.ml", line 110, characters 7-12
+expected: int
+given: ~Nil
+narr_dyn1': (any -> bool) | dyn & arrow
+narr_dyn2': C() -> int
+[Notice] File "tests/2_dyn.ml", line 122, characters 7-12 Unchecked dynamic coercion
+expected: int
+given: Nil | int
+narr_dyn3': C(~Nil) -> int
 [Notice] File "tests/2_dyn.ml", line 128, characters 7-12 Unchecked dynamic coercion
 expected: int
 given: any
@@ -216,7 +209,7 @@ test_classes: { data_frame : true ;; false }
 test_class_ok: { c1 : true ;; false }
 test_class_fail: untypeable application
 File "tests/3_records.ml", line 120, characters 22-45
-function: 'I2419 & { c1 : true ;; false } -> 'I2419
+function: 'I2460 & { c1 : true ;; false } -> 'I2460
 argument: { c1 : true ;; bool }
 test_class_ok2: { c1 : true ; c2 : true ;; bool }
 extract_ellipsis_test: 73 | bool, bool, true
@@ -227,7 +220,7 @@ fun2_with_ellipsis_test: 1, 2, { l3 : 3 ; l4 : 4 ; l5 : 5 }, (3..5)
 ref_42: ref(int)
 ref_42_unresolved: the type inferred is not fully resolved
 File "tests/4_imperative.ml", line 24, characters 4-30
-type inferred: ref(42 | 'I2486)
+type inferred: ref(42 | 'I2527)
 mutate_ref: ∀'a. 42 | 'a -> 42 | 'a
 inference_let: ∀'a,'b. () -> (ref('a & C('b)), 'b, 'b, 'b)
 is_ref: (ref -> true) & (~ref -> false)
@@ -258,7 +251,7 @@ order: Nil | (Nil | int, Nil | int) -> Nil | int | (int, int)
 loop_tricky_narrowing: int -> (any, int)
 loop_invalid: untypeable application
 File "tests/4_imperative.ml", line 180, characters 4-14
-function: (ref('I2900), 'I2900) -> ()
+function: (ref('I2941), 'I2941) -> ()
 argument: ref(int), false
 loop_valid: ∀'a. (int | false | 'a -> int | false | 'a) & ('a \ int -> 'a)
 filter_imp: ∀'a,'b,'c. ('b -> false) & ('a -> bool) -> array('b | 'a) -> array('a \ 'b | 'c)

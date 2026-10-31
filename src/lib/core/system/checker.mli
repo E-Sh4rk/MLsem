@@ -10,7 +10,7 @@ open Mlsem_common
 open Mlsem_types
 open Annot
 
-val is_type_test_unsat : tau:GTy.t -> GTy.t -> Ty.t
+val is_type_test_unsat : tau:Ty.t -> GTy.t -> Ty.t
 (** [is_type_test_unsat ~tau ty] returns a type that is empty
    if and only if a branch [tau] of a typecase on an expression of type [ty]
    is unreachable *)
