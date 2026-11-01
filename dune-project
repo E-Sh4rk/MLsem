@@ -64,7 +64,7 @@
 (package
  (name mlsem-web)
  (synopsis "Web targets for mlsem-app")
- (depends mlsem-app js_of_ocaml js_of_ocaml-ppx (js_of_ocaml-compiler (= 6.3.2)) (wasm_of_ocaml-compiler (= 6.3.2)))
+ (depends mlsem-app js_of_ocaml js_of_ocaml-ppx (js_of_ocaml-compiler (>= 6.5.0)) (wasm_of_ocaml-compiler (>= 6.5.0)))
 )
 
 (package
