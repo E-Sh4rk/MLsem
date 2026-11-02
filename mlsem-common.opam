@@ -7,7 +7,7 @@ license: "MIT"
 homepage: "https://github.com/E-Sh4rk/MLsem"
 bug-reports: "https://github.com/E-Sh4rk/MLsem/issues"
 depends: [
-  "ocaml" {>= "5.3.0"}
+  "ocaml" {>= "5.5.0"}
   "dune" {>= "3.17"}
   "mlsem-types"
   "ppx_deriving"
