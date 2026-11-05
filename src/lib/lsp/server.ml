@@ -60,6 +60,36 @@ let send_request (req : _ Lsp.Server_request.t) =
   let jsonrpc = Lsp.Server_request.to_jsonrpc_request req ~id:(next_request_id ()) in
   send (Packet.Request jsonrpc)
 
+(* Whether the client accepts server-initiated progress
+   ([window.workDoneProgress]). Set from the initialize request. *)
+let work_done_progress = ref false
+
+let next_progress_token =
+  let counter = ref 0 in
+  fun () ->
+    incr counter ;
+    `String ("mlsem/typecheck/" ^ string_of_int !counter)
+
+(* Run [f] while the client shows a progress indicator titled [title].
+   The create request is not awaited: the client handles messages in order,
+   so the token exists by the time the begin notification arrives. The end
+   notification is sent even if [f] raises. *)
+let with_progress ~title f =
+  if not !work_done_progress then
+    f ()
+  else begin
+    let open Lsp.Types in
+    let token = next_progress_token () in
+    let progress value =
+      send_notification
+        (Lsp.Server_notification.WorkDoneProgress (ProgressParams.create ~token ~value))
+    in
+    send_request
+      (Lsp.Server_request.WorkDoneProgressCreate (WorkDoneProgressCreateParams.create ~token)) ;
+    progress (Lsp.Progress.Begin (WorkDoneProgressBegin.create ~title ())) ;
+    Fun.protect ~finally:(fun () -> progress (Lsp.Progress.End (WorkDoneProgressEnd.create ()))) f
+  end
+
 (* Raw params as Yojson for the custom [mlsem/*] handlers. [Jsonrpc.Structured.t]
    ([`Assoc]/[`List]) is a structural subtype of [Yojson.Safe.t], so the
    coercion is total and allocation-free. *)
@@ -109,7 +139,8 @@ let typecheck_and_publish uri text =
   if Store.matches_typechecked_digest uri text then
     Log.Server.debug (fun m -> m "skipping re-typecheck: content unchanged")
   else begin
-    let result = Typecheck.run text in
+    let title = "Typechecking " ^ Filename.basename (Lsp.Types.DocumentUri.to_path uri) in
+    let result = with_progress ~title (fun () -> Typecheck.run text) in
     Store.set_result uri ~text ~result
   end ;
   let params =
@@ -172,7 +203,11 @@ let handle_request ~shutdown_received (req : Jsonrpc.Request.t) =
           shutdown_received
       | Ok (Lsp.Client_request.E typed_req) -> (
           match typed_req with
-          | Lsp.Client_request.Initialize _ ->
+          | Lsp.Client_request.Initialize params ->
+              work_done_progress :=
+                Option.bind params.capabilities.window
+                  (fun (w : Lsp.Types.WindowClientCapabilities.t) -> w.workDoneProgress )
+                |> Option.value ~default:false ;
               send (Packet.Response (Response.ok req.id (initialize_result_json ()))) ;
               shutdown_received
           | Lsp.Client_request.Shutdown ->
