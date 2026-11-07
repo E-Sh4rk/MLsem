@@ -19,6 +19,7 @@ module PrinterCfg : sig
 
     val add_abstract_type : Sstt.Tag.t -> unit
     val add_printer_param : params -> unit
+    val set_printer_params : params list -> unit
 
     val printer_params : unit -> params
     val print_descr_ctx : int -> Sstt.Prec.assoc -> Format.formatter -> descr -> unit
