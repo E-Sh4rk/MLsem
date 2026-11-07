@@ -101,7 +101,7 @@ type log = {
 type cache = { dom : Domain.t ; logs : log list ref ;
                (* When set, a log produced anywhere below the [Alt] that set it
                   carries that [Alt]'s encoding error instead of its own. *)
-               alt_err : (Eid.t * (Format.formatter -> unit)) option }
+               alt_err : log option }
 
 (* Auxiliary *)
 
@@ -254,12 +254,11 @@ let rec refine cache env annot (id, e) =
 and refine_ann r cache env (rid, annot) (id, e) =
   let open IAnnot in
   let log kind msg descr =
-    let eid, kind, msg, descr =
+    let log =
       match cache.alt_err with
-      | Some (eid, descr) -> eid, Checker.UntypeableEncoding, "untypeable encoding", descr
-      | None -> id, kind, msg, descr
+      | Some log -> log
+      | None -> { eid=id ; kind ; ann=annot ; env ; title=msg ; descr }
     in
-    let log = { eid ; kind ; ann=annot ; env ; title=msg ; descr } in
     cache.logs := log::!(cache.logs)
   in
   let env = GREnv.refine_env env r in
@@ -389,9 +388,14 @@ and refine_ann r cache env (rid, annot) (id, e) =
     let mask = settings.amask env in
     let anns = List.map2 (fun ann b -> if b then ann else None) anns mask in
     retry_with (ic (AAlt (true, anns)))
-  | Alt (settings,es), AAlt (true, anns) ->
-    let cache = { cache with alt_err =
-      Some (id, fun fmt -> Format.fprintf fmt "%s" (settings.aerror env)) } in
+  | Alt (_,es), AAlt (true, anns) ->
+    let alt_err = match cache.alt_err with
+      | None -> Some { eid=id ; kind=Checker.UntypeableEncoding ;
+        ann=annot ; env ; title="untypeable encoding" ;
+        descr=fun fmt -> Format.fprintf fmt "" }
+      | Some alt_err -> Some alt_err
+    in
+    let cache = { cache with alt_err } in
     let rec aux es anns =
       match es, anns with
       | [], [] -> Either.left []
