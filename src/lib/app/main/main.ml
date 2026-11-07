@@ -224,6 +224,8 @@ let treat (benv,varm,senv,env) (annot, elem) =
       | "type_narrowing", Bool true | "type_narrowing", String "yes"
       -> Config.type_narrowing := BothNarrowing
       | "allow_implicit_downcast", Bool b -> Config.allow_implicit_downcast := b
+      | "errors_style", String "types" -> Config.errors_style := Mlsem_system.Error.Types
+      | "errors_style", String "witnesses" -> Config.errors_style := Mlsem_system.Error.Witnesses
       | "infer_overload", Bool b -> Config.infer_overload := b
       | "reexplore_failed_domains", Bool b -> Config.reexplore_failed_domains := b
       | "assimilate_vars", Bool b -> Config.assimilate_vars := b
@@ -255,7 +257,7 @@ let treat (benv,varm,senv,env) (annot, elem) =
       then Variable.get_location v
       else Eid.loc err.eid
     in
-    (benv,varm,senv,env), { res=TFailure (Some v, pos, Mlsem_system.Error.title err, Mlsem_system.Error.descr err, retrieve_time time) ; msg=[] }
+    (benv,varm,senv,env), { res=TFailure (Some v, pos, Mlsem_system.Error.title err, Mlsem_system.Error.descr ~style:!Config.errors_style err, retrieve_time time) ; msg=[] }
   | IncompatibleType (var,_) ->
     (benv,varm,senv,env), { res=TFailure (Some var, Variable.get_location var,
       "the type inferred is not a subtype of the type specified", None,
