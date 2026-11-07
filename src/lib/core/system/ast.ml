@@ -28,8 +28,7 @@ type operation =
 | RecUpd of string | RecDel of string | Ignore of Ty.t
 | OCustom of ocustom
 [@@deriving show]
-type alt_settings = { aname: string ; amask: Env.t -> bool list ;
-                      amask_default: bool list ; aerror: Env.t -> string }
+type alt_settings = { aname: string ; amask: Env.t -> bool list ; amask_default: bool list }
 [@@deriving show]
 type param_annot = GTy.t option
 [@@deriving show]
