@@ -20,7 +20,7 @@ type kind =
     types [expected] annotated for the functions (one per function, in order). *)
 | UntypeableEncoding
 (** None of the alternatives of an encoding is typeable. *)
-| UntypeableProjection of { arg: Ty.t }
+| UntypeableProjection of { arg: Ty.t ; domain: Ty.t }
 | UntypeableCast of { check: Ast.check ; expected: GTy.t ; given: GTy.t }
 | UntypeableCoercion of { check: Ast.check ; expected: GTy.t ; given: GTy.t }
 | InvalidAnnot of string
@@ -44,12 +44,21 @@ exception Untypeable of t
 val title : t -> string
 (** A short, one-line summary of the error (e.g. ["untypeable application"]). *)
 
-val pp_descr : Format.formatter -> t -> unit
-(** Prints the details of the error (types involved, etc.).
+type style =
+| Types
+(** Print the types involved (e.g. the function and argument types). *)
+| Witnesses
+(** Print a witness of the failure: a value that is in the given type but not
+    in the expected one (e.g. an argument outside the domain of the function).
+    Falls back to [Types] when no such value exists (e.g. when the failure
+    comes from polymorphism rather than from a plain subtyping mismatch). *)
+
+val pp_descr : ?style:style -> Format.formatter -> t -> unit
+(** Prints the details of the error, according to [style] (default [Types]).
     Prints nothing if there are no details. *)
 
-val descr : t -> string option
+val descr : ?style:style -> t -> string option
 (** The output of {!pp_descr}, or [None] if it is empty. *)
 
-val pp : Format.formatter -> t -> unit
+val pp : ?style:style -> Format.formatter -> t -> unit
 (** Prints the {!title} followed by the {!descr}, if any. *)

@@ -23,27 +23,38 @@ let rec all_some = function
   | (Some x)::l -> Option.map (fun l -> x::l) (all_some l)
 
 (* Depth-limited search: [fuel] bounds the depth of the witness, i.e. the
-   number of nested constructors (tuples, records, tags). *)
+   number of nested constructors (tuples, records, tags) having a non-trivial
+   content. *)
 let rec of_ty' fuel ty =
-  try Ty.def ty |> of_vdescr fuel ; None with Found t -> Some t
+  if fuel < 0 then None
+  else try Ty.def ty |> of_vdescr fuel ; None with Found t -> Some t
 and of_vdescr fuel vd =
-  VDescr.dnf vd |> List.iter (of_line fuel)
-and of_line fuel (_,_,d) = of_descr fuel d
+  let lines = VDescr.dnf vd |> List.map (fun (_,_,d) -> d) in
+  (* Less informative witnesses are only considered if no other witness
+     is found, in any line of the DNF *)
+  lines |> List.iter (of_descr fuel) ;
+  lines |> List.iter of_descr_fallback
 and of_descr fuel d =
-  Descr.get_enums d |> of_enums ;
   Descr.get_intervals d |> of_intervals ;
+  Descr.get_enums d |> of_finite_enums ;
+  let fuel = fuel - 1 in
+  Descr.get_tuples d |> of_tuples fuel ;
+  Descr.get_records d |> of_records fuel ;
+  Descr.get_tags d |> of_tags fuel
+and of_descr_fallback d =
+  Descr.get_enums d |> of_infinite_enums ;
   Descr.get_arrows d |> of_arrows ;
-  Descr.get_others d |> of_others ;
-  if fuel > 0 then begin
-    let fuel = fuel - 1 in
-    Descr.get_tuples d |> of_tuples fuel ;
-    Descr.get_records d |> of_records fuel ;
-    Descr.get_tags d |> of_tags fuel
-  end
-and of_enums e =
-  let neg, enums = Enums.destruct e in
-  if neg then found EnumOther
-  else match enums with [] -> () | e::_ -> found (Enum e)
+  Descr.get_others d |> of_others
+(* [Enums.destruct] returns [(true, enums)] for exactly [enums],
+   and [(false, enums)] for all constants but [enums]. *)
+and of_finite_enums e =
+  match Enums.destruct e with
+  | true, e::_ -> found (Enum e)
+  | _, _ -> ()
+and of_infinite_enums e =
+  match Enums.destruct e with
+  | false, _ -> found EnumOther
+  | true, _ -> ()
 and of_intervals i =
   match Intervals.destruct i with
   | [] -> ()

@@ -419,7 +419,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
       let ty = Ast.domain_of_proj p res in
       let s = GTy.lb s in
       let ss = tally_simpl env res [(s, ty)] in
-      log (Error.UntypeableProjection { arg=s }) ;
+      log (Error.UntypeableProjection { arg=s ; domain=ty }) ;
       Subst (with_res ss, ac (Annot.AProj annot'), ic Untyp, REnv.empty)
     | Subst (ss,a,a',r) -> Subst (ss,AProj (a,res)|>ic,AProj (a',res)|>ic,r)
     | Fail -> Fail
