@@ -49,7 +49,7 @@ val initial : ?direct_narrowing:bool -> ?partition_narrowing:bool
 
 val refine : Env.t -> IAnnot.t -> Ast.t -> Annot.t
 (** Searches for a complete derivation, starting from the given skeleton.
-    @raise Checker.Untypeable if the expression cannot be typed; the error
+    @raise Error.Untypeable if the expression cannot be typed; the error
     points at the most recent operation the search failed on.
     @raise Failure if the search ends up requiring a substitution of a variable
     of [env], which can only happen if the environment was not closed. *)
@@ -57,5 +57,5 @@ val refine : Env.t -> IAnnot.t -> Ast.t -> Annot.t
 val infer : ?direct_narrowing:bool -> ?partition_narrowing:bool
     -> Env.t -> Refinements.t -> Ast.t -> Annot.t
 (** {!initial} followed by {!refine}.
-    @raise Checker.Untypeable if the expression cannot be typed.
+    @raise Error.Untypeable if the expression cannot be typed.
     @raise Failure as {!refine}. *)

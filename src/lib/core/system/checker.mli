@@ -3,7 +3,7 @@
     The checker is purely a {e verifier}: it takes an expression together with a
     complete [Annot.t] — the derivation reconstructed by
     {!Mlsem_system.Reconstruction} — and computes the type it proves, raising
-    {!Untypeable} if the annotation is not a valid derivation. It never searches
+    {!Error.Untypeable} if the annotation is not a valid derivation. It never searches
     for an annotation itself. *)
 
 open Mlsem_common
@@ -15,29 +15,6 @@ val is_type_test_unsat : tau:Ty.t -> GTy.t -> Ty.t
    if and only if a branch [tau] of a typecase on an expression of type [ty]
    is unreachable *)
 
-type error_kind =
-| UnboundVar
-| UntypeableApp
-| UntypeableConstructor
-| UntypeableRec
-| UntypeableEncoding
-| UntypeableProjection
-| UntypeableCast
-| UntypeableCoercion
-| InvalidAnnot
-type error = {
-    eid: Eid.t ;
-    kind: error_kind ;
-    env: Env.t ;
-    ann: IAnnot.a ;
-    title: string ;
-    descr: string option }
-exception Untypeable of error
-(** Raised when the annotation is not a valid derivation for the expression.
-    In normal operation the reconstruction only produces valid annotations, so
-    this escaping from {!typeof} indicates an internal inconsistency rather than
-    a user type error — user errors are reported by the reconstruction. *)
-
 val typeof : Env.t -> Annot.t -> Ast.t -> GTy.t
 (** [typeof env a e] returns the type that [a] proves for [e] under [env].
 
@@ -48,7 +25,7 @@ val typeof : Env.t -> Annot.t -> Ast.t -> GTy.t
     only ever applying to an annotation substitutions that are disjoint from the
     environment's variables.
 
-    @raise Untypeable if the annotation is not a valid derivation.
+    @raise Error.Untypeable if the annotation is not a valid derivation.
     @raise Assert_failure if the annotation does not match the expression. *)
 
 val generalize : e:Ast.t -> Env.t -> GTy.t -> TyScheme.t

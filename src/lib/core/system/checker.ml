@@ -10,34 +10,8 @@ let is_type_test_unsat ~tau t =
 
 (* Expressions *)
 
-type error_kind =
-| UnboundVar
-| UntypeableApp
-| UntypeableConstructor
-| UntypeableRec
-| UntypeableEncoding
-| UntypeableProjection
-| UntypeableCast
-| UntypeableCoercion
-| InvalidAnnot
-type error = {
-    eid: Eid.t ;
-    kind: error_kind ;
-    env: Env.t ;
-    ann: IAnnot.a ;
-    title: string ;
-    descr: string option }
-exception Untypeable of error
-
 let untypeable eid env ann msg =
-  raise (Untypeable {
-    eid ;
-    kind=InvalidAnnot ;
-    env ;
-    ann ;
-    title=msg ;
-    descr=None
-    })
+  raise (Error.Untypeable { eid ; kind=InvalidAnnot msg ; env ; ann })
 
 let rec is_gen (_,e) =
   match e with

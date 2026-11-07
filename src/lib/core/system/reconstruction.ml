@@ -90,18 +90,10 @@ type ('a,'b) result =
 | Fail
 | Subst of (Subst.t * IAnnot.res) list * 'b * 'b * REnv.t
 
-type log = {
-  eid: Eid.t ;
-  kind: Checker.error_kind ;
-  env : Env.t ;
-  ann : IAnnot.a ;
-  title: string ;
-  descr: Format.formatter -> unit }
-
-type cache = { dom : Domain.t ; logs : log list ref ;
+type cache = { dom : Domain.t ; logs : Error.t list ref ;
                (* When set, a log produced anywhere below the [Alt] that set it
                   carries that [Alt]'s encoding error instead of its own. *)
-               alt_err : log option }
+               alt_err : Error.t option }
 
 (* Auxiliary *)
 
@@ -253,11 +245,11 @@ let rec refine cache env annot (id, e) =
   | IAnnot.I { rid ; ann ; refinement } -> refine_ann refinement cache env (rid, ann) (id, e)
 and refine_ann r cache env (rid, annot) (id, e) =
   let open IAnnot in
-  let log kind msg descr =
+  let log kind =
     let log =
       match cache.alt_err with
       | Some log -> log
-      | None -> { eid=id ; kind ; ann=annot ; env ; title=msg ; descr }
+      | None -> { Error.eid=id ; kind ; ann=annot ; env }
     in
     cache.logs := log::!(cache.logs)
   in
@@ -274,9 +266,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
       let ss' = ss |> List.filter (fun (s, _) -> Subst.apply s t2 |> Ty.non_empty) in
       if List.is_empty ss' then ss else ss'
     in
-    log Checker.UntypeableApp "untypeable application" (fun fmt ->
-      Format.fprintf fmt "function: @[<h>%a@]@.argument: @[<h>%a@]" Ty.pp t1 Ty.pp t2
-      ) ;
+    log (Error.UntypeableApp { fn=t1 ; arg=t2 }) ;
     ss
   in
   match e, annot with
@@ -284,8 +274,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
   | Var v, AVar f ->
     begin match Env.find_opt v env with
     | None ->
-      log Checker.UnboundVar "unbound variable"
-        (fun fmt -> Format.fprintf fmt "name: %a" Variable.pp v) ;
+      log (Error.UnboundVar v) ;
       Fail
     | Some ty ->
       let tvs, _ = TyScheme.get ty in
@@ -302,11 +291,8 @@ and refine_ann r cache env (rid, annot) (id, e) =
         doms |> List.concat_map (fun doms ->
         tally_simpl env (Ast.construct c tys) (List.combine tys doms)
       ) in
-      log Checker.UntypeableConstructor "untypeable constructor" (fun fmt ->
-        Format.fprintf fmt "expected: @[<h>%a@]@.given: @[<h>%a@]"
-          (Utils.pp_seq (Utils.pp_seq Ty.pp " ; ") " ;; ") doms
-          (Utils.pp_seq Ty.pp " ; ") tys
-        ) ;
+      log (Error.UntypeableConstructor {
+        expected=List.map (List.map GTy.mk) doms ; given=List.map GTy.mk tys }) ;
       Subst (with_res ss, Annot.AConstruct annots |> ac, ic Untyp, REnv.empty)
     end
   | GConstructor (c, es), AConstruct annots when List.length es = List.length annots ->
@@ -322,11 +308,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
         |> List.concat_map (fun (t,d) -> [(GTy.lb t, GTy.lb d) ; (GTy.ub t, GTy.ub d)])
         |> tally_simpl env res
       ) in
-      log Checker.UntypeableConstructor "untypeable constructor" (fun fmt ->
-        Format.fprintf fmt "expected: @[<h>%a@]@.given: @[<h>%a@]"
-          (Utils.pp_seq (Utils.pp_seq GTy.pp " ; ") " ;; ") doms
-          (Utils.pp_seq GTy.pp " ; ") tys
-        ) ;
+      log (Error.UntypeableConstructor { expected=doms ; given=tys }) ;
       Subst (with_res ss, Annot.AConstruct annots |> ac, ic Untyp, REnv.empty)
     end
   | Lambda (_,v,e'), ALambda (ty, annot') ->
@@ -358,9 +340,9 @@ and refine_ann r cache env (rid, annot) (id, e) =
       let tys' = List.map GTy.lb tys' in
       let cs = List.combine tys' (List.map GTy.lb tys) in
       let ss = tally_simpl env (Tuple.mk tys') cs in
-      log Checker.UntypeableRec "untypeable recursive function" (fun fmt ->
-        Format.fprintf fmt "cannot unify the body with self"
-        ) ;
+      log (Error.UntypeableRec {
+        funs=List.map (fun ((_,v,_),_) -> v) lst ;
+        expected=List.map GTy.lb tys ; given=tys' }) ;
       let ok_ann = ac (Annot.ALambdaRec (List.combine tys annots)) in
       Subst (with_res ss, ok_ann, ic Untyp, REnv.empty)
     end
@@ -390,9 +372,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
     retry_with (ic (AAlt (true, anns)))
   | Alt (_,es), AAlt (true, anns) ->
     let alt_err = match cache.alt_err with
-      | None -> Some { eid=id ; kind=Checker.UntypeableEncoding ;
-        ann=annot ; env ; title="untypeable encoding" ;
-        descr=fun fmt -> Format.fprintf fmt "" }
+      | None -> Some { Error.eid=id ; kind=UntypeableEncoding ; ann=annot ; env }
       | Some alt_err -> Some alt_err
     in
     let cache = { cache with alt_err } in
@@ -439,9 +419,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
       let ty = Ast.domain_of_proj p res in
       let s = GTy.lb s in
       let ss = tally_simpl env res [(s, ty)] in
-      log Checker.UntypeableProjection "untypeable projection" (fun fmt ->
-        Format.fprintf fmt "argument: @[<h>%a@]" Ty.pp s
-        ) ;
+      log (Error.UntypeableProjection { arg=s }) ;
       Subst (with_res ss, ac (Annot.AProj annot'), ic Untyp, REnv.empty)
     | Subst (ss,a,a',r) -> Subst (ss,AProj (a,res)|>ic,AProj (a',res)|>ic,r)
     | Fail -> Fail
@@ -487,12 +465,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
       let cs = match c with
         | Check -> [lbc;ubc] | CheckStatic -> [lbc] | NoCheck -> [] in
       let ss = tally_simpl env (GTy.lb (GTy.cap t s)) cs in
-      log Checker.UntypeableCast "untypeable cast" (fun fmt ->
-        if c = Check then
-          Format.fprintf fmt "expected: @[<h>%a@]@.given: @[<h>%a@]" GTy.pp t GTy.pp s
-        else if c = CheckStatic then
-          Format.fprintf fmt "expected: @[<h>%a@]@.given: @[<h>%a@]" Ty.pp (GTy.lb t) Ty.pp (GTy.lb s)
-        ) ;
+      log (Error.UntypeableCast { check=c ; expected=t ; given=s }) ;
       Subst (with_res ss, ac (Annot.ACast(t,annot')), ic Untyp, REnv.empty)
     | Subst (ss,a,a',r) -> Subst (ss,ACast (t,a)|>ic,ACast (t,a')|>ic,r)
     | Fail -> Fail
@@ -504,12 +477,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
       let cs = match c with
         | Check -> [lbc;ubc] | CheckStatic -> [lbc] | NoCheck -> [] in
       let ss = tally_simpl env (GTy.lb t) cs in
-      log Checker.UntypeableCoercion "untypeable coercion" (fun fmt ->
-        if c = Check then
-          Format.fprintf fmt "expected: @[<h>%a@]@.given: @[<h>%a@]" GTy.pp t GTy.pp s
-        else if c = CheckStatic then
-          Format.fprintf fmt "expected: @[<h>%a@]@.given: @[<h>%a@]" Ty.pp (GTy.lb t) Ty.pp (GTy.lb s)
-        ) ;
+      log (Error.UntypeableCoercion { check=c ; expected=t ; given=s }) ;
       Subst (with_res ss, ac (Annot.ACoerce(t,annot')), ic Untyp, REnv.empty)
     | Subst (ss,a,a',r) -> Subst (ss,ACoerce (t,a)|>ic,ACoerce (t,a')|>ic,r)
     | Fail -> Fail
@@ -624,11 +592,7 @@ let refine env iannot e =
   | Fail ->
     begin match !(cache.logs) with
     | [] -> assert false
-    | log::_ ->
-      let err = {
-        Checker.eid=log.eid ; title=log.title ; kind=log.kind ; env=log.env ; ann=log.ann ;
-        descr=(Some (Format.asprintf "%a" (fun fmt () -> log.descr fmt) ())) } in
-      raise (Checker.Untypeable err)
+    | err::_ -> raise (Error.Untypeable err)
     end
   | Subst _ -> failwith "Top-level environment should not contain an unresolved type variable."
   | Ok (a,_) -> a
