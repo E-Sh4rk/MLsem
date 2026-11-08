@@ -287,15 +287,28 @@ let call_of = function
   | Check {uri; text} -> Engine.Check {uri; text}
   | Tool {method_; params; _} -> Engine.Tool {method_; params = J.to_string params}
 
-(* The running job will not finish: answer or report it with [message]. *)
-let fail_running message =
+(* A pop-up in the editor, prefixed with the file name when there is one. *)
+let show_message ~type_ ?uri message =
+  let message =
+    match uri with
+    | Some uri -> Filename.basename (Uri.to_path uri) ^ ": " ^ message
+    | None -> message
+  in
+  send_notification
+    (Lsp.Server_notification.ShowMessage
+       (Lsp.Types.ShowMessageParams.create ~message:("MLsem: " ^ message) ~type_) )
+
+(* The running job will not finish: answer or report it with [message], both
+   in the response or diagnostics and as a pop-up. *)
+let fail_running ~type_ message =
   Option.iter
     (fun r ->
        running := None ;
        end_progress r.progress ;
        match r.job with
-       | Check {uri; text} -> mark_failed uri text message
+       | Check {uri; text} -> show_message ~type_ ~uri message ; mark_failed uri text message
        | Tool {id; uri; text; _} -> (
+           show_message ~type_ ?uri message ;
            respond_error id Response.Error.Code.RequestFailed message ;
            match (uri, text) with
            | Some uri, Some text -> mark_failed uri text message
@@ -307,7 +320,7 @@ let engine_died () =
   kill_engine () ;
   let now = Unix.gettimeofday () in
   crash_times := now :: List.filter (fun t -> now -. t < crash_window) !crash_times ;
-  fail_running "Typechecking crashed the MLsem server" ;
+  fail_running ~type_:Lsp.Types.MessageType.Error "Typechecking crashed the MLsem server" ;
   if List.length !crash_times >= max_crashes then
     wind_down (Printf.sprintf "engine crashed %d times in %.0f s" max_crashes crash_window)
 
@@ -637,7 +650,7 @@ let check_timeout () =
   | Some r, Some d when Unix.gettimeofday () >= d ->
       kill_engine () ;
       let limit = Printf.sprintf "%g s" !timeout in
-      fail_running
+      fail_running ~type_:Lsp.Types.MessageType.Warning
         ( match r.job with
         | Check _ -> "Typechecking timed out after " ^ limit
         | Tool _ -> "Request timed out after " ^ limit )
