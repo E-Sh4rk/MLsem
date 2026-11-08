@@ -32,6 +32,13 @@ let generalize ~e env s =
   else
     TyScheme.mk_mono s
 
+let hook : (Env.t -> Annot.t -> Ast.t -> GTy.t -> unit) option ref = ref None
+
+let with_hook f k =
+  let old = !hook in
+  hook := Some f ;
+  Fun.protect ~finally:(fun () -> hook := old) k
+
 let rec typeof' env annot (id,e) =
   let open Annot in
   let untypeable = untypeable id env Untyp in
@@ -149,12 +156,13 @@ let rec typeof' env annot (id,e) =
     Format.printf "e:@.%a@.@.a:@.%a@.@." Ast.pp_e e Annot.pp_a a ;
     assert false
 and typeof env annot e =
-  match annot.cache with
-  | Some ty -> ty
-  | None ->
+  match annot.cache, !hook with
+  | Some ty, None -> ty
+  | _ ->
     let env = GREnv.refine_env env annot.refinement in
     let ty = typeof' env annot.ann e in
     annot.cache <- Some ty ;
+    Option.iter (fun f -> f env annot e ty) !hook ;
     ty
 and typeof_b env bannot (id,e) s tau =
   match bannot with

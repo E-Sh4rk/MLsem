@@ -36,3 +36,10 @@ val generalize : e:Ast.t -> Env.t -> GTy.t -> TyScheme.t
 
 val typeof_def : Env.t -> Annot.t -> Ast.t -> TyScheme.t
 (** {!typeof} followed by {!generalize}. *)
+
+val with_hook : (Env.t -> Annot.t -> Ast.t -> GTy.t -> unit) -> (unit -> 'a) -> 'a
+(** [with_hook f k] runs [k ()] with [f] called on every node typed by
+    {!typeof}, after its type is computed: [f env a e ty], where [env] is the
+    (refined) environment of the node. While the hook is installed, cached
+    types are recomputed so that every node of a derivation is visited. Nodes
+    under an [AInter] are visited once per derivation of the intersection. *)
