@@ -42,6 +42,62 @@ let sigs_of_def varm senv env (kind,str) =
       v, Some (sigs, Env.find v env)
     end
 
+(* Types of variables and calls, recorded while checking a definition, for
+   editor tooling. Only recorded when [collect_typings] is set. *)
+
+let collect_typings = ref false
+
+type typing =
+| TUse of Position.t * Variable.t * GTy.t
+(** A variable occurrence and its (instantiated) type. *)
+| TBinder of Variable.t * GTy.t
+(** A bound variable and the type given to it. *)
+| TCall of { pos: Position.t ; callee: (Variable.t * Subst.t) option ;
+             args: (Position.t * GTy.t) list ; result: GTy.t }
+(** A call [f a1 ... an] (curried applications flattened), with the callee's
+    instance when the callee is a variable. *)
+
+type derivation = { sig_index: int option ; typings: typing list }
+(** The typings of one checking pass of a definition: [sig_index] is the
+    index of the [val] declaration it was checked against, if any. *)
+
+let record_typings () =
+  let acc = ref [] and inner = ref Eid.Set.empty in
+  let cache (a : Mlsem_system.Annot.Annot.t) = Option.get a.cache in
+  let rec spine ((id, e) : Mlsem_system.Ast.t) (a : Mlsem_system.Annot.Annot.t) args =
+    match e, a.ann with
+    | App (e1, (id2, _)), AApp (a1, a2, _) ->
+      inner := Eid.Set.add id !inner ;
+      spine e1 a1 ((Eid.loc id2, cache a2) :: args)
+    | Var v, AVar s -> Some (v, s), args
+    (* An overloaded function part: follow its first derivation. *)
+    | _, AInter (a :: _) -> spine (id, e) a args
+    | _ -> None, args
+  in
+  let hook _env (a : Mlsem_system.Annot.Annot.t) ((id, e) as ex) ty =
+    let add t = acc := (id, t) :: !acc in
+    match e, a.ann with
+    | Var v, AVar _ -> add (TUse (Eid.loc id, v, ty))
+    | Lambda (_, v, _), ALambda (s, _) -> add (TBinder (v, s))
+    | LambdaRec lst, ALambdaRec anns when List.length lst = List.length anns ->
+      List.iter2 (fun (_, v, _) (s, _) -> add (TBinder (v, s))) lst anns
+    | Let (_, v, _, _), (ALet (a1, _) | ALet' (a1, _)) -> add (TBinder (v, cache a1))
+    | App _, AApp _ ->
+      let callee, args = spine ex a [] in
+      inner := Eid.Set.remove id !inner ;
+      add (TCall { pos=Eid.loc id ; callee ; args ; result=ty })
+    | _ -> ()
+  in
+  let result () =
+    (* Applications that are the function part of a larger call are covered
+       by that call. *)
+    !acc |> List.rev |> List.filter_map (fun (id, t) ->
+      match t with
+      | TCall _ when Eid.Set.mem id !inner -> None
+      | t -> Some t)
+  in
+  hook, result
+
 (* Type checking and inference *)
 
 let infer var env e =
@@ -62,39 +118,53 @@ let infer var env e =
       (* Format.printf "@.@.%a@.@." Mlsem_system.Ast.pp e ; *)
       raise (Untypeable (var, err))
   in
-  let ty = Mlsem_system.Checker.typeof_def env annot e in
+  let ty, typings =
+    let check () = Mlsem_system.Checker.typeof_def env annot e in
+    if !collect_typings then
+      let hook, result = record_typings () in
+      let ty = Mlsem_system.Checker.with_hook hook check in
+      ty, result ()
+    else check (), []
+  in
   let (tvs, ty) = TyScheme.get ty in
   let ty = TyScheme.mk tvs (GTy.ub ty |> GTy.mk) |> Signature.simplify_tyscheme in
   let msg, visited = Mlsem_system.Analyzer.analyze e annot in
-  ty, msg, visited
+  ty, msg, visited, typings
 
 let type_check_with_sigs env (var,e,sigs,aty) =
   let e, id = Transform.expr_to_ast e, Eid.refresh (fst e) in
   let c = if !Config.allow_implicit_downcast then CheckStatic else Check in
   let es = sigs |> List.map (fun s ->
     (id, TypeCoerce (e, Signature.to_gty s, c)) |> push_coercions ~duplicate_arrows:true) in
-  let tys, msg, visited =
-    List.map (infer (Some var) env) es |> Mlsem_utils.Utils.split3 in
+  let results = List.map (infer (Some var) env) es in
+  let tys = List.map (fun (ty,_,_,_) -> ty) results in
+  let msg = List.map (fun (_,msg,_,_) -> msg) results in
+  let visited = List.map (fun (_,_,visited,_) -> visited) results in
+  let derivations =
+    List.mapi (fun i (_,_,_,typings) -> { sig_index=Some i ; typings }) results in
   List.iter (check_resolved ~allow_mono:false var env) tys ;
   (* Each signature is inferred separately, but they all annotate the same [e]:
      a sub-expression is unreachable only if no signature reached it. *)
   let visited = Mlsem_system.Analyzer.Visited.union_many visited in
   let msg = (List.concat msg)@(Mlsem_system.Analyzer.get_unreachable visited e) in
-  (var,(aty,sigs)),msg
+  (var,(aty,sigs,derivations)),msg
 
 let type_check_recs pos env lst =
   let e =
     Eid.unique_with_pos pos,
     PAst.LambdaRec (List.map (fun (v,e) -> (v,None,e)) lst) in
   let e = Transform.expr_to_ast e in
-  let ty, msg, visited = e |> push_coercions ~duplicate_arrows:true |> infer None env in
+  let ty, msg, visited, typings = e |> push_coercions ~duplicate_arrows:true |> infer None env in
   let msg = msg@(Mlsem_system.Analyzer.get_unreachable visited e) in
   let tvs, ty = ty |> TyScheme.get in
   let n = List.length lst in
   List.mapi (fun i (var,_) ->
     let ty = GTy.map (Tuple.proj n i) ty |> TyScheme.mk tvs |> Signature.simplify_tyscheme in
     check_resolved ~allow_mono:true var env ty ;
-    (var, (ty, Signature.of_tyscheme ty))
+    (* The definitions are checked together: the first one carries the
+       typings of the whole group. *)
+    let derivations = if i = 0 then [{ sig_index=None ; typings }] else [] in
+    (var, (ty, Signature.of_tyscheme ty, derivations))
   ) lst, msg
 
 let poly_leq t1 t2 =
@@ -143,6 +213,8 @@ type inferred = {
   ty: TyScheme.t;
   sigs: Signature.t;
   declared: bool;
+  derivations: derivation list;
+  (** Empty unless [collect_typings] is set. *)
 }
 type result =
 | TSuccess of inferred list * float
@@ -178,7 +250,7 @@ let treat (benv,varm,senv,env) (annot, elem) =
         | Some (sigs,aty) -> Either.Left (var, e, sigs, aty)
         ) lst in
       let tys1, msg1 = type_check_recs pos env recs in
-      let env = List.fold_left (fun env (v,(ty,_)) ->
+      let env = List.fold_left (fun env (v,(ty,_,_)) ->
         try MVariable.add_to_env v ty env
         with Invalid_argument _ -> raise (IncompatibleType (v,ty))
       ) env tys1 in
@@ -188,7 +260,7 @@ let treat (benv,varm,senv,env) (annot, elem) =
         (severity d, Eid.loc d.eid, title d, descr d)
       ) in
       let senv = List.fold_left (fun senv (v,_) -> VarMap.remove v senv) senv tys2 in
-      let render ~declared (v, (ty,sigs)) = { var = v; ty; sigs; declared } in
+      let render ~declared (v, (ty,sigs,derivations)) = { var = v; ty; sigs; declared; derivations } in
       let tys = List.map (render ~declared:false) tys1 @ List.map (render ~declared:true) tys2 in
       (!benv,varm,senv,env), { res=TSuccess (tys,retrieve_time time) ; msg }
     | PAst.Debug dbg ->
@@ -322,6 +394,7 @@ let print_ty pp (_,_,_,_,penv) ty =
     (fun () -> Format.asprintf "@[<h>%a@]" pp ty) ()
   |> fst
 let display envs ty = print_ty TyScheme.pp_short envs ty
+let display_gty envs ty = print_ty GTy.pp envs (GTy.simplify ty)
 let signature envs sigs = sigs |> List.map (print_ty Signature.pp_overload envs)
 
 let build_type ((benv, _, _, _, _) : envs) (s : string) : Ty.t =
