@@ -4,11 +4,33 @@ module MVariable = Mlsem_lang.MVariable
 
 module NameMap : Map.S with type key=string
 type message = Mlsem_system.Analyzer.severity * Position.t * string * string option
+
+(** Types of variables and calls, recorded while checking a definition, for
+    editor tooling. Only recorded when [collect_typings] is set. *)
+val collect_typings : bool ref
+
+type typing =
+| TUse of Position.t * Variable.t * GTy.t
+(** A variable occurrence and its (instantiated) type. *)
+| TBinder of Variable.t * GTy.t
+(** A bound variable and the type given to it. *)
+| TCall of { pos: Position.t ; callee: (Variable.t * Subst.t) option ;
+             args: (Position.t * GTy.t) list ; result: GTy.t }
+(** A call [f a1 ... an] (curried applications flattened), with the callee's
+    instance when the callee is a variable. *)
+
+type derivation = { sig_index: int option ; typings: typing list }
+(** The typings of one checking pass of a definition: [sig_index] is the
+    index of the [val] declaration it was checked against, if any. *)
+
 type inferred = {
   var: Variable.t;
   ty: TyScheme.t;
   sigs: Signature.t;
   declared: bool;
+  derivations: derivation list;
+  (** Empty unless [collect_typings] is set. Definitions checked together
+      (without [val]) share one derivation, carried by the first of them. *)
 }
 type result =
 | TSuccess of inferred list * float
@@ -28,6 +50,7 @@ val initial_benv : Builder.benv
 val initial_penv : PEnv.t
 
 val display : envs -> TyScheme.t -> string
+val display_gty : envs -> GTy.t -> string
 val signature : envs -> Signature.t -> string list
 
 (* Build the concrete type denoted by a surface type expression, resolved
