@@ -1,5 +1,8 @@
 (library
  (name mlsem_lsp)
+ (foreign_stubs
+  (language c)
+  (names pdeathsig_stubs))
  (libraries
   lsp
   jsonrpc

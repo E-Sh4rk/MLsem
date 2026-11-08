@@ -54,19 +54,45 @@ let handle = function
       Tool_result (Yojson.Safe.to_string result)
 
 (* Exit as soon as the supervisor that started us is gone, even mid-typecheck.
-   A timer signal fires every second; OCaml runs the handler at the next safe
-   point, including inside long computations. The handler only checks and
-   exits, it never interrupts work otherwise. When the parent dies the kernel
-   reparents us, so [getppid] changes. *)
-let exit_with_parent () =
-  let parent = Unix.getppid () in
-  Sys.set_signal Sys.sigalrm
-    (Sys.Signal_handle (fun _ -> if Unix.getppid () <> parent then Unix._exit 1)) ;
-  ignore (Unix.setitimer Unix.ITIMER_REAL {Unix.it_interval = 1.0; it_value = 1.0})
+
+   On Linux the kernel does it: [PR_SET_PDEATHSIG] kills us when the parent
+   dies. Elsewhere a timer checks [getppid] once a second while a call is
+   being handled; OCaml runs the handler at the next safe point, including
+   inside long computations. While idle we block reading stdin and see EOF
+   when the supervisor dies, so the timer is off then. When the parent dies
+   the kernel reparents us, so [getppid] changes. *)
+external set_pdeathsig : unit -> bool = "mlsem_set_pdeathsig"
+
+let parent_gone parent = Unix.getppid () <> parent
+
+(* Returns the functions that arm and disarm the timer around a call. *)
+let exit_with_parent parent =
+  if set_pdeathsig () then
+    (ignore, ignore)
+  else begin
+    Sys.set_signal Sys.sigalrm (Sys.Signal_handle (fun _ -> if parent_gone parent then Unix._exit 1)) ;
+    let set interval =
+      ignore (Unix.setitimer Unix.ITIMER_REAL {Unix.it_interval = interval; it_value = interval})
+    in
+    ((fun () -> set 1.0), fun () -> set 0.0)
+  end
+
+(* The supervisor passes its pid after [--engine]; reading it from argv
+   instead of [getppid] at startup catches a parent that died before we ran. *)
+let parent_of_argv () =
+  let rec find = function
+    | "--engine" :: pid :: _ -> int_of_string_opt pid
+    | _ :: rest -> find rest
+    | [] -> None
+  in
+  find (Array.to_list Sys.argv) |> Option.value ~default:(Unix.getppid ())
 
 let run () =
   Log.setup () ;
-  exit_with_parent () ;
+  let parent = parent_of_argv () in
+  let arm, disarm = exit_with_parent parent in
+  (* The parent may have died before the above took effect. *)
+  if parent_gone parent then Unix._exit 1 ;
   (* Replies go to a private copy of stdout, and fd 1 is pointed at stderr,
      so nothing else printed by mlsem can corrupt the protocol. *)
   let out = Unix.out_channel_of_descr (Unix.dup Unix.stdout) in
@@ -78,8 +104,8 @@ let run () =
     match (input_value stdin : call) with
     | exception End_of_file -> exit 0
     | call ->
-        output_value out (handle call) ;
-        flush out ;
-        loop ()
+        arm () ;
+        let reply = Fun.protect ~finally:disarm (fun () -> handle call) in
+        output_value out reply ; flush out ; loop ()
   in
   loop ()

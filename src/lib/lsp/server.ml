@@ -274,7 +274,8 @@ let spawn_engine () =
   let in_r, in_w = Unix.pipe ~cloexec:true () in
   let out_r, out_w = Unix.pipe ~cloexec:true () in
   let exe = Sys.executable_name in
-  let pid = Unix.create_process exe [| exe; "--engine" |] in_r out_w Unix.stderr in
+  let parent = string_of_int (Unix.getpid ()) in
+  let pid = Unix.create_process exe [| exe; "--engine"; parent |] in_r out_w Unix.stderr in
   Unix.close in_r ;
   Unix.close out_w ;
   Log.Server.info (fun m -> m "started engine %d" pid) ;
