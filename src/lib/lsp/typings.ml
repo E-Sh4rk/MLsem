@@ -235,7 +235,7 @@ let add ctx envs (b : Main.inferred) =
               in
               let callee_key =
                 Option.bind callee (fun (v, _) ->
-                  match (Variable.get_name v, range (Variable.get_location v)) with
+                  match (Variable.get_name v, binder_range ctx v) with
                   | Some name, Some (s, _) -> Some (name, s)
                   | Some name, None -> Some (name, -1)
                   | None, _ -> None )
@@ -304,5 +304,6 @@ let add ctx envs (b : Main.inferred) =
     {
       hovers = hovers @ ctx.acc.hovers;
       defns = {tvar_occs; marks = !marks} :: ctx.acc.defns;
-      calls = List.rev_append !calls ctx.acc.calls;
+      (* A node typed several times in one derivation gives identical calls. *)
+      calls = List.rev_append (List.sort_uniq compare !calls) ctx.acc.calls;
     }
