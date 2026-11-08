@@ -2,7 +2,7 @@
 ===== Processing tests/0_hm.ml =====
 length_aux: int -> [ any* ] -> int
 length: [ any* ] -> int
-hd': ∀'a. [ ('a any*)? ] -> 'a
+hd': ∀'a. [ ( 'a any* )? ] -> 'a
 hd_safe: ∀'a. [ 'a any* ] -> 'a
 tl': ∀'a. [] | (any::('a & [ any* ])) -> 'a & [ any* ]
 tl_safe: ∀'a. (any::('a & [ any* ])) -> 'a & [ any* ]
@@ -17,7 +17,7 @@ concat: ∀'a. [ [ 'a* ]* ] -> [ 'a* ]
 map: ∀'a,'b. ('a -> 'b) -> [ 'a* ] -> [ 'b* ]
 mapi_aux: ∀'a,'b. int -> (int -> 'a -> 'b) -> [ 'a* ] -> [ 'b* ]
 mapi: ∀'a,'b. (int -> 'a -> 'b) -> [ 'a* ] -> [ 'b* ]
-fold_left: ∀'a,'b. (('a -> 'b -> 'a) -> 'a -> [ 'b* ] -> 'a) & (('a -> 'b -> empty) -> 'a -> [ ('b any*)? ] -> 'a)
+fold_left: ∀'a,'b. (('a -> 'b -> 'a) -> 'a -> [ 'b* ] -> 'a) & (('a -> 'b -> empty) -> 'a -> [ ( 'b any* )? ] -> 'a)
 fold_right: ∀'a,'b. ('b -> 'a -> 'a) -> [ 'b* ] -> 'a -> 'a
 height: x1 -> int where x1 = Nil | Node(x1, Key, any, x1, int)
 create: ∀'a,'b,'c,'d. 'a & (Nil | Node(x1)) -> 'b -> 'c -> 'd & (Nil | Node(x1)) -> Node('a & (Nil | Node(x1)), 'b, 'c, 'd & (Nil | Node(x1)), int) where x1 = Nil | Node(x1), Key, any, Nil | Node(x1), int
