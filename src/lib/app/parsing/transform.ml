@@ -77,9 +77,8 @@ let expr_to_ast t =
     | Seq (e1, e2) -> Seq (aux e1, aux e2)
     | Alt es ->
       let amask = List.init (List.length es) (Fun.const true) in
-      let aerror _ = "Could not find any typeable alternative." in
-      let settings = { SA.aname="alternatives" ; amask=Fun.const amask ;
-                       amask_default=amask ; aerror } in
+      let settings =
+        { SA.aname="alternatives" ; amask=Fun.const amask ; amask_default=amask } in
       Alt (settings, List.map aux es)
     | Return e -> Return (aux e)
     | Break | Continue -> Break

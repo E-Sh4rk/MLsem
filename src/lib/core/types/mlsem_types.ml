@@ -16,3 +16,5 @@ module TVOp = Tvar.TVOp
 module GTy = GTy
 module TyScheme = TyScheme
 include Builder
+
+module Witness = Witness

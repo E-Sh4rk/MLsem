@@ -4,7 +4,45 @@ open Ast
 open Mlsem_types
 
 type severity = Message | Notice | Warning | Error
-type msg = { eid: Eid.t ; severity: severity ; title: string ; descr: string option }
+
+module Diagnostic = struct
+  type kind =
+  | Unchecked of { check: Ast.check ; expected: GTy.t ; given: GTy.t }
+  | Unreachable
+
+  type t = { eid: Eid.t ; kind: kind }
+
+  let severity t =
+    match t.kind with
+    | Unchecked _ -> Notice
+    | Unreachable -> Warning
+
+  let title t =
+    match t.kind with
+    | Unchecked { check=CheckStatic ; _ } -> "Unchecked dynamic coercion"
+    | Unchecked _ -> "Unchecked coercion"
+    | Unreachable -> "Unreachable code"
+
+  let pp_descr fmt t =
+    match t.kind with
+    | Unchecked { check=CheckStatic ; expected ; given } ->
+      Format.fprintf fmt "expected: @[<h>%a@]@.given: @[<h>%a@]"
+        Ty.pp (GTy.ub expected) Ty.pp (GTy.ub given)
+    | Unchecked { expected ; given ; _ } ->
+      Format.fprintf fmt "expected: @[<h>%a@]@.given: @[<h>%a@]"
+        GTy.pp expected GTy.pp given
+    | Unreachable -> ()
+
+  let descr t =
+    match Format.asprintf "%a" pp_descr t with
+    | "" -> None
+    | d -> Some d
+
+  let pp fmt t =
+    match descr t with
+    | None -> Format.fprintf fmt "%s" (title t)
+    | Some d -> Format.fprintf fmt "%s:@.%s" (title t) d
+end
 
 let rec iter_ann f (id,e) a =
   let children =
@@ -50,22 +88,15 @@ let analyze e a =
   in
   let res = ref [] in
   let visited = ref Visited.empty in
-  let msg m = res := m::!res in
   let aux e a =
     visited := Visited.add (fst e) !visited ;
-    let msg s t d = msg { eid=fst e ; severity=s ; title=t ; descr=Some d } in
+    let report kind = res := { Diagnostic.eid=fst e ; kind }::!res in
     if Eid.show_notices (fst e) then
     match snd e, a.Annot.ann with
-    | TypeCoerce (_, _, c), ACoerce (ty, a) ->
-      let s = tyof a in
-      if GTy.leq s ty |> not then
-        begin if c = CheckStatic then
-          msg Notice "Unchecked dynamic coercion"
-          (Format.asprintf "expected: @[<h>%a@]@.given: @[<h>%a@]" Ty.pp (GTy.ub ty) Ty.pp (GTy.ub s))
-        else if c = NoCheck then
-          msg Notice "Unchecked coercion"
-          (Format.asprintf "expected: @[<h>%a@]@.given: @[<h>%a@]" GTy.pp ty GTy.pp s)
-        end
+    | TypeCoerce (_, _, (CheckStatic | NoCheck as check)), ACoerce (expected, a) ->
+      let given = tyof a in
+      if GTy.leq given expected |> not then
+        report (Diagnostic.Unchecked { check ; expected ; given })
     | _, _ -> ()
   in
   iter_ann aux e a ;
@@ -73,11 +104,9 @@ let analyze e a =
 
 let get_unreachable visited e =
   let res = ref [] in
-  let msg m = res := m::!res in
   let aux e =
-    let msg s t = msg { eid=fst e ; severity=s ; title=t ; descr=None } in
     if Visited.mem (fst e) visited || not (Eid.show_notices (fst e)) then true
-    else (msg Warning "Unreachable code" ; false)
+    else (res := { Diagnostic.eid=fst e ; kind=Unreachable }::!res ; false)
   in
   iter' aux e ;
   List.rev !res

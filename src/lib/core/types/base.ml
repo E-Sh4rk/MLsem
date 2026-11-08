@@ -33,6 +33,7 @@ module PrinterCfg = struct
     let set_printer f = pp := f
     let add_abstract_type t = abstract_types := t::!abstract_types
     let add_printer_param p = extra_params := p::!extra_params
+    let set_printer_params p = extra_params := p
 
     let printer_params () =
       let bools = Bools.tag, builder ~to_t:Bools.to_t ~map:Bools.map ~print:!bool_pp in
