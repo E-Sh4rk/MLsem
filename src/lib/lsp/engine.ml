@@ -26,6 +26,7 @@ type reply =
   | Checked of {
       lenses: Typecheck.lens list;
       diagnostics: Lsp.Types.Diagnostic.t list;
+      typings: Typings.t;
     }
   | Tool_result of string  (** JSON text *)
 
@@ -43,8 +44,8 @@ let is_tool method_ = List.mem_assoc method_ tool_handlers
 let handle = function
   | Check {uri; text} ->
       Store.sync_text uri text ;
-      let lenses, diagnostics = Store.results uri in
-      Checked {lenses; diagnostics}
+      let lenses, diagnostics, typings = Store.results uri in
+      Checked {lenses; diagnostics; typings}
   | Tool {method_; params} ->
       let result =
         match List.assoc_opt method_ tool_handlers with
