@@ -1,6 +1,6 @@
 (* Handlers for the custom [mlsem/*] JSON-RPC requests backing the VS Code
    overload-merge webview. Each takes the request's [params] as raw JSON and
-   returns the JSON result; [Server] wires them into the dispatch loop.
+   returns the JSON result. They run in the engine process ([Engine]).
 
    Consistency model: every request carries the client's current buffer [text].
    We typecheck *that* text and resolve the request's inputs against it, so the
@@ -64,10 +64,9 @@ let decode_instantiations params =
    webview also lets the user type any other type expression. *)
 let builtin_type_names = ["int"; "bool"; "string"; "float"; "char"; "list"; "any"; "empty"]
 
-(* Typecheck and cache the client-sent buffer so binding resolution below runs
-   against exactly the text the request's position/name refer to. The shipped
-   client always sends [text]; if a request omits it we leave the cache as-is
-   (resolution then runs against whatever was last typechecked). *)
+(* Typecheck and cache the buffer so binding resolution below runs against
+   exactly the text the request's position/name refer to. The supervisor
+   fills in [text] from its copy of the document when the client omits it. *)
 let sync params uri =
   match member "text" params with
   | `String text -> Store.sync_text uri text
