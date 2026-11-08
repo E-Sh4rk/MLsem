@@ -183,8 +183,9 @@ let treat (benv,varm,senv,env) (annot, elem) =
         with Invalid_argument _ -> raise (IncompatibleType (v,ty))
       ) env tys1 in
       let tys2, msg2 = List.map (type_check_with_sigs env) sigs |> List.split in
-      let msg = msg1@(List.concat msg2) |> List.map (fun r ->
-        (r.Mlsem_system.Analyzer.severity, Eid.loc r.eid, r.title, r.descr)
+      let msg = msg1@(List.concat msg2) |> List.map (fun d ->
+        let open Mlsem_system.Analyzer.Diagnostic in
+        (severity d, Eid.loc d.eid, title d, descr d)
       ) in
       let senv = List.fold_left (fun senv (v,_) -> VarMap.remove v senv) senv tys2 in
       let render ~declared (v, (ty,sigs)) = { var = v; ty; sigs; declared } in
