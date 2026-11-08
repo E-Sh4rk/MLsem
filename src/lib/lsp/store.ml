@@ -31,11 +31,11 @@ let sync_text uri text =
       Hashtbl.replace entries uri
         {text; line_offsets = Doc.compute_line_offsets text; digest; result}
 
-(* Lenses and diagnostics of the cached typecheck. *)
+(* Lenses, diagnostics and typings of the cached typecheck. *)
 let results uri =
   match Hashtbl.find_opt entries uri with
-  | Some e -> (e.result.lenses, e.result.diagnostics)
-  | None -> ([], [])
+  | Some e -> (e.result.lenses, e.result.diagnostics, e.result.typings)
+  | None -> ([], [], Typings.empty)
 
 let envs_of uri : Mlsem_app.Main.envs option =
   Option.bind (Hashtbl.find_opt entries uri) (fun e -> e.result.envs)

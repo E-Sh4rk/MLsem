@@ -353,11 +353,11 @@ let rec dispatch () =
 
 let on_reply (reply : Engine.reply) =
   match (!running, reply) with
-  | Some {job = Check {uri; text}; progress; _}, Checked {lenses; diagnostics} ->
+  | Some {job = Check {uri; text}; progress; _}, Checked {lenses; diagnostics; typings} ->
       running := None ;
       end_progress progress ;
       if Doc.find uri <> None then begin
-        Doc.set_result uri ~text ~lenses ~diagnostics ;
+        Doc.set_result uri ~text ~lenses ~diagnostics ~typings ;
         publish uri (Doc.diagnostics uri)
       end
   | Some {job = Tool {id; _}; _}, Tool_result json ->
@@ -435,6 +435,7 @@ let initialize_result_json () =
   let capabilities =
     ServerCapabilities.create ~codeActionProvider:(`CodeActionOptions code_action_opts)
       ~codeLensProvider:(CodeLensOptions.create ~resolveProvider:false ())
+      ~hoverProvider:(`Bool true) ~documentHighlightProvider:(`Bool true)
       ~textDocumentSync:(`TextDocumentSyncOptions sync) ()
   in
   InitializeResult.yojson_of_t (InitializeResult.create ~capabilities ())
@@ -543,6 +544,29 @@ let handle_request (req : Request.t) =
                follows the new result. *)
             let lenses = Doc.code_lenses params.textDocument.uri in
             respond req.id (Lsp.Client_request.yojson_of_result typed_req lenses)
+        | Lsp.Client_request.TextDocumentHover params ->
+            (* Like codeLens, answered from the copy. *)
+            let hover =
+              Doc.hover params.textDocument.uri params.position
+              |> Option.map (fun (range, lines) ->
+                let value = "```mlsem\n" ^ String.concat "\n" lines ^ "\n```" in
+                let contents =
+                  `MarkupContent (Lsp.Types.MarkupContent.create ~kind:Markdown ~value)
+                in
+                Lsp.Types.Hover.create ~contents ~range () )
+            in
+            respond req.id (Lsp.Client_request.yojson_of_result typed_req hover)
+        | Lsp.Client_request.TextDocumentHighlight params ->
+            let highlights =
+              match Doc.highlights params.textDocument.uri params.position with
+              | [] -> None
+              | ranges ->
+                  Some
+                    (List.map
+                       (fun range -> Lsp.Types.DocumentHighlight.create ~kind:Text ~range ())
+                       ranges )
+            in
+            respond req.id (Lsp.Client_request.yojson_of_result typed_req highlights)
         | _ -> respond_error req.id Response.Error.Code.MethodNotFound "Method not found" )
 
 (* --- Notifications ------------------------------------------------------- *)
