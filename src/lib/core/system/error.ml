@@ -72,7 +72,7 @@ let witness_of_diff given expected =
 let witness_of_diffs lst =
   List.find_map (fun (g, e) -> witness_of_diff g e) lst
 
-let pp_witness_descr fmt t =
+let witness_descr t =
   let pp_w what fmt w =
     Format.fprintf fmt "%s may be: @[<h>%a@]" what Witness.pp w in
   let gty_pairs check expected given =
@@ -109,16 +109,15 @@ let pp_witness_descr fmt t =
       witness_of_diffs (gty_pairs check expected given)
       |> Option.map (fun w fmt -> pp_w "expression" fmt w)
   in
-  match res with
-  | Some pp -> pp fmt
-  | None -> pp_descr fmt t (* No witness: fall back to printing types *)
+  res
 
-type style = Types | Witnesses
+type style = Types | Witnesses | Both
 
 let pp_descr ?(style=Types) fmt t =
-  match style with
-  | Types -> pp_descr fmt t
-  | Witnesses -> pp_witness_descr fmt t
+  match style, witness_descr t with
+  | Types, _ | (Witnesses | Both), None -> pp_descr fmt t
+  | Witnesses, Some pp -> pp fmt
+  | Both, Some pp -> Format.fprintf fmt "%a@.%t" pp_descr t pp
 
 let descr ?style t =
   match Format.asprintf "%a" (pp_descr ?style) t with

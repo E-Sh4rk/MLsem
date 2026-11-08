@@ -227,6 +227,7 @@ let treat (benv,varm,senv,env) (annot, elem) =
       | "allow_implicit_downcast", Bool b -> Config.allow_implicit_downcast := b
       | "errors_style", String "types" -> Config.errors_style := Mlsem_system.Error.Types
       | "errors_style", String "witnesses" -> Config.errors_style := Mlsem_system.Error.Witnesses
+      | "errors_style", String "both" -> Config.errors_style := Mlsem_system.Error.Both
       | "infer_overload", Bool b -> Config.infer_overload := b
       | "reexplore_failed_domains", Bool b -> Config.reexplore_failed_domains := b
       | "assimilate_vars", Bool b -> Config.assimilate_vars := b
