@@ -55,9 +55,11 @@ type result = {
   (* Final environment of the typecheck, needed to render/merge overloads.
      [None] when the source failed to parse or sigs failed to elaborate. *)
   envs: Main.envs option;
+  (* Types of variables and calls, for hover and highlighting. *)
+  typings: Typings.t;
 }
 
-let empty = {lenses = []; diagnostics = []; bindings = []; envs = None}
+let empty = {lenses = []; diagnostics = []; bindings = []; envs = None; typings = Typings.empty}
 
 (* LSP positions are 0-indexed; Lexing.pos_lnum is 1-indexed while
    [Position.column] already returns a 0-indexed offset within the line. *)
@@ -113,7 +115,10 @@ let add_message acc (sev, pos, title, descr) =
   in
   diagnostic ~severity:(severity_of sev) ~range ~message:(full_message title descr) () :: acc
 
-let add_result envs acc (out : Main.output) : result =
+let add_result ?typings envs acc (out : Main.output) : result =
+  ( match (out.res, typings) with
+  | TSuccess (lst, _), Some ctx -> List.iter (Typings.add ctx envs) lst
+  | _ -> () ) ;
   match out.res with
   | TDone -> acc
   | TFailure (v_opt, pos, msg, descr, _time) ->
@@ -194,6 +199,7 @@ let add_result envs acc (out : Main.output) : result =
    (with no lenses) or the accumulated per-binding results. *)
 let run (source : string) : result =
   Config.restore_all () ;
+  Main.collect_typings := true ;
   try
     match parse (`String source) with
     | PFailure (pos, msg) ->
@@ -217,16 +223,17 @@ let run (source : string) : result =
         if not sigs_ok then
           acc
         else
+          let typings = Typings.create source in
           let final_envs, acc =
             List.fold_left
               (fun (env, acc) e ->
                  let env, res = treat_def env e in
-                 (env, add_result env acc res) )
+                 (env, add_result ~typings env acc res) )
               (envs, acc) program
           in
           (* Keep the final environment so custom requests can render and
              merge the cached overloads in the same elaboration context. *)
-          {acc with envs = Some final_envs}
+          {acc with envs = Some final_envs; typings = Typings.finish typings}
   with
   | e ->
       {
