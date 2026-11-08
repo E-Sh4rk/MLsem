@@ -52,6 +52,8 @@ type style =
     in the expected one (e.g. an argument outside the domain of the function).
     Falls back to [Types] when no such value exists (e.g. when the failure
     comes from polymorphism rather than from a plain subtyping mismatch). *)
+| Both
+(** Print the types, followed by a witness if there is one. *)
 
 val pp_descr : ?style:style -> Format.formatter -> t -> unit
 (** Prints the details of the error, according to [style] (default [Types]).
