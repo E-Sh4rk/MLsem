@@ -145,6 +145,10 @@ let failed : (Uri.t, Digest.t * string) Hashtbl.t = Hashtbl.create 4
 (* Settings from initialize. *)
 let timeout = ref 10.0
 let editor_pid : int option ref = ref None
+
+(* Colour swatches in overload hovers, matching the extension's colouring of
+   [val] lines. Set by the [hoverOverloadColors] initialization option. *)
+let hover_colors = ref false
 let work_done_progress = ref false
 
 let crash_times : float list ref = ref []
@@ -447,9 +451,12 @@ let read_initialize_params (params : Lsp.Types.InitializeParams.t) =
     |> Option.value ~default:false ;
   ( match params.initializationOptions with
   | Some (`Assoc opts) -> (
-      match List.assoc_opt "typecheckTimeout" opts with
+      ( match List.assoc_opt "typecheckTimeout" opts with
       | Some (`Int n) -> timeout := float_of_int n
       | Some (`Float f) -> timeout := f
+      | _ -> () ) ;
+      match List.assoc_opt "hoverOverloadColors" opts with
+      | Some (`Bool b) -> hover_colors := b
       | _ -> () )
   | _ -> () ) ;
   editor_pid := params.processId
@@ -516,11 +523,95 @@ let shutdown () =
   queue := [] ;
   kill_engine ()
 
+let code_block t = "```mlsem\n" ^ t ^ "\n```"
+
+(* Colours of overload rows, readable on dark and light themes. The extension
+   tints the editor with them at low opacity. *)
+let overload_colors = [| "#e5534b"; "#539bf5"; "#c69026"; "#57ab5a"; "#986ee2"; "#cc6b2c" |]
+let overload_color i = overload_colors.(i mod Array.length overload_colors)
+
+(* A single type as a code block; overloads as a table of type and [val]
+   signature per row, with the union as the last row. Markdown table cells
+   can't hold code blocks, which are the only highlighted code, so the table
+   is HTML with a code block in each cell: the blank lines around a block
+   switch the renderer back to markdown inside the HTML. Needs the client to
+   allow HTML in hovers. *)
+let hover_markdown : Typings.hover_body -> string = function
+  | Type t -> code_block t
+  | Overloads {rows; union} ->
+      let cell = function
+        | `Code s -> "<td>\n\n" ^ code_block s ^ "\n\n</td>"
+        | `Text s -> "<td>" ^ s ^ "</td>"
+      in
+      (* VS Code strips [nowrap]; non-breaking spaces keep the cells from
+         wrapping, and a long table scrolls instead. *)
+      let nowrap s = String.concat "\xC2\xA0" (String.split_on_char ' ' s) in
+      (* A swatch in the colour the extension gives the row's part of its
+         [val] line. VS Code keeps [style] only on spans, and only colours. *)
+      let swatch i =
+        Printf.sprintf "<span style=\"background-color:%s;\">&nbsp;&nbsp;&nbsp;</span>"
+          (overload_color i)
+      in
+      (* VS Code's hover styles draw no table borders and the sanitizer
+         keeps no border styles, so the columns are separated by a bar in a
+         code block of its own: it gets the padding of the neighbouring code
+         blocks, so the bars of consecutive one-line rows join up. *)
+      let bar = cell (`Code "│") in
+      let row ?mark a b =
+        let first = if !hover_colors then [cell (`Text (Option.value mark ~default:""))] else [] in
+        "<tr>" ^ String.concat "" (first @ [cell a; bar; cell b]) ^ "</tr>"
+      in
+      let rows =
+        List.mapi
+          (fun i (r : Typings.overload_row) ->
+             let mark = Option.map (fun _ -> swatch i) r.sig_range in
+             row ?mark
+               ( match r.row_type with
+               | Some t -> `Code (nowrap t)
+               | None -> `Text "<em>unreachable</em>" )
+               ( match r.sig_text with
+               | Some s -> `Code (nowrap s)
+               | None -> `Text "" ) )
+          rows
+      in
+      let header =
+        (if !hover_colors then "<th></th>" else "") ^ "<th>type</th><th></th><th>overload</th>"
+      in
+      String.concat "\n"
+        ( ["<table>"; "<tr>" ^ header ^ "</tr>"]
+        @ rows
+        @ [row (`Code (nowrap union)) (`Text "<em>union</em>"); "</table>"] )
+
+(* [mlsem/hoverOverloads]: for the hover at a position, the parts of [val]
+   lines its overload rows stand for, each with its row's colour, for the
+   extension to colour in the editor. *)
+let hover_overloads (params : Yojson.Safe.t) =
+  let open Yojson.Safe.Util in
+  let uri = params |> member "textDocument" |> member "uri" |> Lsp.Types.DocumentUri.t_of_yojson in
+  let pos = params |> member "position" |> Lsp.Types.Position.t_of_yojson in
+  if !hover_colors then
+    `List
+      ( Doc.hover_overload_ranges uri pos
+      |> List.map (fun (i, range) ->
+        `Assoc [("range", Lsp.Types.Range.yojson_of_t range); ("color", `String (overload_color i))] )
+      )
+  else
+    `List []
+
 let handle_request (req : Request.t) =
   if !shutdown_received then
     respond_error req.id Response.Error.Code.InvalidRequest "Server is shutting down"
   else if Engine.is_tool req.method_ then
     handle_tool req
+  else if req.method_ = "mlsem/hoverOverloads" then
+    match
+      req.params
+    with
+    | Some p -> (
+        try respond req.id (hover_overloads (Jsonrpc.Structured.yojson_of_t p)) with
+        | Yojson.Safe.Util.Type_error (msg, _) ->
+            respond_error req.id Response.Error.Code.InvalidParams msg )
+    | None -> respond_error req.id Response.Error.Code.InvalidParams "missing params"
   else
     match
       Lsp.Client_request.of_jsonrpc req
@@ -548,8 +639,8 @@ let handle_request (req : Request.t) =
             (* Like codeLens, answered from the copy. *)
             let hover =
               Doc.hover params.textDocument.uri params.position
-              |> Option.map (fun (range, lines) ->
-                let value = "```mlsem\n" ^ String.concat "\n" lines ^ "\n```" in
+              |> Option.map (fun (range, body) ->
+                let value = hover_markdown body in
                 let contents =
                   `MarkupContent (Lsp.Types.MarkupContent.create ~kind:Markdown ~value)
                 in
@@ -557,14 +648,19 @@ let handle_request (req : Request.t) =
             in
             respond req.id (Lsp.Client_request.yojson_of_result typed_req hover)
         | Lsp.Client_request.TextDocumentHighlight params ->
+            (* Never [None]: VS Code would then highlight every occurrence of
+               the word under the cursor, comments and shadowed names included. *)
             let highlights =
-              match Doc.highlights params.textDocument.uri params.position with
-              | [] -> None
-              | ranges ->
-                  Some
-                    (List.map
-                       (fun range -> Lsp.Types.DocumentHighlight.create ~kind:Text ~range ())
-                       ranges )
+              Doc.highlights params.textDocument.uri params.position
+              |> List.map (fun (range, kind) ->
+                let kind : Lsp.Types.DocumentHighlightKind.t =
+                  match kind with
+                  | `Read -> Read
+                  | `Write -> Write
+                  | `Text -> Text
+                in
+                Lsp.Types.DocumentHighlight.create ~kind ~range () )
+              |> Option.some
             in
             respond req.id (Lsp.Client_request.yojson_of_result typed_req highlights)
         | _ -> respond_error req.id Response.Error.Code.MethodNotFound "Method not found" )

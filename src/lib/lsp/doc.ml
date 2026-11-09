@@ -148,8 +148,21 @@ let shift_typings (t : Typings.t) shift =
       let hovers =
         List.filter_map
           (fun (h : Typings.hover) ->
+             let body : Typings.hover_body =
+               match h.body with
+               | Type _ as b -> b
+               | Overloads o ->
+                   (* A [val] line the edit touched loses its colour. *)
+                   let row (r : Typings.overload_row) =
+                     {
+                       r with
+                       sig_range = Option.bind r.sig_range (shift_offsets ~s_off ~e_off ~delta);
+                     }
+                   in
+                   Overloads {o with rows = List.map row o.rows}
+             in
              Option.map
-               (fun (h_start, h_end) -> {h with h_start; h_end})
+               (fun (h_start, h_end) -> {Typings.h_start; h_end; body})
                (move (h.h_start, h.h_end)) )
           t.hovers
       in
@@ -188,7 +201,15 @@ let shift_typings (t : Typings.t) shift =
                  Some {c with c_start; c_end; args} )
           t.calls
       in
-      ({hovers; defns; calls}, !dropped)
+      let occs =
+        List.filter_map
+          (fun (o : Typings.occ) ->
+             Option.map
+               (fun (v_start, v_end) -> {o with v_start; v_end})
+               (move (o.v_start, o.v_end)) )
+          t.occs
+      in
+      ({hovers; defns; calls; occs}, !dropped)
 
 (* Apply one [TextDocumentContentChangeEvent]: update the buffer, shift the
    cached lenses through the edit, and log the edit for a pending typecheck.
@@ -329,7 +350,7 @@ let lsp_range e (s, e_off) =
 let covers off (s, e) = s <= off && off <= e
 
 (* The hover of the tightest variable occurrence or binder at [pos]. *)
-let hover uri (pos : Lsp.Types.Position.t) : (Lsp.Types.Range.t * string list) option =
+let hover uri (pos : Lsp.Types.Position.t) : (Lsp.Types.Range.t * Typings.hover_body) option =
   match find uri with
   | None -> None
   | Some e -> (
@@ -339,13 +360,24 @@ let hover uri (pos : Lsp.Types.Position.t) : (Lsp.Types.Range.t * string list) o
       |> List.sort (fun (a : Typings.hover) (b : Typings.hover) ->
         compare (a.h_end - a.h_start) (b.h_end - b.h_start) )
       |> function
-      | h :: _ -> Some (lsp_range e (h.h_start, h.h_end), h.lines)
+      | h :: _ -> Some (lsp_range e (h.h_start, h.h_end), h.body)
       | [] -> None )
+
+(* For the hover at [pos]: the parts of [val] lines its overload rows stand
+   for, with the row's index. *)
+let hover_overload_ranges uri pos : (int * Lsp.Types.Range.t) list =
+  match (find uri, hover uri pos) with
+  | Some e, Some (_, Overloads {rows; _}) ->
+      List.mapi (fun i (r : Typings.overload_row) -> (i, r.sig_range)) rows
+      |> List.filter_map (fun (i, r) -> Option.map (fun r -> (i, lsp_range e r)) r)
+  | _ -> []
 
 (* With the cursor on a type variable of a [val] line: that variable's
    occurrences in the definition's [val] lines, and everything in its body
    whose type mentions it. *)
-let highlights uri (pos : Lsp.Types.Position.t) : Lsp.Types.Range.t list =
+let highlights uri (pos : Lsp.Types.Position.t) :
+  (Lsp.Types.Range.t * [`Read | `Write | `Text]) list
+  =
   match find uri with
   | None -> []
   | Some e -> (
@@ -354,9 +386,18 @@ let highlights uri (pos : Lsp.Types.Position.t) : Lsp.Types.Range.t list =
         List.find_opt (fun (o : Typings.tvar_occ) -> covers off (o.o_start, o.o_end)) d.tvar_occs
         |> Option.map (fun (o : Typings.tvar_occ) -> (d, o.tvar))
       in
-      match List.find_map at_cursor e.typings.defns with
-      | None -> []
-      | Some (d, tvar) ->
+      let var_at_cursor =
+        List.find_opt (fun (o : Typings.occ) -> covers off (o.v_start, o.v_end)) e.typings.occs
+      in
+      match (List.find_map at_cursor e.typings.defns, var_at_cursor) with
+      | None, None -> []
+      | None, Some o ->
+          (* With the cursor on a variable: where it is bound and used. *)
+          e.typings.occs
+          |> List.filter (fun (o' : Typings.occ) -> o'.var = o.var)
+          |> List.map (fun (o : Typings.occ) ->
+            (lsp_range e (o.v_start, o.v_end), if o.binder then `Write else `Read) )
+      | Some (d, tvar), _ ->
           let occs =
             d.tvar_occs
             |> List.filter (fun (o : Typings.tvar_occ) -> o.tvar = tvar)
@@ -367,4 +408,4 @@ let highlights uri (pos : Lsp.Types.Position.t) : Lsp.Types.Range.t list =
             |> List.filter (fun (m : Typings.mark) -> List.mem tvar m.tvars)
             |> List.map (fun (m : Typings.mark) -> (m.m_start, m.m_end))
           in
-          List.sort_uniq compare (occs @ marks) |> List.map (lsp_range e) )
+          List.sort_uniq compare (occs @ marks) |> List.map (fun r -> (lsp_range e r, `Text)) )
