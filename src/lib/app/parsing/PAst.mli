@@ -64,7 +64,8 @@ type expr = (Eid.t, Ty.t, GTy.t, Enum.t, Tag.t, Variable.t) t
 
 (** Program AST *)
 
-type varname = string
+type varname = string Position.located
+(** A variable name and where it is written. *)
 type annotation = Eid.t Position.located
 val new_annot : Position.t -> annotation
 
@@ -83,7 +84,7 @@ type debug =
 | DTally of (TyExpr.t * op * TyExpr.t) list
 | DCmp of TyExpr.t * op * TyExpr.t
 type element =
-| Definitions of (Position.t * (TyExpr.t, string) vdef * pexpr) list
+| Definitions of (Position.t * (TyExpr.t, varname) vdef * pexpr) list
 | SigDef of string * bool (* mutable *) * TyExpr.t
 | Types of (string * string list * TyExpr.t) list
 | AbsType of string * int
