@@ -31,6 +31,13 @@ module Variable : sig
   val get_location : t -> Position.t
   (** {!Position.dummy} if no location was attached. *)
 
+  val attach_name_location : t -> Position.t -> unit
+  (** Sets where the name is written at the definition site, within the
+      definition site's location. *)
+
+  val get_name_location : t -> Position.t
+  (** {!Position.dummy} if no name location was attached. *)
+
   val get_sig_locations : t -> Position.t list
   val get_name : t -> string option
 

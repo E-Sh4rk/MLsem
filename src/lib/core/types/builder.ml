@@ -42,6 +42,7 @@ module TyExpr = struct
         | TRecUpd of t * (string * t) list
         | TRecProj of t * string
         | TTagProj of t * string
+        | TLoc of (Lexing.position * Lexing.position) * t
 end
 
 module Builder = struct
@@ -200,6 +201,7 @@ module Builder = struct
             and aux lcl t =
                 let open TyExpr in
                 match t with
+                | TLoc (_, t) -> aux lcl t
                 | TDyn -> GTy.Builder.dyn ()
                 | TVar (kind,v) ->
                     begin match StrMap.find_opt v lcl, Hashtbl.find_opt venv v with
@@ -277,6 +279,7 @@ module Builder = struct
             and aux_field lcl t =
                 let open TyExpr in
                 match t with
+                | TLoc (_, t) -> aux_field lcl t
                 | TOption t -> FTy.of_oty (aux lcl t, true)
                 | TRowVar (kind, v) ->
                     begin match Hashtbl.find_opt rvenv v with

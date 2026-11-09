@@ -10,9 +10,13 @@
   let dummy_annot e =
     (new_annot Position.dummy, e)
 
-  type param = PPattern of pat | PVar of string
+  (* A name and where it is written. *)
+  let name sp ep x = Position.with_poss sp ep x
+  let var sp ep x = annot sp ep (Var (name sp ep x))
 
-  let tmp_var = "_pat"
+  type param = PPattern of pat | PVar of varname
+
+  let tmp_var = Position.unknown_pos "_pat"
   let tmp_var_e = dummy_annot (Var tmp_var)
   let abstraction startpos endpos lst t =
     let step acc (da, pat) =
@@ -181,7 +185,8 @@ unique_ty: ty=typ EOF { ty }
 
 element:
 | LET ds=separated_nonempty_list(AND_KW, tl_let) { annot $symbolstartpos $endpos (Definitions ds) }
-| VAL m=mut id=generalized_identifier COLON ty=typ { annot $symbolstartpos $endpos (SigDef (id, m, ty)) }
+| VAL m=mut id=generalized_identifier COLON ty=typ
+  { annot $symbolstartpos $endpos (SigDef (Position.value id, m, TLoc ($loc(ty), ty))) }
 | TYPE ts=separated_nonempty_list(AND_KW, param_type_def) { annot $symbolstartpos $endpos (Types ts) }
 | ABSTRACT TYPE name=ID { annot $symbolstartpos $endpos (AbsType (name, 0)) }
 | ABSTRACT TYPE name=PID vs=separated_nonempty_list(COMMA, TVAR) RPAREN
@@ -211,13 +216,13 @@ comp_op:
 | IS t=typ { t }
 
 %inline mid:
-| MUT id=ID { (Mut, id) }
-| MUT id=ID COLON ty=typ { (AnnotMut ty, id) }
+| MUT id=ID { (Mut, name $startpos(id) $endpos(id) id) }
+| MUT id=ID COLON ty=typ { (AnnotMut ty, name $startpos(id) $endpos(id) id) }
 
 %inline id_mid:
-  id=ID { (Immut, id) }
-| LPAREN MUT id=ID RPAREN { (Mut, id) }
-| LPAREN MUT id=ID COLON ty=typ RPAREN { (AnnotMut ty, id) }
+  id=ID { (Immut, name $startpos(id) $endpos(id) id) }
+| LPAREN MUT id=ID RPAREN { (Mut, name $startpos(id) $endpos(id) id) }
+| LPAREN MUT id=ID COLON ty=typ RPAREN { (AnnotMut ty, name $startpos(id) $endpos(id) id) }
 
 term:
   t=simple_term o=option(preceded(SEMICOLON, term)) {
@@ -249,14 +254,14 @@ simple_term: (* Cannot end with a semi-colon *)
 | WHILE t=term ott=optional_test_type DO t1=term END { annot $startpos $endpos (While (t,ott,t1)) }
 | MATCH t=term WITH pats=patterns END { annot $startpos $endpos (PatMatch (t,pats)) }
 | hd=simple_term2 COMMA tl=separated_nonempty_list(COMMA, simple_term2) { annot $startpos $endpos (Tuple (hd::tl)) }
-| id=ID ASSIGN t=simple_term { annot $startpos $endpos (VarAssign (id, t)) }
+| id=ID ASSIGN t=simple_term { annot $startpos $endpos (VarAssign (name $startpos(id) $endpos(id) id, t)) }
 
 simple_term2:
   a=op_or { a }
 | t=indexed i=INDEXED t3=op_or
 {
   let (t1,t2) = t in
-  let f = annot $startpos $endpos (Var ("["^i)) in
+  let f = var $startpos $endpos (("["^i)) in
   tern_app $startpos $endpos f t1 t2 t3
 }
 
@@ -309,18 +314,18 @@ simple_term4:
 | p=prefix_term a=simple_term4 { annot $startpos $endpos (App (p, a)) }
 
 %inline indexed:
-| x=IID t=term { annot $startpos $endpos (Var x), t }
+| x=IID t=term { var $startpos $endpos (x), t }
 | LPAREN t1=term IRPAREN t2=term { t1, t2 }
 
 prefix_term:
-  x=prefix { annot $startpos $endpos (Var x) }
+  x=prefix { var $startpos $endpos (x) }
 
 atomic_term:
   x=generalized_identifier { annot $startpos $endpos (Var x) }
 | t=indexed RBRACKET
 {
   let (t1,t2) = t in
-  let f = annot $startpos $endpos (Var "[]") in
+  let f = var $startpos $endpos ("[]") in
   bin_app $startpos $endpos f t1 t2
 }
 | c=CID { annot $startpos $endpos (Enum c) }
@@ -353,7 +358,7 @@ atomic_term:
 
 %inline field_term:
   id=ID EQUAL t=simple_term { (id, t) }
-| id=ID { (id, annot $startpos $endpos (Var id)) }
+| id=ID { (id, var $startpos $endpos (id)) }
 
 literal:
   f=lfloat { Float f }
@@ -377,44 +382,44 @@ lint:
 | COLON ty=typ { Some ty }
 
 parameter:
-  arg = ID { (None, PVar arg) }
+  arg = ID { (None, PVar (name $startpos $endpos arg)) }
 | PLACEHOLDER_VAR { (None, PPattern (PatType (TBase TAny))) }
 | LPAREN RPAREN { (None, PPattern (PatType (TBase TUnit))) }
 | LPAREN arg = pattern opta = optional_typ RPAREN { (opta, PPattern arg) }
 
 generalized_identifier:
-  | x=ID | x=OPID { x }
+  | x=ID | x=OPID { name $startpos $endpos x }
 
 %inline infix_or:
-  OOR { annot $startpos $endpos (Var "||") }
+  OOR { var $startpos $endpos ("||") }
 
 %inline infix_and:
-  AAND { annot $startpos $endpos (Var "&&") }
+  AAND { var $startpos $endpos ("&&") }
 
 %inline infix_cmp:
-  x=INFIX_CMP { annot $startpos $endpos (Var x) }
-| EQUAL { annot $startpos $endpos (Var "=") }
-| LT    { annot $startpos $endpos (Var "<") }
-| GT    { annot $startpos $endpos (Var ">") }
-| LEQ   { annot $startpos $endpos (Var "<=") }
-| GEQ   { annot $startpos $endpos (Var ">=") }
-| DOUBLEPOINT { annot $startpos $endpos (Var "..") }
+  x=INFIX_CMP { var $startpos $endpos (x) }
+| EQUAL { var $startpos $endpos ("=") }
+| LT    { var $startpos $endpos ("<") }
+| GT    { var $startpos $endpos (">") }
+| LEQ   { var $startpos $endpos ("<=") }
+| GEQ   { var $startpos $endpos (">=") }
+| DOUBLEPOINT { var $startpos $endpos ("..") }
 
 %inline infix_cat:
-  x=INFIX_CAT { annot $startpos $endpos (Var x) }
+  x=INFIX_CAT { var $startpos $endpos (x) }
 
 %inline infix_add:
-  x=INFIX_ADD { annot $startpos $endpos (Var x) }
-| PLUS  { annot $startpos $endpos (Var "+") }
-| MINUS { annot $startpos $endpos (Var "-") }
+  x=INFIX_ADD { var $startpos $endpos (x) }
+| PLUS  { var $startpos $endpos ("+") }
+| MINUS { var $startpos $endpos ("-") }
 
 %inline infix_mul:
-  x=INFIX_MUL { annot $startpos $endpos (Var x) }
-| TIMES { annot $startpos $endpos (Var "*") }
-| DIV   { annot $startpos $endpos (Var "/") }
+  x=INFIX_MUL { var $startpos $endpos (x) }
+| TIMES { var $startpos $endpos ("*") }
+| DIV   { var $startpos $endpos ("/") }
 
 %inline infix_pow:
-  x=INFIX_POW { annot $startpos $endpos (Var x) }
+  x=INFIX_POW { var $startpos $endpos (x) }
 
 prefix:
   | x=PREFIX {x}
@@ -447,7 +452,8 @@ typ_norec:
 
 simple_typ:
   t=concat_typ { t }
-| lhs=simple_typ ARROW rhs=simple_typ { Ty (TArrow (as_typ $loc(lhs) lhs, as_typ $loc(rhs) rhs)) }
+| lhs=simple_typ ARROW rhs=simple_typ
+  { Ty (TArrow (TLoc ($loc(lhs), as_typ $loc(lhs) lhs), TLoc ($loc(rhs), as_typ $loc(rhs) rhs))) }
 | lhs=simple_typ CONS rhs=simple_typ  { Ty (TCons (as_typ $loc(lhs) lhs, as_typ $loc(rhs) rhs)) }
 | NEG t=simple_typ { Ty (TNeg (as_typ $loc(t) t)) }
 | lhs=simple_typ OR rhs=simple_typ   { cst_cup $loc(lhs) lhs $loc(rhs) rhs }
@@ -476,8 +482,8 @@ atomic_typ:
 | s=CID { Ty (TEnum s) }
 | s=PCID t=typ RPAREN { Ty (TTag (s, t)) }
 | s=PCID RPAREN { Ty (TTag (s, TBase TUnit)) }
-| s=TVAR { Ty (TVar (KNoInfer, s)) }
-| s=TVAR_WEAK { Ty (TVar (KInfer, s)) }
+| s=TVAR { Ty (TLoc ($loc, TVar (KNoInfer, s))) }
+| s=TVAR_WEAK { Ty (TLoc ($loc, TVar (KInfer, s))) }
 | s=RVAR { Ty (TRowVar (KNoInfer, s)) }
 | s=RVAR_WEAK { Ty (TRowVar (KInfer, s)) }
 | LPAREN RPAREN { Ty (TBase TUnit) }
@@ -556,4 +562,4 @@ atomic_pattern:
 
 %inline pat_field:
   id=ID EQUAL p=simple_pattern { (id, p) }
-| id=ID { (id, PatVar (Immut, id)) }
+| id=ID { (id, PatVar (Immut, name $startpos $endpos id)) }

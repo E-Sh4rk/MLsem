@@ -60,7 +60,7 @@ and ('a, 'typ, 'gty, 'enu, 'tag, 'v) t = 'a * ('a, 'typ, 'gty, 'enu, 'tag, 'v) a
 
 type expr = (Eid.t, Ty.t, GTy.t, Enum.t, Tag.t, Variable.t) t
 
-type varname = string
+type varname = string Position.located
 type annotation = Eid.t Position.located
 let new_annot p = Position.with_pos p (Eid.unique_with_pos p)
 
@@ -92,10 +92,18 @@ let to_expr benv env e =
         if B.is_test_type t then t
         else raise (SymbolError ("typecases should use test types"))
     in
-    let aux_var env str =
+    let aux_var env name =
+        let str = Position.value name in
         if NameMap.mem str env
         then NameMap.find str env
         else raise (SymbolError ("undefined symbol "^str))
+    in
+    (* A variable bound at [pos] (the binding's location) by the name [name]. *)
+    let new_var mkind pos name =
+        let var = MVariable.create mkind (Some (Position.value name)) in
+        Variable.attach_location var pos ;
+        Variable.attach_name_location var (Position.position name) ;
+        var
     in
     let aux_vkind k =
         match k with
@@ -123,34 +131,30 @@ let to_expr benv env e =
         | TagProj (e, str) -> TagProj (aux env e, get_tag str)
         | Suggest (str,tys,e) ->
             Suggest (aux_var env str, aux_tys tys, aux env e)
-        | Lambda (str,da,e) ->
-            let var = MVariable.create Immut (Some str) in
-            Variable.attach_location var pos ;
-            let env = NameMap.add str var env in
+        | Lambda (name,da,e) ->
+            let var = new_var Immut pos name in
+            let env = NameMap.add (Position.value name) var env in
             Lambda (var, aux_a da, aux env e)
         | LambdaRec lst ->
-            let aux (str,tyo,e) =
-                let var = MVariable.create Immut (Some str) in
-                Variable.attach_location var pos ;
-                let env = NameMap.add str var env in
+            let aux (name,tyo,e) =
+                let var = new_var Immut pos name in
+                let env = NameMap.add (Position.value name) var env in
                 var, aux_a tyo, aux env e
-            in 
+            in
             LambdaRec (List.map aux lst)
         | Ite (e, t, e1, e2) ->
             Ite (aux env e, aux_cond t, aux env e1, aux env e2)
         | App (e1, e2) -> App (aux env e1, aux env e2)
-        | Let ((kind,str), e1, e2) ->
+        | Let ((kind,name), e1, e2) ->
             let mkind, kind = aux_vkind kind in
-            let var = MVariable.create mkind (Some str) in
-            Variable.attach_location var pos ;
-            let env' = NameMap.add str var env in
+            let var = new_var mkind pos name in
+            let env' = NameMap.add (Position.value name) var env in
             Let ((kind, var), aux env e1, aux env' e2)
-        | Declare ((kind,str), e) ->
+        | Declare ((kind,name), e) ->
             let mkind, kind = aux_vkind kind in
-            let var = MVariable.create mkind (Some str) in
+            let var = new_var mkind pos name in
             assert (MVariable.is_mutable var) ;
-            Variable.attach_location var pos ;
-            let env' = NameMap.add str var env in
+            let env' = NameMap.add (Position.value name) var env in
             Declare ((kind, var), aux env' e)
         | Tuple es -> Tuple (List.map (aux env) es)
         | TupleProj (e, n, i) -> TupleProj (aux env e, n, i)
@@ -185,7 +189,8 @@ let to_expr benv env e =
                 else raise (SymbolError ("matched variables "^str^" are conflicting")))
         in
         let rec aux_p env pat =
-            let find_or_def_var (kind, str) =
+            let find_or_def_var (kind, name) =
+                let str = Position.value name in
                 let mkind, kind = aux_vkind kind in
                 if NameMap.mem str env
                 then
@@ -193,8 +198,8 @@ let to_expr benv env e =
                     if MVariable.kind_equal (MVariable.kind v) mkind then kind, v, str
                     else raise (SymbolError ("inconsistent mutability for var '"^str^"'"))
                 else
-                    let var = MVariable.create mkind (Some str) in
-                    Variable.attach_location var pos ; kind, var, str
+                    let var = new_var mkind pos name in
+                    kind, var, str
             in
             match pat with
             | PatType t ->
@@ -257,7 +262,7 @@ type debug =
 | DTally of (TyExpr.t * op * TyExpr.t) list
 | DCmp of TyExpr.t * op * TyExpr.t
 type element =
-| Definitions of (Position.t * (TyExpr.t, string) vdef * pexpr) list
+| Definitions of (Position.t * (TyExpr.t, varname) vdef * pexpr) list
 | SigDef of string * bool (* mutable *) * TyExpr.t
 | Types of (string * string list * TyExpr.t) list
 | AbsType of string * int

@@ -231,11 +231,13 @@ let treat (benv,varm,senv,env) (annot, elem) =
     match elem with
     | PAst.Definitions lst ->
       let varm, benv = ref varm, ref benv in
-      let lst = lst |> List.map (fun (bpos, (kind, name), e) ->
+      let lst = lst |> List.map (fun (bpos, (kind, lname), e) ->
+        let name = Position.value lname in
         let kind, benv' = resolve_kind !benv kind in
         let var, sigs = sigs_of_def !varm senv env (kind, name) in
         let bpos = if bpos = Position.dummy then pos else bpos in
         benv := benv' ; Variable.attach_location var bpos ;
+        Variable.attach_name_location var (Position.position lname) ;
         varm := NameMap.add name var !varm ;
         (var, e, sigs)
       )

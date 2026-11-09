@@ -1,6 +1,7 @@
 module Variable = struct
 
-  type data = { name:string option ; pos:Position.t ; sig_pos:Position.t list }
+  type data = { name:string option ; pos:Position.t ; name_pos:Position.t ;
+                sig_pos:Position.t list }
   let data : (int, data) Hashtbl.t = Hashtbl.create 100
 
   type t = int
@@ -15,7 +16,8 @@ module Variable = struct
 
   let create display_name =
     let id = next_id () in
-    Hashtbl.add data id { name=display_name ; pos=Position.dummy ; sig_pos=[] } ;
+    Hashtbl.add data id { name=display_name ; pos=Position.dummy ;
+                          name_pos=Position.dummy ; sig_pos=[] } ;
     id
 
   let refresh id =
@@ -33,6 +35,12 @@ module Variable = struct
     Hashtbl.replace data id { v with sig_pos=loc::v.sig_pos }
 
   let get_location id = (Hashtbl.find data id).pos
+
+  let attach_name_location id loc =
+    let v = Hashtbl.find data id in
+    Hashtbl.replace data id { v with name_pos=loc }
+
+  let get_name_location id = (Hashtbl.find data id).name_pos
 
   let get_sig_locations id = (Hashtbl.find data id).sig_pos
 
