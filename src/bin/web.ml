@@ -27,7 +27,7 @@ let json_of_pos pos =
     ("endLine", `Int (line endp)) ; ("endCol", `Int (column endp)) ;
     ("startOffset", `Int (offset startp)) ; ("endOffset", `Int (offset endp))]
 
-let json_of_msg (s, pos, title, descr) =
+let json_of_msg (s, pos, title, descr, _) =
     let descr = match descr with None -> [] | Some d -> [("descr", `String d)] in
     `Assoc ([("severity", `String (severity_to_str s)) ; ("message", `String title) ;
     ("pos", json_of_pos pos)]@descr)
