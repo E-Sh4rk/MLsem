@@ -53,7 +53,9 @@ val initial_benv : Builder.benv
 val initial_penv : PEnv.t
 
 val display : envs -> TyScheme.t -> string
-val display_gty : envs -> GTy.t -> string
+val display_gty : ?names:Subst.t -> envs -> GTy.t -> string
+(** [names] renames type variables, e.g. to match how [display] names the
+    variables of a scheme. *)
 val signature : envs -> Signature.t -> string list
 
 (* Build the concrete type denoted by a surface type expression, resolved

@@ -397,7 +397,8 @@ let print_ty pp (_,_,_,_,penv) ty =
     (fun () -> Format.asprintf "@[<h>%a@]" pp ty) ()
   |> fst
 let display envs ty = print_ty TyScheme.pp_short envs ty
-let display_gty envs ty = print_ty GTy.pp envs (GTy.simplify ty)
+let display_gty ?(names=Subst.identity) envs ty =
+  print_ty (GTy.pp' names) envs (GTy.simplify ty)
 let signature envs sigs = sigs |> List.map (print_ty Signature.pp_overload envs)
 
 let build_type ((benv, _, _, _, _) : envs) (s : string) : Ty.t =
