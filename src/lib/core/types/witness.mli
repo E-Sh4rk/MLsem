@@ -13,7 +13,7 @@ type t =
   | Record of (Label.t * tf) list * tf
   (** A record: explicit fields and the field for all other labels *)
   | Tag of Tag.t * t  (** A tagged value *)
-  | TagOther of Tag.t
+  | TagOpaque of Tag.t
   (** A value with the given tag, whose content cannot be described
       (the tag does not preserve intersections) *)
   | Arrow  (** A function *)
@@ -40,17 +40,27 @@ type printer = Format.formatter -> t -> unit
 (** A printer for tagged values, which is given the content of the tag
     (i.e. [w] for the witness [Tag (tag, w)]). *)
 
-val add_printer_param : Tag.t * printer -> unit
-(** [add_printer_param (tag, p)] registers [p] as the printer for the values
-    tagged with [tag], with priority over the printers registered before. *)
+type printer_param =
+| Tagged of Tag.t * printer
+(** [Tagged (tag, p)]: the witnesses [Tag (tag, w)] are printed by [p]. *)
+| Opaque of Tag.t * string
+(** [Opaque (tag, str)]: the witnesses [TagOpaque tag] are printed as [str]. *)
 
-val set_printer_params : (Tag.t * printer) list -> unit
+val add_printer_param : printer_param -> unit
+(** Registers a printer, with priority over the printers registered before. *)
+
+val set_printer_params : printer_param list -> unit
 (** Replaces the printers registered with {!add_printer_param}.
-    Built-in printers (for strings, floats and lists) are always kept, but can be overridden. *)
+    Built-in printers are always kept, but can be overridden. *)
 
-(** Default printer for witnesses. Values tagged with a tag having a registered
-    printer are printed with it. Values of other extensions (booleans,
-    characters, etc.) are printed as their type, between [<...>] if the value is not
-    fully specified. In records, absent fields are omitted, and the witness
-    for all other labels is printed as [_ = w]. *)
+val add_builtin_printer_param : printer_param -> unit
+(** Registers a built-in printer: it is not removed by {!set_printer_params}.
+    Built-in printers are already registered for the extensions of Sstt
+    (booleans, floats, characters, strings and lists), and for abstract
+    types defined by {!Mlsem_types.Abstract.define}. *)
+
+(** Default printer for witnesses, using the registered printers.
+    A tagged witness without a registered printer is printed as [tag(w)],
+    or [tag(_)] for [TagOpaque tag]. In records, absent fields are omitted,
+    and the witness for all other labels is printed as [_ = w]. *)
 val pp : Format.formatter -> t -> unit
