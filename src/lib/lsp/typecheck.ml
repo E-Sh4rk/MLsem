@@ -101,19 +101,28 @@ let full_message title descr =
   | None -> title
   | Some d -> title ^ ":\n" ^ d
 
-let diagnostic ?(severity = LT.DiagnosticSeverity.Error) ~range ~message () =
-  LT.Diagnostic.create ~message:(`String message) ~range ~severity ~source:"mlsem" ()
+let diagnostic ?(severity = LT.DiagnosticSeverity.Error) ?tags ~range ~message () =
+  LT.Diagnostic.create ~message:(`String message) ~range ~severity ?tags ~source:"mlsem" ()
 
 let make_lens ?signature ~start_offset ~end_offset ~title () =
   {start_offset; end_offset; title; signature}
 
-let add_message acc (sev, pos, title, descr) =
+let add_message acc (sev, pos, title, descr, kind) =
   let range =
     match lsp_range_of_pos pos with
     | Some r -> r
     | None -> fallback_range ()
   in
-  diagnostic ~severity:(severity_of sev) ~range ~message:(full_message title descr) () :: acc
+  (* Code no derivation reaches (a typecase branch skipped in all of them):
+     the editor fades it out. *)
+  let tags =
+    match (kind : Mlsem_system.Analyzer.Diagnostic.kind option) with
+    | Some Unreachable -> Some [LT.DiagnosticTag.Unnecessary]
+    | Some (Unchecked _)
+    | None ->
+        None
+  in
+  diagnostic ~severity:(severity_of sev) ?tags ~range ~message:(full_message title descr) () :: acc
 
 let add_result ?typings envs acc (out : Main.output) : result =
   ( match (out.res, typings) with

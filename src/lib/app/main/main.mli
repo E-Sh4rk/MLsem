@@ -4,6 +4,9 @@ module MVariable = Mlsem_lang.MVariable
 
 module NameMap : Map.S with type key=string
 type message = Mlsem_system.Analyzer.severity * Position.t * string * string option
+               * Mlsem_system.Analyzer.Diagnostic.kind option
+(** Severity, location, title, description, and the analyzer's diagnostic it
+    comes from, if any. *)
 
 (** Types of variables and calls, recorded while checking a definition, for
     editor tooling. Only recorded when [collect_typings] is set. *)
