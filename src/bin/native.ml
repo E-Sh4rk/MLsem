@@ -42,7 +42,7 @@ let treat_res (acc, output) =
         acc, false
     | TDone -> acc, true
     in
-    output.msg |> List.iter (fun (s,pos,title,descr) ->
+    output.msg |> List.iter (fun (s,pos,title,descr,_) ->
         Format.printf "@{<italic;bold;cyan>[%s]@} @{<italic;cyan>%s@} @{<italic;cyan>%s@}\n%!"
             (severity_to_str s) (Position.string_of_pos pos) title ;
         descr |> Option.iter (Format.printf "@{<italic;cyan>%s@}\n%!") ;

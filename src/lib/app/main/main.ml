@@ -208,6 +208,7 @@ let debug benv d =
     msg, benv
 
 type message = Mlsem_system.Analyzer.severity * Position.t * string * string option
+               * Mlsem_system.Analyzer.Diagnostic.kind option
 type inferred = {
   var: Variable.t;
   ty: TyScheme.t;
@@ -259,7 +260,7 @@ let treat (benv,varm,senv,env) (annot, elem) =
       let tys2, msg2 = List.map (type_check_with_sigs env) sigs |> List.split in
       let msg = msg1@(List.concat msg2) |> List.map (fun d ->
         let open Mlsem_system.Analyzer.Diagnostic in
-        (severity d, Eid.loc d.eid, title d, descr d)
+        (severity d, Eid.loc d.eid, title d, descr d, Some d.kind)
       ) in
       let senv = List.fold_left (fun senv (v,_) -> VarMap.remove v senv) senv tys2 in
       let render ~declared (v, (ty,sigs,derivations)) = { var = v; ty; sigs; declared; derivations } in
@@ -267,7 +268,7 @@ let treat (benv,varm,senv,env) (annot, elem) =
       (!benv,varm,senv,env), { res=TSuccess (tys,retrieve_time time) ; msg }
     | PAst.Debug dbg ->
       let msg, benv = debug benv dbg in
-      let msg = [Mlsem_system.Analyzer.Message, pos, "Computation result", Some msg] in
+      let msg = [Mlsem_system.Analyzer.Message, pos, "Computation result", Some msg, None] in
       (benv,varm,senv,env), { res=TDone ; msg }
     | PAst.SigDef (name, mut, ty) ->
       begin try
