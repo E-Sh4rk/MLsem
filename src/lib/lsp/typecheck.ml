@@ -232,7 +232,7 @@ let run (source : string) : result =
         if not sigs_ok then
           acc
         else
-          let typings = Typings.create source in
+          let typings = Typings.create program in
           let final_envs, acc =
             List.fold_left
               (fun (env, acc) e ->
