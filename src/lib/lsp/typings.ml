@@ -418,7 +418,7 @@ let add ctx envs (b : Main.inferred) =
   let calls = ref [] in
   b.derivations
   |> List.iter (fun (d : Main.derivation) ->
-    Annotations.typings d.expr d.annot
+    Annotations.typings d
     |> List.iter (function
       | Annotations.Use (pos, v, ty) ->
           Option.iter

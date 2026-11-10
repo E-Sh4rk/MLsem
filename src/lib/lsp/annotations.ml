@@ -6,10 +6,12 @@
    types. Nodes the checker did not type (skipped typecase branches, empty
    cells of a partitioned [Let]) have no cached type and are left out.
 
-   Some types are cached by the reconstruction already, before a refinement
-   above the node narrowed its environment; the checker keeps them as they
-   are. Such a type can be wider than retyping the node would give, e.g. a
-   variable's type where retyping gives [empty]. *)
+   The reconstruction caches types before it specializes a derivation, and
+   specializing substitutes those types instead of recomputing them. They stay
+   valid but can be wider than what the checker computes for the final
+   derivation, e.g. a type variable where the checker gives [empty] (issue
+   #22). So the caches are cleared and the derivation typed again before it is
+   read. *)
 
 open Mlsem_common
 open Mlsem_types
@@ -64,8 +66,9 @@ let children ((id, e) : Mlsem_system.Ast.t) (a : Annot.t) =
 
 (* The typings of [expr], whose derivation is [annot], in the order the
    checker types the nodes: a node after its children. A node typed under
-   several derivations of an intersection is listed once per derivation. *)
-let typings expr annot =
+   several derivations of an intersection is listed once per derivation.
+   [annot] must have been typed again from cleared caches, see [typings]. *)
+let read expr annot =
   let acc = ref [] and inner = ref Eid.Set.empty in
   (* The callee and arguments of a call, following the function part of
      curried applications. *)
@@ -111,3 +114,13 @@ let typings expr annot =
     match t with
     | Call _ when Eid.Set.mem id !inner -> None
     | t -> Some t )
+
+(* The typings of a checked definition. Its caches are cleared and the
+   derivation typed again in its environment, so that every cached type is
+   the one the checker computes for the final derivation. If typing again
+   fails, which the checker already did once, nothing is shown. *)
+let typings (d : Mlsem_app.Main.derivation) =
+  Annot.clear_caches d.annot ;
+  match Mlsem_system.Checker.typeof_def d.env d.annot d.expr with
+  | _ -> read d.expr d.annot
+  | exception Mlsem_system.Error.Untypeable _ -> []
