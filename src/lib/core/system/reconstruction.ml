@@ -52,14 +52,14 @@ let initial ?(direct_narrowing=true) ?(partition_narrowing=true) refinements e =
       if List.is_empty tys
       then
         let a2 = initial r e2 in
-        ALet' (a1, a2) |> right
+        ALet' (a1, MVarSet.empty, a2) |> right
       else
         (* Format.printf "Part for %a: %a@." Variable.pp v (Utils.pp_list Ty.pp) tys ; *)
         let parts = tys |> List.map (fun ty -> ty, Some ((fun () ->
             let r = Refinement.Partitioner.filter_compatible r v ty in
             initial r e2
           ) |> LazyIAnnot.mk_lazy)) in
-        ALet (a1, parts) |> right
+        ALet (a1, MVarSet.empty, parts) |> right
     in
     let refinement =
       if direct_narrowing
@@ -424,38 +424,40 @@ and refine_ann r cache env (rid, annot) (id, e) =
     | Subst (ss,a,a',r) -> Subst (ss,AProj (a,res)|>ic,AProj (a',res)|>ic,r)
     | Fail -> Fail
     end
-  | Let (_,v,e1,e2), ALet(annot1,parts) ->
+  | Let (_,v,e1,e2), ALet(annot1,gen,parts) ->
     begin match refine' cache env annot1 e1 with
     | Fail -> Fail
-    | Subst (ss,a,a',r) -> Subst (ss,ALet (a,parts)|>ic,ALet (a',parts)|>ic,r)
+    | Subst (ss,a,a',r) -> Subst (ss,ALet (a,gen,parts)|>ic,ALet (a',gen,parts)|>ic,r)
     | Ok (annot1, s) ->
-      let tvs, s = Checker.generalize ~e:e1 env s |> TyScheme.get in
+      let gen = MVarSet.union gen (Checker.generalizable_vars ~e:e1 env s) in
+      let tvs, s = Checker.scheme_of_def gen s |> TyScheme.get in
       let sa = simplify_entry ~is_lambda:false env tvs s in
       if not (Subst.is_identity sa)
-      then retry_with (IAnnot.substitute sa (ic (ALet (A annot1, parts))))
+      then retry_with (IAnnot.substitute sa (ic (ALet (A annot1, gen, parts))))
       else
       begin match refine_part_seq' cache env e2 v (tvs,s) parts with
       | OneFail -> Fail
-      | OneSubst (ss,p,p',r) -> Subst (ss,ALet(A annot1,p)|>ic,ALet(A annot1,p')|>ic,r)
-      | AllOk (p,_) -> retry_with (ac (Annot.ALet (annot1, p)))
+      | OneSubst (ss,p,p',r) -> Subst (ss,ALet(A annot1,gen,p)|>ic,ALet(A annot1,gen,p')|>ic,r)
+      | AllOk (p,_) -> retry_with (ac (Annot.ALet (annot1, gen, p)))
       end
     end
-  | Let (_,v,e1,e2), ALet'(annot1,annot2) ->
+  | Let (_,v,e1,e2), ALet'(annot1,gen,annot2) ->
     begin match refine' cache env annot1 e1 with
     | Fail -> Fail
-    | Subst (ss,a,a',r) -> Subst (ss,ALet' (a,annot2)|>ic,ALet' (a',annot2)|>ic,r)
+    | Subst (ss,a,a',r) -> Subst (ss,ALet' (a,gen,annot2)|>ic,ALet' (a',gen,annot2)|>ic,r)
     | Ok (annot1, s) ->
-      let t = Checker.generalize ~e:e1 env s in
+      let gen = MVarSet.union gen (Checker.generalizable_vars ~e:e1 env s) in
+      let t = Checker.scheme_of_def gen s in
       let tvs, ty = TyScheme.get t in
       let sa = simplify_entry ~is_lambda:false env tvs ty in
       if not (Subst.is_identity sa)
-      then retry_with (IAnnot.substitute sa (ic (ALet' (A annot1, annot2))))
+      then retry_with (IAnnot.substitute sa (ic (ALet' (A annot1, gen, annot2))))
       else
       let env = Env.add v t env in
       begin match refine' cache env annot2 e2 with
       | Fail -> Fail
-      | Subst (ss,a2,a2',r) -> Subst (ss,ALet'(A annot1,a2)|>ic,ALet'(A annot1,a2')|>ic,r)
-      | Ok (a2,_) -> retry_with (ac (Annot.ALet' (annot1, a2)))
+      | Subst (ss,a2,a2',r) -> Subst (ss,ALet'(A annot1,gen,a2)|>ic,ALet'(A annot1,gen,a2')|>ic,r)
+      | Ok (a2,_) -> retry_with (ac (Annot.ALet' (annot1, gen, a2)))
       end
     end
   | TypeCast (e', _, c), ACast (t,annot') ->

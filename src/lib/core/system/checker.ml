@@ -26,11 +26,8 @@ let rec is_gen (_,e) =
   | Let (_, _, e1, e2) | Ite (_, _, e1, e2) -> is_gen e1 && is_gen e2
   | Alt (_,es) -> List.for_all is_gen es
 
-let generalize ~e env s =
-  if is_gen e then
-    TyScheme.mk_poly_except (Env.tvars env) s |> TyScheme.bot_instance
-  else
-    TyScheme.mk_mono s
+let scheme_of_def gen s =
+  TyScheme.mk gen s |> TyScheme.bot_instance
 
 let rec typeof' env annot (id,e) =
   let open Annot in
@@ -47,6 +44,14 @@ let rec typeof' env annot (id,e) =
     else
       let ub = Arrow.apply (GTy.ub t1) (GTy.ub t2) in
       if Ty.leq res ub then GTy.mk_gradual res ub else GTy.mk res
+  in
+  let typeof_let_def env annot gen e =
+    let s = typeof env annot e in
+    if MVarSet.inter gen (Env.tvars env) |> MVarSet.is_empty |> not
+    then untypeable "Generalized variables must not occur in the environment."
+    else if not (is_gen e) && not (MVarSet.is_empty gen)
+    then untypeable "Definition cannot be generalized."
+    else scheme_of_def gen s
   in
   match e, annot with
   | Value _, AValue ty -> ty
@@ -111,8 +116,8 @@ let rec typeof' env annot (id,e) =
     | Some ty -> ty
     | None -> untypeable "Invalid projection."
     end
-  | Let (_, v, e1, e2), ALet (annot1, annots2) ->
-    let tvs,s = typeof_def env annot1 e1 |> TyScheme.get in
+  | Let (_, v, e1, e2), ALet (annot1, gen, annots2) ->
+    let tvs,s = typeof_let_def env annot1 gen e1 |> TyScheme.get in
     let aux (si, annot) =
       if MVarSet.inter tvs (TVOp.vars si) |> MVarSet.is_empty then
         match annot with
@@ -126,8 +131,8 @@ let rec typeof' env annot (id,e) =
         untypeable ("Partition of "^(Variable.show v)^" contains generalized variables.")
     in
     List.map aux annots2 |> GTy.disj
-  | Let (_, v, e1, e2), ALet' (annot1, annot2) ->
-    let ty = typeof_def env annot1 e1 in
+  | Let (_, v, e1, e2), ALet' (annot1, gen, annot2) ->
+    let ty = typeof_let_def env annot1 gen e1 in
     typeof (Env.add v ty env) annot2 e2
   | TypeCast (e, _, c), ACast (ty, annot) ->
     let t = typeof env annot e in
@@ -163,5 +168,15 @@ and typeof_b env bannot (id,e) s tau =
     if is_type_test_unsat ~tau s |> Ty.is_empty |> not
     then untypeable id env Untyp "Branch is reachable and must be typed."
     else GTy.empty
-and typeof_def env annot e =
+
+(* Typing of let-definitions *)
+
+let generalizable_vars ~e env s =
+  if is_gen e then MVarSet.diff (GTy.fv s) (Env.tvars env)
+  else MVarSet.empty
+
+let generalize ~e env s =
+  scheme_of_def (generalizable_vars ~e env s) s
+
+let typeof_def env annot e =
   typeof env annot e |> generalize ~e env

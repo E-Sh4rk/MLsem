@@ -51,9 +51,9 @@ let rec iter_ann f (id,e) a =
     | Constructor (_, es), AConstruct anns | GConstructor (_, es), AConstruct anns
       when List.length es = List.length anns ->
       List.combine es anns
-    | Let (_, _, e1, e2), ALet (a1, anns) ->
+    | Let (_, _, e1, e2), ALet (a1, _, anns) ->
       (e1,a1)::(List.filter_map (function (_,Some a2) -> Some (e2, a2) | (_, None) -> None) anns)
-    | App (e1,e2), AApp (a1,a2,_) | Let (_, _, e1, e2), ALet' (a1, a2) -> [(e1,a1) ; (e2,a2)]
+    | App (e1,e2), AApp (a1,a2,_) | Let (_, _, e1, e2), ALet' (a1, _, a2) -> [(e1,a1) ; (e2,a2)]
     | Alt (_,es), AAlt anns when List.length es = List.length anns ->
       List.combine es anns |> List.filter_map
         (function (_,None) -> None | (e,Some a) -> Some (e,a))

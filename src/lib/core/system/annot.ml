@@ -1,6 +1,14 @@
 open Mlsem_common
 open Mlsem_types
 
+let pp_mvarset fmt vs =
+  let tvs, rvs = MVarSet.elements vs in
+  let pp_sep fmt () = Format.fprintf fmt ",@ " in
+  Format.fprintf fmt "{@[<hov>%a%s%a@]}"
+    (Format.pp_print_list ~pp_sep TVar.pp) tvs
+    (if tvs <> [] && rvs <> [] then ", " else "")
+    (Format.pp_print_list ~pp_sep RVar.pp) rvs
+
 module Annot = struct
   type branch = BType of t | BSkip
   [@@deriving show]
@@ -12,8 +20,8 @@ module Annot = struct
   | AValue of GTy.t
   | AVar of Subst.t [@printer fun fmt _ -> Format.fprintf fmt "_"]
   | AConstruct of t list
-  | ALet of t * part
-  | ALet' of t * t
+  | ALet of t * (MVarSet.t [@printer pp_mvarset]) (* generalized *) * part
+  | ALet' of t * (MVarSet.t [@printer pp_mvarset]) (* generalized *) * t
   | AApp of t * t * Ty.t (* result *)
   | AOp of GTy.t * t * Ty.t (* result *)
   | AProj of t
@@ -34,8 +42,8 @@ module Annot = struct
       | AValue t -> AValue (GTy.substitute s t)
       | AVar s' -> AVar (Subst.compose_restr s s')
       | AConstruct ts -> AConstruct (List.map aux ts)
-      | ALet (t, ps) -> ALet (aux t, List.map (fun (ty, t) -> Subst.apply s ty, Option.map aux t) ps)
-      | ALet' (t1, t2) -> ALet' (aux t1, aux t2)
+      | ALet (t, gen, ps) -> ALet (aux t, gen, List.map (fun (ty, t) -> Subst.apply s ty, Option.map aux t) ps)
+      | ALet' (t1, gen, t2) -> ALet' (aux t1, gen, aux t2)
       | AApp (t1, t2, ty) -> AApp (aux t1, aux t2, Subst.apply s ty)
       | AOp (gty, t, ty) -> AOp (GTy.substitute s gty, aux t, Subst.apply s ty)
       | AProj t -> AProj (aux t)
@@ -58,10 +66,10 @@ module Annot = struct
     match t.ann with
     | AValue _ | AVar _ -> ()
     | AConstruct ts | AInter ts -> List.iter clear_caches ts
-    | ALet (t, ps) ->
+    | ALet (t, _, ps) ->
       clear_caches t ;
       List.iter (fun (_, t) -> Option.iter clear_caches t) ps
-    | ALet' (t1, t2) | AApp (t1, t2, _) -> clear_caches t1 ; clear_caches t2
+    | ALet' (t1, _, t2) | AApp (t1, t2, _) -> clear_caches t1 ; clear_caches t2
     | AOp (_, t, _) | AProj t | ACast (_, t) | ACoerce (_, t) | ALambda (_, t) ->
       clear_caches t
     | AIte (t, _, b1, b2) ->
@@ -95,8 +103,8 @@ module rec IAnnot : sig
   | Untyp
   | AVar of (MVarSet.t -> Subst.t)
   | AConstruct of t list
-  | ALet of t * part
-  | ALet' of t * t
+  | ALet of t * MVarSet.t (* generalized *) * part
+  | ALet' of t * MVarSet.t (* generalized *) * t
   | AApp of t * t * Ty.t (* result *)
   | AOp of (MVarSet.t -> Subst.t) * t * Ty.t (* result *)
   | AProj of t * Ty.t (* result *)
@@ -133,8 +141,8 @@ end = struct
   | Untyp
   | AVar of (MVarSet.t -> Subst.t)
   | AConstruct of t list
-  | ALet of t * part
-  | ALet' of t * t
+  | ALet of t * (MVarSet.t [@printer pp_mvarset]) (* generalized *) * part
+  | ALet' of t * (MVarSet.t [@printer pp_mvarset]) (* generalized *) * t
   | AApp of t * t * Ty.t (* result *)
   | AOp of (MVarSet.t -> Subst.t) * t * Ty.t (* result *)
   | AProj of t * Ty.t (* result *)
@@ -157,9 +165,9 @@ end = struct
       | Untyp -> Untyp
       | AVar f -> AVar f
       | AConstruct ts -> AConstruct (List.map aux ts)
-      | ALet (t, ps) ->
-        ALet (aux t, List.map (fun (ty, t) -> Subst.apply s ty, Option.map (LazyIAnnot.substitute s) t) ps)
-      | ALet' (t1, t2) -> ALet' (aux t1, aux t2)
+      | ALet (t, gen, ps) ->
+        ALet (aux t, gen, List.map (fun (ty, t) -> Subst.apply s ty, Option.map (LazyIAnnot.substitute s) t) ps)
+      | ALet' (t1, gen, t2) -> ALet' (aux t1, gen, aux t2)
       | AApp (t1, t2, ty) -> AApp (aux t1, aux t2, Subst.apply s ty)
       | AOp (f, t, ty) -> AOp (f, aux t, Subst.apply s ty)
       | AProj (t, ty) -> AProj (aux t, Subst.apply s ty)
