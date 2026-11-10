@@ -8,26 +8,12 @@ type message = Mlsem_system.Analyzer.severity * Position.t * string * string opt
 (** Severity, location, title, description, and the analyzer's diagnostic it
     comes from, if any. *)
 
-(** Types of variables and calls, recorded while checking a definition, for
-    editor tooling. Only recorded when [collect_typings] is set. *)
-val collect_typings : bool ref
-
-type typing =
-| TUse of Position.t * Variable.t * GTy.t
-(** A variable occurrence and its (instantiated) type. *)
-| TBinder of Variable.t * GTy.t
-(** A bound variable and the type given to it. *)
-| TCall of { pos: Position.t ; callee: (Variable.t * Subst.t) option ;
-             args: (Position.t * GTy.t) list ; result: GTy.t }
-(** A call [f a1 ... an] (curried applications flattened), with the callee's
-    instance when the callee is a variable. *)
-
-type derivation = { sig_index: int option ; typings: typing list ;
+type derivation = { sig_index: int option ;
                     expr: Mlsem_system.Ast.t ; annot: Mlsem_system.Annot.Annot.t }
-(** The typings of one checking pass of a definition: [sig_index] is the
-    index of the [val] declaration it was checked against, if any. [expr] is
-    the expression checked and [annot] its derivation, with every typed node's
-    type cached in it. *)
+(** One checking pass of a definition: [sig_index] is the index of the [val]
+    declaration it was checked against, if any. [expr] is the expression
+    checked and [annot] its derivation, with every typed node's type cached in
+    it. *)
 
 type inferred = {
   var: Variable.t;

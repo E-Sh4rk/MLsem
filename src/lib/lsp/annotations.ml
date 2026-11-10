@@ -56,9 +56,9 @@ let children ((id, e) : Mlsem_system.Ast.t) (a : Annot.t) =
   | TypeCast (e, _, _), ACast (_, a)
   | TypeCoerce (e, _, _), ACoerce (_, a) ->
       [(e, a)]
-  | Let (_, _, e1, e2), ALet (a1, parts) ->
+  | Let (_, _, e1, e2), ALet (a1, _, parts) ->
       (e1, a1) :: List.filter_map (fun (_, a) -> Option.map (fun a -> (e2, a)) a) parts
-  | Let (_, _, e1, e2), ALet' (a1, a2) -> [(e1, a1); (e2, a2)]
+  | Let (_, _, e1, e2), ALet' (a1, _, a2) -> [(e1, a1); (e2, a2)]
   | _, AInter anns -> List.map (fun a -> ((id, e), a)) anns
   | _ -> []
 
@@ -95,7 +95,7 @@ let typings expr annot =
         | Lambda (_, v, _), ALambda (s, _) -> add (Binder (v, s))
         | LambdaRec lst, ALambdaRec anns when List.length lst = List.length anns ->
             List.iter2 (fun (_, v, _) (s, _) -> add (Binder (v, s))) lst anns
-        | Let (_, v, _, _), (ALet (a1, _) | ALet' (a1, _)) ->
+        | Let (_, v, _, _), (ALet (a1, _, _) | ALet' (a1, _, _)) ->
             Option.iter (fun t -> add (Binder (v, t))) a1.cache
         | App _, AApp _ ->
             let callee, args = spine ex a [] in
