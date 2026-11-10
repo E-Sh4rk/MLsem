@@ -249,7 +249,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
     let log =
       match cache.alt_err with
       | Some log -> log
-      | None -> { Error.eid=id ; kind ; ann=annot ; env }
+      | None -> { Error.eid=id ; expr=e ; kind ; ann=annot ; env }
     in
     cache.logs := log::!(cache.logs)
   in
@@ -372,7 +372,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
     retry_with (ic (AAlt (true, anns)))
   | Alt (_,es), AAlt (true, anns) ->
     let alt_err = match cache.alt_err with
-      | None -> Some { Error.eid=id ; kind=UntypeableEncoding ; ann=annot ; env }
+      | None -> Some { Error.eid=id ; expr=e ; kind=UntypeableEncoding ; ann=annot ; env }
       | Some alt_err -> Some alt_err
     in
     let cache = { cache with alt_err } in

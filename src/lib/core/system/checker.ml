@@ -10,8 +10,8 @@ let is_type_test_unsat ~tau t =
 
 (* Expressions *)
 
-let untypeable eid env ann msg =
-  raise (Error.Untypeable { eid ; kind=InvalidAnnot msg ; env ; ann })
+let untypeable eid expr env ann msg =
+  raise (Error.Untypeable { eid ; expr ; kind=InvalidAnnot msg ; env ; ann })
 
 let rec is_gen (_,e) =
   match e with
@@ -31,7 +31,7 @@ let scheme_of_def gen s =
 
 let rec typeof' env annot (id,e) =
   let open Annot in
-  let untypeable = untypeable id env Untyp in
+  let untypeable = untypeable id e env Untyp in
   let subst_ts s ts =
     let (tvs, ty) = TyScheme.get ts in
     if MVarSet.subset (Subst.domain s) tvs then GTy.substitute s ty
@@ -166,7 +166,7 @@ and typeof_b env bannot (id,e) s tau =
   | BType annot -> typeof env annot (id,e)
   | BSkip ->
     if is_type_test_unsat ~tau s |> Ty.is_empty |> not
-    then untypeable id env Untyp "Branch is reachable and must be typed."
+    then untypeable id e env Untyp "Branch is reachable and must be typed."
     else GTy.empty
 
 (* Typing of let-definitions *)
