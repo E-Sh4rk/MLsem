@@ -22,9 +22,12 @@ type typing =
 (** A call [f a1 ... an] (curried applications flattened), with the callee's
     instance when the callee is a variable. *)
 
-type derivation = { sig_index: int option ; typings: typing list }
+type derivation = { sig_index: int option ; typings: typing list ;
+                    expr: Mlsem_system.Ast.t ; annot: Mlsem_system.Annot.Annot.t }
 (** The typings of one checking pass of a definition: [sig_index] is the
-    index of the [val] declaration it was checked against, if any. *)
+    index of the [val] declaration it was checked against, if any. [expr] is
+    the expression checked and [annot] its derivation, with every typed node's
+    type cached in it. *)
 
 type inferred = {
   var: Variable.t;
@@ -32,8 +35,8 @@ type inferred = {
   sigs: Signature.t;
   declared: bool;
   derivations: derivation list;
-  (** Empty unless [collect_typings] is set. Definitions checked together
-      (without [val]) share one derivation, carried by the first of them. *)
+  (** Definitions checked together (without [val]) share one derivation,
+      carried by the first of them. *)
 }
 type result =
 | TSuccess of inferred list * float
