@@ -8,12 +8,12 @@ type message = Mlsem_system.Analyzer.severity * Position.t * string * string opt
 (** Severity, location, title, description, and the analyzer's diagnostic it
     comes from, if any. *)
 
-type derivation = { sig_index: int option ;
+type derivation = { sig_index: int option ; env: Env.t ;
                     expr: Mlsem_system.Ast.t ; annot: Mlsem_system.Annot.Annot.t }
 (** One checking pass of a definition: [sig_index] is the index of the [val]
     declaration it was checked against, if any. [expr] is the expression
-    checked and [annot] its derivation, with every typed node's type cached in
-    it. *)
+    checked in the environment [env], and [annot] its derivation, with every
+    typed node's type cached in it. *)
 
 type inferred = {
   var: Variable.t;

@@ -42,7 +42,7 @@ let sigs_of_def varm senv env (kind,str) =
       v, Some (sigs, Env.find v env)
     end
 
-type derivation = { sig_index: int option ;
+type derivation = { sig_index: int option ; env: Env.t ;
                     expr: Mlsem_system.Ast.t ; annot: Mlsem_system.Annot.Annot.t }
 (** One checking pass of a definition: [sig_index] is the index of the [val]
     declaration it was checked against, if any. *)
@@ -83,7 +83,7 @@ let type_check_with_sigs env (var,e,sigs,aty) =
   let msg = List.map (fun (_,msg,_,_) -> msg) results in
   let visited = List.map (fun (_,_,visited,_) -> visited) results in
   let derivations = List.combine es results |> List.mapi
-    (fun i (expr,(_,_,_,annot)) -> { sig_index=Some i ; expr ; annot }) in
+    (fun i (expr,(_,_,_,annot)) -> { sig_index=Some i ; env ; expr ; annot }) in
   List.iter (check_resolved ~allow_mono:false var env) tys ;
   (* Each signature is inferred separately, but they all annotate the same [e]:
      a sub-expression is unreachable only if no signature reached it. *)
@@ -106,7 +106,7 @@ let type_check_recs pos env lst =
     check_resolved ~allow_mono:true var env ty ;
     (* The definitions are checked together: the first one carries the
        derivation of the whole group. *)
-    let derivations = if i = 0 then [{ sig_index=None ; expr ; annot }] else [] in
+    let derivations = if i = 0 then [{ sig_index=None ; env ; expr ; annot }] else [] in
     (var, (ty, Signature.of_tyscheme ty, derivations))
   ) lst, msg
 
