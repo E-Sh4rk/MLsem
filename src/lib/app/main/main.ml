@@ -57,7 +57,8 @@ type typing =
 (** A call [f a1 ... an] (curried applications flattened), with the callee's
     instance when the callee is a variable. *)
 
-type derivation = { sig_index: int option ; typings: typing list }
+type derivation = { sig_index: int option ; typings: typing list ;
+                    expr: Mlsem_system.Ast.t ; annot: Mlsem_system.Annot.Annot.t }
 (** The typings of one checking pass of a definition: [sig_index] is the
     index of the [val] declaration it was checked against, if any. *)
 
@@ -129,7 +130,7 @@ let infer var env e =
   let (tvs, ty) = TyScheme.get ty in
   let ty = TyScheme.mk tvs (GTy.ub ty |> GTy.mk) |> Signature.simplify_tyscheme in
   let msg, visited = Mlsem_system.Analyzer.analyze e annot in
-  ty, msg, visited, typings
+  ty, msg, visited, typings, annot
 
 let type_check_with_sigs env (var,e,sigs,aty) =
   let e, id = Transform.expr_to_ast e, Eid.refresh (fst e) in
@@ -137,11 +138,11 @@ let type_check_with_sigs env (var,e,sigs,aty) =
   let es = sigs |> List.map (fun s ->
     (id, TypeCoerce (e, Signature.to_gty s, c)) |> push_coercions ~duplicate_arrows:true) in
   let results = List.map (infer (Some var) env) es in
-  let tys = List.map (fun (ty,_,_,_) -> ty) results in
-  let msg = List.map (fun (_,msg,_,_) -> msg) results in
-  let visited = List.map (fun (_,_,visited,_) -> visited) results in
-  let derivations =
-    List.mapi (fun i (_,_,_,typings) -> { sig_index=Some i ; typings }) results in
+  let tys = List.map (fun (ty,_,_,_,_) -> ty) results in
+  let msg = List.map (fun (_,msg,_,_,_) -> msg) results in
+  let visited = List.map (fun (_,_,visited,_,_) -> visited) results in
+  let derivations = List.combine es results |> List.mapi
+    (fun i (expr,(_,_,_,typings,annot)) -> { sig_index=Some i ; typings ; expr ; annot }) in
   List.iter (check_resolved ~allow_mono:false var env) tys ;
   (* Each signature is inferred separately, but they all annotate the same [e]:
      a sub-expression is unreachable only if no signature reached it. *)
@@ -154,7 +155,8 @@ let type_check_recs pos env lst =
     Eid.unique_with_pos pos,
     PAst.LambdaRec (List.map (fun (v,e) -> (v,None,e)) lst) in
   let e = Transform.expr_to_ast e in
-  let ty, msg, visited, typings = e |> push_coercions ~duplicate_arrows:true |> infer None env in
+  let expr = push_coercions ~duplicate_arrows:true e in
+  let ty, msg, visited, typings, annot = infer None env expr in
   let msg = msg@(Mlsem_system.Analyzer.get_unreachable visited e) in
   let tvs, ty = ty |> TyScheme.get in
   let n = List.length lst in
@@ -163,7 +165,7 @@ let type_check_recs pos env lst =
     check_resolved ~allow_mono:true var env ty ;
     (* The definitions are checked together: the first one carries the
        typings of the whole group. *)
-    let derivations = if i = 0 then [{ sig_index=None ; typings }] else [] in
+    let derivations = if i = 0 then [{ sig_index=None ; typings ; expr ; annot }] else [] in
     (var, (ty, Signature.of_tyscheme ty, derivations))
   ) lst, msg
 
@@ -215,7 +217,6 @@ type inferred = {
   sigs: Signature.t;
   declared: bool;
   derivations: derivation list;
-  (** Empty unless [collect_typings] is set. *)
 }
 type result =
 | TSuccess of inferred list * float
