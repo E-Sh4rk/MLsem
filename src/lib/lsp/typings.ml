@@ -1,10 +1,10 @@
 (* Types of variables and calls, as plain data for hover and highlighting.
 
-   While a definition is checked, [Main] records the type of every variable
-   occurrence, binder and call ([Main.typing]), once per derivation: a
-   definition with several [val] lines is checked once per line. This module
-   turns those records into plain data (byte ranges, strings, integers) that
-   the supervisor keeps and answers from, without the engine.
+   A definition is checked once per derivation (one per [val] line, if any),
+   and [Main] keeps each derivation; [Annotations] reads from it the type of
+   every variable occurrence, binder and call. This module turns those into
+   plain data (byte ranges, strings, integers) that the supervisor keeps and
+   answers from, without the engine.
 
    Type variables are identified by integers, assigned per document. The
    builder shares variable objects by name, so ['a] in two [val] lines can be
@@ -418,9 +418,9 @@ let add ctx envs (b : Main.inferred) =
   let calls = ref [] in
   b.derivations
   |> List.iter (fun (d : Main.derivation) ->
-    d.typings
+    Annotations.typings d.expr d.annot
     |> List.iter (function
-      | Main.TUse (pos, v, ty) ->
+      | Annotations.Use (pos, v, ty) ->
           Option.iter
             (fun r ->
                note v r d.sig_index ty ;
@@ -429,12 +429,12 @@ let add ctx envs (b : Main.inferred) =
                (* The binder of a variable from another definition. *)
                Option.iter (occ ctx ~binder:true v) (binder_range v) )
             (use_range ctx pos)
-      | TBinder (v, ty) when not (Variable.equal v b.var) ->
+      | Binder (v, ty) when not (Variable.equal v b.var) ->
           Option.iter
             (fun r -> note v r d.sig_index ty ; mark r ty ; occ ctx ~binder:true v r)
             (binder_range v)
-      | TBinder _ -> ()
-      | TCall {pos; callee; args; result} -> (
+      | Binder _ -> ()
+      | Call {pos; callee; args; result} -> (
           match range pos with
           | None -> ()
           | Some (c_start, c_end) ->

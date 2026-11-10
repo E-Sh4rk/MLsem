@@ -208,7 +208,6 @@ let add_result ?typings envs acc (out : Main.output) : result =
    (with no lenses) or the accumulated per-binding results. *)
 let run (source : string) : result =
   Config.restore_all () ;
-  Main.collect_typings := true ;
   try
     match parse (`String source) with
     | PFailure (pos, msg) ->
