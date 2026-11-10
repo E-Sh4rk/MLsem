@@ -520,7 +520,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
 
    Disjointness is also what keeps the cached types of the derivation valid
    under [IAnnot.substitute]: the environment is left untouched, so the types
-   already computed for its sub-derivations remain the right ones. *)
+   already computed for its sub-derivations remain valid. *)
 and refine' cache env annot e =
   let tvars = Env.tvars env in
   let subst_disjoint s =

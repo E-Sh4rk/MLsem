@@ -53,6 +53,24 @@ module Annot = struct
     in
     aux t
 
+  let rec clear_caches t =
+    t.cache <- None ;
+    match t.ann with
+    | AValue _ | AVar _ -> ()
+    | AConstruct ts | AInter ts -> List.iter clear_caches ts
+    | ALet (t, ps) ->
+      clear_caches t ;
+      List.iter (fun (_, t) -> Option.iter clear_caches t) ps
+    | ALet' (t1, t2) | AApp (t1, t2, _) -> clear_caches t1 ; clear_caches t2
+    | AOp (_, t, _) | AProj t | ACast (_, t) | ACoerce (_, t) | ALambda (_, t) ->
+      clear_caches t
+    | AIte (t, _, b1, b2) ->
+      clear_caches t ; clear_caches_b b1 ; clear_caches_b b2
+    | ALambdaRec lst -> List.iter (fun (_, t) -> clear_caches t) lst
+    | AAlt ts -> List.iter (Option.iter clear_caches) ts
+  and clear_caches_b b =
+    match b with BSkip -> () | BType t -> clear_caches t
+
   let nc renv a = { cache=None ; ann=a ; refinement=renv }
 end
 

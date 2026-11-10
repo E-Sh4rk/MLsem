@@ -60,6 +60,10 @@ module Annot : sig
   val substitute : Subst.t -> t -> t
   (** Substitutes throughout the derivation, cached types included. *)
 
+  val clear_caches : t -> unit
+  (** Clears the caches of an annotation tree, forcing the recomputation
+      of types for the next [Checker.typeof] call. *)
+
   val pp : Format.formatter -> t -> unit
   val pp_a : Format.formatter -> a -> unit
 end
