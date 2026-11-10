@@ -42,62 +42,10 @@ let sigs_of_def varm senv env (kind,str) =
       v, Some (sigs, Env.find v env)
     end
 
-(* Types of variables and calls, recorded while checking a definition, for
-   editor tooling. Only recorded when [collect_typings] is set. *)
-
-let collect_typings = ref false
-
-type typing =
-| TUse of Position.t * Variable.t * GTy.t
-(** A variable occurrence and its (instantiated) type. *)
-| TBinder of Variable.t * GTy.t
-(** A bound variable and the type given to it. *)
-| TCall of { pos: Position.t ; callee: (Variable.t * Subst.t) option ;
-             args: (Position.t * GTy.t) list ; result: GTy.t }
-(** A call [f a1 ... an] (curried applications flattened), with the callee's
-    instance when the callee is a variable. *)
-
-type derivation = { sig_index: int option ; typings: typing list ;
+type derivation = { sig_index: int option ;
                     expr: Mlsem_system.Ast.t ; annot: Mlsem_system.Annot.Annot.t }
-(** The typings of one checking pass of a definition: [sig_index] is the
-    index of the [val] declaration it was checked against, if any. *)
-
-let record_typings () =
-  let acc = ref [] and inner = ref Eid.Set.empty in
-  let cache (a : Mlsem_system.Annot.Annot.t) = Option.get a.cache in
-  let rec spine ((id, e) : Mlsem_system.Ast.t) (a : Mlsem_system.Annot.Annot.t) args =
-    match e, a.ann with
-    | App (e1, (id2, _)), AApp (a1, a2, _) ->
-      inner := Eid.Set.add id !inner ;
-      spine e1 a1 ((Eid.loc id2, cache a2) :: args)
-    | Var v, AVar s -> Some (v, s), args
-    (* An overloaded function part: follow its first derivation. *)
-    | _, AInter (a :: _) -> spine (id, e) a args
-    | _ -> None, args
-  in
-  let hook _env (a : Mlsem_system.Annot.Annot.t) ((id, e) as ex) ty =
-    let add t = acc := (id, t) :: !acc in
-    match e, a.ann with
-    | Var v, AVar _ -> add (TUse (Eid.loc id, v, ty))
-    | Lambda (_, v, _), ALambda (s, _) -> add (TBinder (v, s))
-    | LambdaRec lst, ALambdaRec anns when List.length lst = List.length anns ->
-      List.iter2 (fun (_, v, _) (s, _) -> add (TBinder (v, s))) lst anns
-    | Let (_, v, _, _), (ALet (a1, _) | ALet' (a1, _)) -> add (TBinder (v, cache a1))
-    | App _, AApp _ ->
-      let callee, args = spine ex a [] in
-      inner := Eid.Set.remove id !inner ;
-      add (TCall { pos=Eid.loc id ; callee ; args ; result=ty })
-    | _ -> ()
-  in
-  let result () =
-    (* Applications that are the function part of a larger call are covered
-       by that call. *)
-    !acc |> List.rev |> List.filter_map (fun (id, t) ->
-      match t with
-      | TCall _ when Eid.Set.mem id !inner -> None
-      | t -> Some t)
-  in
-  hook, result
+(** One checking pass of a definition: [sig_index] is the index of the [val]
+    declaration it was checked against, if any. *)
 
 (* Type checking and inference *)
 
@@ -119,18 +67,11 @@ let infer var env e =
       (* Format.printf "@.@.%a@.@." Mlsem_system.Ast.pp e ; *)
       raise (Untypeable (var, err))
   in
-  let ty, typings =
-    let check () = Mlsem_system.Checker.typeof_def env annot e in
-    if !collect_typings then
-      let hook, result = record_typings () in
-      let ty = Mlsem_system.Checker.with_hook hook check in
-      ty, result ()
-    else check (), []
-  in
+  let ty = Mlsem_system.Checker.typeof_def env annot e in
   let (tvs, ty) = TyScheme.get ty in
   let ty = TyScheme.mk tvs (GTy.ub ty |> GTy.mk) |> Signature.simplify_tyscheme in
   let msg, visited = Mlsem_system.Analyzer.analyze e annot in
-  ty, msg, visited, typings, annot
+  ty, msg, visited, annot
 
 let type_check_with_sigs env (var,e,sigs,aty) =
   let e, id = Transform.expr_to_ast e, Eid.refresh (fst e) in
@@ -138,11 +79,11 @@ let type_check_with_sigs env (var,e,sigs,aty) =
   let es = sigs |> List.map (fun s ->
     (id, TypeCoerce (e, Signature.to_gty s, c)) |> push_coercions ~duplicate_arrows:true) in
   let results = List.map (infer (Some var) env) es in
-  let tys = List.map (fun (ty,_,_,_,_) -> ty) results in
-  let msg = List.map (fun (_,msg,_,_,_) -> msg) results in
-  let visited = List.map (fun (_,_,visited,_,_) -> visited) results in
+  let tys = List.map (fun (ty,_,_,_) -> ty) results in
+  let msg = List.map (fun (_,msg,_,_) -> msg) results in
+  let visited = List.map (fun (_,_,visited,_) -> visited) results in
   let derivations = List.combine es results |> List.mapi
-    (fun i (expr,(_,_,_,typings,annot)) -> { sig_index=Some i ; typings ; expr ; annot }) in
+    (fun i (expr,(_,_,_,annot)) -> { sig_index=Some i ; expr ; annot }) in
   List.iter (check_resolved ~allow_mono:false var env) tys ;
   (* Each signature is inferred separately, but they all annotate the same [e]:
      a sub-expression is unreachable only if no signature reached it. *)
@@ -156,7 +97,7 @@ let type_check_recs pos env lst =
     PAst.LambdaRec (List.map (fun (v,e) -> (v,None,e)) lst) in
   let e = Transform.expr_to_ast e in
   let expr = push_coercions ~duplicate_arrows:true e in
-  let ty, msg, visited, typings, annot = infer None env expr in
+  let ty, msg, visited, annot = infer None env expr in
   let msg = msg@(Mlsem_system.Analyzer.get_unreachable visited e) in
   let tvs, ty = ty |> TyScheme.get in
   let n = List.length lst in
@@ -164,8 +105,8 @@ let type_check_recs pos env lst =
     let ty = GTy.map (Tuple.proj n i) ty |> TyScheme.mk tvs |> Signature.simplify_tyscheme in
     check_resolved ~allow_mono:true var env ty ;
     (* The definitions are checked together: the first one carries the
-       typings of the whole group. *)
-    let derivations = if i = 0 then [{ sig_index=None ; typings ; expr ; annot }] else [] in
+       derivation of the whole group. *)
+    let derivations = if i = 0 then [{ sig_index=None ; expr ; annot }] else [] in
     (var, (ty, Signature.of_tyscheme ty, derivations))
   ) lst, msg
 
