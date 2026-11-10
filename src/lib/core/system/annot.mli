@@ -32,8 +32,8 @@ module Annot : sig
   | AValue of GTy.t
   | AVar of Subst.t
   | AConstruct of t list
-  | ALet of t * part
-  | ALet' of t * t
+  | ALet of t * MVarSet.t (* generalized *) * part
+  | ALet' of t * MVarSet.t (* generalized *) * t
   | AApp of t * t * Ty.t (* result *)
   | AOp of GTy.t * t * Ty.t (* result *)
   | AProj of t
@@ -59,6 +59,10 @@ module Annot : sig
 
   val substitute : Subst.t -> t -> t
   (** Substitutes throughout the derivation, cached types included. *)
+
+  val clear_caches : t -> unit
+  (** Clears the caches of an annotation tree, forcing the recomputation
+      of types for the next [Checker.typeof] call. *)
 
   val pp : Format.formatter -> t -> unit
   val pp_a : Format.formatter -> a -> unit
@@ -100,8 +104,8 @@ module rec IAnnot : sig
   | Untyp (** Known untypeable; fails immediately. *)
   | AVar of (MVarSet.t -> Subst.t)
   | AConstruct of t list
-  | ALet of t * part
-  | ALet' of t * t
+  | ALet of t * MVarSet.t (* generalized *) * part
+  | ALet' of t * MVarSet.t (* generalized *) * t
   | AApp of t * t * Ty.t (* result *)
   | AOp of (MVarSet.t -> Subst.t) * t * Ty.t (* result *)
   | AProj of t * Ty.t (* result *)

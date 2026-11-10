@@ -30,7 +30,8 @@ type kind =
     error — user errors are reported by the reconstruction. *)
 
 type t = {
-    eid: Eid.t ;  (** The expression on which the error occurred *)
+    eid: Eid.t ;  (** The identifier of the expression on which the error occurred *)
+    expr: Ast.e ; (** The expression on which the error occurred *)
     kind: kind ;
     env: Env.t ;  (** The typing environment at that expression *)
     ann: IAnnot.a (** The (partial) annotation of that expression *)

@@ -224,7 +224,9 @@ module Abstract = struct
   let define name n =
     let vs = List.init n (fun _ -> Sstt.Extensions.Abstracts.Inv) in
     let tag = Sstt.Extensions.Abstracts.define name vs in
-    PrinterCfg.add_abstract_type tag ; tag
+    PrinterCfg.add_abstract_type tag ;
+    Witness.add_builtin_printer_param (Witness.Opaque (tag, "<"^name^">")) ;
+    tag
   let arity = Sstt.Extensions.Abstracts.arity
   let mk = Sstt.Extensions.Abstracts.mk
   let any = Sstt.Extensions.Abstracts.mk_any

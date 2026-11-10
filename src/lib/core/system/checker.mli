@@ -28,11 +28,28 @@ val typeof : Env.t -> Annot.t -> Ast.t -> GTy.t
     @raise Error.Untypeable if the annotation is not a valid derivation.
     @raise Assert_failure if the annotation does not match the expression. *)
 
+(** {1 Typing of let-definitions} *)
+
+val generalizable_vars : e:Ast.t -> Env.t -> GTy.t -> MVarSet.t
+(** [generalizable_vars ~e env ty] returns the variables of [ty] that can be
+    generalized for the definition [e]: those that do not occur in [env], or none
+    if [e] is not generalizable under the value restriction
+    (see {!Config.value_restriction}). *)
+
+val scheme_of_def : MVarSet.t -> GTy.t -> TyScheme.t
+(** [scheme_of_def gen ty] quantifies the variables of [gen] in [ty], then
+    simplifies the result with [TyScheme.bot_instance]. Together with the cached
+    type of a [Let] definition and its set of generalized variables, this gives
+    the scheme of the definition without needing an environment. *)
+
 val generalize : e:Ast.t -> Env.t -> GTy.t -> TyScheme.t
 (** [generalize ~e env ty] quantifies the variables of [ty] that do not occur in
     [env], then simplifies the result with [TyScheme.bot_instance]. Under the
     value restriction (see {!Config.value_restriction}), applications are not
-    generalized as their evaluation may be effectful. *)
+    generalized as their evaluation may be effectful.
+    Equivalent to [scheme_of_def (generalizable_vars ~e env ty) ty]. *)
 
 val typeof_def : Env.t -> Annot.t -> Ast.t -> TyScheme.t
-(** {!typeof} followed by {!generalize}. *)
+(** {!typeof} followed by {!generalize}. Used for top-level definitions;
+    [Let] definitions are instead generalized according to the set of
+    variables stored in their annotation. *)

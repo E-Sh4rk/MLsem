@@ -16,6 +16,7 @@ type kind =
 
 type t = {
     eid: Eid.t ;
+    expr: Ast.e ;
     kind: kind ;
     env: Env.t ;
     ann: IAnnot.a
