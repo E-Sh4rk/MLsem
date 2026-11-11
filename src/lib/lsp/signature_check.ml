@@ -8,12 +8,14 @@
    long to infer without a [val].
 
    - [mlsem/definitionAt] finds the top-level definition at a position and
-     returns its name and the source up to its end, for the prompt.
+     returns its name, source and first line, for the prompt.
    - [mlsem/checkSignature] writes the candidate [val] lines above the
-     definition, in place of the existing ones, cuts the source after the
-     definition (what follows cannot change its typing) and typechecks that.
-     It returns the errors in the definition, or on success the edit that
-     writes the [val] lines into the document. *)
+     definition, in place of the existing ones, and typechecks the source up
+     to the definition followed by the later [val] and type declarations. A
+     definition may use a later definition that has a [val], so those are
+     needed, but the later definitions themselves cannot change its typing.
+     It returns the errors in the [val] lines and the definition, or on
+     success the edit that writes the [val] lines into the document. *)
 
 open Mlsem_common
 open Mlsem_app
@@ -24,6 +26,7 @@ type target = {
   line_start: int;  (** start of the definition's first line *)
   stop: int;  (** end of the definition *)
   vals: (int * int) list;  (** the existing [val] lines of [name], as whole lines, in order *)
+  later_decls: string;  (** the [val] and type declarations after the definition, as whole lines *)
 }
 
 let span pos =
@@ -81,7 +84,19 @@ let find_target text (program : PAst.program) off =
                       | _ -> acc )
                    []
             in
-            Some {name; line_start = line_start text s; stop = e; vals = List.rev vals}
+            (* A definition can use a later one that has a [val], even one
+               written after it, so later declarations are kept. *)
+            let later_decls =
+              rest
+              |> List.filter_map (fun (annot, elem) ->
+                match (elem, span (Position.position annot)) with
+                | (PAst.SigDef _ | Types _ | AbsType _), Some (s, e) ->
+                    let s = line_start text s in
+                    Some (String.sub text s (line_end text e - s))
+                | _ -> None )
+              |> String.concat ""
+            in
+            Some {name; line_start = line_start text s; stop = e; vals = List.rev vals; later_decls}
         | _ -> go (el :: before) rest )
   in
   go [] program
@@ -129,7 +144,7 @@ let definition_at params : Yojson.Safe.t =
       [
         ("ok", `Bool true); ("name", `String t.name);
         ("definition", `String (String.sub text t.line_start (t.stop - t.line_start)));
-        ("source", `String (String.sub text 0 t.stop));
+        ("line", `Int (Doc.position_of_offset (Doc.compute_line_offsets text) t.line_start).line);
       ] )
 
 (* The text of [pos] in [text], shortened, to show the LLM where an error is. *)
@@ -159,13 +174,17 @@ let check_signature params : Yojson.Safe.t =
     in
     let kept = without_spans text t.vals ~from ~until:t.line_start in
     let prefix = String.sub text 0 from ^ kept in
-    let candidate = prefix ^ decls ^ String.sub text t.line_start (t.stop - t.line_start) ^ "\n" in
-    let first_line = List.length (String.split_on_char '\n' prefix) - 1 in
+    let lines s = List.length (String.split_on_char '\n' s) - 1 in
+    let checked = prefix ^ decls ^ String.sub text t.line_start (t.stop - t.line_start) ^ "\n" in
+    let candidate = checked ^ t.later_decls in
+    (* Errors from the [val] lines to the end of the definition. *)
+    let first_line = lines prefix and last_line = lines checked in
     let result = Typecheck.run candidate in
     let errors =
       result.diagnostics
       |> List.filter (fun (d : Lsp.Types.Diagnostic.t) ->
-        d.severity = Some Lsp.Types.DiagnosticSeverity.Error && d.range.start.line >= first_line )
+        d.severity = Some Lsp.Types.DiagnosticSeverity.Error
+        && d.range.start.line >= first_line && d.range.start.line < last_line )
       |> List.rev_map (fun (d : Lsp.Types.Diagnostic.t) ->
         let msg =
           match d.message with
