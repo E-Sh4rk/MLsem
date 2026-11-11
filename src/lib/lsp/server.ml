@@ -262,7 +262,14 @@ let error_at_start message =
     ~severity:Lsp.Types.DiagnosticSeverity.Error ~source:"mlsem" ()
 
 (* Remember that [text] of [uri] cannot be typechecked, and tell the client.
-   Earlier lenses and diagnostics describe another text: drop them. *)
+   Earlier lenses and diagnostics describe another text: drop them.
+
+   TODO: say which definition the typecheck was in when it timed out or
+   crashed. The engine could report each top-level definition as it starts
+   it, like [Engine.Typechecking]; the error would then sit on that
+   definition instead of the file's start, and the LLM inference could say
+   whether its target or an earlier definition is the one that times out
+   (an earlier one makes every check of the target time out too). *)
 let mark_failed uri text message =
   Hashtbl.replace failed uri (Digest.string text, message) ;
   Doc.clear_results uri ;
