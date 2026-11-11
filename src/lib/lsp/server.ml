@@ -311,12 +311,18 @@ let fail_running ~type_ message =
        end_progress r.progress ;
        match r.job with
        | Check {uri; text} -> show_message ~type_ ~uri message ; mark_failed uri text message
-       | Tool {id; uri; text; _} -> (
-           show_message ~type_ ?uri message ;
+       | Tool {id; method_; uri; text; _} -> (
+           (* No pop-up: the client shows a toolkit request's failure where
+              the request came from. *)
            respond_error id Response.Error.Code.RequestFailed message ;
-           match (uri, text) with
-           | Some uri, Some text -> mark_failed uri text message
-           | _ -> () ) )
+           (* The failure of a request that typechecks only its own variant of
+              the document says nothing about the document. *)
+           if not (Engine.independent_of_typecheck method_) then
+             match
+               (uri, text)
+             with
+             | Some uri, Some text -> mark_failed uri text message
+             | _ -> () ) )
     !running
 
 let engine_died () =
@@ -331,6 +337,13 @@ let engine_died () =
 (* Start the next queued job if the engine is free. *)
 let rec dispatch () =
   match (!running, !queue) with
+  | None, Tool {id; method_; uri = Some uri; text = Some text; _} :: rest
+    when (not (Engine.independent_of_typecheck method_)) && known_failure uri text <> None ->
+      (* The document's typecheck failed while this request waited: running
+         it would only fail the same way again. *)
+      queue := rest ;
+      Option.iter (respond_error id Response.Error.Code.RequestFailed) (known_failure uri text) ;
+      dispatch ()
   | None, job :: rest -> (
       queue := rest ;
       let e =
@@ -505,7 +518,13 @@ let handle_tool (req : Request.t) =
     | `Assoc fields, `Null, Some t -> `Assoc (("text", `String t) :: fields)
     | _ -> params
   in
-  match Option.bind uri (fun uri -> Option.bind text (known_failure uri)) with
+  let failure =
+    if Engine.independent_of_typecheck req.method_ then
+      None
+    else
+      Option.bind uri (fun uri -> Option.bind text (known_failure uri))
+  in
+  match failure with
   | Some message -> respond_error req.id Response.Error.Code.RequestFailed message
   | None -> enqueue (Tool {id = req.id; method_ = req.method_; uri; text; params})
 
