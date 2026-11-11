@@ -339,7 +339,10 @@ let engine_died () =
   kill_engine () ;
   let now = Unix.gettimeofday () in
   crash_times := now :: List.filter (fun t -> now -. t < crash_window) !crash_times ;
-  fail_running ~type_:Lsp.Types.MessageType.Error "Typechecking crashed the MLsem server" ;
+  fail_running ~type_:Lsp.Types.MessageType.Error
+    ( match !running with
+    | Some {job = Tool _; typechecking = false; _} -> "Toolkit request crashed the MLsem server"
+    | _ -> "Typechecking crashed the MLsem server" ) ;
   if List.length !crash_times >= max_crashes then
     wind_down (Printf.sprintf "engine crashed %d times in %.0f s" max_crashes crash_window)
 
@@ -405,10 +408,10 @@ let cancel id =
   | Some {job = Tool t; _} when t.id = id ->
       kill_engine () ;
       running := None ;
-      respond_error id Response.Error.Code.RequestCancelled "Request cancelled"
+      respond_error id Response.Error.Code.RequestCancelled "Toolkit request cancelled"
   | _ ->
       if drop_queued id then
-        respond_error id Response.Error.Code.RequestCancelled "Request cancelled"
+        respond_error id Response.Error.Code.RequestCancelled "Toolkit request cancelled"
 
 (* Typecheck [text] of [uri]. Older typechecks of [uri] are pointless now:
    queued ones are dropped, and a running one of another text is killed. *)
@@ -792,7 +795,7 @@ let check_timeout () =
         ( match r.job with
         | Check _ -> "Typechecking timed out after " ^ limit
         | Tool _ when r.typechecking -> "Typechecking timed out after " ^ limit
-        | Tool _ -> "Request timed out after " ^ limit )
+        | Tool _ -> "Toolkit request timed out after " ^ limit )
   | _ -> ()
 
 let last_editor_check = ref 0.0
