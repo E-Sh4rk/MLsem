@@ -43,6 +43,13 @@ let tool_handlers =
 
 let is_tool method_ = List.mem_assoc method_ tool_handlers
 
+(* Toolkit requests that do not typecheck the document: they parse it, or
+   typecheck their own variant of it. A document whose typecheck failed or
+   timed out does not stop them, and their own failure says nothing about the
+   document. *)
+let independent_of_typecheck method_ =
+  List.mem method_ ["mlsem/definitionAt"; "mlsem/checkSignature"]
+
 let handle = function
   | Check {uri; text} ->
       Store.sync_text uri text ;
