@@ -48,6 +48,7 @@ let tool_handlers =
     ("mlsem/instantiatePreview", Handlers.instantiate_preview);
     ("mlsem/applyInstantiate", Handlers.apply_instantiate);
     ("mlsem/definitionAt", Signature_check.definition_at);
+    ("mlsem/definitionStatus", Signature_check.definition_status);
     ("mlsem/checkSignature", Signature_check.check_signature);
   ]
 

@@ -2,13 +2,15 @@
    editor's "Infer type with LLM" command.
 
    The editor asks an LLM for [val] lines, sends them here, and feeds the
-   errors back to the LLM until the definition checks. Everything here works
-   from the parse tree, not from a typecheck of the document: the definition
-   may not typecheck at all yet (that is often why the user asks), or take too
+   errors back to the LLM until the definition checks. The definition is
+   found from the parse tree, not from a typecheck of the document: it may
+   not typecheck at all yet (that is often why the user asks), or take too
    long to infer without a [val].
 
    - [mlsem/definitionAt] finds the top-level definition at a position and
      returns its name, source and first line, for the prompt.
+   - [mlsem/definitionStatus] says how that definition fares in the
+     document's typecheck: its type, its errors, or the file's failure.
    - [mlsem/checkSignature] writes the candidate [val] lines above the
      definition, in place of the existing ones, and typechecks the source up
      to the definition followed by the later [val] and type declarations. A
@@ -165,12 +167,6 @@ let definition_at params : Yojson.Safe.t =
         ("ok", `Bool true); ("name", `String t.name);
         ("definition", `String (String.sub text t.line_start (t.stop - t.line_start)));
         ("line", `Int (Doc.position_of_offset (Doc.compute_line_offsets text) t.line_start).line);
-        (* The failure of the file's own typecheck, if it timed out or
-           crashed. Which definition caused it is not known. *)
-        ( "fileFailure",
-          match !Store.known_failure with
-          | Some message -> `String message
-          | None -> `Null );
       ] )
 
 (* The text of [pos] in [text], shortened, to show the LLM where an error is. *)
@@ -181,6 +177,68 @@ let excerpt text (r : Lsp.Types.Range.t) =
   let e = Doc.offset_of_position offsets len r.end_ in
   let ex = String.sub text s (max 0 (e - s)) |> String.split_on_char '\n' |> String.concat " " in
   if String.length ex > 80 then String.sub ex 0 77 ^ "..." else ex
+
+(* The error diagnostics of [text] starting in lines [first_line] to
+   [last_line] (excluded), each with the source it points at, for the LLM. *)
+let errors_in text (diagnostics : Lsp.Types.Diagnostic.t list) ~first_line ~last_line =
+  diagnostics
+  |> List.filter (fun (d : Lsp.Types.Diagnostic.t) ->
+    d.severity = Some Lsp.Types.DiagnosticSeverity.Error
+    && d.range.start.line >= first_line && d.range.start.line < last_line )
+  |> List.rev_map (fun (d : Lsp.Types.Diagnostic.t) ->
+    let msg =
+      match d.message with
+      | `String s -> s
+      | `MarkupContent m -> m.value
+    in
+    match excerpt text d.range with
+    | "" -> `String msg
+    | ex -> `String (Printf.sprintf "at `%s`: %s" ex msg) )
+
+(* mlsem/definitionStatus: how the definition fares in the document's
+   typecheck.
+   - [typed]: it typechecks; [types] are its overloads as [val] types, and
+     [declared] whether they are its own [val] lines.
+   - [errors]: the errors in its [val] lines and its body.
+   - [failed]: the document's typecheck timed out or crashed, with the
+     message. TODO: in which definition is not known, see [mark_failed] in
+     [Server].
+   - [unknown]: neither, e.g. when the declarations of the file failed. *)
+let definition_status params : Yojson.Safe.t =
+  with_target params (fun text offsets t ->
+    let uri =
+      (params |> member "textDocument" |> Lsp.Types.TextDocumentIdentifier.t_of_yojson).uri
+    in
+    let status fields = `Assoc (("ok", `Bool true) :: fields) in
+    match Store.try_sync uri text with
+    | Error message -> status [("status", `String "failed"); ("message", `String message)]
+    | Ok () -> (
+        let binding =
+          Store.bindings uri
+          |> List.find_opt (fun (b : Typecheck.binding) ->
+            b.name = t.name && t.line_start <= b.def_start && b.def_start <= t.stop )
+        in
+        match (binding, Store.envs_of uri) with
+        | Some b, Some envs ->
+            Config.restore_all () ;
+            status
+              [
+                ("status", `String "typed"); ("declared", `Bool b.declared);
+                ("types", `List (List.map (fun s -> `String s) (Main.signature envs b.sigs)));
+              ]
+        | _ -> (
+            let line off = (Doc.position_of_offset offsets off).line in
+            let from =
+              match t.vals with
+              | (s, _) :: _ -> s
+              | [] -> t.line_start
+            in
+            let _, diagnostics, _ = Store.results uri in
+            match
+              errors_in text diagnostics ~first_line:(line from) ~last_line:(line t.stop + 1)
+            with
+            | [] -> status [("status", `String "unknown")]
+            | errors -> status [("status", `String "errors"); ("errors", `List errors)] ) ) )
 
 (* mlsem/checkSignature *)
 let check_signature params : Yojson.Safe.t =
@@ -206,21 +264,7 @@ let check_signature params : Yojson.Safe.t =
     (* Errors from the [val] lines to the end of the definition. *)
     let first_line = lines prefix and last_line = lines checked in
     let result = Typecheck.run candidate in
-    let errors =
-      result.diagnostics
-      |> List.filter (fun (d : Lsp.Types.Diagnostic.t) ->
-        d.severity = Some Lsp.Types.DiagnosticSeverity.Error
-        && d.range.start.line >= first_line && d.range.start.line < last_line )
-      |> List.rev_map (fun (d : Lsp.Types.Diagnostic.t) ->
-        let msg =
-          match d.message with
-          | `String s -> s
-          | `MarkupContent m -> m.value
-        in
-        match excerpt candidate d.range with
-        | "" -> `String msg
-        | ex -> `String (Printf.sprintf "at `%s`: %s" ex msg) )
-    in
+    let errors = errors_in candidate result.diagnostics ~first_line ~last_line in
     let declared =
       List.exists
         (fun (b : Typecheck.binding) ->
