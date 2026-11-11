@@ -37,6 +37,8 @@ let tool_handlers =
     ("mlsem/applyMerge", Handlers.apply_merge);
     ("mlsem/instantiatePreview", Handlers.instantiate_preview);
     ("mlsem/applyInstantiate", Handlers.apply_instantiate);
+    ("mlsem/definitionAt", Signature_check.definition_at);
+    ("mlsem/checkSignature", Signature_check.check_signature);
   ]
 
 let is_tool method_ = List.mem_assoc method_ tool_handlers
