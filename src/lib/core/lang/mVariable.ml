@@ -112,3 +112,23 @@ let ref_assign v arg =
       ]) in
   let op = { SA.oname="assign" ; ofun=Fun.const (ref_assign v) ; ogen=false } in
   SA.Operation (OCustom op, arg)
+
+let as_ref_assign (e:SA.e) =
+  match e with
+  | SA.Operation (OCustom { oname="assign" ; _ },
+      (_, SA.Constructor (SA.Tuple 2, [ (_, SA.Var v) ; (_, SA.GConstructor (SA.UpperBound, [_])) ])))
+    when is_mutable v -> Some v
+  | _ -> None
+
+let content_ty v ref_ty =
+  match Hashtbl.find_opt all v with
+  | None -> invalid_arg "Variable must be mutable."
+  | Some (Some gty) -> Some (GTy.ub gty)
+  | Some None ->
+      (* The type of a cell is obtained by substitution from [ref('a)]:
+        we only handle the case of a single [ref] atom. *)
+      if Ty.leq ref_ty (Abstract.any ref_abs) |> not then None
+      else
+        match Abstract.dnf ref_abs ref_ty with
+        | [[[ty]]] -> Some ty
+        | _ -> None

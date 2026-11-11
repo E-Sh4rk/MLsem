@@ -8,7 +8,7 @@ module NameMap = PAst.NameMap
 
 exception IncompatibleType of Variable.t * TyScheme.t
 exception UnresolvedType of Variable.t * TyScheme.t
-exception Untypeable of Variable.t option * Mlsem_system.Error.t
+exception Untypeable of Variable.t option * Mlsem_lang.Error.t
 exception AlreadyDefined of Variable.t
 
 (* Utility *)
@@ -60,7 +60,7 @@ let infer var env e =
       env r e with
     | Mlsem_system.Error.Untypeable err ->
       (* Format.printf "@.@.%a@.@." Mlsem_system.Ast.pp e ; *)
-      raise (Untypeable (var, err))
+      raise (Untypeable (var, Mlsem_lang.Error.of_system err))
   in
   let ty = Mlsem_system.Checker.typeof_def env annot e in
   let (tvs, ty) = TyScheme.get ty in
@@ -259,7 +259,7 @@ let treat (benv,varm,senv,env) (annot, elem) =
       then Variable.get_location v
       else Eid.loc err.eid
     in
-    (benv,varm,senv,env), { res=TFailure (Some v, pos, Mlsem_system.Error.title err, Mlsem_system.Error.descr ~style:!Config.errors_style err, retrieve_time time) ; msg=[] }
+    (benv,varm,senv,env), { res=TFailure (Some v, pos, Mlsem_lang.Error.title err, Mlsem_lang.Error.descr ~style:!Config.errors_style err, retrieve_time time) ; msg=[] }
   | IncompatibleType (var,_) ->
     (benv,varm,senv,env), { res=TFailure (Some var, Variable.get_location var,
       "the type inferred is not a subtype of the type specified", None,
