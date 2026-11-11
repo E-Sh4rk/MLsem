@@ -48,58 +48,78 @@ let line_end text off =
   | Some i -> i + 1
   | None -> String.length text
 
-(* The top-level definition containing [off]. In a [let ... and ...] group,
-   the member whose binding contains [off], or the first one. The [val] lines
-   of its name are those written since the last definition of that name. *)
+(* The top-level definition at [off]: the one containing it, or the one a
+   [val] line containing it declares (the next definition of that name). In a
+   [let ... and ...] group, the member whose binding contains [off], or the
+   first one. The [val] lines of its name are those written since the last
+   definition of that name. *)
 let find_target text (program : PAst.program) off =
+  let contains pos =
+    match span pos with
+    | Some (s, e) -> s <= off && off <= e
+    | None -> false
+  in
   let binds name = function
     | PAst.Definitions lst ->
         List.exists (fun (_, (_, lname), _) -> Position.value lname = name) lst
     | _ -> false
   in
-  let rec go before = function
+  (* The name, the elements before the definition (most recent first), the
+     definition and the elements after it. *)
+  let rec locate before = function
     | [] -> None
     | ((annot, elem) as el) :: rest -> (
-        match (elem, span (Position.position annot)) with
-        | PAst.Definitions ((_, (_, first), _) :: _ as lst), Some (s, e) when s <= off && off <= e
+        match elem with
+        | PAst.Definitions ((_, (_, first), _) :: _ as lst) when contains (Position.position annot)
           ->
             let name =
               lst
               |> List.find_map (fun (bpos, (_, lname), _) ->
-                match span bpos with
-                | Some (s, e) when s <= off && off <= e -> Some (Position.value lname)
-                | _ -> None )
+                if contains bpos then Some (Position.value lname) else None )
               |> Option.value ~default:(Position.value first)
             in
-            let vals =
-              List.rev before
-              |> List.fold_left
-                   (fun acc (annot, elem) ->
-                      match elem with
-                      | PAst.SigDef (n, _, _) when n = name -> (
-                          match span (Position.position annot) with
-                          | Some (s, e) -> (line_start text s, line_end text e) :: acc
-                          | None -> acc )
-                      | elem when binds name elem -> []
-                      | _ -> acc )
-                   []
+            Some (name, before, annot, rest)
+        | PAst.SigDef (name, _, _) when contains (Position.position annot) ->
+            let rec next before = function
+              | [] -> None
+              | (annot, elem) :: rest when binds name elem -> Some (name, before, annot, rest)
+              | el :: rest -> next (el :: before) rest
             in
-            (* A definition can use a later one that has a [val], even one
-               written after it, so later declarations are kept. *)
-            let later_decls =
-              rest
-              |> List.filter_map (fun (annot, elem) ->
-                match (elem, span (Position.position annot)) with
-                | (PAst.SigDef _ | Types _ | AbsType _), Some (s, e) ->
-                    let s = line_start text s in
-                    Some (String.sub text s (line_end text e - s))
-                | _ -> None )
-              |> String.concat ""
-            in
-            Some {name; line_start = line_start text s; stop = e; vals = List.rev vals; later_decls}
-        | _ -> go (el :: before) rest )
+            next (el :: before) rest
+        | _ -> locate (el :: before) rest )
   in
-  go [] program
+  match locate [] program with
+  | None -> None
+  | Some (name, before, annot, rest) -> (
+      match span (Position.position annot) with
+      | None -> None
+      | Some (s, e) ->
+          let vals =
+            List.rev before
+            |> List.fold_left
+                 (fun acc (annot, elem) ->
+                    match elem with
+                    | PAst.SigDef (n, _, _) when n = name -> (
+                        match span (Position.position annot) with
+                        | Some (s, e) -> (line_start text s, line_end text e) :: acc
+                        | None -> acc )
+                    | elem when binds name elem -> []
+                    | _ -> acc )
+                 []
+          in
+          (* A definition can use a later one that has a [val], even one
+             written after it, so later declarations are kept. *)
+          let later_decls =
+            rest
+            |> List.filter_map (fun (annot, elem) ->
+              match (elem, span (Position.position annot)) with
+              | (PAst.SigDef _ | Types _ | AbsType _), Some (s, e) ->
+                  let s = line_start text s in
+                  Some (String.sub text s (line_end text e - s))
+              | _ -> None )
+            |> String.concat ""
+          in
+          Some {name; line_start = line_start text s; stop = e; vals = List.rev vals; later_decls} )
 
 let without_spans text spans ~from ~until =
   let b = Buffer.create (until - from) in
