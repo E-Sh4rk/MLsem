@@ -45,6 +45,7 @@ let tool_handlers =
   [
     ("mlsem/overloads", Handlers.overloads); ("mlsem/mergePreview", Handlers.merge_preview);
     ("mlsem/applyMerge", Handlers.apply_merge);
+    ("mlsem/generalizePreview", Handlers.generalize_preview);
     ("mlsem/instantiatePreview", Handlers.instantiate_preview);
     ("mlsem/applyInstantiate", Handlers.apply_instantiate);
     ("mlsem/definitionAt", Signature_check.definition_at);
