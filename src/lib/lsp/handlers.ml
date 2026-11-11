@@ -204,6 +204,49 @@ let merge_preview params : Yojson.Safe.t =
   with
   | e -> error (Printexc.to_string e)
 
+(* mlsem/generalizePreview: the selected overloads generalized into one
+   polymorphic type ([Generalize]), as the [val name : ...] line and as the
+   type alone, for [mlsem/checkSignature] to check: the result claims more
+   than the overloads, so it may not hold. [correlated] says whether some
+   variable links two positions; without one the result is no more precise
+   than the plain merge. *)
+let generalize_preview params : Yojson.Safe.t =
+  try
+    let uri = decode_uri params in
+    let name = decode_name params in
+    let wanted = decode_overload_texts params in
+    sync params uri ;
+    match (Store.find_binding_by_name uri name, Store.envs_of uri) with
+    | Some b, Some envs -> (
+        Config.restore_all () ;
+        let rendered = Main.signature envs b.sigs in
+        if not (List.for_all (fun w -> List.mem w rendered) wanted) then
+          stale
+        else
+          match
+            List.filter (fun r -> List.mem r wanted) rendered
+          with
+          | [] -> error "Select at least one overload."
+          | selected -> (
+              let g = Generalize.generalize (List.map IO.parse_type_string selected) in
+              let benv, _, _, _, _ = envs in
+              let overload, _ = Signature.build benv g.ty in
+              match Main.signature envs [overload] with
+              | [ty] ->
+                  `Assoc
+                    [
+                      ("ok", `Bool true); ("text", `String ("val " ^ name ^ " : " ^ ty));
+                      ("type", `String ty);
+                      ( "correlated",
+                        `Bool
+                          (List.exists (fun (v : Generalize.variable) -> v.occurrences > 1) g.vars)
+                      );
+                    ]
+              | _ -> error "The generalized type did not print as one overload." ) )
+    | _ -> error "No binding found."
+  with
+  | e -> error (Printexc.to_string e)
+
 (* mlsem/applyMerge: the workspace edits that write the merged declaration —
    replacing existing [val] line(s) or inserting above the binder. Returned as
    a list for the extension to apply via [vscode.workspace.applyEdit]. *)
