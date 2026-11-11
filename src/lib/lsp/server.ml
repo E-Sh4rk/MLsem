@@ -123,6 +123,9 @@ type running = {
   job: job;
   started: float;
   progress: Lsp.Types.ProgressToken.t option;
+  mutable typechecking: bool;
+    (** A toolkit job is typechecking its document ([Engine.Typechecking]):
+          its timeout or crash is the document's. *)
 }
 
 type engine = {
@@ -287,9 +290,16 @@ let spawn_engine () =
   engine := Some e ;
   e
 
+(* Built when the job starts, so a failure found while it waited counts. *)
 let call_of = function
   | Check {uri; text} -> Engine.Check {uri; text}
-  | Tool {method_; params; _} -> Engine.Tool {method_; params = J.to_string params}
+  | Tool {method_; params; uri; text; _} ->
+      let known_failure =
+        match (uri, text) with
+        | Some uri, Some text -> known_failure uri text
+        | _ -> None
+      in
+      Engine.Tool {method_; params = J.to_string params; known_failure}
 
 (* A pop-up in the editor, prefixed with the file name when there is one. *)
 let show_message ~type_ ?uri message =
@@ -302,27 +312,26 @@ let show_message ~type_ ?uri message =
     (Lsp.Server_notification.ShowMessage
        (Lsp.Types.ShowMessageParams.create ~message:("MLsem: " ^ message) ~type_) )
 
-(* The running job will not finish: answer or report it with [message], both
-   in the response or diagnostics and as a pop-up. *)
+(* The running job will not finish: answer or report it with [message]. A
+   failure while typechecking the document is the document's: it is
+   remembered, published and shown as a pop-up. Any other failure of a
+   toolkit job is the job's own, and only answers its request: the client
+   shows it where the request came from. *)
 let fail_running ~type_ message =
   Option.iter
     (fun r ->
        running := None ;
        end_progress r.progress ;
+       let document_failed uri text =
+         show_message ~type_ ~uri message ; mark_failed uri text message
+       in
        match r.job with
-       | Check {uri; text} -> show_message ~type_ ~uri message ; mark_failed uri text message
-       | Tool {id; method_; uri; text; _} -> (
-           (* No pop-up: the client shows a toolkit request's failure where
-              the request came from. *)
+       | Check {uri; text} -> document_failed uri text
+       | Tool {id; uri; text; _} -> (
            respond_error id Response.Error.Code.RequestFailed message ;
-           (* The failure of a request that typechecks only its own variant of
-              the document says nothing about the document. *)
-           if not (Engine.independent_of_typecheck method_) then
-             match
-               (uri, text)
-             with
-             | Some uri, Some text -> mark_failed uri text message
-             | _ -> () ) )
+           match (r.typechecking, uri, text) with
+           | true, Some uri, Some text -> document_failed uri text
+           | _ -> () ) )
     !running
 
 let engine_died () =
@@ -337,13 +346,6 @@ let engine_died () =
 (* Start the next queued job if the engine is free. *)
 let rec dispatch () =
   match (!running, !queue) with
-  | None, Tool {id; method_; uri = Some uri; text = Some text; _} :: rest
-    when (not (Engine.independent_of_typecheck method_)) && known_failure uri text <> None ->
-      (* The document's typecheck failed while this request waited: running
-         it would only fail the same way again. *)
-      queue := rest ;
-      Option.iter (respond_error id Response.Error.Code.RequestFailed) (known_failure uri text) ;
-      dispatch ()
   | None, job :: rest -> (
       queue := rest ;
       let e =
@@ -365,7 +367,7 @@ let rec dispatch () =
                 begin_progress ("Typechecking " ^ Filename.basename (Uri.to_path uri))
             | Tool _ -> None
           in
-          running := Some {job; started = Unix.gettimeofday (); progress} )
+          running := Some {job; started = Unix.gettimeofday (); progress; typechecking = false} )
   | _ -> ()
 
 let on_reply (reply : Engine.reply) =
@@ -377,9 +379,13 @@ let on_reply (reply : Engine.reply) =
         Doc.set_result uri ~text ~lenses ~diagnostics ~typings ;
         publish uri (Doc.diagnostics uri)
       end
+  | Some ({job = Tool _; _} as r), Typechecking -> r.typechecking <- true
   | Some {job = Tool {id; _}; _}, Tool_result json ->
       running := None ;
       respond id (J.from_string json)
+  | Some {job = Tool {id; _}; _}, Tool_refused message ->
+      running := None ;
+      respond_error id Response.Error.Code.RequestFailed message
   | _ -> Log.Server.warn (fun m -> m "engine reply does not match the running job")
 
 let enqueue job = queue := !queue @ [job]
@@ -498,7 +504,8 @@ let code_actions_for uri (req_range : Lsp.Types.Range.t) =
 
 (* A toolkit request becomes an engine job. Its [text] is filled in from our
    copy of the document when the client did not send it, so the engine always
-   works on an explicit text. *)
+   works on an explicit text. A known failure of that text does not stop it
+   here: only the engine knows whether the request needs the typecheck. *)
 let handle_tool (req : Request.t) =
   let params = params_json req in
   let uri =
@@ -518,15 +525,7 @@ let handle_tool (req : Request.t) =
     | `Assoc fields, `Null, Some t -> `Assoc (("text", `String t) :: fields)
     | _ -> params
   in
-  let failure =
-    if Engine.independent_of_typecheck req.method_ then
-      None
-    else
-      Option.bind uri (fun uri -> Option.bind text (known_failure uri))
-  in
-  match failure with
-  | Some message -> respond_error req.id Response.Error.Code.RequestFailed message
-  | None -> enqueue (Tool {id = req.id; method_ = req.method_; uri; text; params})
+  enqueue (Tool {id = req.id; method_ = req.method_; uri; text; params})
 
 let shutdown () =
   (* Answered here so it works even when the engine hangs. Pending work is
@@ -792,6 +791,7 @@ let check_timeout () =
       fail_running ~type_:Lsp.Types.MessageType.Warning
         ( match r.job with
         | Check _ -> "Typechecking timed out after " ^ limit
+        | Tool _ when r.typechecking -> "Typechecking timed out after " ^ limit
         | Tool _ -> "Request timed out after " ^ limit )
   | _ -> ()
 
