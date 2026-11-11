@@ -20,16 +20,30 @@ type entry = {
 
 let entries : (Uri.t, entry) Hashtbl.t = Hashtbl.create 16
 
+(* Set by the engine around each call. The supervisor remembers texts whose
+   typecheck timed out or crashed: [known_failure] is that message when the
+   call's document text is one of them. A call that would typecheck it is
+   [refused] with the message instead, and [on_typecheck] runs before every
+   typecheck, so the supervisor knows a timeout from then on is the
+   document's, not the call's. *)
+let known_failure : string option ref = ref None
+let refused : string option ref = ref None
+let on_typecheck : (unit -> unit) ref = ref ignore
+
 (* Make [text] the cached content of [uri], typechecking it unless it already
    is. *)
 let sync_text uri text =
   let digest = Digest.string text in
   match Hashtbl.find_opt entries uri with
   | Some e when Digest.equal e.digest digest -> ()
-  | _ ->
-      let result = Typecheck.run text in
-      Hashtbl.replace entries uri
-        {text; line_offsets = Doc.compute_line_offsets text; digest; result}
+  | _ -> (
+      match !known_failure with
+      | Some message -> refused := Some message
+      | None ->
+          !on_typecheck () ;
+          let result = Typecheck.run text in
+          Hashtbl.replace entries uri
+            {text; line_offsets = Doc.compute_line_offsets text; digest; result} )
 
 (* Lenses, diagnostics and typings of the cached typecheck. *)
 let results uri =

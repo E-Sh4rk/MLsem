@@ -1,7 +1,8 @@
 (* The engine: a child process ([lsp.exe --engine]) that runs all mlsem work.
 
    The supervisor ([Server]) sends one [call] at a time over the engine's
-   stdin and reads one [reply] from its stdout, both with [Marshal]. Only plain
+   stdin and reads its [reply] from its stdout, both with [Marshal]; a toolkit
+   call may first send [Typechecking]. Only plain
    data crosses: texts, offsets, strings, LSP diagnostics, JSON as text. mlsem
    types stay here, because they carry ids from process-global counters that
    mean nothing in another process.
@@ -18,9 +19,12 @@ type call =
   | Tool of {
       method_: string;
       params: string;
+      known_failure: string option;
     }
   (** an [mlsem/*] toolkit request; [params] is JSON text including the
-          document [text]; answered with [Tool_result] *)
+          document [text], and [known_failure] the message of the document's
+          failed typecheck if the supervisor knows of one; answered with
+          [Tool_result] or [Tool_refused] *)
 
 type reply =
   | Checked of {
@@ -28,7 +32,13 @@ type reply =
       diagnostics: Lsp.Types.Diagnostic.t list;
       typings: Typings.t;
     }
+  | Typechecking
+  (** Not an answer: the toolkit call starts typechecking its document, so
+          a timeout or crash from now on is the document's. *)
   | Tool_result of string  (** JSON text *)
+  | Tool_refused of string
+  (** The call needed the typecheck of a document whose typecheck is
+          known to fail, with that failure's message. *)
 
 (* The toolkit requests the engine serves. *)
 let tool_handlers =
@@ -43,25 +53,28 @@ let tool_handlers =
 
 let is_tool method_ = List.mem_assoc method_ tool_handlers
 
-(* Toolkit requests that do not typecheck the document: they parse it, or
-   typecheck their own variant of it. A document whose typecheck failed or
-   timed out does not stop them, and their own failure says nothing about the
-   document. *)
-let independent_of_typecheck method_ =
-  List.mem method_ ["mlsem/definitionAt"; "mlsem/checkSignature"]
-
-let handle = function
+(* Whether a tool needs the document's typecheck shows in what it does: it
+   goes through [Store.sync_text] or not. So the handlers run unchanged, and
+   [Store] refuses or reports the typecheck. *)
+let handle ~typechecking = function
   | Check {uri; text} ->
+      Store.known_failure := None ;
+      Store.on_typecheck := ignore ;
       Store.sync_text uri text ;
       let lenses, diagnostics, typings = Store.results uri in
       Checked {lenses; diagnostics; typings}
-  | Tool {method_; params} ->
+  | Tool {method_; params; known_failure} -> (
+      Store.known_failure := known_failure ;
+      Store.refused := None ;
+      Store.on_typecheck := typechecking ;
       let result =
         match List.assoc_opt method_ tool_handlers with
         | Some handler -> handler (Yojson.Safe.from_string params)
         | None -> `Null
       in
-      Tool_result (Yojson.Safe.to_string result)
+      match !Store.refused with
+      | Some message -> Tool_refused message
+      | None -> Tool_result (Yojson.Safe.to_string result) )
 
 (* Exit as soon as the supervisor that started us is gone, even mid-typecheck.
 
@@ -115,7 +128,9 @@ let run () =
     | exception End_of_file -> exit 0
     | call ->
         arm () ;
-        let reply = Fun.protect ~finally:disarm (fun () -> handle call) in
-        output_value out reply ; flush out ; loop ()
+        let send (reply : reply) = output_value out reply ; flush out in
+        let typechecking () = send Typechecking in
+        let reply = Fun.protect ~finally:disarm (fun () -> handle ~typechecking call) in
+        send reply ; loop ()
   in
   loop ()
