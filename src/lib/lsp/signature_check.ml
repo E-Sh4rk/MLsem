@@ -165,6 +165,12 @@ let definition_at params : Yojson.Safe.t =
         ("ok", `Bool true); ("name", `String t.name);
         ("definition", `String (String.sub text t.line_start (t.stop - t.line_start)));
         ("line", `Int (Doc.position_of_offset (Doc.compute_line_offsets text) t.line_start).line);
+        (* The failure of the file's own typecheck, if it timed out or
+           crashed. Which definition caused it is not known. *)
+        ( "fileFailure",
+          match !Store.known_failure with
+          | Some message -> `String message
+          | None -> `Null );
       ] )
 
 (* The text of [pos] in [text], shortened, to show the LLM where an error is. *)
