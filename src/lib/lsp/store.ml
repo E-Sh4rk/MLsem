@@ -31,19 +31,33 @@ let refused : string option ref = ref None
 let on_typecheck : (unit -> unit) ref = ref ignore
 
 (* Make [text] the cached content of [uri], typechecking it unless it already
-   is. *)
-let sync_text uri text =
+   is. [Error] with the message when its typecheck is known to fail. *)
+let try_sync uri text =
   let digest = Digest.string text in
   match Hashtbl.find_opt entries uri with
-  | Some e when Digest.equal e.digest digest -> ()
+  | Some e when Digest.equal e.digest digest -> Ok ()
   | _ -> (
       match !known_failure with
-      | Some message -> refused := Some message
+      | Some message -> Error message
       | None ->
           !on_typecheck () ;
           let result = Typecheck.run text in
           Hashtbl.replace entries uri
-            {text; line_offsets = Doc.compute_line_offsets text; digest; result} )
+            {text; line_offsets = Doc.compute_line_offsets text; digest; result} ;
+          Ok () )
+
+(* [try_sync] for a call that cannot do without the typecheck: a known
+   failure refuses the call. *)
+let sync_text uri text =
+  match try_sync uri text with
+  | Ok () -> ()
+  | Error message -> refused := Some message
+
+(* The bindings of the cached typecheck. *)
+let bindings uri : Typecheck.binding list =
+  match Hashtbl.find_opt entries uri with
+  | Some e -> e.result.bindings
+  | None -> []
 
 (* Lenses, diagnostics and typings of the cached typecheck. *)
 let results uri =
