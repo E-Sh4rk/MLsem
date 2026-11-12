@@ -40,3 +40,13 @@ val ref_get : Variable.t -> SA.e
 val ref_assign : Variable.t -> SA.t -> SA.e
 (** Write of the given expression into the cell.
     @raise Invalid_argument if the variable is not mutable. *)
+
+val as_ref_assign : SA.e -> Variable.t option
+(** Recognizes an expression produced by {!ref_assign}, returning the variable
+    being assigned. *)
+
+val content_ty : Variable.t -> Ty.t -> Ty.t option
+(** [content_ty v ty] is the type of the values that can be assigned to [v],
+    given the type [ty] of its cell (as produced by the encoding), if it can be
+    determined (i.e. if [v] is annotated, or if [ty] is a single [ref] atom).
+    @raise Invalid_argument if the variable is not mutable. *)
