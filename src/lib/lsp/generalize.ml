@@ -225,3 +225,45 @@ let generalize (overloads : TyExpr.t list) : result =
         | None -> t )
   in
   {ty = bound ty; vars}
+
+(* How a generalized type compares with the collapse of the same overloads. *)
+type precision =
+  | Equivalent
+  | More_precise  (** some instance of it is below the collapse, not conversely *)
+  | Less_precise
+  | Incomparable
+
+(* Whether [t] can stand for [s]: an intersection of [copies] instances of [t]
+   is a subtype of [s], with the variables of [s] held rigid. This is
+   expansion followed by subsumption: a polymorphic type is used at several
+   instances at once, which a single instance cannot do. For example
+   ['a & B -> ('a & B, 'a & B)] is below [(int, int) | (bool, bool)] only as
+   the intersection of its [int] and [bool] instances. Each copy gets fresh
+   variables, and tallying solves for all of them together. *)
+let derives ~copies (t : Ty.t) (s : Ty.t) =
+  let vars = TVOp.vars t in
+  let instances =
+    if MVarSet.is_empty vars then
+      t
+    else
+      List.init copies (fun _ -> Subst.apply (TVOp.refresh ~kind:KInfer vars) t) |> Ty.conj
+  in
+  TVOp.tally ~record:false (TVOp.vars s) [(instances, s)] <> []
+
+(* [copies] instances are tried for each side: as many as there are
+   overloads, which is enough whenever every overload is an instance of the
+   generalized type, as anti-unification makes it. A type that needs more
+   instances than that to stand for the other is reported as not standing for
+   it. *)
+let compare_with_collapse ~copies ~generalized ~collapsed =
+  match (derives ~copies generalized collapsed, derives ~copies collapsed generalized) with
+  | true, true -> Equivalent
+  | true, false -> More_precise
+  | false, true -> Less_precise
+  | false, false -> Incomparable
+
+let precision_name = function
+  | Equivalent -> "equivalent"
+  | More_precise -> "more"
+  | Less_precise -> "less"
+  | Incomparable -> "incomparable"
