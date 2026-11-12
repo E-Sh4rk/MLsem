@@ -207,9 +207,9 @@ let merge_preview params : Yojson.Safe.t =
 (* mlsem/generalizePreview: the selected overloads generalized into one
    polymorphic type ([Generalize]), as the [val name : ...] line and as the
    type alone, for [mlsem/checkSignature] to check: the result claims more
-   than the overloads, so it may not hold. [correlated] says whether some
-   variable links two positions; without one the result is no more precise
-   than the plain merge. *)
+   than the overloads, so it may not hold. [precision] compares it with the
+   collapse of the same overloads ([Generalize.compare_with_collapse]):
+   "equivalent", "more" (precise), "less" or "incomparable". *)
 let generalize_preview params : Yojson.Safe.t =
   try
     let uri = decode_uri params in
@@ -223,24 +223,32 @@ let generalize_preview params : Yojson.Safe.t =
         if not (List.for_all (fun w -> List.mem w rendered) wanted) then
           stale
         else
-          match
-            List.filter (fun r -> List.mem r wanted) rendered
-          with
+          let pairs =
+            List.combine b.sigs rendered |> List.filter (fun (_, r) -> List.mem r wanted)
+          in
+          match pairs with
           | [] -> error "Select at least one overload."
-          | selected -> (
+          | _ -> (
+              let selected = List.map snd pairs in
               let g = Generalize.generalize (List.map IO.parse_type_string selected) in
               let benv, _, _, _, _ = envs in
               let overload, _ = Signature.build benv g.ty in
+              (* The same collapse as [merge_texts], to compare against. *)
+              let collapsed =
+                Signature.merge ~recursive:true (Signature.regroup (List.map fst pairs))
+              in
+              let ty_of o = Signature.to_gty o |> Mlsem_types.GTy.ub in
+              let precision =
+                Generalize.compare_with_collapse ~copies:(List.length pairs)
+                  ~generalized:(ty_of overload) ~collapsed:(ty_of collapsed)
+              in
               match Main.signature envs [overload] with
               | [ty] ->
                   `Assoc
                     [
                       ("ok", `Bool true); ("text", `String ("val " ^ name ^ " : " ^ ty));
                       ("type", `String ty);
-                      ( "correlated",
-                        `Bool
-                          (List.exists (fun (v : Generalize.variable) -> v.occurrences > 1) g.vars)
-                      );
+                      ("precision", `String (Generalize.precision_name precision));
                     ]
               | _ -> error "The generalized type did not print as one overload." ) )
     | _ -> error "No binding found."
