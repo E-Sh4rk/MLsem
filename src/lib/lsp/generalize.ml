@@ -226,12 +226,13 @@ let generalize (overloads : TyExpr.t list) : result =
   in
   {ty = bound ty; vars}
 
-(* How a generalized type compares with the collapse of the same overloads. *)
+(* How a generalized type compares with the overloads it was made from. *)
 type precision =
-  | Equivalent
-  | More_precise  (** some instance of it is below the collapse, not conversely *)
-  | Less_precise
-  | Incomparable
+  | Equivalent  (** the same type, written differently *)
+  | Stronger
+  (** the overloads follow from it, and it claims more: whether it holds
+          is for the check to decide *)
+  | Weaker  (** the overloads do not follow from it: information was lost *)
 
 (* Whether [t] can stand for [s]: an intersection of [copies] instances of [t]
    is a subtype of [s], with the variables of [s] held rigid. This is
@@ -250,20 +251,19 @@ let derives ~copies (t : Ty.t) (s : Ty.t) =
   in
   TVOp.tally ~record:false (TVOp.vars s) [(instances, s)] <> []
 
-(* [copies] instances are tried for each side: as many as there are
-   overloads, which is enough whenever every overload is an instance of the
-   generalized type, as anti-unification makes it. A type that needs more
-   instances than that to stand for the other is reported as not standing for
-   it. *)
-let compare_with_collapse ~copies ~generalized ~collapsed =
-  match (derives ~copies generalized collapsed, derives ~copies collapsed generalized) with
-  | true, true -> Equivalent
-  | true, false -> More_precise
-  | false, true -> Less_precise
-  | false, false -> Incomparable
+(* [overloads] is their intersection. As many instances are tried as there are
+   overloads, which is enough when every overload is an instance of the
+   generalized type, as anti-unification makes it; a generalized type that
+   would need more is reported weaker. *)
+let compare_with_overloads ~copies ~generalized ~overloads =
+  if not (derives ~copies generalized overloads) then
+    Weaker
+  else if derives ~copies overloads generalized then
+    Equivalent
+  else
+    Stronger
 
 let precision_name = function
   | Equivalent -> "equivalent"
-  | More_precise -> "more"
-  | Less_precise -> "less"
-  | Incomparable -> "incomparable"
+  | Stronger -> "stronger"
+  | Weaker -> "weaker"
