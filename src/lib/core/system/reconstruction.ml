@@ -90,7 +90,13 @@ type ('a,'b) result =
 | Fail
 | Subst of (Subst.t * IAnnot.res) list * 'b * 'b * REnv.t
 
-type cache = { dom : Domain.t ; logs : Error.t list ref ;
+type cache = { dom : Domain.t ;
+               (* The last operation logged: if the search fails, it is the
+                  error reported. *)
+               last_log : Error.t option ref ;
+               (* The number of nodes successfully refined so far: it measures
+                  how far a branch of an intersection went before failing. *)
+               progress : int ref ;
                (* When set, a log produced anywhere below the [Alt] that set it
                   carries that [Alt]'s encoding error instead of its own. *)
                alt_err : Error.t option }
@@ -251,7 +257,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
       | Some log -> log
       | None -> { Error.eid=id ; expr=e ; kind ; ann=annot ; env }
     in
-    cache.logs := log::!(cache.logs)
+    cache.last_log := Some log
   in
   let env = GREnv.refine_env env r in
   let retry_with a = refine cache env a (id, e) in
@@ -485,6 +491,23 @@ and refine_ann r cache env (rid, annot) (id, e) =
     | Fail -> Fail
     end
   | e, AInter lst ->
+    (* The failed branches, with their progress, whether they are the default
+       branch, and the last operation they logged (if any), most recent first *)
+    let failed = ref [] in
+    let explore dom coverage ann =
+      let last0, p0 = !(cache.last_log), !(cache.progress) in
+      cache.last_log := None ;
+      let res = refine_opt' {cache with dom} env ann (id,e) in
+      let last = !(cache.last_log) in
+      cache.last_log := (match last with Some _ -> last | None -> last0) ;
+      begin match res, last with
+      | Fail, Some log ->
+        let default = match coverage with Some (None, _) -> true | _ -> false in
+        failed := (!(cache.progress) - p0, default, log)::!failed
+      | _, _ -> ()
+      end ;
+      res
+    in
     let rec aux dom lst =
       match lst with
       | [] -> Either.left []
@@ -496,7 +519,7 @@ and refine_ann r cache env (rid, annot) (id, e) =
         in
         if useless then aux dom lst
         else
-          begin match refine_opt' {cache with dom} env ann (id,e) with
+          begin match explore dom coverage ann with
           | Fail when !Config.reexplore_failed_domains -> aux dom lst
           | Fail -> aux dom' lst |> add_to_res None { coverage ; ann=None }
           | Subst (ss,a,a',r) ->
@@ -506,7 +529,19 @@ and refine_ann r cache env (rid, annot) (id, e) =
           end
     in
     begin match aux cache.dom lst with
-    | Either.Left [] -> Fail
+    | Either.Left [] ->
+      (* All the branches failed: the error reported is the one of the branch
+         that went the furthest, preferring a non-default branch and then the
+         most recent one. Branches that failed without logging anything have
+         nothing to report. *)
+      let better (p1, d1, _) (p2, d2, _) = p1 > p2 || (p1 = p2 && not d1 && d2) in
+      begin match List.rev !failed with
+      | [] -> ()
+      | b::bs ->
+        let (_, _, log) = List.fold_left (fun best b -> if better best b then best else b) b bs in
+        cache.last_log := Some log
+      end ;
+      Fail
     | Either.Left lst -> retry_with (ac (Annot.AInter lst))
     | Either.Right (ss,a,a',r) -> Subst (ss,AInter(a)|>ic,AInter(a')|>ic,r)
     end
@@ -529,7 +564,7 @@ and refine' cache env annot e =
     MVarSet.inter (Subst.domain s) tvars |> MVarSet.is_empty
   in
   match refine cache env annot e with
-  | Ok (a, ty) -> Ok (a, ty)
+  | Ok (a, ty) -> incr cache.progress ; Ok (a, ty)
   | Fail -> Fail
   | Subst (ss, a1, a2, r) when ss |> List.map fst |> List.for_all subst_disjoint ->
     let default =
@@ -589,12 +624,13 @@ and refine_part_seq' cache env e v s lst =
     (lst |> List.map (fun a -> (a,())))
 
 let refine env iannot e =
-  let cache = { dom = Domain.empty ; logs = ref [] ; alt_err = None } in
+  let cache = { dom = Domain.empty ; last_log = ref None ; progress = ref 0 ;
+                alt_err = None } in
   match refine' cache env iannot e with
   | Fail ->
-    begin match !(cache.logs) with
-    | [] -> assert false
-    | err::_ -> raise (Error.Untypeable err)
+    begin match !(cache.last_log) with
+    | None -> assert false
+    | Some err -> raise (Error.Untypeable err)
     end
   | Subst _ -> failwith "Top-level environment should not contain an unresolved type variable."
   | Ok (a,_) -> a
