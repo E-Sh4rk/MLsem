@@ -208,8 +208,8 @@ let merge_preview params : Yojson.Safe.t =
    polymorphic type ([Generalize]), as the [val name : ...] line and as the
    type alone, for [mlsem/checkSignature] to check: the result claims more
    than the overloads, so it may not hold. [precision] compares it with the
-   collapse of the same overloads ([Generalize.compare_with_collapse]):
-   "equivalent", "more" (precise), "less" or "incomparable". *)
+   overloads ([Generalize.compare_with_overloads]): "equivalent", "stronger"
+   or "weaker". *)
 let generalize_preview params : Yojson.Safe.t =
   try
     let uri = decode_uri params in
@@ -233,14 +233,11 @@ let generalize_preview params : Yojson.Safe.t =
               let g = Generalize.generalize (List.map IO.parse_type_string selected) in
               let benv, _, _, _, _ = envs in
               let overload, _ = Signature.build benv g.ty in
-              (* The same collapse as [merge_texts], to compare against. *)
-              let collapsed =
-                Signature.merge ~recursive:true (Signature.regroup (List.map fst pairs))
-              in
               let ty_of o = Signature.to_gty o |> Mlsem_types.GTy.ub in
               let precision =
-                Generalize.compare_with_collapse ~copies:(List.length pairs)
-                  ~generalized:(ty_of overload) ~collapsed:(ty_of collapsed)
+                Generalize.compare_with_overloads ~copies:(List.length pairs)
+                  ~generalized:(ty_of overload)
+                  ~overloads:(ty_of (Signature.regroup (List.map fst pairs)))
               in
               match Main.signature envs [overload] with
               | [ty] ->
