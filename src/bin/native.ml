@@ -28,7 +28,7 @@ let treat_res (acc, output) =
             Format.printf "\n%!"
         ) ;
         acc, true
-    | TFailure (Some v, pos, msg, descr, time) ->
+    | TFailure (Some v, pos, msg, descr, time, _) ->
         Format.printf "@{<blue;bold>%s@}: @{<red>%s@}"
             (Variable.get_name v |> Option.get) msg ;
         if !notime |> not then
@@ -37,7 +37,7 @@ let treat_res (acc, output) =
         Format.printf "@{<italic;cyan>%s@}\n%!" (Position.string_of_pos pos) ;
         descr |> Option.iter (Format.printf "@{<italic;cyan>%s@}\n%!") ;
         acc, false
-    | TFailure (None, _, msg, _, _) ->
+    | TFailure (None, _, msg, _, _, _) ->
         Format.printf "@{<red>%s@}\n%!" msg ;
         acc, false
     | TDone -> acc, true

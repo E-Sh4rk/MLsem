@@ -190,6 +190,7 @@ type result =
 | TSuccess of inferred list * float
 | TDone
 | TFailure of Variable.t option * Position.t * string * string option * float
+              * Mlsem_lang.Error.t option
 type output = { res:result ; msg:message list }
 
 let dummy = Variable.create (Some "_")
@@ -273,7 +274,7 @@ let treat (benv,varm,senv,env) (annot, elem) =
         let senv = VarMap.add var sigs senv in
         (benv,varm,senv,env), { res=TDone ; msg=[] }
       with Invalid_argument str -> (benv,varm,senv,env),
-        { res=TFailure (None, pos, str, None, 0.0) ; msg=[] }
+        { res=TFailure (None, pos, str, None, 0.0, None) ; msg=[] }
       end
     | PAst.Command (str, c) ->
       begin match str, c with
@@ -307,11 +308,11 @@ let treat (benv,varm,senv,env) (annot, elem) =
       (benv,varm,senv,env), { res=TDone ; msg=[] }
   with
   | PAst.SymbolError msg ->
-    (benv,varm,senv,env), { res=TFailure (Some !v, pos, msg, None, 0.0) ; msg=[] }
+    (benv,varm,senv,env), { res=TFailure (Some !v, pos, msg, None, 0.0, None) ; msg=[] }
   | TypeDefinitionError msg ->
-    (benv,varm,senv,env), { res=TFailure (None, pos, msg, None, 0.0) ; msg=[] }
+    (benv,varm,senv,env), { res=TFailure (None, pos, msg, None, 0.0, None) ; msg=[] }
   | AlreadyDefined v ->
-    (benv,varm,senv,env), { res=TFailure (Some v, pos, "Symbol already defined.", None, 0.0) ; msg=[] }
+    (benv,varm,senv,env), { res=TFailure (Some v, pos, "Symbol already defined.", None, 0.0, None) ; msg=[] }
   | Untypeable (v', err) ->
     let v = match v' with None -> !v | Some v -> v in
     let pos =
@@ -319,16 +320,16 @@ let treat (benv,varm,senv,env) (annot, elem) =
       then Variable.get_location v
       else Eid.loc err.eid
     in
-    (benv,varm,senv,env), { res=TFailure (Some v, pos, Mlsem_lang.Error.title err, Mlsem_lang.Error.descr ~style:!Config.errors_style err, retrieve_time time) ; msg=[] }
+    (benv,varm,senv,env), { res=TFailure (Some v, pos, Mlsem_lang.Error.title err, Mlsem_lang.Error.descr ~style:!Config.errors_style err, retrieve_time time, Some err) ; msg=[] }
   | IncompatibleType (var,_) ->
     (benv,varm,senv,env), { res=TFailure (Some var, Variable.get_location var,
       "the type inferred is not a subtype of the type specified", None,
-      retrieve_time time); msg=[] }
+      retrieve_time time, None); msg=[] }
   | UnresolvedType (var,ty) ->
     (benv,varm,senv,env), { res=TFailure (Some var, Variable.get_location var,
       "the type inferred is not fully resolved",
       Some (Format.asprintf "type inferred: @[<h>%a@]" TyScheme.pp_short ty),
-      retrieve_time time); msg=[] }
+      retrieve_time time, None); msg=[] }
 
 let treat (benv,varm,senv,env,penv) e =
   let ((benv,varm,senv,env),r), penv = PEnv.sequential_handler penv (treat (benv,varm,senv,env)) e in

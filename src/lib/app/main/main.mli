@@ -30,6 +30,9 @@ type result =
 | TSuccess of inferred list * float
 | TDone
 | TFailure of Variable.t option * Position.t * string * string option * float
+              * Mlsem_lang.Error.t option
+(** The defined variable, if any, where it failed, the title and description,
+    the time, and the type error when it is one. *)
 type output = { res:result ; msg:message list }
 
 type envs = Builder.benv * Variable.t NameMap.t * Signature.t VarMap.t * Env.t * PEnv.t

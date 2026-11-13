@@ -35,7 +35,7 @@ let json_of_msg (s, pos, title, descr, _) =
 let add_res envs res out =
   let res = match out.res with
   | TDone -> res
-  | TFailure (Some v, pos, msg, descr, time) ->
+  | TFailure (Some v, pos, msg, descr, time, _) ->
     let name = Variable.get_name v |> Option.get in
     let def_pos = Variable.get_location v in
     let descr = match descr with None -> [] | Some d -> [("descr", `String d)] in
@@ -44,7 +44,7 @@ let add_res envs res out =
       ("typeable", `Bool false) ; ("message", `String msg) ; ("pos", json_of_pos pos)]@descr)
     in
     untyp::res
-  | TFailure (None, pos, msg, descr, time) ->
+  | TFailure (None, pos, msg, descr, time, _) ->
     let descr = match descr with None -> [] | Some d -> [("descr", `String d)] in
     let untyp =
       `Assoc ([("time", `Float time) ; ("def_pos", json_of_pos pos) ;
