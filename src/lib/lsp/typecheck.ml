@@ -129,7 +129,8 @@ let add_result ?typings envs acc (out : Main.output) : result =
   | TSuccess (lst, _), Some ctx -> List.iter (Typings.add ctx envs) lst
   | _ -> () ) ;
   match out.res with
-  | TDone -> acc
+  (* Statements without bindings, e.g. the result of a [##] debug query. *)
+  | TDone -> {acc with diagnostics = List.fold_left add_message acc.diagnostics out.msg}
   | TFailure (v_opt, pos, msg, descr, _time) ->
       let def_pos =
         match v_opt with
