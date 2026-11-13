@@ -169,8 +169,9 @@ let line_start source off =
    A definition stops at its first failure, so a definition calling [f]
    twice wrongly ([let g x = (f true, f "a")]) shows only the first call:
    the second appears once the first is fixed. *)
-let app_fixes envs source bindings (err : Mlsem_lang.Error.t) : Typings.fix list =
+let app_fixes envs source val_types bindings (err : Mlsem_lang.Error.t) : Typings.fix list =
   let open Mlsem_types in
+  let open TyExpr in
   match (err.kind, err.expr) with
   | UntypeableApp {arg; _}, App ((_, Var f), _) when TVOp.is_ground_typ arg -> (
       let callee =
@@ -183,22 +184,33 @@ let app_fixes envs source bindings (err : Mlsem_lang.Error.t) : Typings.fix list
       in
       match (offsets_of_pos (Eid.loc err.eid), callee) with
       | Some (x_start, x_end), Some b -> (
-          (* Types as written, to build the drafts from: the argument's, and
-             each overload's domain. *)
           let parse s =
-            match Type_refactor.strip (IO.parse_type_string s) with
+            match IO.parse_type_string s with
             | t -> Some t
             | exception _ -> None
           in
           let rendered = Main.signature envs b.sigs in
+          let locs = List.sort compare b.sig_offsets in
+          (* Each overload's type as a tree: its [val] line as written when
+             each overload is one line, else as printed. *)
+          let overload_types =
+            if b.declared && List.length locs = List.length rendered then
+              List.map (fun loc -> List.assoc_opt loc val_types) locs
+            else
+              List.map parse rendered
+          in
           let arg_expr = parse (Main.display_gty envs (GTy.mk arg)) in
-          let domain r =
-            match parse r with
-            | Some (TArrow (d, _)) -> Some d
+          let hole = TVar (KInfer, "_hole") in
+          (* [t] with its domain widened with [a] and its result a hole. *)
+          let rec widen_domain a = function
+            | TLoc (_, t) -> widen_domain a t
+            | TWhere (t, defs) -> Option.map (fun t -> TWhere (t, defs)) (widen_domain a t)
+            | TArrow (d, _) -> Some (TArrow (TCup (d, a), hole))
             | _ -> None
           in
+          let print t = Type_refactor.checked_print (Type_refactor.strip t) in
           (* The draft [dom -> _]. *)
-          let draft dom = Type_refactor.checked_print (TArrow (dom, TVar (KInfer, "_hole"))) in
+          let draft dom = print (TArrow (dom, hole)) in
           let val_line ty = "val " ^ b.name ^ " : " ^ ty in
           let at_binder = line_start source b.def_start in
           (* Add [decl] as a [val] line; a definition without [val] lines also
@@ -214,7 +226,6 @@ let app_fixes envs source bindings (err : Mlsem_lang.Error.t) : Typings.fix list
              deleted. *)
           let replace k decl =
             let decls = List.mapi (fun i r -> if i = k then decl else r) rendered in
-            let locs = List.sort compare b.sig_offsets in
             if List.length locs = List.length rendered then
               let s, e = List.nth locs k in
               [(s, e, val_line decl)]
@@ -245,16 +256,17 @@ let app_fixes envs source bindings (err : Mlsem_lang.Error.t) : Typings.fix list
                  the call fails for another reason. *)
               let widened =
                 List.mapi
-                  (fun k (o, r) ->
+                  (fun k (o, t) ->
                      let dom = Arrow.domain (Signature.to_gty o |> GTy.ub) in
                      if Ty.leq arg dom then
                        None
                      else
-                       Option.bind (domain r) (fun d ->
-                         Option.map
-                           (fun d -> fix ("Widen domain: " ^ val_line d) (replace k d))
-                           (draft (TCup (d, a))) ) )
-                  (List.combine b.sigs rendered)
+                       Option.bind t (fun t ->
+                         Option.bind (widen_domain a t) (fun t ->
+                           Option.map
+                             (fun d -> fix ("Widen domain: " ^ val_line d) (replace k d))
+                             (print t) ) ) )
+                  (List.combine b.sigs overload_types)
                 |> List.filter_map Fun.id
               in
               added @ widened )
@@ -265,7 +277,7 @@ let add_result ?typings ?(source = "") envs acc (out : Main.output) : result =
   ( match (out.res, typings) with
   | TSuccess (lst, _), Some ctx -> List.iter (Typings.add ctx envs) lst
   | TFailure (_, _, _, _, _, Some err), Some ctx ->
-      Typings.add_fixes ctx (app_fixes envs source acc.bindings err)
+      Typings.add_fixes ctx (app_fixes envs source ctx.src.sigs acc.bindings err)
   | _ -> () ) ;
   match out.res with
   (* Statements without bindings, e.g. the result of a [##] debug query. *)
