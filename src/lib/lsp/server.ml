@@ -463,7 +463,9 @@ let initialize_result_json () =
       ()
   in
   let code_action_opts =
-    CodeActionOptions.create ~codeActionKinds:[CodeActionKind.RefactorInline] ()
+    CodeActionOptions.create
+      ~codeActionKinds:[CodeActionKind.RefactorInline; CodeActionKind.RefactorRewrite]
+      ()
   in
   let capabilities =
     ServerCapabilities.create ~codeActionProvider:(`CodeActionOptions code_action_opts)
@@ -505,12 +507,66 @@ let inline_type_action uri (range : Lsp.Types.Range.t) ~indent ~name ~tys : Lsp.
     ~title:("Inline inferred type: " ^ String.concat " ; " tys)
     ~kind:Lsp.Types.CodeActionKind.RefactorInline ~edit:workspace_edit ()
 
+(* Replace holes of draft [val] lines with the types they were resolved to. *)
+let fill_holes_action uri ~title holes : Lsp.Types.CodeAction.t =
+  let edits =
+    List.map (fun (range, _, value) -> Lsp.Types.TextEdit.create ~newText:value ~range) holes
+  in
+  let workspace_edit = Lsp.Types.WorkspaceEdit.create ~changes:[(uri, edits)] () in
+  Lsp.Types.CodeAction.create ~title ~kind:Lsp.Types.CodeActionKind.RefactorRewrite
+    ~edit:workspace_edit ()
+
+(* For the holes on the lines of [req_range]: one action per hole, and one for
+   all of them when there are several. *)
+let hole_actions uri (req_range : Lsp.Types.Range.t) =
+  let open Lsp.Types in
+  let lines =
+    Range.create
+      ~start:(Position.create ~line:req_range.start.line ~character:0)
+      ~end_:(Position.create ~line:(req_range.end_.line + 1) ~character:0)
+  in
+  let holes = Doc.holes ~range:lines uri in
+  (* A named hole (['_a]) is one variable: its occurrences on a line are
+     replaced together. *)
+  let groups =
+    List.fold_left
+      (fun groups (((range : Range.t), hole, _) as h) ->
+         let same ((r : Range.t), hole', _) =
+           hole <> "_" && hole' = hole && r.start.line = range.start.line
+         in
+         match List.partition (fun g -> same (List.hd g)) groups with
+         | [g], rest -> rest @ [g @ [h]]
+         | _ -> groups @ [[h]] )
+      [] holes
+  in
+  let one g =
+    let _, hole, value = List.hd g in
+    fill_holes_action uri ~title:(Printf.sprintf "Replace %s with %s" hole value) g
+  in
+  List.map one groups
+  @ if List.length groups > 1 then [fill_holes_action uri ~title:"Replace all holes" holes] else []
+
 let code_actions_for uri (req_range : Lsp.Types.Range.t) =
-  Doc.lenses_in_range uri req_range
+  ( Doc.lenses_in_range uri req_range
   |> List.filter_map (fun (range, signature, indent) ->
     match signature with
     | None -> None
-    | Some (name, tys) -> Some (`CodeAction (inline_type_action uri range ~indent ~name ~tys)) )
+    | Some (name, tys) -> Some (inline_type_action uri range ~indent ~name ~tys) ) )
+  @ hole_actions uri req_range
+  |> List.map (fun a -> `CodeAction a)
+
+(* [mlsem/holes]: the resolved holes of the document's draft [val] lines. *)
+let holes_json (params : Yojson.Safe.t) =
+  let open Yojson.Safe.Util in
+  let uri = params |> member "textDocument" |> member "uri" |> Lsp.Types.DocumentUri.t_of_yojson in
+  `List
+    ( Doc.holes uri
+    |> List.map (fun (range, hole, value) ->
+      `Assoc
+        [
+          ("range", Lsp.Types.Range.yojson_of_t range); ("hole", `String hole);
+          ("value", `String value);
+        ] ) )
 
 (* A toolkit request becomes an engine job. Its [text] is filled in from our
    copy of the document when the client did not send it, so the engine always
@@ -566,6 +622,7 @@ let overload_color i = overload_colors.(i mod Array.length overload_colors)
    allow HTML in hovers. *)
 let hover_markdown : Typings.hover_body -> string = function
   | Type t -> code_block t
+  | Hole {hole; value} -> code_block (hole ^ " = " ^ value)
   | Overloads {rows; union} ->
       let cell = function
         | `Code s -> "<td>\n\n" ^ code_block s ^ "\n\n</td>"
@@ -637,6 +694,15 @@ let handle_request (req : Request.t) =
     with
     | Some p -> (
         try respond req.id (hover_overloads (Jsonrpc.Structured.yojson_of_t p)) with
+        | Yojson.Safe.Util.Type_error (msg, _) ->
+            respond_error req.id Response.Error.Code.InvalidParams msg )
+    | None -> respond_error req.id Response.Error.Code.InvalidParams "missing params"
+  else if req.method_ = "mlsem/holes" then
+    match
+      req.params
+    with
+    | Some p -> (
+        try respond req.id (holes_json (Jsonrpc.Structured.yojson_of_t p)) with
         | Yojson.Safe.Util.Type_error (msg, _) ->
             respond_error req.id Response.Error.Code.InvalidParams msg )
     | None -> respond_error req.id Response.Error.Code.InvalidParams "missing params"

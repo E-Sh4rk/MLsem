@@ -150,7 +150,7 @@ let shift_typings (t : Typings.t) shift =
           (fun (h : Typings.hover) ->
              let body : Typings.hover_body =
                match h.body with
-               | Type _ as b -> b
+               | (Type _ | Hole _) as b -> b
                | Overloads o ->
                    (* A [val] line the edit touched loses its colour. *)
                    let row (r : Typings.overload_row) =
@@ -362,6 +362,30 @@ let hover uri (pos : Lsp.Types.Position.t) : (Lsp.Types.Range.t * Typings.hover_
       |> function
       | h :: _ -> Some (lsp_range e (h.h_start, h.h_end), h.body)
       | [] -> None )
+
+(* The resolved holes of draft [val] lines, in document order, as (range,
+   hole as written, type), optionally only those overlapping [range]. *)
+let holes ?range uri : (Lsp.Types.Range.t * string * string) list =
+  match find uri with
+  | None -> []
+  | Some e ->
+      let text_len = String.length e.text in
+      let overlaps (s, e_off) =
+        match range with
+        | None -> true
+        | Some (r : Lsp.Types.Range.t) ->
+            let lo = offset_of_position e.line_offsets text_len r.start in
+            let hi = offset_of_position e.line_offsets text_len r.end_ in
+            s <= hi && lo <= e_off
+      in
+      e.typings.hovers
+      |> List.filter_map (fun (h : Typings.hover) ->
+        match h.body with
+        | Hole {hole; value} when overlaps (h.h_start, h.h_end) ->
+            Some (h.h_start, (lsp_range e (h.h_start, h.h_end), hole, value))
+        | _ -> None )
+      |> List.sort_uniq (fun (a, _) (b, _) -> compare a b)
+      |> List.map snd
 
 (* For the hover at [pos]: the parts of [val] lines its overload rows stand
    for, with the row's index. *)

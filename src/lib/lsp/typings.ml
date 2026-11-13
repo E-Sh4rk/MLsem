@@ -27,6 +27,12 @@ type overload_row = {
 
 type hover_body =
   | Type of string
+  (* A hole of a draft [val] line, as written ([_] or ['_a]), and the type it
+     was resolved to. *)
+  | Hole of {
+      hole: string;
+      value: string;
+    }
   | Overloads of {
       rows: overload_row list;
       union: string;
@@ -333,7 +339,7 @@ let hole_hovers ctx envs display overload r =
                    else
                      value
                  in
-                 {h_start; h_end; body = Type (shown ^ " = " ^ value)} ) )
+                 {h_start; h_end; body = Hole {hole = shown; value}} ) )
             holes )
 
 (* Occurrences of the overload's type variables in its [val] line. *)
