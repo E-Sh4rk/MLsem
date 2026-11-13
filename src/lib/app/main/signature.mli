@@ -6,8 +6,10 @@ type t = overload list
 val simplify_tyscheme : TyScheme.t -> TyScheme.t
 val simplify_overload : overload -> overload
 
-(* May raise [Invalid_argument] if the type is not fully resolved. *)
 val build : Builder.benv -> TyExpr.t -> overload * Builder.benv
+(* Whether the signature has holes (weak type variables): it is then only
+   added to the environment once its definition is typed. *)
+val is_draft : overload -> bool
 (* May raise [Invalid_argument] if the type is not fully resolved. *)
 val of_tyscheme : TyScheme.t -> t
 
