@@ -74,7 +74,21 @@ let infer var env e =
   let msg, visited = Mlsem_system.Analyzer.analyze e annot in
   ty, msg, visited, annot
 
-let type_check_with_sigs env (var,e,sigs,aty) =
+(* [drafts] are the drafts of the group, as (var, body, sigs). *)
+let type_check_with_sigs ?(drafts=[]) env (var,e,sigs,aty) =
+  let e = match aty with
+  | Some _ -> e
+  | None ->
+    (* A draft: the drafts of the group are checked together, and their
+       bodies can call each other at the draft types. The holes are shared by
+       all the recursive calls, like the type of a recursive function without
+       signature. *)
+    let lst = drafts |> List.map (fun (v,e,sigs) ->
+      v, Some (sigs |> List.map Signature.to_gty |> GTy.conj), e) in
+    let i = List.find_index (fun (v,_,_) -> Variable.equal v var) lst |> Option.get in
+    let id = Eid.refresh (fst e) in
+    Eid.refresh id, PAst.TupleProj ((id, PAst.LambdaRec lst), List.length lst, i)
+  in
   let e, id = Transform.expr_to_ast e, Eid.refresh (fst e) in
   let c = if !Config.allow_implicit_downcast then CheckStatic else Check in
   let es = sigs |> List.map (fun s ->
@@ -207,11 +221,17 @@ let treat (benv,varm,senv,env) (annot, elem) =
         try MVariable.add_to_env v ty env
         with Invalid_argument _ -> raise (IncompatibleType (v,ty))
       ) env tys1 in
-      let tys2, msg2 = List.map (type_check_with_sigs env) sigs |> List.split in
-      (* Drafts, now resolved, enter the environment. *)
-      let env = List.fold_left (fun env (v,(ty,_,_)) ->
-        if Env.mem v env then env else MVariable.add_to_env v ty env
-      ) env tys2 in
+      (* Drafts first: once resolved, they enter the environment, so that the
+         complete signatures of the group can use them. *)
+      let drafts, complete = List.partition (fun (_,_,_,aty) -> Option.is_none aty) sigs in
+      let group = List.map (fun (v,e,sigs,_) -> (v,e,sigs)) drafts in
+      let tysd, msgd = List.map (type_check_with_sigs ~drafts:group env) drafts |> List.split in
+      let env = List.fold_left (fun env (v,(ty,_,_)) -> MVariable.add_to_env v ty env) env tysd in
+      let tysc, msgc = List.map (type_check_with_sigs env) complete |> List.split in
+      (* Back in the order of the definitions. *)
+      let tys2 = sigs |> List.map (fun (v,_,_,_) ->
+        List.find (fun (v',_) -> Variable.equal v v') (tysd@tysc)) in
+      let msg2 = msgd@msgc in
       let msg = msg1@(List.concat msg2) |> List.map (fun d ->
         let open Mlsem_system.Analyzer.Diagnostic in
         (severity d, Eid.loc d.eid, title d, descr d, Some d.kind)
