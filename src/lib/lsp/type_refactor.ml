@@ -134,71 +134,107 @@ let base = function
   | TTagAny -> "tag"
   | TRecordAny -> "record"
 
+(* Printed text, with the span of each part printed in it: the part (as
+   given to the printer) and its [start, end) in the text, without the
+   parentheses around it. *)
+type piece = {
+  s: string;
+  spans: (t * int * int) list;
+}
+
+let lit s = {s; spans = []}
+
+let cat ps =
+  let _, s, spans =
+    List.fold_left
+      (fun (off, s, spans) p ->
+         ( off + String.length p.s,
+           s ^ p.s,
+           List.rev_append (List.map (fun (t, a, b) -> (t, a + off, b + off)) p.spans) spans ) )
+      (0, "", []) ps
+  in
+  {s; spans}
+
+let join sep ps =
+  cat
+    (List.concat
+       (List.mapi
+          (fun i p ->
+             if i = 0 then
+               [p]
+             else
+               [lit sep; p] )
+          ps ) )
+
 let rec pr lvl t =
-  let s = pr_node t in
-  if level t < lvl then "(" ^ s ^ ")" else s
+  let p = pr_node t in
+  let p = {p with spans = (t, 0, String.length p.s) :: p.spans} in
+  if level t < lvl then cat [lit "("; p; lit ")"] else p
 
 and pr_node (t : t) =
-  let fields fs = List.map (fun (l, t) -> l ^ " : " ^ pr 2 t) fs |> String.concat "; " in
+  let fields fs = join "; " (List.map (fun (l, t) -> cat [lit (l ^ " : "); pr 2 t]) fs) in
   match t with
   | TLoc (_, t) -> pr_node t
-  | TDyn -> "dyn"
-  | TVar (KInfer, n) when String.starts_with ~prefix:"_hole" n -> "_"
-  | TVar (_, n) -> "'" ^ n
-  | TRowVar (_, n) -> "`" ^ n
-  | TBase b -> base b
+  | TDyn -> lit "dyn"
+  | TVar (KInfer, n) when String.starts_with ~prefix:"_hole" n -> lit "_"
+  | TVar (_, n) -> lit ("'" ^ n)
+  | TRowVar (_, n) -> lit ("`" ^ n)
+  | TBase b -> lit (base b)
   | TCustom s
   | TEnum s ->
-      s
-  | TApp (s, ts) -> s ^ "(" ^ String.concat ", " (List.map (pr 2) ts) ^ ")"
-  | TTag (s, TBase TUnit) -> s ^ "()"
-  | TTag (s, t) -> s ^ "(" ^ pr 0 t ^ ")"
-  | TTuple ts -> String.concat ", " (List.map (pr 2) ts)
+      lit s
+  | TApp (s, ts) -> cat [lit (s ^ "("); join ", " (List.map (pr 2) ts); lit ")"]
+  | TTag (s, TBase TUnit) -> lit (s ^ "()")
+  | TTag (s, t) -> cat [lit (s ^ "("); pr 0 t; lit ")"]
+  | TTuple ts -> join ", " (List.map (pr 2) ts)
   | TRecord (fs, tail) ->
       let tail =
         match tail with
-        | TOption (TBase TAny) -> " .."
-        | TOption (TBase TEmpty) -> ""
-        | t -> " ;; " ^ pr 0 t
+        | TOption (TBase TAny) -> lit " .."
+        | TOption (TBase TEmpty) -> lit ""
+        | t -> cat [lit " ;; "; pr 0 t]
       in
-      "{ " ^ fields fs ^ tail ^ " }"
-  | TSList Epsilon -> "[]"
-  | TSList (Symbol t) -> "[ " ^ pr 0 t ^ " ]"
-  | TSList r -> "[ " ^ rx 0 r ^ " ]"
-  | TCons (a, b) -> pr 7 a ^ " :: " ^ pr 6 b
-  | TArrow (a, b) -> pr 3 a ^ " -> " ^ pr 2 b
-  | TOption t -> pr 8 t ^ "?"
-  | TCup (a, b) -> pr 3 a ^ " | " ^ pr 4 b
-  | TCap (a, b) -> pr 4 a ^ " & " ^ pr 5 b
-  | TDiff (a, b) -> pr 5 a ^ " \\ " ^ pr 6 b
-  | TNeg t -> "~" ^ pr 7 t
+      cat [lit "{ "; fields fs; tail; lit " }"]
+  | TSList Epsilon -> lit "[]"
+  | TSList (Symbol t) -> cat [lit "[ "; pr 0 t; lit " ]"]
+  | TSList r -> cat [lit "[ "; rx 0 r; lit " ]"]
+  | TCons (a, b) -> cat [pr 7 a; lit " :: "; pr 6 b]
+  | TArrow (a, b) -> cat [pr 3 a; lit " -> "; pr 2 b]
+  | TOption t -> cat [pr 8 t; lit "?"]
+  | TCup (a, b) -> cat [pr 3 a; lit " | "; pr 4 b]
+  | TCap (a, b) -> cat [pr 4 a; lit " & "; pr 5 b]
+  | TDiff (a, b) -> cat [pr 5 a; lit " \\ "; pr 6 b]
+  | TNeg t -> cat [lit "~"; pr 7 t]
   | TWhere (t, defs) ->
       let def (n, ps, t) =
         let n =
           if ps = [] then n else n ^ "(" ^ String.concat ", " (List.map (( ^ ) "'") ps) ^ ")"
         in
-        n ^ " = " ^ pr 1 t
+        cat [lit (n ^ " = "); pr 1 t]
       in
-      pr 1 t ^ " where " ^ String.concat " and " (List.map def defs)
-  | TRecUpd (t, fs) -> "{ " ^ pr 1 t ^ " with " ^ fields fs ^ " }"
+      cat [pr 1 t; lit " where "; join " and " (List.map def defs)]
+  | TRecUpd (t, fs) -> cat [lit "{ "; pr 1 t; lit " with "; fields fs; lit " }"]
   | TRecProj (t, l)
   | TTagProj (t, l) ->
-      pr 8 t ^ "." ^ l
+      cat [pr 8 t; lit ("." ^ l)]
 
 (* Regular expressions: union 0, concatenation 1, postfix 2; a symbol in
    them is atomic. *)
 and rx lvl r =
-  let paren l s = if l < lvl then "(" ^ s ^ ")" else s in
+  let paren l p = if l < lvl then cat [lit "("; p; lit ")"] else p in
   match r with
-  | Epsilon -> "()"
+  | Epsilon -> lit "()"
   | Symbol t -> pr 8 t
-  | Union rs -> paren 0 (String.concat " | " (List.map (rx 1) rs))
-  | Concat rs -> paren 1 (String.concat " " (List.map (rx 2) rs))
-  | Star r -> rx 2 r ^ "*"
-  | Plus r -> rx 2 r ^ "+"
-  | Option r -> rx 2 r ^ "?"
+  | Union rs -> paren 0 (join " | " (List.map (rx 1) rs))
+  | Concat rs -> paren 1 (join " " (List.map (rx 2) rs))
+  | Star r -> cat [rx 2 r; lit "*"]
+  | Plus r -> cat [rx 2 r; lit "+"]
+  | Option r -> cat [rx 2 r; lit "?"]
 
-let print t = pr 0 t
+let print t = (pr 0 t).s
+
+(* [t] printed, with the span of each of its parts. *)
+let layout t = pr 0 t
 
 (* [t] printed, if the text parses back to it. *)
 let checked_print t =
@@ -308,6 +344,147 @@ let extract ~holes t =
       |> List.map (fun (n, ps, _) -> (n, ps, TVar (KInfer, "_hole")))
   in
   if defs = [] then None else checked_print (TWhere (body, old_defs @ defs))
+
+(* ===== Extracting chosen parts, for the toolkit ===== *)
+
+let holes_in t = List.length (List.filter is_hole (subterms t))
+
+(* The parts of [t] that repeat, largest first. Unlike [extract], parts with
+   holes are included: all [_] compare equal, so these group by shape, and
+   the toolkit extracts them linking the holes or keeping them apart. *)
+let groups t =
+  let t = strip t in
+  let counts = Hashtbl.create 16 in
+  List.iter
+    (fun s -> Hashtbl.replace counts s (1 + Option.value ~default:0 (Hashtbl.find_opt counts s)))
+    (subterms t) ;
+  (* [unnamable] without its rule on holes: a hole inside is fine here. *)
+  let extractable s =
+    let rec no_holes s = if is_hole s then TBase TAny else map_children no_holes s in
+    not (unnamable (no_holes s))
+  in
+  Hashtbl.fold (fun s n acc -> if n >= 2 && extractable s then s :: acc else acc) counts []
+  |> List.sort (fun a b -> compare (size b, print a) (size a, print b))
+
+(* A default name for a part, from its shape, not in [used]. *)
+let default_name used g =
+  let base =
+    match g with
+    | TArrow _ -> "fn"
+    | TTuple _ -> "tup"
+    | TRecord _ -> "row"
+    | TSList _ -> "lst"
+    | TCup _ -> "u"
+    | TTag (s, _) -> String.lowercase_ascii s
+    | _ -> "t"
+  in
+  let rec go i =
+    let n = if i = 1 then base else base ^ string_of_int i in
+    if List.mem n used then go (i + 1) else n
+  in
+  go 1
+
+let valid_name n =
+  n <> ""
+  && ( match n.[0] with
+    | 'a' .. 'z'
+    | '_' ->
+        true
+    | _ -> false )
+  && String.for_all
+       (function
+         | 'a' .. 'z'
+         | 'A' .. 'Z'
+         | '0' .. '9'
+         | '_'
+         | '\'' ->
+             true
+         | _ -> false )
+       n
+
+(* Extract the chosen parts of [t], each [(part, name)] with [part] one of
+   [groups t]. Smaller parts first, so that a larger part is matched with
+   its smaller chosen parts already named. A part with holes becomes, with
+   [plumbing], a definition with one parameter per hole, used with a fresh
+   hole for each ([fn(_, _) where fn('a, 'b) = 'a -> 'b]): the type keeps
+   its meaning. Without, it is used as a plain name ([fn where
+   fn = _ -> _]): all its copies share the same holes. *)
+let extract_chosen ~plumbing t chosen =
+  let t = strip t in
+  let body, old_defs =
+    match t with
+    | TWhere (b, d) -> (b, d)
+    | b -> (b, [])
+  in
+  let taken = names t in
+  match
+    List.find_opt
+      (fun (_, n) ->
+         (not (valid_name n))
+         || List.mem n taken
+         || List.length (List.filter (fun (_, m) -> m = n) chosen) > 1 )
+      chosen
+  with
+  | Some (_, n) -> Error (Printf.sprintf "%S cannot be used as a name here." n)
+  | None -> (
+      let tvars =
+        ref
+          (List.filter_map
+             (function
+               | TVar (_, n) -> Some n
+               | _ -> None )
+             (subterms t) )
+      in
+      let fresh_tvar () =
+        let rec go i =
+          let n =
+            String.make 1 (Char.chr (97 + (i mod 26)))
+            ^ if i < 26 then "" else string_of_int (i / 26)
+          in
+          if List.mem n !tvars then go (i + 1) else n
+        in
+        let n = go 0 in
+        tvars := n :: !tvars ;
+        n
+      in
+      let chosen = List.sort (fun (a, _) (b, _) -> compare (size a) (size b)) chosen in
+      let _, body, old_defs, new_defs =
+        List.fold_left
+          (fun (applied, body, old_defs, new_defs) (g, name) ->
+             let g = applied g in
+             let k = holes_in g in
+             let params, def, by =
+               if plumbing && k > 0 then
+                 let params = List.init k (fun _ -> fresh_tvar ()) in
+                 let rest = ref params in
+                 let rec number t =
+                   if is_hole t then
+                     match
+                       !rest
+                     with
+                     | p :: tl ->
+                         rest := tl ;
+                         TVar (KNoInfer, p)
+                     | [] -> t
+                   else
+                     map_children number t
+                 in
+                 let def = number g in
+                 (params, def, TApp (name, List.init k (fun _ -> TVar (KInfer, "_hole"))))
+               else
+                 ([], g, TCustom name)
+             in
+             let sub = replace ~what:g ~by in
+             let sub_def (m, ps, t) = (m, ps, sub t) in
+             ( (fun t -> sub (applied t)),
+               sub body,
+               List.map sub_def old_defs,
+               List.map sub_def new_defs @ [(name, params, def)] ) )
+          (Fun.id, body, old_defs, []) chosen
+      in
+      match checked_print (TWhere (body, old_defs @ new_defs)) with
+      | Some s -> Ok s
+      | None -> Error "The result cannot be printed back as the same type." )
 
 (* ===== Inlining ===== *)
 
