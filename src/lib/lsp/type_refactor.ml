@@ -140,9 +140,10 @@ let base = function
 type piece = {
   s: string;
   spans: (t * int * int) list;
+  wrapped: t list;  (** the parts printed in parentheses *)
 }
 
-let lit s = {s; spans = []}
+let lit s = {s; spans = []; wrapped = []}
 
 let cat ps =
   let _, s, spans =
@@ -153,7 +154,7 @@ let cat ps =
            List.rev_append (List.map (fun (t, a, b) -> (t, a + off, b + off)) p.spans) spans ) )
       (0, "", []) ps
   in
-  {s; spans}
+  {s; spans; wrapped = List.concat_map (fun p -> p.wrapped) ps}
 
 let join sep ps =
   cat
@@ -169,7 +170,11 @@ let join sep ps =
 let rec pr lvl t =
   let p = pr_node t in
   let p = {p with spans = (t, 0, String.length p.s) :: p.spans} in
-  if level t < lvl then cat [lit "("; p; lit ")"] else p
+  if level t < lvl then
+    let p = cat [lit "("; p; lit ")"] in
+    {p with wrapped = t :: p.wrapped}
+  else
+    p
 
 and pr_node (t : t) =
   (* [?;] would lex as one operator: an optional field, but the last, is
@@ -235,6 +240,8 @@ and pr_node (t : t) =
 (* Regular expressions: union 0, concatenation 1, postfix 2; a symbol in
    them is atomic. *)
 and rx lvl r =
+  (* Parenthesized regular expressions are not parts: [wrapped] is for
+     types. *)
   let paren l p = if l < lvl then cat [lit "("; p; lit ")"] else p in
   match r with
   | Epsilon -> lit "()"
@@ -249,6 +256,50 @@ let print t = (pr 0 t).s
 
 (* [t] printed, with the span of each of its parts. *)
 let layout t = pr 0 t
+
+(* [t] with its [i]th child (in the order of [children]) replaced by [c]. *)
+let with_child t i c =
+  let j = ref (-1) in
+  map_children
+    (fun x ->
+       incr j ;
+       if !j = i then c else x )
+    t
+
+(* [c] printed as the [i]th child of [parent]: in parentheses when the
+   printer puts it in them there. *)
+let print_as_child parent i c =
+  let wrapped = (layout (with_child (strip parent) i c)).wrapped in
+  if List.memq c wrapped then "(" ^ print c ^ ")" else print c
+
+(* A part of a type, found by its location. *)
+type part = {
+  span: int * int;  (** where it is written, with the parentheses around it *)
+  node: t;
+  parent: (t * int) option;  (** the part it is in, and its index there *)
+}
+
+(* The smallest part of [t] whose location contains [lo, hi], [t] itself
+   included. A part's location is the outermost [TLoc] around it. *)
+let rec part_at (lo, hi) (t : t) : part option =
+  let rec peel span = function
+    | TLoc ((s, e), u) ->
+        peel (if Option.is_none span then Some (s.Lexing.pos_cnum, e.Lexing.pos_cnum) else span) u
+    | u -> (span, u)
+  in
+  let span, u = peel None t in
+  let deeper =
+    List.find_map
+      (fun (i, k) ->
+         Option.map
+           (fun p -> if Option.is_none p.parent then {p with parent = Some (u, i)} else p)
+           (part_at (lo, hi) k) )
+      (List.mapi (fun i k -> (i, k)) (children u))
+  in
+  match (deeper, span) with
+  | Some _, _ -> deeper
+  | None, Some (s, e) when s <= lo && hi <= e -> Some {span = (s, e); node = u; parent = None}
+  | None, _ -> None
 
 (* [t] printed, if the text parses back to it. *)
 let checked_print t =
