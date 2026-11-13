@@ -65,6 +65,14 @@ let results uri =
   | Some e -> (e.result.lenses, e.result.diagnostics, e.result.typings)
   | None -> ([], [], Typings.empty)
 
+(* The range of a byte interval of the cached text, and the text in it. *)
+let span uri (s, e) =
+  Option.map
+    (fun en ->
+       let pos = Doc.position_of_offset en.line_offsets in
+       (Lsp.Types.Range.create ~start:(pos s) ~end_:(pos e), String.sub en.text s (e - s)) )
+    (Hashtbl.find_opt entries uri)
+
 let envs_of uri : Mlsem_app.Main.envs option =
   Option.bind (Hashtbl.find_opt entries uri) (fun e -> e.result.envs)
 

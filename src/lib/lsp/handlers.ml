@@ -160,6 +160,47 @@ let instantiate_texts ?only envs (sigs : Signature.t) insts =
     in
     `Ok (Main.signature envs (List.map snd kept))
 
+(* The instances of the [k]th overload of [b] that its calls in the document
+   fit, each with the calls (range and text), in order of first call. A call
+   to [b] is one whose callee is named like [b] and bound inside its
+   definition. *)
+let call_instances uri (b : Typecheck.binding) k =
+  let _, _, typings = Store.results uri in
+  let calls =
+    typings.calls
+    |> List.filter (fun (c : Typings.call) ->
+      match c.callee with
+      | Some (name, off) -> name = b.name && b.def_start <= off && off <= b.def_end
+      | None -> false )
+    |> List.sort (fun (c : Typings.call) c' -> compare c.c_start c'.c_start)
+  in
+  let groups =
+    List.fold_left
+      (fun groups (c : Typings.call) ->
+         match List.assoc_opt k c.instances with
+         | None -> groups
+         | Some inst when List.mem_assoc inst groups ->
+             List.map (fun (i, cs) -> if i = inst then (i, c :: cs) else (i, cs)) groups
+         | Some inst -> groups @ [(inst, [c])] )
+      [] calls
+  in
+  groups
+  |> List.map (fun (inst, cs) ->
+    `Assoc
+      [
+        ( "assignments",
+          `List (List.map (fun (v, ty) -> `Assoc [("var", `String v); ("type", `String ty)]) inst)
+        );
+        ( "calls",
+          `List
+            ( List.rev cs
+            |> List.filter_map (fun (c : Typings.call) ->
+              Store.span uri (c.c_start, c.c_end)
+              |> Option.map (fun (range, text) ->
+                `Assoc [("range", Lsp.Types.Range.yojson_of_t range); ("text", `String text)] ) ) )
+        );
+      ] )
+
 (* mlsem/overloads: the binding under the cursor and its overloads, each
    rendered to [val]-compatible surface syntax (text is the overload's
    identity for selection). *)
@@ -175,11 +216,12 @@ let overloads params : Yojson.Safe.t =
         let strs ss = `List (List.map (fun s -> `String s) ss) in
         let overload_vars = b.sigs |> List.map (fun o -> strs (Signature.overload_vars o)) in
         let concrete_types = builtin_type_names @ Main.user_type_names envs in
+        let instances = List.mapi (fun k _ -> `List (call_instances uri b k)) b.sigs in
         `Assoc
           [
             ("found", `Bool true); ("name", `String b.name); ("declared", `Bool b.declared);
             ("overloads", strs texts); ("overloadVars", `List overload_vars);
-            ("concreteTypes", strs concrete_types);
+            ("concreteTypes", strs concrete_types); ("callInstances", `List instances);
           ]
     | _ -> not_found
   with
