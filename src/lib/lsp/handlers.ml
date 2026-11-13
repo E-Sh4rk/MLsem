@@ -19,8 +19,6 @@
    - Merge arrows: [int → int ∧ dbl → dbl] becomes [num → num] (loses
      precision) or [α ≤ num. α → α] (keeps it).
    - Split an arrow whose result union hides a dependency on the input.
-   - Resolve overlap by subtracting domains, which is where negation enters;
-     the user picks the policy, and the tool writes the [∖].
    - Widen an arrow to cover inputs the traces never exercised. *)
 
 open Mlsem_app
