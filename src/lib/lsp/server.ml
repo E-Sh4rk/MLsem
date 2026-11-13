@@ -525,7 +525,7 @@ let hole_actions uri (req_range : Lsp.Types.Range.t) =
       ~start:(Position.create ~line:req_range.start.line ~character:0)
       ~end_:(Position.create ~line:(req_range.end_.line + 1) ~character:0)
   in
-  let holes = Doc.holes ~range:lines uri in
+  let holes = Doc.holes uri lines in
   (* A named hole (['_a]) is one variable: its occurrences on a line are
      replaced together. *)
   let groups =
@@ -554,19 +554,6 @@ let code_actions_for uri (req_range : Lsp.Types.Range.t) =
     | Some (name, tys) -> Some (inline_type_action uri range ~indent ~name ~tys) ) )
   @ hole_actions uri req_range
   |> List.map (fun a -> `CodeAction a)
-
-(* [mlsem/holes]: the resolved holes of the document's draft [val] lines. *)
-let holes_json (params : Yojson.Safe.t) =
-  let open Yojson.Safe.Util in
-  let uri = params |> member "textDocument" |> member "uri" |> Lsp.Types.DocumentUri.t_of_yojson in
-  `List
-    ( Doc.holes uri
-    |> List.map (fun (range, hole, value) ->
-      `Assoc
-        [
-          ("range", Lsp.Types.Range.yojson_of_t range); ("hole", `String hole);
-          ("value", `String value);
-        ] ) )
 
 (* A toolkit request becomes an engine job. Its [text] is filled in from our
    copy of the document when the client did not send it, so the engine always
@@ -694,15 +681,6 @@ let handle_request (req : Request.t) =
     with
     | Some p -> (
         try respond req.id (hover_overloads (Jsonrpc.Structured.yojson_of_t p)) with
-        | Yojson.Safe.Util.Type_error (msg, _) ->
-            respond_error req.id Response.Error.Code.InvalidParams msg )
-    | None -> respond_error req.id Response.Error.Code.InvalidParams "missing params"
-  else if req.method_ = "mlsem/holes" then
-    match
-      req.params
-    with
-    | Some p -> (
-        try respond req.id (holes_json (Jsonrpc.Structured.yojson_of_t p)) with
         | Yojson.Safe.Util.Type_error (msg, _) ->
             respond_error req.id Response.Error.Code.InvalidParams msg )
     | None -> respond_error req.id Response.Error.Code.InvalidParams "missing params"

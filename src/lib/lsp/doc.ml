@@ -363,21 +363,16 @@ let hover uri (pos : Lsp.Types.Position.t) : (Lsp.Types.Range.t * Typings.hover_
       | h :: _ -> Some (lsp_range e (h.h_start, h.h_end), h.body)
       | [] -> None )
 
-(* The resolved holes of draft [val] lines, in document order, as (range,
-   hole as written, type), optionally only those overlapping [range]. *)
-let holes ?range uri : (Lsp.Types.Range.t * string * string) list =
+(* The resolved holes of draft [val] lines overlapping [range], in document
+   order, as (range, hole as written, type). *)
+let holes uri (range : Lsp.Types.Range.t) : (Lsp.Types.Range.t * string * string) list =
   match find uri with
   | None -> []
   | Some e ->
       let text_len = String.length e.text in
-      let overlaps (s, e_off) =
-        match range with
-        | None -> true
-        | Some (r : Lsp.Types.Range.t) ->
-            let lo = offset_of_position e.line_offsets text_len r.start in
-            let hi = offset_of_position e.line_offsets text_len r.end_ in
-            s <= hi && lo <= e_off
-      in
+      let lo = offset_of_position e.line_offsets text_len range.start in
+      let hi = offset_of_position e.line_offsets text_len range.end_ in
+      let overlaps (s, e_off) = s <= hi && lo <= e_off in
       e.typings.hovers
       |> List.filter_map (fun (h : Typings.hover) ->
         match h.body with
