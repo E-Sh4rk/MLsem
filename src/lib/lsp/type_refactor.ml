@@ -479,6 +479,81 @@ let extract ~holes t =
   in
   if defs = [] then None else checked_print (TWhere (body, old_defs @ defs))
 
+(* ===== Records sharing some fields =====
+
+   Records can share some of their fields: the shared fields become a
+   top-level type [r], and each record [{ r with ... }], the fields it adds.
+   Not a [where] definition: MLsem builds those as recursive equations, so
+   [with] cannot see that the name is a record. *)
+
+(* A record's fields and tail, for a closed or open record. *)
+let record_view = function
+  | TRecord (fs, (TOption (TBase (TEmpty | TAny)) as tail)) -> Some (fs, tail)
+  | _ -> None
+
+(* When the fields of record [g] are all fields of record [p], and both have
+   the same tail: the other fields of [p], in order. *)
+let record_rest g p =
+  match (record_view g, record_view p) with
+  | Some (gs, gt), Some (ps, pt) when gt = pt ->
+      let has (l, f) = List.exists (fun (l', f') -> l = l' && same f f') ps in
+      if List.for_all has gs then
+        Some (List.filter (fun (l, _) -> not (List.mem_assoc l gs)) ps)
+      else
+        None
+  | _ -> None
+
+(* The rigid type variables of [t], in order: the parameters of a top-level
+   type made of it. *)
+let tvars_of t =
+  List.fold_left
+    (fun acc s ->
+       match s with
+       | TVar (KNoInfer, n) when not (List.mem n acc) -> acc @ [n]
+       | _ -> acc )
+    [] (subterms t)
+
+let has_weak t =
+  List.exists
+    (function
+      | TVar (KInfer, _) -> true
+      | _ -> false )
+    (subterms t)
+
+(* Whether [g] is extracted as a top-level type: a record that is only part
+   of some record in [t]. *)
+let global g t =
+  record_view g <> None
+  && List.exists
+       (fun p ->
+          match record_rest g p with
+          | Some (_ :: _) -> true
+          | _ -> false )
+       (parts t)
+
+(* Records of [t] sharing at least two fields, with the same tail: the
+   shared fields, as a record. *)
+let shared_records t =
+  let records = List.filter (fun p -> record_view p <> None) (parts t) in
+  List.concat
+    (List.mapi
+       (fun i a ->
+          List.concat
+            (List.mapi
+               (fun j b ->
+                  match (record_view a, record_view b) with
+                  | Some (fa, ta), Some (fb, tb) when j > i && ta = tb ->
+                      let common =
+                        List.filter
+                          (fun (l, f) -> List.exists (fun (l', f') -> l = l' && same f f') fb)
+                          fa
+                      in
+                      let g = TRecord (common, ta) in
+                      if List.length common >= 2 && not (has_weak g) then [g] else []
+                  | _ -> [] )
+               records ) )
+       records )
+
 (* ===== Extracting chosen parts, for the toolkit ===== *)
 
 let holes_in t = List.length (List.filter is_hole (subterms t))
@@ -521,7 +596,10 @@ let groups t =
                     chains ) ) )
          chains )
   in
-  let count g = List.length (List.filter (fun p -> same p g || sub_members g p <> None) ps) in
+  let count g =
+    List.length
+      (List.filter (fun p -> same p g || sub_members g p <> None || record_rest g p <> None) ps)
+  in
   (* [unnamable] without its rule on holes: a hole inside is fine here. *)
   let extractable s =
     let rec no_holes s = if is_hole s then TBase TAny else map_children no_holes s in
@@ -530,7 +608,8 @@ let groups t =
   List.fold_left
     (fun acc g ->
        if List.exists (same g) acc || (not (extractable g)) || count g < 2 then acc else acc @ [g] )
-    [] (ps @ shared)
+    []
+    (ps @ shared @ shared_records t)
   |> List.sort (fun a b -> compare (size b, print a) (size a, print b))
 
 (* Where the occurrences of [g] are in [l], the layout of [t]: one span per
@@ -542,7 +621,7 @@ let occurrences (l : piece) t g =
   in
   List.concat_map
     (fun p ->
-       if same p g then
+       if same p g || record_rest g p <> None then
          Option.to_list (span p)
        else
          match
@@ -573,7 +652,7 @@ let default_name used g =
     match g with
     | TArrow _ -> "fn"
     | TTuple _ -> "tup"
-    | TRecord _ -> "row"
+    | TRecord _ -> "r"
     | TSList _ -> "lst"
     | TCup _ -> "u"
     | TTag (s, _) -> String.lowercase_ascii s
@@ -610,7 +689,10 @@ let valid_name n =
    hole for each ([fn(_, _) where fn('a, 'b) = 'a -> 'b]): the type keeps
    its meaning. Without, it is used as a plain name ([fn where
    fn = _ -> _]): all its copies share the same holes. *)
-let extract_chosen ~plumbing t chosen =
+(* Records only part of some record ([global]) become top-level types, first:
+   the result is the new type and their declarations. [types]: the names of
+   the file's types, which a top-level type cannot reuse. *)
+let extract_chosen ~plumbing ~types t chosen =
   let t = strip t in
   let body, old_defs =
     match t with
@@ -618,74 +700,109 @@ let extract_chosen ~plumbing t chosen =
     | b -> (b, [])
   in
   let taken = names t in
+  let globals, chosen = List.partition (fun (g, _) -> global g t) chosen in
   match
     List.find_opt
-      (fun (_, n) ->
+      (fun (g, n) ->
          (not (valid_name n))
          || List.mem n taken
-         || List.length (List.filter (fun (_, m) -> m = n) chosen) > 1 )
-      chosen
+         || (global g t && List.mem n types)
+         || List.length (List.filter (fun (_, m) -> m = n) (globals @ chosen)) > 1 )
+      (globals @ chosen)
   with
   | Some (_, n) -> Error (Printf.sprintf "%S cannot be used as a name here." n)
   | None -> (
-      let tvars =
-        ref
-          (List.filter_map
-             (function
-               | TVar (_, n) -> Some n
-               | _ -> None )
-             (subterms t) )
-      in
-      let fresh_tvar () =
-        let rec go i =
-          let n =
-            String.make 1 (Char.chr (97 + (i mod 26)))
-            ^ if i < 26 then "" else string_of_int (i / 26)
-          in
-          if List.mem n !tvars then go (i + 1) else n
-        in
-        let n = go 0 in
-        tvars := n :: !tvars ;
-        n
-      in
-      let chosen = List.sort (fun (a, _) (b, _) -> compare (size a) (size b)) chosen in
-      let _, body, old_defs, new_defs =
+      (* Top-level record types, before the [where] parts: their
+         declarations cannot use the names those define. *)
+      let body, old_defs, decls =
         List.fold_left
-          (fun (applied, body, old_defs, new_defs) (g, name) ->
-             let g = applied g in
-             let k = holes_in g in
-             let params, def, by =
-               if plumbing && k > 0 then
-                 let params = List.init k (fun _ -> fresh_tvar ()) in
-                 let rest = ref params in
-                 let rec number t =
-                   if is_hole t then
-                     match
-                       !rest
-                     with
-                     | p :: tl ->
-                         rest := tl ;
-                         TVar (KNoInfer, p)
-                     | [] -> t
-                   else
-                     map_children number t
-                 in
-                 let def = number g in
-                 (params, def, TApp (name, List.init k (fun _ -> TVar (KInfer, "_hole"))))
+          (fun (body, old_defs, decls) (g, name) ->
+             let params = tvars_of g in
+             let use =
+               if params = [] then
+                 TCustom name
                else
-                 ([], g, TCustom name)
+                 TApp (name, List.map (fun p -> TVar (KNoInfer, p)) params)
              in
-             let sub = replace ~what:g ~by in
-             let sub_def (m, ps, t) = (m, ps, sub t) in
-             ( (fun t -> sub (applied t)),
-               sub body,
-               List.map sub_def old_defs,
-               List.map sub_def new_defs @ [(name, params, def)] ) )
-          (Fun.id, body, old_defs, []) chosen
+             let rec rw t =
+               match record_rest g t with
+               | Some [] -> use
+               | Some rest -> TRecUpd (use, List.map (fun (l, f) -> (l, rw f)) rest)
+               | None -> map_children rw t
+             in
+             let head =
+               if params = [] then
+                 name
+               else
+                 name ^ "(" ^ String.concat ", " (List.map (( ^ ) "'") params) ^ ")"
+             in
+             let decl = Option.map (fun s -> "type " ^ head ^ " = " ^ s) (checked_print g) in
+             (rw body, List.map (fun (m, ps, t) -> (m, ps, rw t)) old_defs, decls @ [decl]) )
+          (body, old_defs, []) globals
       in
-      match checked_print (TWhere (body, old_defs @ new_defs)) with
-      | Some s -> Ok s
-      | None -> Error "The result cannot be printed back as the same type." )
+      if List.mem None decls then
+        Error "A shared record cannot be printed back as the same type."
+      else
+        let decls = List.map Option.get decls in
+        let tvars =
+          ref
+            (List.filter_map
+               (function
+                 | TVar (_, n) -> Some n
+                 | _ -> None )
+               (subterms t) )
+        in
+        let fresh_tvar () =
+          let rec go i =
+            let n =
+              String.make 1 (Char.chr (97 + (i mod 26)))
+              ^ if i < 26 then "" else string_of_int (i / 26)
+            in
+            if List.mem n !tvars then go (i + 1) else n
+          in
+          let n = go 0 in
+          tvars := n :: !tvars ;
+          n
+        in
+        let chosen = List.sort (fun (a, _) (b, _) -> compare (size a) (size b)) chosen in
+        let _, body, old_defs, new_defs =
+          List.fold_left
+            (fun (applied, body, old_defs, new_defs) (g, name) ->
+               let g = applied g in
+               let k = holes_in g in
+               let params, def, by =
+                 if plumbing && k > 0 then
+                   let params = List.init k (fun _ -> fresh_tvar ()) in
+                   let rest = ref params in
+                   let rec number t =
+                     if is_hole t then
+                       match
+                         !rest
+                       with
+                       | p :: tl ->
+                           rest := tl ;
+                           TVar (KNoInfer, p)
+                       | [] -> t
+                     else
+                       map_children number t
+                   in
+                   let def = number g in
+                   (params, def, TApp (name, List.init k (fun _ -> TVar (KInfer, "_hole"))))
+                 else
+                   ([], g, TCustom name)
+               in
+               let sub = replace ~what:g ~by in
+               let sub_def (m, ps, t) = (m, ps, sub t) in
+               ( (fun t -> sub (applied t)),
+                 sub body,
+                 List.map sub_def old_defs,
+                 List.map sub_def new_defs @ [(name, params, def)] ) )
+            (Fun.id, body, old_defs, []) chosen
+        in
+        let defs = old_defs @ new_defs in
+        match checked_print (if defs = [] then body else TWhere (body, defs)) with
+        | Some s -> Ok (s, decls)
+        | None -> Error "The result cannot be printed back as the same type." )
 
 (* ===== Inlining ===== *)
 
