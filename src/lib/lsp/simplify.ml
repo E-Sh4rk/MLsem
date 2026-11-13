@@ -68,18 +68,19 @@ let options envs line (p : Type_refactor.part) =
             ]
           in
           (* Compared up to the order of unions and intersections, which the
-             printer may change without simplifying anything. *)
+             printer may change without simplifying anything; a duplicate
+             member it drops is a simplification. *)
+          let same = Type_refactor.same_but_order in
           let original = Type_refactor.strip p.node in
           let results =
             List.fold_left
               (fun acc (label, t) ->
                  match parse (Main.display_gty envs (GTy.mk t)) with
                  | None -> acc
-                 | Some e when Type_refactor.same e original -> acc
-                 | Some e when List.exists (fun (e', _) -> Type_refactor.same e e') acc ->
+                 | Some e when same e original -> acc
+                 | Some e when List.exists (fun (e', _) -> same e e') acc ->
                      List.map
-                       (fun (e', ls) ->
-                          if Type_refactor.same e e' then (e', ls @ [label]) else (e', ls) )
+                       (fun (e', ls) -> if same e e' then (e', ls @ [label]) else (e', ls))
                        acc
                  | Some e -> acc @ [(e, [label])] )
               [] steps

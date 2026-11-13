@@ -387,14 +387,21 @@ let rebuild k = function
            | Cap -> TCap (acc, y) )
         x xs
 
-(* A canonical form: members of chains sorted, without duplicates. *)
-let rec norm t =
-  let t = map_children norm t in
+(* A canonical form: members of chains sorted, and with [~dedup] without
+   duplicates. *)
+let rec norm ?(dedup = true) t =
+  let t = map_children (norm ~dedup) t in
   match ac_kind t with
-  | Some k -> rebuild k (List.sort_uniq compare (ops k t))
+  | Some k -> rebuild k ((if dedup then List.sort_uniq else List.sort) compare (ops k t))
   | None -> t
 
+(* The same up to the order of the members of unions and intersections and
+   to their duplicates. *)
 let same a b = norm a = norm b
+
+(* The same up to the order of the members of unions and intersections
+   only: [int & int] is not [int]. *)
+let same_but_order a b = norm ~dedup:false a = norm ~dedup:false b
 
 (* The parts of [t]: its subterms, a chain counting as one part made of its
    members (not of its sub-chains). *)
