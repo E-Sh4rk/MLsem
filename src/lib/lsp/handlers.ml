@@ -218,8 +218,9 @@ let overloads params : Yojson.Safe.t =
         `Assoc
           [
             ("found", `Bool true); ("name", `String b.name); ("declared", `Bool b.declared);
-            ("overloads", strs texts); ("overloadVars", `List overload_vars);
-            ("concreteTypes", strs concrete_types); ("callInstances", `List instances);
+            ("checked", `Bool b.checked); ("overloads", strs texts);
+            ("overloadVars", `List overload_vars); ("concreteTypes", strs concrete_types);
+            ("callInstances", `List instances);
           ]
     | _ -> not_found
   with

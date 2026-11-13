@@ -31,14 +31,18 @@ type lens = {
   signature: (string * string list) option;
 }
 
-(* A typeable, named binding retained so that custom requests can re-render
-   its overloads and merge a chosen subset on demand. [sigs] is the raw
-   overload list (the merge input); rendering and merging need the final
-   [envs] kept on [result]. Offsets are byte intervals, shifted through edits
-   by [Store.apply_change] just like [lens] offsets. *)
+(* A named binding retained so that custom requests can re-render its
+   overloads and merge a chosen subset on demand: a typeable one, or a
+   declared one whose definition does not typecheck, with the overloads of
+   its [val] lines ([checked] false), which the tools that only rewrite
+   types can still work on. [sigs] is the raw overload list (the merge
+   input); rendering and merging need the final [envs] kept on [result].
+   Offsets are byte intervals, shifted through edits by
+   [Store.apply_change] just like [lens] offsets. *)
 type binding = {
   name: string;
   declared: bool;
+  checked: bool;
   def_start: int;
   def_end: int;
   (* Source spans of any existing [val name : ...] declaration lines, used to
@@ -306,7 +310,34 @@ let add_result ?typings ?(source = "") envs acc (out : Main.output) : result =
         diagnostic ~severity:LT.DiagnosticSeverity.Error ~range:diag_range
           ~message:(full_message msg descr) ()
       in
-      {acc with lenses; diagnostics = diag :: acc.diagnostics}
+      (* A declared definition keeps its overloads, from its [val] lines: they
+         were all built before any definition was checked. *)
+      let bindings =
+        let _, _, senv, _, _ = envs in
+        match v_opt with
+        | Some v -> (
+            match
+              ( Variable.get_name v,
+                offsets_of_pos (Variable.get_location v),
+                Variable.get_sig_locations v,
+                VarMap.find_opt v senv )
+            with
+            | Some name, Some (def_start, def_end), (_ :: _ as locs), Some sigs
+              when not (List.exists (fun (b : binding) -> b.name = name) acc.bindings) ->
+                {
+                  name;
+                  declared = true;
+                  checked = false;
+                  def_start;
+                  def_end;
+                  sig_offsets = List.filter_map offsets_of_pos locs;
+                  sigs;
+                }
+                :: acc.bindings
+            | _ -> acc.bindings )
+        | None -> acc.bindings
+      in
+      {acc with lenses; diagnostics = diag :: acc.diagnostics; bindings}
   | TSuccess (lst, _time) ->
       let lenses =
         List.fold_left
@@ -349,7 +380,15 @@ let add_result ?typings ?(source = "") envs acc (out : Main.output) : result =
                      let sig_offsets =
                        Variable.get_sig_locations b.var |> List.filter_map offsets_of_pos
                      in
-                     {name; declared = b.declared; def_start; def_end; sig_offsets; sigs = b.sigs}
+                     {
+                       name;
+                       declared = b.declared;
+                       checked = true;
+                       def_start;
+                       def_end;
+                       sig_offsets;
+                       sigs = b.sigs;
+                     }
                      :: bindings ) )
           acc.bindings lst
       in
