@@ -53,9 +53,8 @@ let groups params : Yojson.Safe.t =
               let name = Type_refactor.default_name !used g in
               used := name :: !used ;
               let occurrences =
-                layout.spans
-                |> List.filter (fun (s, _, _) -> s = g)
-                |> List.map (fun (_, a, b) -> `List [`Int a; `Int b])
+                Type_refactor.occurrences layout ty g
+                |> List.map (fun (a, b) -> `List [`Int a; `Int b])
                 |> List.sort_uniq compare
               in
               `Assoc
