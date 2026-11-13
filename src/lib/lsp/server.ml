@@ -464,7 +464,11 @@ let initialize_result_json () =
   in
   let code_action_opts =
     CodeActionOptions.create
-      ~codeActionKinds:[CodeActionKind.RefactorInline; CodeActionKind.RefactorRewrite]
+      ~codeActionKinds:
+        [
+          CodeActionKind.RefactorInline; CodeActionKind.RefactorRewrite;
+          CodeActionKind.RefactorExtract;
+        ]
       ()
   in
   let capabilities =
@@ -516,8 +520,10 @@ let fill_holes_action uri ~title holes : Lsp.Types.CodeAction.t =
   Lsp.Types.CodeAction.create ~title ~kind:Lsp.Types.CodeActionKind.RefactorRewrite
     ~edit:workspace_edit ()
 
-(* For the holes on the lines of [req_range]: one action per hole, and one for
-   all of them when there are several. *)
+(* For the hole at the cursor, an action replacing it; for the holes on the
+   lines of [req_range], one replacing all of them, unless it would be the
+   same edit. A named hole (['_a]) is one variable: its occurrences on the
+   line are replaced together. *)
 let hole_actions uri (req_range : Lsp.Types.Range.t) =
   let open Lsp.Types in
   let lines =
@@ -526,25 +532,70 @@ let hole_actions uri (req_range : Lsp.Types.Range.t) =
       ~end_:(Position.create ~line:(req_range.end_.line + 1) ~character:0)
   in
   let holes = Doc.holes uri lines in
-  (* A named hole (['_a]) is one variable: its occurrences on a line are
-     replaced together. *)
-  let groups =
-    List.fold_left
-      (fun groups (((range : Range.t), hole, _) as h) ->
-         let same ((r : Range.t), hole', _) =
-           hole <> "_" && hole' = hole && r.start.line = range.start.line
-         in
-         match List.partition (fun g -> same (List.hd g)) groups with
-         | [g], rest -> rest @ [g @ [h]]
-         | _ -> groups @ [[h]] )
-      [] holes
+  let at_cursor =
+    match Doc.holes uri (Range.create ~start:req_range.start ~end_:req_range.start) with
+    | [] -> []
+    | (range, hole, _) :: _ when hole <> "_" ->
+        List.filter (fun ((r : Range.t), h, _) -> h = hole && r.start.line = range.start.line) holes
+    | h :: _ -> [h]
   in
-  let one g =
-    let _, hole, value = List.hd g in
-    fill_holes_action uri ~title:(Printf.sprintf "Replace %s with %s" hole value) g
+  let one =
+    match at_cursor with
+    | [] -> []
+    | (_, hole, value) :: _ ->
+        [fill_holes_action uri ~title:(Printf.sprintf "Replace %s with %s" hole value) at_cursor]
   in
-  List.map one groups
-  @ if List.length groups > 1 then [fill_holes_action uri ~title:"Replace all holes" holes] else []
+  let all =
+    if holes = [] || List.length holes = List.length at_cursor then
+      []
+    else
+      [fill_holes_action uri ~title:"Replace all holes with their types" holes]
+  in
+  one @ all
+
+(* Naming the repeated parts of the type of a [val] line on the lines of
+   [req_range] with [where], or inlining its [where] definitions. Answered
+   from a parse of our copy of the document. *)
+let where_actions uri (req_range : Lsp.Types.Range.t) =
+  match Doc.text uri with
+  | None -> []
+  | Some text -> (
+      match Mlsem_app.Main.parse (`String text) with
+      | PFailure _ -> []
+      | PSuccess program ->
+          let offsets = Doc.compute_line_offsets text in
+          let line_off l = if l < Array.length offsets then offsets.(l) else String.length text in
+          let lo = line_off req_range.start.line in
+          let hi = line_off (req_range.end_.line + 1) in
+          List.concat_map
+            (fun (_, elem) ->
+               match elem with
+               | Mlsem_app.PAst.SigDef (_, _, TLoc ((s, e), ty))
+                 when s.Lexing.pos_cnum < hi && lo <= e.Lexing.pos_cnum ->
+                   let range =
+                     Lsp.Types.Range.create
+                       ~start:(Doc.position_of_offset offsets s.pos_cnum)
+                       ~end_:(Doc.position_of_offset offsets e.pos_cnum)
+                   in
+                   let action kind title = function
+                     | None -> []
+                     | Some newText ->
+                         let edit = Lsp.Types.TextEdit.create ~newText ~range in
+                         [
+                           Lsp.Types.CodeAction.create ~title ~kind
+                             ~edit:(Lsp.Types.WorkspaceEdit.create ~changes:[(uri, [edit])] ())
+                             ();
+                         ]
+                   in
+                   action Lsp.Types.CodeActionKind.RefactorExtract "Name repeated parts with where"
+                     (Type_refactor.extract ~holes:false ty)
+                   @ action Lsp.Types.CodeActionKind.RefactorExtract
+                       "Name repeated parts with where, as holes"
+                       (Type_refactor.extract ~holes:true ty)
+                   @ action Lsp.Types.CodeActionKind.RefactorInline "Inline where definitions"
+                       (Type_refactor.inline ty)
+               | _ -> [] )
+            program )
 
 let code_actions_for uri (req_range : Lsp.Types.Range.t) =
   ( Doc.lenses_in_range uri req_range
@@ -552,7 +603,7 @@ let code_actions_for uri (req_range : Lsp.Types.Range.t) =
     match signature with
     | None -> None
     | Some (name, tys) -> Some (inline_type_action uri range ~indent ~name ~tys) ) )
-  @ hole_actions uri req_range
+  @ hole_actions uri req_range @ where_actions uri req_range
   |> List.map (fun a -> `CodeAction a)
 
 (* A toolkit request becomes an engine job. Its [text] is filled in from our
