@@ -16,8 +16,8 @@
      to the definition followed by the later [val] and type declarations. A
      definition may use a later definition that has a [val], so those are
      needed, but the later definitions themselves cannot change its typing.
-     It returns the errors in the [val] lines and the definition, or on
-     success the edit that writes the [val] lines into the document. *)
+     It returns the edit that writes the [val] lines into the document,
+     and when they do not check, the errors in them and the definition. *)
 
 open Mlsem_common
 open Mlsem_app
@@ -271,19 +271,18 @@ let check_signature params : Yojson.Safe.t =
            b.name = t.name && b.declared && b.def_start >= String.length prefix )
         result.bindings
     in
+    let range =
+      Lsp.Types.Range.create
+        ~start:(Doc.position_of_offset offsets from)
+        ~end_:(Doc.position_of_offset offsets t.line_start)
+    in
+    let edit =
+      ( "edit",
+        `Assoc [("range", Lsp.Types.Range.yojson_of_t range); ("newText", `String (kept ^ decls))]
+      )
+    in
     if errors = [] && declared then
-      let range =
-        Lsp.Types.Range.create
-          ~start:(Doc.position_of_offset offsets from)
-          ~end_:(Doc.position_of_offset offsets t.line_start)
-      in
-      `Assoc
-        [
-          ("ok", `Bool true);
-          ( "edit",
-            `Assoc
-              [("range", Lsp.Types.Range.yojson_of_t range); ("newText", `String (kept ^ decls))] );
-        ]
+      `Assoc [("ok", `Bool true); edit]
     else
       let errors =
         if errors = [] then
@@ -291,4 +290,5 @@ let check_signature params : Yojson.Safe.t =
         else
           errors
       in
-      `Assoc [("ok", `Bool false); ("errors", `List errors)] )
+      (* The edit too, for a client that writes the types anyway. *)
+      `Assoc [("ok", `Bool false); ("errors", `List errors); edit] )
