@@ -172,7 +172,21 @@ let rec pr lvl t =
   if level t < lvl then cat [lit "("; p; lit ")"] else p
 
 and pr_node (t : t) =
-  let fields fs = join "; " (List.map (fun (l, t) -> cat [lit (l ^ " : "); pr 2 t]) fs) in
+  (* [?;] would lex as one operator: an optional field, but the last, is
+     followed by a space. *)
+  let fields fs =
+    let n = List.length fs in
+    join "; "
+      (List.mapi
+         (fun i (l, t) ->
+            let gap =
+              match t with
+              | TOption _ when i < n - 1 -> " "
+              | _ -> ""
+            in
+            cat [lit (l ^ " : "); pr 2 t; lit gap] )
+         fs )
+  in
   match t with
   | TLoc (_, t) -> pr_node t
   | TDyn -> lit "dyn"
@@ -270,14 +284,27 @@ let unnamable t =
       true
   | TApp (_, []) -> true
   | _ ->
-      List.exists
-        (function
-          | TOption _
-          | TRowVar _
-          | TDyn ->
-              true
-          | t -> is_hole t )
-        (subterms t)
+      (* [t?] and row variables are fine where they belong: as a record's
+         field or tail. *)
+      let rec bad t =
+        match t with
+        | TOption _
+        | TRowVar _
+        | TDyn ->
+            true
+        | TRecord (fs, tail) -> (
+            List.exists (fun (_, f) -> bad (unoption f)) fs
+            ||
+            match tail with
+            | TOption f -> bad f
+            | TRowVar _ -> false
+            | t -> bad t )
+        | t -> is_hole t || List.exists bad (children t)
+      and unoption = function
+        | TOption f -> f
+        | f -> f
+      in
+      bad t
 
 (* ===== Unions and intersections as sets =====
 
