@@ -9,11 +9,13 @@ type message = Mlsem_system.Analyzer.severity * Position.t * string * string opt
     comes from, if any. *)
 
 type derivation = { sig_index: int option ; env: Env.t ;
-                    expr: Mlsem_system.Ast.t ; annot: Mlsem_system.Annot.Annot.t }
+                    expr: Mlsem_system.Ast.t ; annot: Mlsem_system.Annot.Annot.t ;
+                    resolved: Signature.t }
 (** One checking pass of a definition: [sig_index] is the index of the [val]
     declaration it was checked against, if any. [expr] is the expression
     checked in the environment [env], and [annot] its derivation, with every
-    typed node's type cached in it. *)
+    typed node's type cached in it. [resolved] is the type this pass gave, as
+    overloads: several when the body is overloaded. *)
 
 type inferred = {
   var: Variable.t;
