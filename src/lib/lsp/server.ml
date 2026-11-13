@@ -587,10 +587,10 @@ let where_actions uri (req_range : Lsp.Types.Range.t) =
                              ();
                          ]
                    in
-                   action Lsp.Types.CodeActionKind.RefactorExtract "Name repeated parts with where"
+                   action Lsp.Types.CodeActionKind.RefactorExtract "Extract repeated parts"
                      (Type_refactor.extract ~holes:false ty)
                    @ action Lsp.Types.CodeActionKind.RefactorExtract
-                       "Name repeated parts with where, as holes"
+                       "Extract repeated parts as holes"
                        (Type_refactor.extract ~holes:true ty)
                    @ action Lsp.Types.CodeActionKind.RefactorInline "Inline where definitions"
                        (Type_refactor.inline ty)
