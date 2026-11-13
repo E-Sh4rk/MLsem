@@ -279,27 +279,24 @@ type part = {
   parent: (t * int) option;  (** the part it is in, and its index there *)
 }
 
-(* The smallest part of [t] whose location contains [lo, hi], [t] itself
-   included. A part's location is the outermost [TLoc] around it. *)
-let rec part_at (lo, hi) (t : t) : part option =
+(* The located parts of [t], [t] itself included, outermost first. A part's
+   location is the outermost [TLoc] around it. *)
+let located_parts (t : t) : part list =
   let rec peel span = function
     | TLoc ((s, e), u) ->
         peel (if Option.is_none span then Some (s.Lexing.pos_cnum, e.Lexing.pos_cnum) else span) u
     | u -> (span, u)
   in
-  let span, u = peel None t in
-  let deeper =
-    List.find_map
-      (fun (i, k) ->
-         Option.map
-           (fun p -> if Option.is_none p.parent then {p with parent = Some (u, i)} else p)
-           (part_at (lo, hi) k) )
-      (List.mapi (fun i k -> (i, k)) (children u))
+  let rec go parent t =
+    let span, u = peel None t in
+    let here =
+      match span with
+      | Some span -> [{span; node = u; parent}]
+      | None -> []
+    in
+    here @ List.concat (List.mapi (fun i k -> go (Some (u, i)) k) (children u))
   in
-  match (deeper, span) with
-  | Some _, _ -> deeper
-  | None, Some (s, e) when s <= lo && hi <= e -> Some {span = (s, e); node = u; parent = None}
-  | None, _ -> None
+  go None t
 
 (* [t] printed, if the text parses back to it. *)
 let checked_print t =
