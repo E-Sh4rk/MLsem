@@ -59,6 +59,12 @@
       let left = x in let right = list_of_pats xs in
       PatCons (left,right)
 
+  (* A hole [_] in a type is a fresh weak type variable. *)
+  let hole_counter = ref 0
+  let fresh_hole () =
+    incr hole_counter ;
+    TVar (KInfer, Printf.sprintf "_hole%d" !hole_counter)
+
   let builtin_type_or_custom str =
     match str with
     | "empty" -> TBase TEmpty
@@ -484,6 +490,7 @@ atomic_typ:
 | s=PCID RPAREN { Ty (TTag (s, TBase TUnit)) }
 | s=TVAR { Ty (TLoc ($loc, TVar (KNoInfer, s))) }
 | s=TVAR_WEAK { Ty (TLoc ($loc, TVar (KInfer, s))) }
+| PLACEHOLDER_VAR { Ty (TLoc ($loc, fresh_hole ())) }
 | s=RVAR { Ty (TRowVar (KNoInfer, s)) }
 | s=RVAR_WEAK { Ty (TRowVar (KInfer, s)) }
 | LPAREN RPAREN { Ty (TBase TUnit) }

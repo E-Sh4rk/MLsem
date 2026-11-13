@@ -39,7 +39,8 @@ let sigs_of_def varm senv env (kind,str) =
     | None -> raise (AlreadyDefined v)
     | Some sigs ->
       if MVariable.kind_compat kind (MVariable.kind v) |> not then raise (AlreadyDefined v) ;
-      v, Some (sigs, Env.find v env)
+      (* A draft is not in the environment yet. *)
+      v, Some (sigs, Env.find_opt v env)
     end
 
 type derivation = { sig_index: int option ; env: Env.t ;
@@ -89,6 +90,13 @@ let type_check_with_sigs env (var,e,sigs,aty) =
      a sub-expression is unreachable only if no signature reached it. *)
   let visited = Mlsem_system.Analyzer.Visited.union_many visited in
   let msg = (List.concat msg)@(Mlsem_system.Analyzer.get_unreachable visited e) in
+  let aty, sigs = match aty with
+  | Some aty -> aty, sigs
+  | None ->
+    (* A draft: its holes are resolved in the types inferred against it. *)
+    let sigs = List.concat_map Signature.of_tyscheme tys in
+    Signature.to_tyscheme sigs, sigs
+  in
   (var,(aty,sigs,derivations)),msg
 
 let type_check_recs pos env lst =
@@ -200,6 +208,10 @@ let treat (benv,varm,senv,env) (annot, elem) =
         with Invalid_argument _ -> raise (IncompatibleType (v,ty))
       ) env tys1 in
       let tys2, msg2 = List.map (type_check_with_sigs env) sigs |> List.split in
+      (* Drafts, now resolved, enter the environment. *)
+      let env = List.fold_left (fun env (v,(ty,_,_)) ->
+        if Env.mem v env then env else MVariable.add_to_env v ty env
+      ) env tys2 in
       let msg = msg1@(List.concat msg2) |> List.map (fun d ->
         let open Mlsem_system.Analyzer.Diagnostic in
         (severity d, Eid.loc d.eid, title d, descr d, Some d.kind)
@@ -215,6 +227,8 @@ let treat (benv,varm,senv,env) (annot, elem) =
     | PAst.SigDef (name, mut, ty) ->
       begin try
         let new_sig, benv = Signature.build benv ty in
+        if mut && Signature.is_draft new_sig then
+          invalid_arg "A mutable variable cannot have a draft signature." ;
         let kind = if mut then MVariable.AnnotMut (Signature.to_gty new_sig) else Immut in
         let var, sigs = sigs_of_def varm senv env (kind, name) in
         Variable.attach_sig_location var pos ;
@@ -225,8 +239,12 @@ let treat (benv,varm,senv,env) (annot, elem) =
         | None (* First definition *) -> [new_sig]
         | Some (sigs, _) -> sigs@[new_sig]
         in
-        let ty = Signature.to_tyscheme sigs in
-        let env = MVariable.replace_in_env var ty env in
+        (* A draft is only an obligation for now: it enters the environment
+           once its definition is typed. *)
+        let env =
+          if List.exists Signature.is_draft sigs then Env.rm var env
+          else MVariable.replace_in_env var (Signature.to_tyscheme sigs) env
+        in
         let senv = VarMap.add var sigs senv in
         (benv,varm,senv,env), { res=TDone ; msg=[] }
       with Invalid_argument str -> (benv,varm,senv,env),
