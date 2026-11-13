@@ -322,7 +322,17 @@ let hole_hovers ctx envs display overload r =
       let draft, _ = Signature.build benv (Option.get (sig_type ctx r)) in
       let d = Signature.to_gty draft |> GTy.ub in
       let o = Signature.to_gty overload |> GTy.ub in
-      let weak = TVOp.vars d |> MVarSet.proj1 |> TVarSet.elements in
+      (* The resolved type is fixed: only the holes are solved for. Its
+         variables are rigid already (generalized, then renamed rigid by
+         [Signature.of_tyscheme]); a weak one would be made rigid too. *)
+      let o =
+        let w = TVOp.vars o |> MVarSet.proj1 |> TVarSet.filter (TVar.has_kind KInfer) in
+        Subst.apply (TVOp.refresh ~kind:KNoInfer (MVarSet.of_set1 w)) o
+      in
+      (* The holes: the draft's weak variables, not its rigid ones. *)
+      let weak =
+        TVOp.vars d |> MVarSet.proj1 |> TVarSet.elements |> List.filter (TVar.has_kind KInfer)
+      in
       match TVOp.tally (TVOp.all_vars KNoInfer) [(d, o); (o, d)] with
       | [] -> []
       | s :: _ ->
