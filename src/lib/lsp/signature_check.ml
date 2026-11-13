@@ -17,7 +17,9 @@
      definition may use a later definition that has a [val], so those are
      needed, but the later definitions themselves cannot change its typing.
      It returns the edit that writes the [val] lines into the document,
-     and when they do not check, the errors in them and the definition. *)
+     and when they do not check, the errors in them and the definition.
+   - [mlsem/holes] lists, for the type toolkit, the resolved holes of the
+     definition's draft [val] lines. *)
 
 open Mlsem_common
 open Mlsem_app
@@ -158,6 +160,47 @@ let with_target params k =
         | Some t -> k text offsets t )
   with
   | e -> error (Printexc.to_string e)
+
+(* mlsem/holes: the resolved holes of the [val] lines of the definition at
+   [position], from the document's typecheck, in order, with the line of
+   each. *)
+let holes params : Yojson.Safe.t =
+  with_target params (fun text offsets t ->
+    let uri =
+      (params |> member "textDocument" |> Lsp.Types.TextDocumentIdentifier.t_of_yojson).uri
+    in
+    Store.sync_text uri text ;
+    let _, _, (typings : Typings.t) = Store.results uri in
+    let in_vals (s, e) = List.exists (fun (vs, ve) -> vs <= s && e <= ve) t.vals in
+    let range (s, e) =
+      Lsp.Types.Range.create
+        ~start:(Doc.position_of_offset offsets s)
+        ~end_:(Doc.position_of_offset offsets e)
+    in
+    let holes =
+      typings.hovers
+      |> List.filter_map (fun (h : Typings.hover) ->
+        match h.body with
+        | Hole {hole; value} when in_vals (h.h_start, h.h_end) ->
+            let line_s = line_start text h.h_start in
+            (* Without its newline, so that the hole's characters index it. *)
+            let line_e = line_end text h.h_start in
+            let line_e =
+              if line_e > line_s && text.[line_e - 1] = '\n' then line_e - 1 else line_e
+            in
+            let line = String.sub text line_s (line_e - line_s) in
+            Some
+              ( h.h_start,
+                `Assoc
+                  [
+                    ("range", Lsp.Types.Range.yojson_of_t (range (h.h_start, h.h_end)));
+                    ("hole", `String hole); ("value", `String value); ("lineText", `String line);
+                  ] )
+        | _ -> None )
+      |> List.sort_uniq (fun (a, _) (b, _) -> compare a b)
+      |> List.map snd
+    in
+    `Assoc [("ok", `Bool true); ("name", `String t.name); ("holes", `List holes)] )
 
 (* mlsem/definitionAt *)
 let definition_at params : Yojson.Safe.t =
