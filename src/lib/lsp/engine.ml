@@ -52,7 +52,8 @@ let tool_handlers =
     ("mlsem/definitionStatus", Signature_check.definition_status);
     ("mlsem/checkSignature", Signature_check.check_signature);
     ("mlsem/extractGroups", Extract_tool.groups); ("mlsem/extractApply", Extract_tool.apply);
-    ("mlsem/widen", Widen.parts); ("mlsem/resolveOverlap", Resolve.resolve);
+    ("mlsem/widen", Widen.parts); ("mlsem/simplify", Simplify.parts);
+    ("mlsem/resolveOverlap", Resolve.resolve);
   ]
 
 let is_tool method_ = List.mem_assoc method_ tool_handlers
