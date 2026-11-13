@@ -97,23 +97,25 @@
   | Ty of Mlsem_types.TyExpr.t
   | Regexp of Mlsem_types.TyExpr.regexp
 
+  (* A type is located where it is written ([TLoc]) when it is part of
+     another one, so that editor tooling can find each part of a type. *)
   let as_typ (s,e) cst =
     match cst with
-    | Ty ty -> ty
+    | Ty ty -> TLoc ((s,e), ty)
     | Regexp _ ->
       raise (SyntaxError (Position.lex_join s e, "unexpected regular expression"))
 
-  let as_regexp _loc cst =
+  let as_regexp loc cst =
     match cst with
     (* [TOption] is only meaningful for record fields: in a regexp position,
        [t?] denotes the optional regular expression instead. *)
     | Ty (TOption ty) -> Option (Symbol ty)
-    | Ty ty -> Symbol ty
+    | Ty ty -> Symbol (TLoc (loc, ty))
     | Regexp r -> r
 
   let cst_cup l1 c1 l2 c2 =
     match c1, c2 with
-    | Ty t1, Ty t2 -> Ty (TCup (t1, t2))
+    | Ty t1, Ty t2 -> Ty (TCup (TLoc (l1, t1), TLoc (l2, t2)))
     | _ ->
       let r2 = as_regexp l2 c2 in
       begin match as_regexp l1 c1 with
@@ -127,10 +129,10 @@
     | Concat rs -> Regexp (Concat (rs@[r2]))
     | r1 -> Regexp (Concat [r1;r2])
 
-  let cst_option c =
+  let cst_option loc c =
     match c with
     (* Meaning of [?] on a type: optional record field *)
-    | Ty t -> Ty (TOption t)
+    | Ty t -> Ty (TOption (TLoc (loc, t)))
     | Regexp r -> Regexp (Option r)
 %}
 
@@ -453,13 +455,16 @@ typ_cst:
 
 typ_norec:
   t=simple_typ { t }
-| hd=simple_typ COMMA tl=separated_nonempty_list(COMMA, simple_typ)
-  { Ty (TTuple (hd::tl |> List.map (as_typ $loc))) }
+| hd=located_typ COMMA tl=separated_nonempty_list(COMMA, located_typ)
+  { Ty (TTuple (hd::tl)) }
+
+(* A component of a tuple or an argument of a type constructor. *)
+located_typ: t=simple_typ { as_typ $loc t }
 
 simple_typ:
   t=concat_typ { t }
 | lhs=simple_typ ARROW rhs=simple_typ
-  { Ty (TArrow (TLoc ($loc(lhs), as_typ $loc(lhs) lhs), TLoc ($loc(rhs), as_typ $loc(rhs) rhs))) }
+  { Ty (TArrow (as_typ $loc(lhs) lhs, as_typ $loc(rhs) rhs)) }
 | lhs=simple_typ CONS rhs=simple_typ  { Ty (TCons (as_typ $loc(lhs) lhs, as_typ $loc(rhs) rhs)) }
 | NEG t=simple_typ { Ty (TNeg (as_typ $loc(t) t)) }
 | lhs=simple_typ OR rhs=simple_typ   { cst_cup $loc(lhs) lhs $loc(rhs) rhs }
@@ -477,14 +482,14 @@ postfix_typ:
   t=atomic_typ { t }
 | t=postfix_typ TIMES { Regexp (Star (as_regexp $loc(t) t)) }
 | t=postfix_typ PLUS  { Regexp (Plus (as_regexp $loc(t) t)) }
-| t=postfix_typ INTERROGATION_MARK { cst_option t }
+| t=postfix_typ INTERROGATION_MARK { cst_option $loc(t) t }
 
 atomic_typ:
   x=type_constant { Ty (TBase x) }
 | DYN { Ty TDyn }
 | s=ID { Ty (builtin_type_or_custom s) }
-| s=PID ts=separated_list(COMMA, simple_typ) RPAREN
-  { Ty (TApp (s, ts |> List.map (as_typ $loc))) }
+| s=PID ts=separated_list(COMMA, located_typ) RPAREN
+  { Ty (TApp (s, ts)) }
 | s=CID { Ty (TEnum s) }
 | s=PCID t=typ RPAREN { Ty (TTag (s, t)) }
 | s=PCID RPAREN { Ty (TTag (s, TBase TUnit)) }
