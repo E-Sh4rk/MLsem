@@ -149,7 +149,14 @@ rule token = parse
 | prefix_op as s { PREFIX s }
 | indexed_op as s { INDEXED s }
 | op_id as s { OPID (String.sub s 1 ((String.length s) - 2) |> String.trim) }
-| '"' { read_string (Buffer.create 17) lexbuf }
+| '"' {
+  (* The string's rules each start a lexeme: its token starts at the
+     opening quote. *)
+  let start = lexbuf.lex_start_p in
+  let tok = read_string (Buffer.create 17) lexbuf in
+  lexbuf.lex_start_p <- start ;
+  tok
+}
 | '\'' ([^ '\'' '\\' '\010' '\013'] as c) '\'' { LCHAR c }
 | '\'' '\\' (backslash_escapes as c) '\'' { LCHAR (char_for_backslash c) }
 | id as s { ID s }
