@@ -335,8 +335,13 @@ let hole_hovers ctx envs display overload r =
                     holes' own among them, for parts that do not matter
                     ([_hole := ('a & int) | (_hole \ int)] when the hole is
                     intersected with [int]). Any choice for them is a
-                    solution: [empty] keeps the rest. *)
-                 let value = Subst.apply s (TVar.typ v) in
+                    solution. As when simplifying a signature, each is
+                    chosen by its polarity: [empty] where it only occurs
+                    positively, [any] where only negatively. One occurring
+                    both ways stays, and is then made [empty]. *)
+                 let value =
+                   Subst.apply s (TVar.typ v) |> TVOp.bot_instance (TVOp.all_vars KNoInfer)
+                 in
                  let leftover =
                    TVOp.vars value |> MVarSet.proj1 |> TVarSet.elements
                    |> List.filter (TVar.has_kind KInfer)
