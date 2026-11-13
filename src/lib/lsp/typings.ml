@@ -328,9 +328,9 @@ let hole_values ctx envs display overload r =
       let draft, _ = Signature.build benv (Option.get (sig_type ctx r)) in
       let d = Signature.to_gty draft |> GTy.ub in
       let o = Signature.to_gty overload |> GTy.ub in
-      (* The resolved type is fixed: only the holes are solved for. Its
-         variables are rigid already (generalized, then renamed rigid by
-         [Signature.of_tyscheme]); a weak one would be made rigid too. *)
+      (* The resolved type's variables are rigid (generalized, then renamed
+         rigid by [Signature.of_tyscheme]); a weak one would be made rigid
+         too. *)
       let o =
         let w = TVOp.vars o |> MVarSet.proj1 |> TVarSet.filter (TVar.has_kind KInfer) in
         Subst.apply (TVOp.refresh ~kind:KNoInfer (MVarSet.of_set1 w)) o
@@ -339,7 +339,13 @@ let hole_values ctx envs display overload r =
       let weak =
         TVOp.vars d |> MVarSet.proj1 |> TVarSet.elements |> List.filter (TVar.has_kind KInfer)
       in
-      match TVOp.tally (TVOp.all_vars KNoInfer) [(d, o); (o, d)] with
+      (* The resolved type's variables are fresh ones made by MLsem: its ['a]
+         is not the draft's ['a]. So the resolved type is fixed, and solved
+         for are the holes and the draft's rigid variables, which the
+         solution maps to the resolved type's; the values are then renamed
+         back to the draft's variables ([back]). *)
+      let mono = MVarSet.diff (TVOp.all_vars KNoInfer) (TVOp.vars d) in
+      match TVOp.tally mono [(d, o); (o, d)] with
       | [] -> None
       | s :: _ ->
           (* The most general solution can leave weak variables, the holes'
@@ -372,9 +378,23 @@ let hole_values ctx envs display overload r =
             |> Subst.of_list1
           in
           let resolve t = Subst.apply rest (resolve t) in
-          (* Only shown if filling the holes gives back the resolved type. *)
+          (* Only shown if filling the holes gives back the resolved type, its
+             variables related to the draft's as the solution does. *)
           let filled = resolve d in
-          if not (Ty.leq filled o && Ty.leq o filled) then
+          let target = resolve o in
+          (* Each of the draft's rigid variables that the solution maps to a
+             variable of the resolved type: that variable, renamed back. *)
+          let back =
+            TVOp.vars d |> MVarSet.proj1 |> TVarSet.elements
+            |> List.filter (fun r -> not (TVar.has_kind KInfer r))
+            |> List.filter_map (fun r ->
+              let t = Subst.apply s (TVar.typ r) in
+              TVOp.vars o |> MVarSet.proj1 |> TVarSet.elements
+              |> List.find_opt (fun w -> Ty.leq t (TVar.typ w) && Ty.leq (TVar.typ w) t)
+              |> Option.map (fun w -> (w, TVar.typ r)) )
+            |> Subst.of_list1
+          in
+          if not (Ty.leq filled target && Ty.leq target filled) then
             None
           else
             Some
@@ -385,7 +405,7 @@ let hole_values ctx envs display overload r =
                       let shown =
                         if String.starts_with ~prefix:"_hole" name then "_" else "'" ^ name
                       in
-                      let value = resolve (TVar.typ v) |> GTy.mk |> display in
+                      let value = resolve (TVar.typ v) |> Subst.apply back |> GTy.mk |> display in
                       (* A tuple is printed without parentheses. *)
                       let value =
                         if String.contains value ',' && value.[0] <> '(' then
