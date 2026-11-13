@@ -1,6 +1,6 @@
-(* The toolkit's "Resolve overlap": making the cases of selected overloads
-   disjoint the way first-match pattern matching types its cases, each case
-   minus the cases before it.
+(* The toolkit's "Domain subtraction": making the cases of selected
+   overloads disjoint the way first-match pattern matching types its cases,
+   each case minus the cases before it.
 
    A case is the first [depth] arguments of an overload, as a product: with
    [depth] 2, [A₁ -> A₂ -> R] is the case [A₁ × A₂], and [R] is kept as
@@ -116,7 +116,7 @@ let diff p q =
       p
     |> List.filter (fun r -> not (empty r))
 
-(* The overloads in the order they are resolved: repeatedly, the first (in
+(* The overloads in the order their cases are taken: repeatedly, the first (in
    [val] order) of those left whose case has none of the others left
    strictly inside it. *)
 let priority cases =
@@ -145,11 +145,11 @@ let maximal cases =
             (List.mapi (fun j x -> (j, x)) cases) ) )
     cases
 
-(* mlsem/resolveOverlap: for the selected overloads of the binding [name],
-   resolved on their first [depth] arguments: each [val] line as it would
+(* mlsem/subtractDomains: for the selected overloads of the binding [name],
+   their cases on the first [depth] arguments made disjoint: each [val] line as it would
    be, the unreachable ones, the edits, and how many arguments all of the
    selected overloads take. *)
-let resolve params : Yojson.Safe.t =
+let subtract params : Yojson.Safe.t =
   try
     let uri =
       (params |> member "textDocument" |> Lsp.Types.TextDocumentIdentifier.t_of_yojson).uri
@@ -171,7 +171,7 @@ let resolve params : Yojson.Safe.t =
         if not (List.for_all (fun w -> List.mem w rendered) wanted) then
           `Assoc [("ok", `Bool false); ("stale", `Bool true)]
         else if (not b.declared) || List.length locs <> List.length rendered then
-          error "Resolving rewrites val lines: write them first, without holes."
+          error "Domain subtraction rewrites val lines: write them first, without holes."
         else
           let trees = (Typings.source program).sigs in
           let selected =
