@@ -279,7 +279,111 @@ let unnamable t =
           | t -> is_hole t )
         (subterms t)
 
-let rec replace ~what ~by t = if t = what then by else map_children (replace ~what ~by) t
+(* ===== Unions and intersections as sets =====
+
+   [1 | true | 'a] and [1 | 'a | true] are the same union: a chain of [|]
+   (or [&]) is compared as the set of its members, and a part can be some
+   of the members of a union. *)
+
+type ac =
+  | Cup
+  | Cap
+
+let ac_kind = function
+  | TCup _ -> Some Cup
+  | TCap _ -> Some Cap
+  | _ -> None
+
+(* The members of a chain of [k], through any nesting. *)
+let rec ops k t =
+  match (k, t) with
+  | Cup, TCup (a, b)
+  | Cap, TCap (a, b) ->
+      ops k a @ ops k b
+  | _ -> [t]
+
+let rebuild k = function
+  | [] -> invalid_arg "Type_refactor.rebuild"
+  | x :: xs ->
+      List.fold_left
+        (fun acc y ->
+           match k with
+           | Cup -> TCup (acc, y)
+           | Cap -> TCap (acc, y) )
+        x xs
+
+(* A canonical form: members of chains sorted, without duplicates. *)
+let rec norm t =
+  let t = map_children norm t in
+  match ac_kind t with
+  | Some k -> rebuild k (List.sort_uniq compare (ops k t))
+  | None -> t
+
+let same a b = norm a = norm b
+
+(* The parts of [t]: its subterms, a chain counting as one part made of its
+   members (not of its sub-chains). *)
+let rec parts t =
+  t
+  :: List.concat_map parts
+       ( match ac_kind t with
+       | Some k -> ops k t
+       | None -> children t )
+
+(* When [g] is a chain of fewer members than [p], of the same kind, all
+   among those of [p]: the positions in [p] of the members of [g]. *)
+let sub_members g p =
+  match (ac_kind g, ac_kind p) with
+  | Some k, Some k' when k = k' ->
+      let gs = List.sort_uniq compare (List.map norm (ops k g)) in
+      let ps = List.map norm (ops k p) in
+      if List.length gs >= List.length (List.sort_uniq compare ps) then
+        None
+      else
+        let rec go taken = function
+          | [] -> Some (List.rev taken)
+          | x :: xs -> (
+              match
+                List.find_index
+                  (fun i -> i)
+                  (List.mapi (fun i y -> y = x && not (List.mem i taken)) ps)
+              with
+              | Some i -> go (i :: taken) xs
+              | None -> None )
+        in
+        go [] gs
+  | _ -> None
+
+(* Replace each occurrence of [what] in [t] by [by], including as some of
+   the members of a chain: [1 | 'a | true] with [what = true | 1] becomes
+   [by | 'a]. *)
+let rec replace ~what ~by t =
+  if same t what then
+    by
+  else
+    match
+      ac_kind t
+    with
+    | Some k ->
+        let os = ops k t in
+        let os =
+          match sub_members what t with
+          | Some (_ :: _ as idx) ->
+              let first = List.fold_left min max_int idx in
+              List.concat
+                (List.mapi
+                   (fun i o ->
+                      if i = first then
+                        [by]
+                      else if List.mem i idx then
+                        []
+                      else
+                        [o] )
+                   os )
+          | _ -> os
+        in
+        rebuild k (List.map (replace ~what ~by) os)
+    | None -> map_children (replace ~what ~by) t
 
 (* Name the repeated parts of [t], largest first, until none is left: each
    becomes a [where] definition. Repeats are counted in the type and in the
@@ -304,16 +408,19 @@ let extract ~holes t =
     n
   in
   let rec loop body defs =
-    let all = List.concat_map subterms (body :: List.map (fun (_, _, t) -> t) defs) in
+    let all = List.concat_map parts (body :: List.map (fun (_, _, t) -> t) defs) in
+    (* By canonical form: the first part written, and how many. *)
     let counts = Hashtbl.create 16 in
     List.iter
       (fun s ->
          if not (unnamable s) then
-           Hashtbl.replace counts s (1 + Option.value ~default:0 (Hashtbl.find_opt counts s)) )
+           let key = norm s in
+           let first, n = Option.value ~default:(s, 0) (Hashtbl.find_opt counts key) in
+           Hashtbl.replace counts key (first, n + 1) )
       all ;
     let best =
       Hashtbl.fold
-        (fun s n best ->
+        (fun _ (s, n) best ->
            if n < 2 then
              best
            else
@@ -354,17 +461,84 @@ let holes_in t = List.length (List.filter is_hole (subterms t))
    the toolkit extracts them linking the holes or keeping them apart. *)
 let groups t =
   let t = strip t in
-  let counts = Hashtbl.create 16 in
-  List.iter
-    (fun s -> Hashtbl.replace counts s (1 + Option.value ~default:0 (Hashtbl.find_opt counts s)))
-    (subterms t) ;
+  let ps = parts t in
+  (* Candidates: every part, and every set of at least two members that two
+     chains share (all such sets, up to a common set of 5 members). *)
+  let rec subsets = function
+    | [] -> [[]]
+    | x :: xs ->
+        let rest = subsets xs in
+        List.map (fun s -> x :: s) rest @ rest
+  in
+  let chains = List.filter (fun p -> ac_kind p <> None) ps in
+  let shared =
+    List.concat
+      (List.mapi
+         (fun i a ->
+            List.concat
+              (List.filteri
+                 (fun j _ -> j > i)
+                 (List.map
+                    (fun b ->
+                       match (ac_kind a, ac_kind b) with
+                       | Some k, Some k' when k = k' ->
+                           let bs = List.map norm (ops k b) in
+                           let common = List.filter (fun m -> List.mem (norm m) bs) (ops k a) in
+                           if List.length common > 5 then
+                             [rebuild k common]
+                           else
+                             subsets common
+                             |> List.filter (fun s -> List.length s >= 2)
+                             |> List.map (rebuild k)
+                       | _ -> [] )
+                    chains ) ) )
+         chains )
+  in
+  let count g = List.length (List.filter (fun p -> same p g || sub_members g p <> None) ps) in
   (* [unnamable] without its rule on holes: a hole inside is fine here. *)
   let extractable s =
     let rec no_holes s = if is_hole s then TBase TAny else map_children no_holes s in
     not (unnamable (no_holes s))
   in
-  Hashtbl.fold (fun s n acc -> if n >= 2 && extractable s then s :: acc else acc) counts []
+  List.fold_left
+    (fun acc g ->
+       if List.exists (same g) acc || (not (extractable g)) || count g < 2 then acc else acc @ [g] )
+    [] (ps @ shared)
   |> List.sort (fun a b -> compare (size b, print a) (size a, print b))
+
+(* Where the occurrences of [g] are in [l], the layout of [t]: one span per
+   occurrence, or, for a [g] made of some members of a chain, one span per
+   run of consecutive members. *)
+let occurrences (l : piece) t g =
+  let span node =
+    List.find_map (fun (s, a, b) -> if s == node then Some (a, b) else None) l.spans
+  in
+  List.concat_map
+    (fun p ->
+       if same p g then
+         Option.to_list (span p)
+       else
+         match
+           (sub_members g p, ac_kind p)
+         with
+         | Some idx, Some k ->
+             let os = Array.of_list (ops k p) in
+             let runs =
+               List.fold_left
+                 (fun runs i ->
+                    match runs with
+                    | (a, b) :: rest when b + 1 = i -> (a, i) :: rest
+                    | _ -> (i, i) :: runs )
+                 [] (List.sort compare idx)
+             in
+             List.filter_map
+               (fun (i, j) ->
+                  match (span os.(i), span os.(j)) with
+                  | Some (a, _), Some (_, b) -> Some (a, b)
+                  | _ -> None )
+               (List.rev runs)
+         | _ -> [] )
+    (parts t)
 
 (* A default name for a part, from its shape, not in [used]. *)
 let default_name used g =
