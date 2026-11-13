@@ -177,11 +177,29 @@ let holes params : Yojson.Safe.t =
         ~start:(Doc.position_of_offset offsets s)
         ~end_:(Doc.position_of_offset offsets e)
     in
+    (* A hole's values: one, or one per overload of its line's result when
+       they differ ([value] null where the line cannot be that overload). *)
+    let rows (body : Typings.hover_body) =
+      match body with
+      | Hole {hole; value} -> Some (hole, [`Assoc [("overload", `Null); ("value", `String value)]])
+      | Hole_per_overload {hole; rows} ->
+          Some
+            ( hole,
+              List.map
+                (fun (o, v) ->
+                   `Assoc
+                     [
+                       ("overload", `String o);
+                       ("value", Option.fold ~none:`Null ~some:(fun v -> `String v) v);
+                     ] )
+                rows )
+      | _ -> None
+    in
     let holes =
       typings.hovers
       |> List.filter_map (fun (h : Typings.hover) ->
-        match h.body with
-        | Hole {hole; value} when in_vals (h.h_start, h.h_end) ->
+        match rows h.body with
+        | Some (hole, rows) when in_vals (h.h_start, h.h_end) ->
             let line_s = line_start text h.h_start in
             (* Without its newline, so that the hole's characters index it. *)
             let line_e = line_end text h.h_start in
@@ -194,7 +212,7 @@ let holes params : Yojson.Safe.t =
                 `Assoc
                   [
                     ("range", Lsp.Types.Range.yojson_of_t (range (h.h_start, h.h_end)));
-                    ("hole", `String hole); ("value", `String value); ("lineText", `String line);
+                    ("hole", `String hole); ("rows", `List rows); ("lineText", `String line);
                   ] )
         | _ -> None )
       |> List.sort_uniq (fun (a, _) (b, _) -> compare a b)
