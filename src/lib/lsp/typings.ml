@@ -80,6 +80,10 @@ type call = {
   args: (int * int * string) list;
   result: string;
   instance: (string * string) list;  (** callee's type variable := type *)
+  instances: (int * (string * string) list) list;
+    (** for a top-level callee: per overload of its signature (by index), the
+      instance of that overload the call fits, as the overload's variable :=
+      type; overloads the call does not fit are absent *)
   group: int;
 }
 
@@ -92,14 +96,25 @@ type occ = {
   binder: bool;
 }
 
+(* A change of a callee's [val] lines for a call to it that fails:
+   [x_start, x_end] is the call, [edits] the byte intervals to replace and
+   their new text. *)
+type fix = {
+  x_start: int;
+  x_end: int;
+  title: string;
+  edits: (int * int * string) list;
+}
+
 type t = {
   hovers: hover list;
   defns: defn list;
   calls: call list;
   occs: occ list;
+  fixes: fix list;
 }
 
-let empty = {hovers = []; defns = []; calls = []; occs = []}
+let empty = {hovers = []; defns = []; calls = []; occs = []; fixes = []}
 
 let range pos =
   if pos = Position.dummy then
@@ -214,11 +229,20 @@ type ctx = {
   mutable groups: ((string * int) option * GTy.t list * int) list;
   mutable var_ids: (Variable.t * int) list;
   mutable occs: occ list;
+  mutable sigs: (Variable.t * Signature.t) list;  (** top-level definitions so far *)
   mutable acc: t;
 }
 
 let create program =
-  {src = source program; tvar_ids = []; groups = []; var_ids = []; occs = []; acc = empty}
+  {
+    src = source program;
+    tvar_ids = [];
+    groups = [];
+    var_ids = [];
+    occs = [];
+    sigs = [];
+    acc = empty;
+  }
 
 (* A node is typed once per derivation, and some several times in one. *)
 let finish ctx = {ctx.acc with occs = List.sort_uniq compare ctx.occs}
@@ -315,6 +339,11 @@ let rec tyexpr_holes (ty : TyExpr.t) =
   | TLoc (loc, TVar (KInfer, name)) -> [(lex_range loc, name)]
   | _ -> List.concat_map tyexpr_holes (tyexpr_children ty)
 
+(* A tuple is printed without parentheses; written in place of a variable, it
+   needs them. *)
+let paren_tuple value =
+  if String.contains value ',' && value.[0] <> '(' then "(" ^ value ^ ")" else value
+
 (* What each hole of the [val] line at [r] is for the line to be [overload]:
    tallying the line's type, holes included, against it, in both directions.
    [None] when nothing fits. *)
@@ -405,13 +434,8 @@ let hole_values ctx envs display overload r =
                       let shown =
                         if String.starts_with ~prefix:"_hole" name then "_" else "'" ^ name
                       in
-                      let value = resolve (TVar.typ v) |> Subst.apply back |> GTy.mk |> display in
-                      (* A tuple is printed without parentheses. *)
                       let value =
-                        if String.contains value ',' && value.[0] <> '(' then
-                          "(" ^ value ^ ")"
-                        else
-                          value
+                        resolve (TVar.typ v) |> Subst.apply back |> GTy.mk |> display |> paren_tuple
                       in
                       (range, shown, value) ) )
                  holes ) )
@@ -453,6 +477,55 @@ let hole_hovers ctx envs display overloads r =
                in
                {h_start; h_end; body} )
             holes )
+
+(* The instance of [overload] a call with these argument and result types
+   uses: a value for each of the overload's variables such that the
+   instantiated overload is a subtype of the call's type ([args] to
+   [result]), as an application requires. [None] when there is none, or when
+   the overload has no variable. Of the instances, the one closest to the
+   call: the variables the call leaves open are [any] where the instantiated
+   overload gives them out and [empty] where it takes them in; the rest are
+   [empty]. *)
+let call_instance overload args result =
+  let o = Signature.to_gty overload |> GTy.ub in
+  let vars = TVOp.vars o |> MVarSet.proj1 |> TVarSet.elements in
+  if vars = [] then
+    None
+  else
+    let call = List.fold_right (fun a acc -> Arrow.mk (GTy.lb a) acc) args (GTy.lb result) in
+    (* Everything but the overload's variables is fixed, the caller's
+       variables included. *)
+    let mono =
+      MVarSet.diff (MVarSet.union (TVOp.all_vars KNoInfer) (TVOp.all_vars KInfer)) (TVOp.vars o)
+    in
+    match TVOp.tally ~record:false mono [(o, call)] with
+    | [] -> None
+    | s :: _ ->
+        let inst = Subst.apply s o in
+        let clean =
+          TVOp.clean_subst' ~pos1:Ty.any ~neg1:Ty.empty ~pos2:Row.any ~neg2:Row.empty mono [inst]
+        in
+        let open_vars t =
+          MVarSet.diff (TVOp.vars t) mono
+          |> MVarSet.proj1 |> TVarSet.elements
+          |> List.map (fun v -> (v, Ty.empty))
+          |> Subst.of_list1
+        in
+        let rest = open_vars (Subst.apply clean inst) in
+        let value v =
+          let t = Subst.apply clean (Subst.apply s (TVar.typ v)) in
+          Subst.apply (open_vars t) (Subst.apply rest t)
+        in
+        let inst = Subst.of_list1 (List.map (fun v -> (v, value v)) vars) in
+        if Ty.leq (Subst.apply inst o) call then
+          Some (List.map (fun v -> (v, value v)) vars)
+        else
+          None
+
+let is_tvar ty =
+  match TVOp.vars ty |> MVarSet.proj1 |> TVarSet.elements with
+  | [v] -> Ty.leq ty (TVar.typ v) && Ty.leq (TVar.typ v) ty
+  | _ -> false
 
 (* Occurrences of the overload's type variables in its [val] line. *)
 let val_tvar_occs ctx overload r =
@@ -523,6 +596,7 @@ let lens_names (b : Main.inferred) =
     !names
 
 let add ctx envs (b : Main.inferred) =
+  ctx.sigs <- (b.var, b.sigs) :: ctx.sigs ;
   let display =
     if b.declared then
       Main.display_gty envs
@@ -597,6 +671,8 @@ let add ctx envs (b : Main.inferred) =
           | None -> ()
           | Some (c_start, c_end) ->
               mark (c_start, c_end) result ;
+              (* Every argument, written in the source or not. *)
+              let arg_types = List.map snd args in
               let args =
                 List.filter_map
                   (fun (p, ty) -> Option.map (fun r -> mark r ty ; (r, ty)) (range p))
@@ -615,6 +691,27 @@ let add ctx envs (b : Main.inferred) =
                 | Some (_, s) ->
                     Subst.bindings1 s |> List.map (fun (v, ty) -> (var_name v, display (GTy.mk ty)))
               in
+              (* An instance that only renames variables is left out: it
+                 specializes nothing. *)
+              let instances =
+                match callee with
+                | None -> []
+                | Some (v, _) -> (
+                    match List.find_opt (fun (v', _) -> Variable.equal v v') ctx.sigs with
+                    | None -> []
+                    | Some (_, sigs) ->
+                        List.mapi (fun k o -> (k, o)) sigs
+                        |> List.filter_map (fun (k, o) ->
+                          match call_instance o arg_types result with
+                          | Some inst when not (List.for_all (fun (_, ty) -> is_tvar ty) inst) ->
+                              Some
+                                ( k,
+                                  List.map
+                                    (fun (v, ty) -> (var_name v, display (GTy.mk ty) |> paren_tuple))
+                                    inst
+                                  |> List.sort compare )
+                          | _ -> None ) )
+              in
               calls :=
                 {
                   c_start;
@@ -624,6 +721,7 @@ let add ctx envs (b : Main.inferred) =
                   args = List.map (fun ((s, e), ty) -> (s, e, display ty)) args;
                   result = display result;
                   instance;
+                  instances;
                   group = group ctx callee_key (List.map snd args);
                 }
                 :: !calls ) ) ) ;
@@ -709,4 +807,7 @@ let add ctx envs (b : Main.inferred) =
       (* A node typed several times in one derivation gives identical calls. *)
       calls = List.rev_append (List.sort_uniq compare !calls) ctx.acc.calls;
       occs = [];
+      fixes = ctx.acc.fixes;
     }
+
+let add_fixes ctx fixes = ctx.acc <- {ctx.acc with fixes = fixes @ ctx.acc.fixes}

@@ -209,7 +209,25 @@ let shift_typings (t : Typings.t) shift =
                (move (o.v_start, o.v_end)) )
           t.occs
       in
-      ({hovers; defns; calls; occs}, !dropped)
+      (* A fix whose call or any of whose edits the edit touched is gone. *)
+      let fixes =
+        List.filter_map
+          (fun (f : Typings.fix) ->
+             match move (f.x_start, f.x_end) with
+             | None -> None
+             | Some (x_start, x_end) ->
+                 let edits =
+                   List.map
+                     (fun (s, e, text) -> Option.map (fun (s, e) -> (s, e, text)) (move (s, e)))
+                     f.edits
+                 in
+                 if List.mem None edits then
+                   None
+                 else
+                   Some {f with x_start; x_end; edits = List.filter_map Fun.id edits} )
+          t.fixes
+      in
+      ({hovers; defns; calls; occs; fixes}, !dropped)
 
 (* Apply one [TextDocumentContentChangeEvent]: update the buffer, shift the
    cached lenses through the edit, and log the edit for a pending typecheck.
@@ -381,6 +399,19 @@ let holes uri (range : Lsp.Types.Range.t) : (Lsp.Types.Range.t * string * string
         | _ -> None )
       |> List.sort_uniq (fun (a, _) (b, _) -> compare a b)
       |> List.map snd
+
+(* The fixes of the failing calls overlapping [range]: title and edits. *)
+let fixes uri (range : Lsp.Types.Range.t) : (string * (Lsp.Types.Range.t * string) list) list =
+  match find uri with
+  | None -> []
+  | Some e ->
+      let text_len = String.length e.text in
+      let lo = offset_of_position e.line_offsets text_len range.start in
+      let hi = offset_of_position e.line_offsets text_len range.end_ in
+      e.typings.fixes
+      |> List.filter (fun (f : Typings.fix) -> f.x_start <= hi && lo <= f.x_end)
+      |> List.map (fun (f : Typings.fix) ->
+        (f.title, List.map (fun (s, e', text) -> (lsp_range e (s, e'), text)) f.edits) )
 
 (* For the hover at [pos]: the parts of [val] lines its overload rows stand
    for, with the row's index. *)

@@ -467,7 +467,7 @@ let initialize_result_json () =
       ~codeActionKinds:
         [
           CodeActionKind.RefactorInline; CodeActionKind.RefactorRewrite;
-          CodeActionKind.RefactorExtract;
+          CodeActionKind.RefactorExtract; CodeActionKind.QuickFix;
         ]
       ()
   in
@@ -597,13 +597,25 @@ let where_actions uri (req_range : Lsp.Types.Range.t) =
                | _ -> [] )
             program )
 
+(* For a failing call in [req_range], the changes of the callee's [val]
+   lines the typecheck proposed ([Typecheck.app_fixes]). *)
+let call_fix_actions uri (req_range : Lsp.Types.Range.t) =
+  Doc.fixes uri req_range
+  |> List.map (fun (title, edits) ->
+    let edits =
+      List.map (fun (range, newText) -> Lsp.Types.TextEdit.create ~newText ~range) edits
+    in
+    Lsp.Types.CodeAction.create ~title ~kind:Lsp.Types.CodeActionKind.QuickFix
+      ~edit:(Lsp.Types.WorkspaceEdit.create ~changes:[(uri, edits)] ())
+      () )
+
 let code_actions_for uri (req_range : Lsp.Types.Range.t) =
   ( Doc.lenses_in_range uri req_range
   |> List.filter_map (fun (range, signature, indent) ->
     match signature with
     | None -> None
     | Some (name, tys) -> Some (inline_type_action uri range ~indent ~name ~tys) ) )
-  @ hole_actions uri req_range @ where_actions uri req_range
+  @ call_fix_actions uri req_range @ hole_actions uri req_range @ where_actions uri req_range
   |> List.map (fun a -> `CodeAction a)
 
 (* A toolkit request becomes an engine job. Its [text] is filled in from our

@@ -150,14 +150,127 @@ let add_message acc (sev, pos, title, descr, kind) =
   in
   diagnostic ~severity:(severity_of sev) ?tags ~range ~message () :: acc
 
-let add_result ?typings envs acc (out : Main.output) : result =
+(* Where the line holding byte [off] of [source] starts. *)
+let line_start source off =
+  match String.rindex_from_opt source (off - 1) '\n' with
+  | Some i -> i + 1
+  | None -> 0
+  | exception Invalid_argument _ -> 0
+
+(* For a call [f a] that fails, where [f] is a definition typed earlier
+   ([bindings]), changes of [f]'s [val] lines that may make the call
+   typecheck, written as drafts so the definition's check gives the result:
+   - add the overload [<type of a> -> _];
+   - widen the domain of an overload with [a]'s type: [<domain> | <type of a> -> _].
+   Nothing more is checked: whether the definition still typechecks against
+   them, and whether the call then does, shows once applied.
+   Only a failure of [f]'s first argument is handled, and only an argument
+   type without type variables.
+   A definition stops at its first failure, so a definition calling [f]
+   twice wrongly ([let g x = (f true, f "a")]) shows only the first call:
+   the second appears once the first is fixed. *)
+let app_fixes envs source bindings (err : Mlsem_lang.Error.t) : Typings.fix list =
+  let open Mlsem_types in
+  match (err.kind, err.expr) with
+  | UntypeableApp {arg; _}, App ((_, Var f), _) when TVOp.is_ground_typ arg -> (
+      let callee =
+        match (offsets_of_pos (Variable.get_location f), Variable.get_name f) with
+        | Some (s, e), Some name ->
+            List.find_opt
+              (fun (b : binding) -> b.name = name && b.def_start = s && b.def_end = e)
+              bindings
+        | _ -> None
+      in
+      match (offsets_of_pos (Eid.loc err.eid), callee) with
+      | Some (x_start, x_end), Some b -> (
+          (* Types as written, to build the drafts from: the argument's, and
+             each overload's domain. *)
+          let parse s =
+            match Type_refactor.strip (IO.parse_type_string s) with
+            | t -> Some t
+            | exception _ -> None
+          in
+          let rendered = Main.signature envs b.sigs in
+          let arg_expr = parse (Main.display_gty envs (GTy.mk arg)) in
+          let domain r =
+            match parse r with
+            | Some (TArrow (d, _)) -> Some d
+            | _ -> None
+          in
+          (* The draft [dom -> _]. *)
+          let draft dom = Type_refactor.checked_print (TArrow (dom, TVar (KInfer, "_hole"))) in
+          let val_line ty = "val " ^ b.name ^ " : " ^ ty in
+          let at_binder = line_start source b.def_start in
+          (* Add [decl] as a [val] line; a definition without [val] lines also
+             gets lines for its current type, which the new one would
+             otherwise replace. *)
+          let lines decls = String.concat "" (List.map (fun d -> val_line d ^ "\n") decls) in
+          let add decl =
+            [(at_binder, at_binder, lines ((if b.declared then [] else rendered) @ [decl]))]
+          in
+          (* Replace the [k]th overload by [decl]: its [val] line when each
+             overload is one line; else (a draft line can give several) all
+             the lines are rewritten, the first replaced and the others
+             deleted. *)
+          let replace k decl =
+            let decls = List.mapi (fun i r -> if i = k then decl else r) rendered in
+            let locs = List.sort compare b.sig_offsets in
+            if List.length locs = List.length rendered then
+              let s, e = List.nth locs k in
+              [(s, e, val_line decl)]
+            else
+              match
+                locs
+              with
+              | [] -> [(at_binder, at_binder, lines decls)]
+              | (s, e) :: rest ->
+                  let next_line e =
+                    match String.index_from_opt source e '\n' with
+                    | Some i -> i + 1
+                    | None -> String.length source
+                  in
+                  (s, e, String.concat "\n" (List.map val_line decls))
+                  :: List.map (fun (s, e) -> (line_start source s, next_line e, "")) rest
+          in
+          let fix title edits = {Typings.x_start; x_end; title; edits} in
+          match arg_expr with
+          | None -> []
+          | Some a ->
+              let added =
+                match draft a with
+                | Some d -> [fix ("Add overload: " ^ val_line d) (add d)]
+                | None -> []
+              in
+              (* Not for an overload whose domain has the argument already:
+                 the call fails for another reason. *)
+              let widened =
+                List.mapi
+                  (fun k (o, r) ->
+                     let dom = Arrow.domain (Signature.to_gty o |> GTy.ub) in
+                     if Ty.leq arg dom then
+                       None
+                     else
+                       Option.bind (domain r) (fun d ->
+                         Option.map
+                           (fun d -> fix ("Widen domain: " ^ val_line d) (replace k d))
+                           (draft (TCup (d, a))) ) )
+                  (List.combine b.sigs rendered)
+                |> List.filter_map Fun.id
+              in
+              added @ widened )
+      | _ -> [] )
+  | _ -> []
+
+let add_result ?typings ?(source = "") envs acc (out : Main.output) : result =
   ( match (out.res, typings) with
   | TSuccess (lst, _), Some ctx -> List.iter (Typings.add ctx envs) lst
+  | TFailure (_, _, _, _, _, Some err), Some ctx ->
+      Typings.add_fixes ctx (app_fixes envs source acc.bindings err)
   | _ -> () ) ;
   match out.res with
   (* Statements without bindings, e.g. the result of a [##] debug query. *)
   | TDone -> {acc with diagnostics = List.fold_left add_message acc.diagnostics out.msg}
-  | TFailure (v_opt, pos, msg, descr, _time) ->
+  | TFailure (v_opt, pos, msg, descr, _time, _) ->
       let def_pos =
         match v_opt with
         | Some v -> Variable.get_location v
@@ -263,7 +376,7 @@ let run (source : string) : result =
             List.fold_left
               (fun (env, acc) e ->
                  let env, res = treat_def env e in
-                 (env, add_result ~typings env acc res) )
+                 (env, add_result ~typings ~source env acc res) )
               (envs, acc) program
           in
           (* Keep the final environment so custom requests can render and
