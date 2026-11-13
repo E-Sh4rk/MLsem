@@ -296,6 +296,46 @@ let rec tyexpr_tvars (ty : TyExpr.t) =
 (* The type written in the [val] line at [r]. *)
 let sig_type ctx r = List.assoc_opt r ctx.src.sigs
 
+(* Located holes of a draft [val] line: its weak type variables, written [_]
+   (named [_holeN] by the parser) or ['_a]. *)
+let rec tyexpr_holes (ty : TyExpr.t) =
+  match ty with
+  | TLoc (loc, TVar (KInfer, name)) -> [(lex_range loc, name)]
+  | _ -> List.concat_map tyexpr_holes (tyexpr_children ty)
+
+(* What each hole of the [val] line at [r] became, as hovers: tallying the
+   line's type, holes included, against [overload], the type its definition
+   was given, in both directions. *)
+let hole_hovers ctx envs display overload r =
+  match Option.map tyexpr_holes (sig_type ctx r) with
+  | None
+  | Some [] ->
+      []
+  | Some holes -> (
+      let benv, _, _, _, _ = envs in
+      let draft, _ = Signature.build benv (Option.get (sig_type ctx r)) in
+      let d = Signature.to_gty draft |> GTy.ub in
+      let o = Signature.to_gty overload |> GTy.ub in
+      let weak = TVOp.vars d |> MVarSet.proj1 |> TVarSet.elements in
+      match TVOp.tally (TVOp.all_vars KNoInfer) [(d, o); (o, d)] with
+      | [] -> []
+      | s :: _ ->
+          List.filter_map
+            (fun ((h_start, h_end), name) ->
+               List.find_opt (fun v -> TVar.name v = name) weak
+               |> Option.map (fun v ->
+                 let shown = if String.starts_with ~prefix:"_hole" name then "_" else "'" ^ name in
+                 let value = Subst.apply s (TVar.typ v) |> GTy.mk |> display in
+                 (* A tuple is printed without parentheses. *)
+                 let value =
+                   if String.contains value ',' && value.[0] <> '(' then
+                     "(" ^ value ^ ")"
+                   else
+                     value
+                 in
+                 {h_start; h_end; body = Type (shown ^ " = " ^ value)} ) )
+            holes )
+
 (* Occurrences of the overload's type variables in its [val] line. *)
 let val_tvar_occs ctx overload r =
   let vars = Signature.to_gty overload |> GTy.fv |> MVarSet.proj1 |> TVarSet.elements in
@@ -508,6 +548,16 @@ let add ctx envs (b : Main.inferred) =
         occ ctx ~binder:true b.var (h_start, h_end) ;
         {h_start; h_end; body = Type (name ^ " : " ^ Main.display envs b.ty)} :: hovers
     | _ -> hovers
+  in
+  let hovers =
+    List.concat
+      (List.mapi
+         (fun i loc ->
+            match List.nth_opt b.sigs i with
+            | Some o -> hole_hovers ctx envs display o loc
+            | None -> [] )
+         sig_locs )
+    @ hovers
   in
   let tvar_occs =
     List.concat
