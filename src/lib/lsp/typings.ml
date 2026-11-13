@@ -331,7 +331,19 @@ let hole_hovers ctx envs display overload r =
                List.find_opt (fun v -> TVar.name v = name) weak
                |> Option.map (fun v ->
                  let shown = if String.starts_with ~prefix:"_hole" name then "_" else "'" ^ name in
-                 let value = Subst.apply s (TVar.typ v) |> GTy.mk |> display in
+                 (* The most general solution can leave weak variables, the
+                    holes' own among them, for parts that do not matter
+                    ([_hole := ('a & int) | (_hole \ int)] when the hole is
+                    intersected with [int]). Any choice for them is a
+                    solution: [empty] keeps the rest. *)
+                 let value = Subst.apply s (TVar.typ v) in
+                 let leftover =
+                   TVOp.vars value |> MVarSet.proj1 |> TVarSet.elements
+                   |> List.filter (TVar.has_kind KInfer)
+                   |> List.map (fun w -> (w, Ty.empty))
+                 in
+                 let value = Subst.apply (Subst.of_list1 leftover) value in
+                 let value = value |> GTy.mk |> display in
                  (* A tuple is printed without parentheses. *)
                  let value =
                    if String.contains value ',' && value.[0] <> '(' then
