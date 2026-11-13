@@ -44,9 +44,11 @@ let sigs_of_def varm senv env (kind,str) =
     end
 
 type derivation = { sig_index: int option ; env: Env.t ;
-                    expr: Mlsem_system.Ast.t ; annot: Mlsem_system.Annot.Annot.t }
+                    expr: Mlsem_system.Ast.t ; annot: Mlsem_system.Annot.Annot.t ;
+                    resolved: Signature.t }
 (** One checking pass of a definition: [sig_index] is the index of the [val]
-    declaration it was checked against, if any. *)
+    declaration it was checked against, if any, and [resolved] the type this
+    pass gave, as overloads: several when the body is overloaded. *)
 
 (* Type checking and inference *)
 
@@ -97,9 +99,10 @@ let type_check_with_sigs ?(drafts=[]) env (var,e,sigs,aty) =
   let tys = List.map (fun (ty,_,_,_) -> ty) results in
   let msg = List.map (fun (_,msg,_,_) -> msg) results in
   let visited = List.map (fun (_,_,visited,_) -> visited) results in
-  let derivations = List.combine es results |> List.mapi
-    (fun i (expr,(_,_,_,annot)) -> { sig_index=Some i ; env ; expr ; annot }) in
   List.iter (check_resolved ~allow_mono:false var env) tys ;
+  let derivations = List.combine es results |> List.mapi
+    (fun i (expr,(ty,_,_,annot)) ->
+      { sig_index=Some i ; env ; expr ; annot ; resolved=Signature.of_tyscheme ty }) in
   (* Each signature is inferred separately, but they all annotate the same [e]:
      a sub-expression is unreachable only if no signature reached it. *)
   let visited = Mlsem_system.Analyzer.Visited.union_many visited in
@@ -128,8 +131,10 @@ let type_check_recs pos env lst =
     check_resolved ~allow_mono:true var env ty ;
     (* The definitions are checked together: the first one carries the
        derivation of the whole group. *)
-    let derivations = if i = 0 then [{ sig_index=None ; env ; expr ; annot }] else [] in
-    (var, (ty, Signature.of_tyscheme ty, derivations))
+    let resolved = Signature.of_tyscheme ty in
+    let derivations =
+      if i = 0 then [{ sig_index=None ; env ; expr ; annot ; resolved }] else [] in
+    (var, (ty, resolved, derivations))
   ) lst, msg
 
 let poly_leq t1 t2 =

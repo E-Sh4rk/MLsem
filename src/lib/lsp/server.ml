@@ -661,6 +661,20 @@ let overload_color i = overload_colors.(i mod Array.length overload_colors)
 let hover_markdown : Typings.hover_body -> string = function
   | Type t -> code_block t
   | Hole {hole; value} -> code_block (hole ^ " = " ^ value)
+  | Hole_per_overload {hole; rows} ->
+      (* One row per overload, the overload as a comment, aligned. *)
+      let lefts =
+        List.map
+          (function
+            | _, Some v -> hole ^ " = " ^ v
+            | _, None -> hole ^ " : no value" )
+          rows
+      in
+      let width = List.fold_left (fun w s -> max w (String.length s)) 0 lefts in
+      List.map2
+        (fun l (o, _) -> l ^ String.make (width - String.length l + 2) ' ' ^ "(* " ^ o ^ " *)")
+        lefts rows
+      |> String.concat "\n" |> code_block
   | Overloads {rows; union} ->
       let cell = function
         | `Code s -> "<td>\n\n" ^ code_block s ^ "\n\n</td>"

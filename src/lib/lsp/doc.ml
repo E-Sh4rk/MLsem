@@ -150,7 +150,7 @@ let shift_typings (t : Typings.t) shift =
           (fun (h : Typings.hover) ->
              let body : Typings.hover_body =
                match h.body with
-               | (Type _ | Hole _) as b -> b
+               | (Type _ | Hole _ | Hole_per_overload _) as b -> b
                | Overloads o ->
                    (* A [val] line the edit touched loses its colour. *)
                    let row (r : Typings.overload_row) =

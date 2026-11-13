@@ -33,6 +33,12 @@ type hover_body =
       hole: string;
       value: string;
     }
+  (* A hole of a line whose check gave several overloads, which disagree on
+     it: per overload, its value ([None]: the line cannot be that overload). *)
+  | Hole_per_overload of {
+      hole: string;
+      rows: (string * string option) list;
+    }
   | Overloads of {
       rows: overload_row list;
       union: string;
@@ -309,14 +315,14 @@ let rec tyexpr_holes (ty : TyExpr.t) =
   | TLoc (loc, TVar (KInfer, name)) -> [(lex_range loc, name)]
   | _ -> List.concat_map tyexpr_holes (tyexpr_children ty)
 
-(* What each hole of the [val] line at [r] became, as hovers: tallying the
-   line's type, holes included, against [overload], the type its definition
-   was given, in both directions. *)
-let hole_hovers ctx envs display overload r =
+(* What each hole of the [val] line at [r] is for the line to be [overload]:
+   tallying the line's type, holes included, against it, in both directions.
+   [None] when nothing fits. *)
+let hole_values ctx envs display overload r =
   match Option.map tyexpr_holes (sig_type ctx r) with
   | None
   | Some [] ->
-      []
+      None
   | Some holes -> (
       let benv, _, _, _, _ = envs in
       let draft, _ = Signature.build benv (Option.get (sig_type ctx r)) in
@@ -334,7 +340,7 @@ let hole_hovers ctx envs display overload r =
         TVOp.vars d |> MVarSet.proj1 |> TVarSet.elements |> List.filter (TVar.has_kind KInfer)
       in
       match TVOp.tally (TVOp.all_vars KNoInfer) [(d, o); (o, d)] with
-      | [] -> []
+      | [] -> None
       | s :: _ ->
           (* The most general solution can leave weak variables, the holes'
              own among them ([_hole := ('a & int) | (_hole \ int)] when the
@@ -369,25 +375,64 @@ let hole_hovers ctx envs display overload r =
           (* Only shown if filling the holes gives back the resolved type. *)
           let filled = resolve d in
           if not (Ty.leq filled o && Ty.leq o filled) then
-            []
+            None
           else
-            List.filter_map
-              (fun ((h_start, h_end), name) ->
-                 List.find_opt (fun v -> TVar.name v = name) weak
-                 |> Option.map (fun v ->
-                   let shown =
-                     if String.starts_with ~prefix:"_hole" name then "_" else "'" ^ name
-                   in
-                   let value = resolve (TVar.typ v) |> GTy.mk |> display in
-                   (* A tuple is printed without parentheses. *)
-                   let value =
-                     if String.contains value ',' && value.[0] <> '(' then
-                       "(" ^ value ^ ")"
-                     else
-                       value
-                   in
-                   {h_start; h_end; body = Hole {hole = shown; value}} ) )
-              holes )
+            Some
+              (List.filter_map
+                 (fun (range, name) ->
+                    List.find_opt (fun v -> TVar.name v = name) weak
+                    |> Option.map (fun v ->
+                      let shown =
+                        if String.starts_with ~prefix:"_hole" name then "_" else "'" ^ name
+                      in
+                      let value = resolve (TVar.typ v) |> GTy.mk |> display in
+                      (* A tuple is printed without parentheses. *)
+                      let value =
+                        if String.contains value ',' && value.[0] <> '(' then
+                          "(" ^ value ^ ")"
+                        else
+                          value
+                      in
+                      (range, shown, value) ) )
+                 holes ) )
+
+(* What each hole of the [val] line at [r] became, as hovers. [overloads] is
+   the type the line's own check gave: several when the body is overloaded,
+   and then a hole has one value only if every overload gives it the same;
+   otherwise its hover lists the value for each overload, and it cannot be
+   filled. *)
+let hole_hovers ctx envs display overloads r =
+  let per = List.map (fun o -> (o, hole_values ctx envs display o r)) overloads in
+  match per with
+  | [(_, None)]
+  | [] ->
+      []
+  | [(_, Some values)] ->
+      List.map
+        (fun ((h_start, h_end), hole, value) -> {h_start; h_end; body = Hole {hole; value}})
+        values
+  | _ -> (
+      (* The holes, from whichever overload gave values. *)
+      match List.find_map snd per with
+      | None -> []
+      | Some holes ->
+          List.mapi
+            (fun i ((h_start, h_end), hole, _) ->
+               let value_in = Option.map (fun vs -> (fun (_, _, v) -> v) (List.nth vs i)) in
+               let values = List.map (fun (_, vs) -> value_in vs) per in
+               let body =
+                 match List.sort_uniq compare values with
+                 | [Some value] -> Hole {hole; value}
+                 | _ ->
+                     Hole_per_overload
+                       {
+                         hole;
+                         rows =
+                           List.map2 (fun (o, _) v -> (display (Signature.to_gty o), v)) per values;
+                       }
+               in
+               {h_start; h_end; body} )
+            holes )
 
 (* Occurrences of the overload's type variables in its [val] line. *)
 let val_tvar_occs ctx overload r =
@@ -602,23 +647,39 @@ let add ctx envs (b : Main.inferred) =
         {h_start; h_end; body = Type (name ^ " : " ^ Main.display envs b.ty)} :: hovers
     | _ -> hovers
   in
+  (* The overloads of the [i]th [val] line. A complete signature's overloads
+     are its lines. A draft's are what each line's check gave, which can be
+     several for one line (an overloaded body), so they are taken from that
+     line's derivation, not by position. *)
+  let draft =
+    List.exists
+      (fun loc ->
+         match sig_type ctx loc with
+         | Some ty -> tyexpr_holes ty <> []
+         | None -> false )
+      sig_locs
+  in
+  let line_overloads i =
+    if draft then
+      match
+        List.find_opt (fun (d : Main.derivation) -> d.sig_index = Some i) b.derivations
+      with
+      | Some d -> d.resolved
+      | None -> []
+    else
+      Option.to_list (List.nth_opt b.sigs i)
+  in
   let hovers =
     List.concat
-      (List.mapi
-         (fun i loc ->
-            match List.nth_opt b.sigs i with
-            | Some o -> hole_hovers ctx envs display o loc
-            | None -> [] )
-         sig_locs )
+      (List.mapi (fun i loc -> hole_hovers ctx envs display (line_overloads i) loc) sig_locs)
     @ hovers
   in
   let tvar_occs =
     List.concat
       (List.mapi
          (fun i loc ->
-            match List.nth_opt b.sigs i with
-            | Some o -> val_tvar_occs ctx o loc
-            | None -> [] )
+            List.concat_map (fun o -> val_tvar_occs ctx o loc) (line_overloads i)
+            |> List.sort_uniq compare )
          sig_locs )
   in
   ctx.acc <-
