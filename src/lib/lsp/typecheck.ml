@@ -101,6 +101,24 @@ let full_message title descr =
   | None -> title
   | Some d -> title ^ ":\n" ^ d
 
+(* The result of a [##] debug query (the only [Message]), on one line. The
+   printer puts each tally solution in brackets over several lines; they are
+   joined, with "or" between solutions. A tally without solution prints
+   nothing. *)
+let one_line_result title descr =
+  let lines =
+    Option.value descr ~default:"" |> String.split_on_char '\n' |> List.map String.trim
+    |> List.filter (( <> ) "")
+  in
+  let rec join prev = function
+    | [] -> []
+    | l :: ls when prev = "]" && String.starts_with ~prefix:"[" l -> "or" :: l :: join l ls
+    | l :: ls -> l :: join l ls
+  in
+  match lines with
+  | [] -> title ^ ": no solution"
+  | lines -> title ^ ": " ^ String.concat " " (join "" lines)
+
 let diagnostic ?(severity = LT.DiagnosticSeverity.Error) ?tags ~range ~message () =
   LT.Diagnostic.create ~message:(`String message) ~range ~severity ?tags ~source:"mlsem" ()
 
@@ -122,7 +140,15 @@ let add_message acc (sev, pos, title, descr, kind) =
     | None ->
         None
   in
-  diagnostic ~severity:(severity_of sev) ?tags ~range ~message:(full_message title descr) () :: acc
+  let message =
+    match (sev : Mlsem_system.Analyzer.severity) with
+    | Message -> one_line_result title descr
+    | Notice
+    | Warning
+    | Error ->
+        full_message title descr
+  in
+  diagnostic ~severity:(severity_of sev) ?tags ~range ~message () :: acc
 
 let add_result ?typings envs acc (out : Main.output) : result =
   ( match (out.res, typings) with
