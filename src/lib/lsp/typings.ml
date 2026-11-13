@@ -326,38 +326,58 @@ let hole_hovers ctx envs display overload r =
       match TVOp.tally (TVOp.all_vars KNoInfer) [(d, o); (o, d)] with
       | [] -> []
       | s :: _ ->
-          List.filter_map
-            (fun ((h_start, h_end), name) ->
-               List.find_opt (fun v -> TVar.name v = name) weak
-               |> Option.map (fun v ->
-                 let shown = if String.starts_with ~prefix:"_hole" name then "_" else "'" ^ name in
-                 (* The most general solution can leave weak variables, the
-                    holes' own among them, for parts that do not matter
-                    ([_hole := ('a & int) | (_hole \ int)] when the hole is
-                    intersected with [int]). Any choice for them is a
-                    solution. As when simplifying a signature, each is
-                    chosen by its polarity: [empty] where it only occurs
-                    positively, [any] where only negatively. One occurring
-                    both ways stays, and is then made [empty]. *)
-                 let value =
-                   Subst.apply s (TVar.typ v) |> TVOp.bot_instance (TVOp.all_vars KNoInfer)
-                 in
-                 let leftover =
-                   TVOp.vars value |> MVarSet.proj1 |> TVarSet.elements
-                   |> List.filter (TVar.has_kind KInfer)
-                   |> List.map (fun w -> (w, Ty.empty))
-                 in
-                 let value = Subst.apply (Subst.of_list1 leftover) value in
-                 let value = value |> GTy.mk |> display in
-                 (* A tuple is printed without parentheses. *)
-                 let value =
-                   if String.contains value ',' && value.[0] <> '(' then
-                     "(" ^ value ^ ")"
-                   else
-                     value
-                 in
-                 {h_start; h_end; body = Hole {hole = shown; value}} ) )
-            holes )
+          (* The most general solution can leave weak variables, the holes'
+             own among them ([_hole := ('a & int) | (_hole \ int)] when the
+             hole is intersected with [int]). Any choice for them is a
+             solution, but one choice for the whole line, so that the holes
+             agree:
+             - those in the line are chosen by their polarity in it, as when
+               simplifying a signature ([empty] where only positive, [any]
+               where only negative); one there both ways is a variable of the
+               signature, made a rigid one;
+             - those not in the line do not change it: [empty]. *)
+          let mono = TVOp.all_vars KNoInfer in
+          let weak_of t =
+            TVOp.vars t |> MVarSet.proj1 |> TVarSet.elements |> List.filter (TVar.has_kind KInfer)
+          in
+          let clean =
+            TVOp.clean_subst' ~pos1:Ty.empty ~neg1:Ty.any ~pos2:Row.empty ~neg2:Row.any mono
+              [Subst.apply s d]
+          in
+          let line = Subst.apply clean (Subst.apply s d) in
+          let rigid =
+            TVOp.refresh ~kind:KNoInfer (MVarSet.of_set1 (TVarSet.of_list (weak_of line)))
+          in
+          let resolve t = Subst.apply rigid (Subst.apply clean (Subst.apply s t)) in
+          let rest =
+            List.concat_map (fun v -> weak_of (resolve (TVar.typ v))) weak
+            |> List.sort_uniq TVar.compare
+            |> List.map (fun w -> (w, Ty.empty))
+            |> Subst.of_list1
+          in
+          let resolve t = Subst.apply rest (resolve t) in
+          (* Only shown if filling the holes gives back the resolved type. *)
+          let filled = resolve d in
+          if not (Ty.leq filled o && Ty.leq o filled) then
+            []
+          else
+            List.filter_map
+              (fun ((h_start, h_end), name) ->
+                 List.find_opt (fun v -> TVar.name v = name) weak
+                 |> Option.map (fun v ->
+                   let shown =
+                     if String.starts_with ~prefix:"_hole" name then "_" else "'" ^ name
+                   in
+                   let value = resolve (TVar.typ v) |> GTy.mk |> display in
+                   (* A tuple is printed without parentheses. *)
+                   let value =
+                     if String.contains value ',' && value.[0] <> '(' then
+                       "(" ^ value ^ ")"
+                     else
+                       value
+                   in
+                   {h_start; h_end; body = Hole {hole = shown; value}} ) )
+              holes )
 
 (* Occurrences of the overload's type variables in its [val] line. *)
 let val_tvar_occs ctx overload r =
