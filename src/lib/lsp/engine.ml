@@ -51,6 +51,7 @@ let tool_handlers =
     ("mlsem/definitionAt", Signature_check.definition_at); ("mlsem/holes", Signature_check.holes);
     ("mlsem/definitionStatus", Signature_check.definition_status);
     ("mlsem/checkSignature", Signature_check.check_signature);
+    ("mlsem/extractGroups", Extract_tool.groups); ("mlsem/extractApply", Extract_tool.apply);
   ]
 
 let is_tool method_ = List.mem_assoc method_ tool_handlers
