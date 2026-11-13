@@ -23,9 +23,7 @@ let is_arrow_sig ty = Ty.leq ty Arrow.any && not (Ty.is_empty ty)
    definition is typed. *)
 let is_draft overload = is_well_formed overload |> not
 
-let build benv ty =
-  let open Builder in
-  type_expr_to_typ ~allow_gradual:true benv ty
+let build benv ty = Builder.type_expr_to_typ ~allow_gradual:true benv ty
 
 let rec decompose ?(recursive=false) ty =
   if is_arrow_sig ty then
