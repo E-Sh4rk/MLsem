@@ -32,17 +32,20 @@ type lens = {
 }
 
 (* A named binding retained so that custom requests can re-render its
-   overloads and merge a chosen subset on demand: a typeable one, or a
-   declared one whose definition does not typecheck, with the overloads of
-   its [val] lines ([checked] false), which the tools that only rewrite
-   types can still work on. [sigs] is the raw overload list (the merge
-   input); rendering and merging need the final [envs] kept on [result].
+   overloads and merge a chosen subset on demand: a typeable one, a declared
+   one whose definition does not typecheck, or one of the declarations
+   alone ([declarations]); the last two with the overloads of their [val]
+   lines, which the tools that only rewrite types can work on. [checked]:
+   whether the definition typechecks, [None] when it was not checked.
+   [body]: whether there is a definition. [sigs] is the raw overload list
+   (the merge input); rendering and merging need the [envs] it comes with.
    Offsets are byte intervals, shifted through edits by
    [Store.apply_change] just like [lens] offsets. *)
 type binding = {
   name: string;
   declared: bool;
-  checked: bool;
+  checked: bool option;
+  body: bool;
   def_start: int;
   def_end: int;
   (* Source spans of any existing [val name : ...] declaration lines, used to
@@ -327,7 +330,8 @@ let add_result ?typings ?(source = "") envs acc (out : Main.output) : result =
                 {
                   name;
                   declared = true;
-                  checked = false;
+                  checked = Some false;
+                  body = true;
                   def_start;
                   def_end;
                   sig_offsets = List.filter_map offsets_of_pos locs;
@@ -383,7 +387,8 @@ let add_result ?typings ?(source = "") envs acc (out : Main.output) : result =
                      {
                        name;
                        declared = b.declared;
-                       checked = true;
+                       checked = Some true;
+                       body = true;
                        def_start;
                        def_end;
                        sig_offsets;
@@ -397,6 +402,65 @@ let add_result ?typings ?(source = "") envs acc (out : Main.output) : result =
 (* Counterpart to [web.ml]'s [typecheck]: runs the full pipeline on the
    source string. Returns a parse/internal error as a single diagnostic
    (with no lenses) or the accumulated per-binding results. *)
+(* The declarations of [source] alone: its type and [val] lines elaborated
+   in order, one that fails skipped, and a binding per name with [val]
+   lines, with their overloads. Its span is its definition's (the last
+   binding of that name), or its [val] lines' when it has none. No
+   definition is checked, so this is quick and cannot time out on them.
+   [None] when [source] does not parse. *)
+let declarations (source : string) : (Main.envs * binding list) option =
+  Config.restore_all () ;
+  match parse (`String source) with
+  | PFailure _ -> None
+  | PSuccess program ->
+      let envs = List.fold_left (fun envs e -> fst (treat_sig envs e)) initial_envs program in
+      let _, varm, senv, _, _ = envs in
+      let definitions =
+        List.concat_map
+          (fun (_, elem) ->
+             match (elem : PAst.element) with
+             | Definitions lst ->
+                 List.filter_map
+                   (fun (bpos, (_, lname), _) ->
+                      Option.map (fun span -> (Position.value lname, span)) (offsets_of_pos bpos) )
+                   lst
+             | _ -> [] )
+          program
+      in
+      let bindings =
+        NameMap.bindings varm
+        |> List.filter_map (fun (name, v) ->
+          match
+            (VarMap.find_opt v senv, List.filter_map offsets_of_pos (Variable.get_sig_locations v))
+          with
+          | Some sigs, (_ :: _ as sig_offsets) ->
+              let definition =
+                List.fold_left
+                  (fun acc (n, span) -> if n = name then Some span else acc)
+                  None definitions
+              in
+              let def_start, def_end =
+                match definition with
+                | Some span -> span
+                | None ->
+                    ( List.fold_left (fun m (s, _) -> min m s) max_int sig_offsets,
+                      List.fold_left (fun m (_, e) -> max m e) 0 sig_offsets )
+              in
+              Some
+                {
+                  name;
+                  declared = true;
+                  checked = None;
+                  body = Option.is_some definition;
+                  def_start;
+                  def_end;
+                  sig_offsets;
+                  sigs;
+                }
+          | _ -> None )
+      in
+      Some (envs, bindings)
+
 let run (source : string) : result =
   Config.restore_all () ;
   try
