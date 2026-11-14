@@ -70,13 +70,11 @@ let decode_instantiations params =
    webview also lets the user type any other type expression. *)
 let builtin_type_names = ["int"; "bool"; "string"; "float"; "char"; "list"; "any"; "empty"]
 
-(* Typecheck and cache the buffer so binding resolution below runs against
-   exactly the text the request's position/name refer to. The supervisor
-   fills in [text] from its copy of the document when the client omits it. *)
-let sync params uri =
-  match member "text" params with
-  | `String text -> Store.sync_text uri text
-  | _ -> ()
+(* The text the request's position or name refer to: bindings are resolved
+   against exactly it ([Store.binding_at], [Store.binding_by_name]). The
+   supervisor fills it in from its copy of the document when the client
+   omits it. *)
+let text_of params = params |> member "text" |> to_string
 
 let not_found =
   `Assoc
@@ -161,7 +159,7 @@ let instantiate_texts ?only envs (sigs : Signature.t) insts =
 (* The instances of the [k]th overload of [b] that its calls in the document
    fit, each with the calls (range and text), in order of first call. A call
    to [b] is one whose callee is named like [b] and bound inside its
-   definition. *)
+   definition. From the typecheck, which must have been synced. *)
 let call_instances uri (b : Typecheck.binding) k =
   let _, _, typings = Store.results uri in
   let calls =
@@ -206,25 +204,58 @@ let overloads params : Yojson.Safe.t =
   try
     let uri = decode_uri params in
     let pos = decode_position params in
-    sync params uri ;
-    match (Store.find_binding_at uri pos, Store.envs_of uri) with
-    | Some b, Some envs ->
+    let text = text_of params in
+    match Store.binding_at uri text pos with
+    | Some (b, envs) ->
         Config.restore_all () ;
         let texts = Main.signature envs b.sigs in
         let strs ss = `List (List.map (fun s -> `String s) ss) in
         let overload_vars = b.sigs |> List.map (fun o -> strs (Signature.overload_vars o)) in
         let concrete_types = builtin_type_names @ Main.user_type_names envs in
-        let instances = List.mapi (fun k _ -> `List (call_instances uri b k)) b.sigs in
+        (* From the typecheck: with its extras. From the declarations: they
+           come with [mlsem/overloadExtras]. *)
+        let extras =
+          match b.checked with
+          | None -> []
+          | Some checked ->
+              [
+                ("checked", `Bool checked);
+                ( "callInstances",
+                  `List (List.mapi (fun k _ -> `List (call_instances uri b k)) b.sigs) );
+              ]
+        in
         `Assoc
-          [
-            ("found", `Bool true); ("name", `String b.name); ("declared", `Bool b.declared);
-            ("checked", `Bool b.checked); ("overloads", strs texts);
-            ("overloadVars", `List overload_vars); ("concreteTypes", strs concrete_types);
-            ("callInstances", `List instances);
-          ]
+          ( [
+              ("found", `Bool true); ("name", `String b.name); ("declared", `Bool b.declared);
+              ("body", `Bool b.body); ("overloads", strs texts);
+              ("overloadVars", `List overload_vars); ("concreteTypes", strs concrete_types);
+            ]
+          @ extras )
     | _ -> not_found
   with
   | _ -> not_found
+
+(* mlsem/overloadExtras: what the overloads of the declared binding [name]
+   come with that needs the typecheck, typechecking [text] if it is not
+   cached: whether its definition typechecks ([null] without one), and per
+   overload the instances its calls use. Asked for after [mlsem/overloads],
+   so that the overloads do not wait for it. *)
+let overload_extras params : Yojson.Safe.t =
+  try
+    let uri = decode_uri params in
+    let name = decode_name params in
+    Store.sync_text uri (text_of params) ;
+    match Store.find_binding_by_name uri name with
+    | Some b ->
+        `Assoc
+          [
+            ("ok", `Bool true);
+            ("checked", Option.fold ~none:`Null ~some:(fun c -> `Bool c) b.checked);
+            ("callInstances", `List (List.mapi (fun k _ -> `List (call_instances uri b k)) b.sigs));
+          ]
+    | None -> `Assoc [("ok", `Bool true); ("checked", `Null); ("callInstances", `List [])]
+  with
+  | e -> error (Printexc.to_string e)
 
 (* mlsem/mergePreview: the merged type of the selected overloads as the
    one-line [val name : ...] the apply would write. *)
@@ -233,9 +264,8 @@ let merge_preview params : Yojson.Safe.t =
     let uri = decode_uri params in
     let name = decode_name params in
     let wanted = decode_overload_texts params in
-    sync params uri ;
-    match (Store.find_binding_by_name uri name, Store.envs_of uri) with
-    | Some b, Some envs -> (
+    match Store.binding_by_name uri (text_of params) name with
+    | Some (b, envs) -> (
         match merge_texts envs b.sigs wanted with
         | `Empty -> error "Select at least one overload."
         | `Stale -> stale
@@ -256,9 +286,8 @@ let generalize_preview params : Yojson.Safe.t =
     let uri = decode_uri params in
     let name = decode_name params in
     let wanted = decode_overload_texts params in
-    sync params uri ;
-    match (Store.find_binding_by_name uri name, Store.envs_of uri) with
-    | Some b, Some envs -> (
+    match Store.binding_by_name uri (text_of params) name with
+    | Some (b, envs) -> (
         Config.restore_all () ;
         let rendered = Main.signature envs b.sigs in
         if not (List.for_all (fun w -> List.mem w rendered) wanted) then
@@ -301,9 +330,9 @@ let apply_merge params : Yojson.Safe.t =
     let uri = decode_uri params in
     let name = decode_name params in
     let wanted = decode_overload_texts params in
-    sync params uri ;
-    match (Store.find_binding_by_name uri name, Store.envs_of uri) with
-    | Some b, Some envs -> (
+    let text = text_of params in
+    match Store.binding_by_name uri text name with
+    | Some (b, envs) -> (
         match merge_texts envs b.sigs wanted with
         | `Empty -> error "Select at least one overload."
         | `Stale -> stale
@@ -321,7 +350,7 @@ let apply_merge params : Yojson.Safe.t =
                   else
                     [merged]
             in
-            let edits = Store.signature_edit uri b ~name ~decls ~mode in
+            let edits = Store.signature_edit text b ~name ~decls ~mode in
             `Assoc
               [
                 ("ok", `Bool true); ("uri", Lsp.Types.DocumentUri.yojson_of_t uri);
@@ -348,9 +377,8 @@ let instantiate_preview params : Yojson.Safe.t =
     let uri = decode_uri params in
     let name = decode_name params in
     let insts = decode_instantiations params in
-    sync params uri ;
-    match (Store.find_binding_by_name uri name, Store.envs_of uri) with
-    | Some b, Some envs -> (
+    match Store.binding_by_name uri (text_of params) name with
+    | Some (b, envs) -> (
         match instantiate_texts envs b.sigs insts with
         | `Stale -> stale
         | `Ok overloads ->
@@ -373,13 +401,13 @@ let apply_instantiate params : Yojson.Safe.t =
     let name = decode_name params in
     let insts = decode_instantiations params in
     let only = decode_only params in
-    sync params uri ;
-    match (Store.find_binding_by_name uri name, Store.envs_of uri) with
-    | Some b, Some envs -> (
+    let text = text_of params in
+    match Store.binding_by_name uri text name with
+    | Some (b, envs) -> (
         match instantiate_texts ?only envs b.sigs insts with
         | `Stale -> stale
         | `Ok overloads ->
-            let edits = Store.signature_edit uri b ~name ~decls:overloads ~mode:(mode_of params) in
+            let edits = Store.signature_edit text b ~name ~decls:overloads ~mode:(mode_of params) in
             `Assoc
               [
                 ("ok", `Bool true); ("uri", Lsp.Types.DocumentUri.yojson_of_t uri);
