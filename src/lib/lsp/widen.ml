@@ -2,8 +2,7 @@
    types.
 
    For each [val] line of the definition at a position, every part of its
-   type (as the parser located it) that has a wider type than [any], with
-   its wider types. A wider type is written in place of the part,
+   type (as the parser located it), with its wider types and a hole. A wider type is written in place of the part,
    parentheses included, in parentheses when the printer puts it in them
    there.
 
@@ -13,7 +12,9 @@
      intervals to [int], ["a"] to [string], [true] to [bool], ['c'] to
      [char]);
    - each built-in and declared type;
-   - [any].
+   - [any];
+   then the hole [_], which Draft holes fills from the definition's body
+   (not wider: it can end up narrower than the part).
    Types are built in the environment of the document's typecheck, which
    has its declared types.
 
@@ -49,9 +50,9 @@ let widen_literals t =
   in
   go t
 
-(* The wider types of the located part [p], as written in its place;
-   [None] when it cannot be built on its own (an optional field [t?]) or
-   only [any] is wider. *)
+(* The wider types of the located part [p], as written in its place, and
+   the hole; [None] when it cannot be built on its own (an optional field
+   [t?]) or is a hole itself. *)
 let wider envs (p : Type_refactor.part) =
   let benv, _, _, _, _ = envs in
   let build t = Signature.build benv t |> fst |> Signature.to_gty |> GTy.ub in
@@ -86,13 +87,15 @@ let wider envs (p : Type_refactor.part) =
           let wider_than (_, t) = List.length (List.filter (fun (_, t') -> Ty.leq t t') wider) in
           let sorted = List.stable_sort (fun a b -> compare (wider_than b) (wider_than a)) wider in
           let written = Type_parts.written p in
-          match sorted with
+          let any = if Ty.leq Ty.any part_ty then [] else [(written (TBase TAny), None)] in
+          let hole =
+            match node with
+            | TVar (KInfer, _) -> []
+            | _ -> [("_", Some "hole")]
+          in
+          match List.map (fun (c, _) -> (written c, None)) sorted @ any @ hole with
           | [] -> None
-          | _ ->
-              let any = if Ty.leq Ty.any part_ty then [] else [written (TBase TAny)] in
-              Some
-                ( List.map (fun (c, _) -> (written c, None)) sorted
-                @ List.map (fun a -> (a, None)) any ) ) )
+          | os -> Some os ) )
 
 (* mlsem/widen: the [val] lines of the definition at [position] with their
    widenable parts and the wider types of each ([Type_parts.lines]). *)
