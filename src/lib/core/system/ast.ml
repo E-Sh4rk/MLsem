@@ -270,7 +270,10 @@ let coerce ?coercion_id ?(duplicate_arrows=false) c ty t =
   in
   let decompose ty =
     match Arrow.dnf ty with
-    | [arrs] -> arrs |> List.map (fun (a,b) -> Arrow.mk a b)
+    | [arrs] ->
+      let res = arrs |> List.map (fun (a,b) -> Arrow.mk a b) in
+      if Ty.leq (Ty.conj res) ty |> not then raise Exit ;
+      res
     | _ -> raise Exit
   in
   let decompose_gradual _ = (* not implemented *) raise Exit in
