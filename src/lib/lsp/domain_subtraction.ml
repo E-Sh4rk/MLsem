@@ -162,9 +162,8 @@ let subtract params : Yojson.Safe.t =
       | `Int d when d >= 1 -> d
       | _ -> 1
     in
-    Store.sync_text uri text ;
-    match (Store.find_binding_by_name uri name, Store.envs_of uri, Main.parse (`String text)) with
-    | Some b, Some envs, PSuccess program -> (
+    match (Store.binding_by_name uri text name, Main.parse (`String text)) with
+    | Some (b, envs), PSuccess program -> (
         Config.restore_all () ;
         let rendered = Main.signature envs b.sigs in
         let locs = List.sort compare b.sig_offsets in

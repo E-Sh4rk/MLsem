@@ -24,11 +24,13 @@ let lines params options : Yojson.Safe.t =
     let uri =
       (params |> member "textDocument" |> Lsp.Types.TextDocumentIdentifier.t_of_yojson).uri
     in
-    Store.sync_text uri text ;
-    match (Store.envs_of uri, Main.parse (`String text)) with
-    | None, _ -> error "The document's typecheck failed: its types are not known."
-    | _, PFailure _ -> error "The file does not parse."
-    | Some envs, PSuccess program ->
+    (* Only the types matter: the declarations' environment, without
+       typechecking the definitions. *)
+    match (Store.declarations uri text, Main.parse (`String text)) with
+    | None, _
+    | _, PFailure _ ->
+        error "The file does not parse."
+    | Some (envs, _), PSuccess program ->
         let in_vals s = List.exists (fun (vs, ve) -> vs <= s && s < ve) t.vals in
         let lines =
           List.filter_map

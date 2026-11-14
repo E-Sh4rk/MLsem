@@ -76,34 +76,35 @@ let span uri (s, e) =
 let envs_of uri : Mlsem_app.Main.envs option =
   Option.bind (Hashtbl.find_opt entries uri) (fun e -> e.result.envs)
 
-(* The cached binding whose definition or [val] declaration span contains
-   [pos], tightest span first when several nest. Used to resolve the binding
-   under the cursor for the custom merge requests — so the merge view opens
-   from either the [let] binder or any of its [val] declaration lines. *)
+(* Of [bindings] of [text], the one whose definition or [val] declaration
+   span contains [pos], tightest span first when several nest — so the
+   merge view opens from either the [let] binder or any of its [val]
+   declaration lines. *)
+let pick_at text (bindings : Typecheck.binding list) (pos : Lsp.Types.Position.t) =
+  let off = Doc.offset_of_position (Doc.compute_line_offsets text) (String.length text) pos in
+  (* Width of the tightest of the binding's spans (definition + each [val]
+     declaration) that contains [off], or [None] if [off] is in none. *)
+  let containing_width (b : Typecheck.binding) : int option =
+    (b.def_start, b.def_end) :: b.sig_offsets
+    |> List.filter_map (fun (s, en) -> if s <= off && off <= en then Some (en - s) else None)
+    |> function
+    | [] -> None
+    | ws -> Some (List.fold_left min max_int ws)
+  in
+  List.fold_left
+    (fun best (b : Typecheck.binding) ->
+       match containing_width b with
+       | None -> best
+       | Some w -> (
+           match best with
+           | Some (_, bw) when bw <= w -> best
+           | _ -> Some (b, w) ) )
+    None bindings
+  |> Option.map fst
+
+(* The cached binding under the cursor ([pick_at]). *)
 let find_binding_at uri (pos : Lsp.Types.Position.t) : Typecheck.binding option =
-  match Hashtbl.find_opt entries uri with
-  | None -> None
-  | Some e ->
-      let off = Doc.offset_of_position e.line_offsets (String.length e.text) pos in
-      (* Width of the tightest of the binding's spans (definition + each [val]
-         declaration) that contains [off], or [None] if [off] is in none. *)
-      let containing_width (b : Typecheck.binding) : int option =
-        (b.def_start, b.def_end) :: b.sig_offsets
-        |> List.filter_map (fun (s, en) -> if s <= off && off <= en then Some (en - s) else None)
-        |> function
-        | [] -> None
-        | ws -> Some (List.fold_left min max_int ws)
-      in
-      List.fold_left
-        (fun best (b : Typecheck.binding) ->
-           match containing_width b with
-           | None -> best
-           | Some w -> (
-               match best with
-               | Some (_, bw) when bw <= w -> best
-               | _ -> Some (b, w) ) )
-        None e.result.bindings
-      |> Option.map fst
+  Option.bind (Hashtbl.find_opt entries uri) (fun e -> pick_at e.text e.result.bindings pos)
 
 (* The cached binding with the given [name]. Binding names are unique at top
    level, so this disambiguates members of a [let .. and ..] group that share
@@ -113,6 +114,46 @@ let find_binding_by_name uri name : Typecheck.binding option =
   match Hashtbl.find_opt entries uri with
   | None -> None
   | Some e -> List.find_opt (fun (b : Typecheck.binding) -> b.name = name) e.result.bindings
+
+(* Per document, the declarations of a text ([Typecheck.declarations]). *)
+let declarations_cache :
+  (Uri.t, Digest.t * (Mlsem_app.Main.envs * Typecheck.binding list) option) Hashtbl.t
+  =
+  Hashtbl.create 16
+
+let declarations uri text =
+  let digest = Digest.string text in
+  match Hashtbl.find_opt declarations_cache uri with
+  | Some (d, r) when Digest.equal d digest -> r
+  | _ ->
+      let r = Typecheck.declarations text in
+      Hashtbl.replace declarations_cache uri (digest, r) ;
+      r
+
+(* The binding of [text] that [select] picks among bindings, and the envs to
+   render it in. A declared one with complete [val] lines comes from the
+   declarations, without typechecking [text]: the tools that only rewrite
+   types then work whatever the definitions do, and whether there is one;
+   its [checked] is [None]. Any other (inferred, or with a draft [val] line,
+   whose overloads its definition gives) comes from the typecheck. *)
+let lookup uri text select =
+  let declared =
+    Option.bind (declarations uri text) (fun (envs, bs) ->
+      Option.bind (select text bs) (fun (b : Typecheck.binding) ->
+        if List.exists Mlsem_app.Signature.is_draft b.sigs then None else Some (b, envs) ) )
+  in
+  match declared with
+  | Some _ -> declared
+  | None ->
+      sync_text uri text ;
+      Option.bind
+        (select text (bindings uri))
+        (fun b -> Option.map (fun envs -> (b, envs)) (envs_of uri))
+
+let binding_by_name uri text name =
+  lookup uri text (fun _ bs -> List.find_opt (fun (b : Typecheck.binding) -> b.name = name) bs)
+
+let binding_at uri text pos = lookup uri text (fun text bs -> pick_at text bs pos)
 
 (* The edit(s) that write [decls] as the [val name : ...] declaration line(s)
    of [b], one [val] line per element.
@@ -126,12 +167,12 @@ let find_binding_by_name uri name : Typecheck.binding option =
    [mode = `Insert]: never touch existing declarations; always emit the new
    [val] line(s) just above the binder. Existing declarations sit above the
    binder too, so the new ones join the group rather than replacing it. *)
-let signature_edit ?(mode = `Replace) uri (b : Typecheck.binding) ~name ~decls :
+let signature_edit ?(mode = `Replace) text (b : Typecheck.binding) ~name ~decls :
   (Lsp.Types.Range.t * string) list
   =
-  let e = Hashtbl.find entries uri in
-  let position_of_offset = Doc.position_of_offset e.line_offsets in
-  let indent_at = Doc.indent_at e.text e.line_offsets in
+  let line_offsets = Doc.compute_line_offsets text in
+  let position_of_offset = Doc.position_of_offset line_offsets in
+  let indent_at = Doc.indent_at text line_offsets in
   let lines indent =
     decls |> List.map (fun d -> "val " ^ name ^ " : " ^ d) |> String.concat ("\n" ^ indent)
   in
@@ -156,7 +197,7 @@ let signature_edit ?(mode = `Replace) uri (b : Typecheck.binding) ~name ~decls :
       in
       (* Delete each remaining declaration as a whole line (up to the start of
          the next line), leaving anything in between untouched. *)
-      let last_line = Array.length e.line_offsets - 1 in
+      let last_line = Array.length line_offsets - 1 in
       let deletions =
         List.map
           (fun (s, _) ->
@@ -167,7 +208,7 @@ let signature_edit ?(mode = `Replace) uri (b : Typecheck.binding) ~name ~decls :
                 range stays valid. *)
              let line_end =
                if p.line >= last_line then
-                 position_of_offset (String.length e.text)
+                 position_of_offset (String.length text)
                else
                  Lsp.Types.Position.create ~line:(p.line + 1) ~character:0
              in

@@ -43,8 +43,8 @@ type reply =
 (* The toolkit requests the engine serves. *)
 let tool_handlers =
   [
-    ("mlsem/overloads", Handlers.overloads); ("mlsem/mergePreview", Handlers.merge_preview);
-    ("mlsem/applyMerge", Handlers.apply_merge);
+    ("mlsem/overloads", Handlers.overloads); ("mlsem/overloadExtras", Handlers.overload_extras);
+    ("mlsem/mergePreview", Handlers.merge_preview); ("mlsem/applyMerge", Handlers.apply_merge);
     ("mlsem/generalizePreview", Handlers.generalize_preview);
     ("mlsem/instantiatePreview", Handlers.instantiate_preview);
     ("mlsem/applyInstantiate", Handlers.apply_instantiate);

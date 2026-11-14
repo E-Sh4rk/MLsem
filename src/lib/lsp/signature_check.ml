@@ -31,6 +31,9 @@ type target = {
   stop: int;  (** end of the definition *)
   vals: (int * int) list;  (** the existing [val] lines of [name], as whole lines, in order *)
   later_decls: string;  (** the [val] and type declarations after the definition, as whole lines *)
+  body: bool;
+    (** whether there is a definition; without one, the target is the [val]
+          lines, which [line_start] and [stop] span *)
 }
 
 let span pos =
@@ -56,7 +59,8 @@ let line_end text off =
    [val] line containing it declares (the next definition of that name). In a
    [let ... and ...] group, the member whose binding contains [off], or the
    first one. The [val] lines of its name are those written since the last
-   definition of that name. *)
+   definition of that name. A [val] line with no definition after it is a
+   target too, without a body: its [val] lines are all those of its name. *)
 let find_target text (program : PAst.program) off =
   let contains pos =
     match span pos with
@@ -92,8 +96,50 @@ let find_target text (program : PAst.program) off =
             next (el :: before) rest
         | _ -> locate (el :: before) rest )
   in
+  (* Without a definition: the [val] lines of [name]. *)
+  let vals_only name =
+    let vals =
+      List.filter_map
+        (fun (annot, elem) ->
+           match elem with
+           | PAst.SigDef (n, _, _) when n = name ->
+               Option.map
+                 (fun (s, e) -> (line_start text s, line_end text e))
+                 (span (Position.position annot))
+           | _ -> None )
+        program
+    in
+    match vals with
+    | [] -> None
+    | (s, _) :: _ ->
+        let e = List.fold_left (fun m (_, e) -> max m e) s vals in
+        Some {name; line_start = s; stop = e; vals; later_decls = ""; body = false}
+  in
+  let bodyless =
+    let rec find = function
+      | [] -> None
+      | (annot, PAst.SigDef (name, _, _)) :: _ when contains (Position.position annot) -> Some name
+      | _ :: rest -> find rest
+    in
+    find program
+  in
   match locate [] program with
-  | None -> None
+  | None ->
+      Option.bind bodyless (fun name ->
+        (* A [val] line whose name has no definition after it. *)
+        if
+          List.exists
+            (fun (annot, elem) ->
+               binds name elem
+               &&
+               match span (Position.position annot) with
+               | Some (s, _) -> s > off
+               | None -> false )
+            program
+        then
+          None
+        else
+          vals_only name )
   | Some (name, before, annot, rest) -> (
       match span (Position.position annot) with
       | None -> None
@@ -123,7 +169,15 @@ let find_target text (program : PAst.program) off =
               | _ -> None )
             |> String.concat ""
           in
-          Some {name; line_start = line_start text s; stop = e; vals = List.rev vals; later_decls} )
+          Some
+            {
+              name;
+              line_start = line_start text s;
+              stop = e;
+              vals = List.rev vals;
+              later_decls;
+              body = true;
+            } )
 
 let without_spans text spans ~from ~until =
   let b = Buffer.create (until - from) in
@@ -225,7 +279,7 @@ let definition_at params : Yojson.Safe.t =
   with_target params (fun text _ t ->
     `Assoc
       [
-        ("ok", `Bool true); ("name", `String t.name);
+        ("ok", `Bool true); ("name", `String t.name); ("body", `Bool t.body);
         ("definition", `String (String.sub text t.line_start (t.stop - t.line_start)));
         ("line", `Int (Doc.position_of_offset (Doc.compute_line_offsets text) t.line_start).line);
       ] )
@@ -267,89 +321,98 @@ let errors_in text (diagnostics : Lsp.Types.Diagnostic.t list) ~first_line ~last
    - [unknown]: neither, e.g. when the declarations of the file failed. *)
 let definition_status params : Yojson.Safe.t =
   with_target params (fun text offsets t ->
-    let uri =
-      (params |> member "textDocument" |> Lsp.Types.TextDocumentIdentifier.t_of_yojson).uri
-    in
-    let status fields = `Assoc (("ok", `Bool true) :: fields) in
-    match Store.try_sync uri text with
-    | Error message -> status [("status", `String "failed"); ("message", `String message)]
-    | Ok () -> (
-        let binding =
-          Store.bindings uri
-          |> List.find_opt (fun (b : Typecheck.binding) ->
-            b.name = t.name && t.line_start <= b.def_start && b.def_start <= t.stop )
-        in
-        match (binding, Store.envs_of uri) with
-        | Some b, Some envs ->
-            Config.restore_all () ;
-            status
-              [
-                ("status", `String "typed"); ("declared", `Bool b.declared);
-                ("types", `List (List.map (fun s -> `String s) (Main.signature envs b.sigs)));
-              ]
-        | _ -> (
-            let line off = (Doc.position_of_offset offsets off).line in
-            let from =
-              match t.vals with
-              | (s, _) :: _ -> s
-              | [] -> t.line_start
-            in
-            let _, diagnostics, _ = Store.results uri in
-            match
-              errors_in text diagnostics ~first_line:(line from) ~last_line:(line t.stop + 1)
-            with
-            | [] -> status [("status", `String "unknown")]
-            | errors -> status [("status", `String "errors"); ("errors", `List errors)] ) ) )
+    if not t.body then
+      error "No definition here, only val lines."
+    else
+      let uri =
+        (params |> member "textDocument" |> Lsp.Types.TextDocumentIdentifier.t_of_yojson).uri
+      in
+      let status fields = `Assoc (("ok", `Bool true) :: fields) in
+      match Store.try_sync uri text with
+      | Error message -> status [("status", `String "failed"); ("message", `String message)]
+      | Ok () -> (
+          (* A binding whose definition typechecks: a declared one that does
+           not has a binding too, with the overloads of its [val] lines. *)
+          let binding =
+            Store.bindings uri
+            |> List.find_opt (fun (b : Typecheck.binding) ->
+              b.name = t.name && b.checked = Some true && t.line_start <= b.def_start
+              && b.def_start <= t.stop )
+          in
+          match (binding, Store.envs_of uri) with
+          | Some b, Some envs ->
+              Config.restore_all () ;
+              status
+                [
+                  ("status", `String "typed"); ("declared", `Bool b.declared);
+                  ("types", `List (List.map (fun s -> `String s) (Main.signature envs b.sigs)));
+                ]
+          | _ -> (
+              let line off = (Doc.position_of_offset offsets off).line in
+              let from =
+                match t.vals with
+                | (s, _) :: _ -> s
+                | [] -> t.line_start
+              in
+              let _, diagnostics, _ = Store.results uri in
+              match
+                errors_in text diagnostics ~first_line:(line from) ~last_line:(line t.stop + 1)
+              with
+              | [] -> status [("status", `String "unknown")]
+              | errors -> status [("status", `String "errors"); ("errors", `List errors)] ) ) )
 
 (* mlsem/checkSignature *)
 let check_signature params : Yojson.Safe.t =
   with_target params (fun text offsets t ->
-    let indent = Doc.indent_at text offsets t.line_start in
-    let decls =
-      params |> member "types" |> to_list |> List.map to_string
-      |> List.map (fun ty -> indent ^ "val " ^ t.name ^ " : " ^ String.trim ty ^ "\n")
-      |> String.concat ""
-    in
-    (* The first line the edit touches: the first [val] line, or the
-       definition. *)
-    let from =
-      match t.vals with
-      | (s, _) :: _ -> s
-      | [] -> t.line_start
-    in
-    let kept = without_spans text t.vals ~from ~until:t.line_start in
-    let prefix = String.sub text 0 from ^ kept in
-    let lines s = List.length (String.split_on_char '\n' s) - 1 in
-    let checked = prefix ^ decls ^ String.sub text t.line_start (t.stop - t.line_start) ^ "\n" in
-    let candidate = checked ^ t.later_decls in
-    (* Errors from the [val] lines to the end of the definition. *)
-    let first_line = lines prefix and last_line = lines checked in
-    let result = Typecheck.run candidate in
-    let errors = errors_in candidate result.diagnostics ~first_line ~last_line in
-    let declared =
-      List.exists
-        (fun (b : Typecheck.binding) ->
-           b.name = t.name && b.declared && b.def_start >= String.length prefix )
-        result.bindings
-    in
-    let range =
-      Lsp.Types.Range.create
-        ~start:(Doc.position_of_offset offsets from)
-        ~end_:(Doc.position_of_offset offsets t.line_start)
-    in
-    let edit =
-      ( "edit",
-        `Assoc [("range", Lsp.Types.Range.yojson_of_t range); ("newText", `String (kept ^ decls))]
-      )
-    in
-    if errors = [] && declared then
-      `Assoc [("ok", `Bool true); edit]
+    if not t.body then
+      error "No definition here, only val lines."
     else
-      let errors =
-        if errors = [] then
-          [`String "The definition does not check against these types."]
-        else
-          errors
+      let indent = Doc.indent_at text offsets t.line_start in
+      let decls =
+        params |> member "types" |> to_list |> List.map to_string
+        |> List.map (fun ty -> indent ^ "val " ^ t.name ^ " : " ^ String.trim ty ^ "\n")
+        |> String.concat ""
       in
-      (* The edit too, for a client that writes the types anyway. *)
-      `Assoc [("ok", `Bool false); ("errors", `List errors); edit] )
+      (* The first line the edit touches: the first [val] line, or the
+       definition. *)
+      let from =
+        match t.vals with
+        | (s, _) :: _ -> s
+        | [] -> t.line_start
+      in
+      let kept = without_spans text t.vals ~from ~until:t.line_start in
+      let prefix = String.sub text 0 from ^ kept in
+      let lines s = List.length (String.split_on_char '\n' s) - 1 in
+      let checked = prefix ^ decls ^ String.sub text t.line_start (t.stop - t.line_start) ^ "\n" in
+      let candidate = checked ^ t.later_decls in
+      (* Errors from the [val] lines to the end of the definition. *)
+      let first_line = lines prefix and last_line = lines checked in
+      let result = Typecheck.run candidate in
+      let errors = errors_in candidate result.diagnostics ~first_line ~last_line in
+      let declared =
+        List.exists
+          (fun (b : Typecheck.binding) ->
+             b.name = t.name && b.declared && b.def_start >= String.length prefix )
+          result.bindings
+      in
+      let range =
+        Lsp.Types.Range.create
+          ~start:(Doc.position_of_offset offsets from)
+          ~end_:(Doc.position_of_offset offsets t.line_start)
+      in
+      let edit =
+        ( "edit",
+          `Assoc [("range", Lsp.Types.Range.yojson_of_t range); ("newText", `String (kept ^ decls))]
+        )
+      in
+      if errors = [] && declared then
+        `Assoc [("ok", `Bool true); edit]
+      else
+        let errors =
+          if errors = [] then
+            [`String "The definition does not check against these types."]
+          else
+            errors
+        in
+        (* The edit too, for a client that writes the types anyway. *)
+        `Assoc [("ok", `Bool false); ("errors", `List errors); edit] )
