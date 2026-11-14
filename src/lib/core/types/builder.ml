@@ -314,7 +314,9 @@ module Builder = struct
         in
         let res = derecurse_types defs in
         let tys =
-            try Sstt.Ty.of_eqs !eqs |> VarMap.of_list
+            try
+                let vars, tys = Sstt.Ty.of_eqs !eqs |> List.split in
+                List.combine vars (Sstt.Ty.factorize_many tys) |> VarMap.of_list
             with Invalid_argument str -> raise (TypeDefinitionError str)
         in
         let res = res |> List.map (fun (n,p,node) -> n,p,VarMap.find node tys) in
