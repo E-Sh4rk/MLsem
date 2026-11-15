@@ -354,7 +354,7 @@ let add_result ?typings ?(source = "") envs acc (out : Main.output) : result =
                     genuinely-named bindings that lack a user-written
                     declaration. *)
                  let signature =
-                   if b.declared || name = "" || name = "_" then
+                   if Typings.declared b || name = "" || name = "_" then
                      None
                    else
                      Some (name, Main.signature envs b.sigs)
@@ -386,7 +386,7 @@ let add_result ?typings ?(source = "") envs acc (out : Main.output) : result =
                      in
                      {
                        name;
-                       declared = b.declared;
+                       declared = Typings.declared b;
                        checked = Some true;
                        body = true;
                        def_start;
