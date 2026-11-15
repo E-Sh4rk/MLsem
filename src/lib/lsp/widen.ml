@@ -54,8 +54,7 @@ let widen_literals t =
    the hole; [None] when it cannot be built on its own (an optional field
    [t?]) or is a hole itself. *)
 let wider envs (p : Type_refactor.part) =
-  let benv, _, _, _, _ = envs in
-  let build t = Signature.build benv t |> fst |> Signature.to_gty |> GTy.ub in
+  let build t = Typings.build_signature envs t |> fst |> Signature.to_gty |> GTy.ub in
   match p.node with
   | TOption _ -> None
   | _ -> (

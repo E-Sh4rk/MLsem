@@ -301,8 +301,7 @@ let generalize_preview params : Yojson.Safe.t =
           | _ -> (
               let selected = List.map snd pairs in
               let g = Generalize.generalize (List.map IO.parse_type_string selected) in
-              let benv, _, _, _, _ = envs in
-              let overload, _ = Signature.build benv g.ty in
+              let overload, _ = Typings.build_signature envs g.ty in
               let ty_of o = Signature.to_gty o |> Mlsem_types.GTy.ub in
               let precision =
                 Generalize.compare_with_overloads ~copies:(List.length pairs)
