@@ -503,17 +503,18 @@ let draft_solutions ctx envs display ty locs =
      - then a set of solutions that together imply each dropped one
        ([~bool -> int] is implied by [int -> int] and
        [~(int | bool) -> 42]), none implied by the others of the set. It is
-       grown from the solutions with the narrowest domain to those with the
-       widest, a solution added only if the set does not already imply it,
-       so that the precise overloads come first ([int -> int] before
-       [int | 'a -> int | 'a]); then, from the last added, one implied by
-       the rest of the set is dropped. Checking against the set only, not
-       against all the others, keeps each check small: a tally with many
-       arrows does not end in time. A filled line is polymorphic, so the
-       set's lines may be instantiated ([int | 'a -> int | 'a] implies
-       [int -> int]): a tally, after a plain subtyping check. The first pass
-       must come before it: tallying the junk of mixed solutions (recursive
-       types) does not end in time.
+       grown from the least general solutions to the most general (by how
+       many solutions each alone strictly implies), a solution added only if
+       the set does not already imply it, so that the precise overloads come
+       first ([int -> int] before [int | 'a -> int | 'a], which implies it),
+       wherever the holes sit in the lines; then, from the last added, one
+       implied by the rest of the set is dropped. Checking against one
+       solution, or the set only, not against all the others, keeps each
+       check small: a tally with many arrows does not end in time. A filled
+       line is polymorphic, so the implying lines may be instantiated
+       ([int | 'a -> int | 'a] implies [int -> int]): a tally, after a plain
+       subtyping check. The first pass must come before it: tallying the junk
+       of mixed solutions (recursive types) does not end in time.
      The kept solutions are in tally's order. *)
   |> fun sols ->
   let conj (_, _, f) = Ty.conj f in
@@ -551,21 +552,14 @@ let draft_solutions ctx envs display ty locs =
     && ( Ty.leq (Ty.conj others) f
        || TVOp.tally (TVOp.all_vars KNoInfer) [(Ty.conj (List.map instance others), f)] <> [] )
   in
-  (* The domain of a solution's filled lines, [any] if they are not a
-     function. *)
-  let dom =
-    Array.init n (fun i ->
-      let t = Ty.conj (filled i) in
-      if Ty.leq t Arrow.any then Arrow.domain t else Ty.any )
-  in
-  (* Narrowest first: by how many domains are strictly below it. *)
-  let narrower i =
-    List.init n Fun.id
-    |> List.filter (fun j -> Ty.leq dom.(j) dom.(i) && not (Ty.leq dom.(i) dom.(j)))
-    |> List.length
+  (* Whether solution [i] alone implies solution [j]. *)
+  let alone = Array.init n (fun i -> Array.init n (fun j -> i = j || implies [i] j)) in
+  (* Least general first: by how many solutions it alone strictly implies. *)
+  let more_general i =
+    List.init n Fun.id |> List.filter (fun j -> alone.(i).(j) && not alone.(j).(i)) |> List.length
   in
   let order =
-    List.init n (fun i -> (narrower i, i))
+    List.init n (fun i -> (more_general i, i))
     |> List.stable_sort (fun (a, _) (b, _) -> compare a b)
     |> List.map snd
   in
