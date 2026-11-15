@@ -345,48 +345,65 @@ let paren_tuple value =
   if String.contains value ',' && value.[0] <> '(' then "(" ^ value ^ ")" else value
 
 (* The holes of a draft's [val] lines (at [locs]), solved from the
-   definition's type [ty].
+   definition's type scheme [ty].
 
-   The lines share their holes, and the definition has every line's type
-   with the holes filled: [ty ≤ L₁ & … & Lₙ] is tallied, solving for the
-   holes. Tally gives the most general solutions, possibly several: a hole in
-   a domain can have values that each give a part of [ty] ([h -> h] for
-   [(int -> int) & (bool -> bool)]: [int], and [bool]). MLsem itself may have
-   instantiated the holes several ways and intersected the results, so its
-   solving is not read back: a solution here need not be one of its.
+   The definition has every line's type with the holes filled, so each line
+   [Lᵢ] is above an instance of [ty]: [ty₁ ≤ L₁, …, tyₙ ≤ Lₙ] is tallied,
+   each [tyᵢ] a copy of [ty] whose variables are solved for, the holes
+   shared by the lines, and the lines' type variables fixed (a line's ['a]
+   is any type; ['a] in two lines is two variables, as in MLsem). Tally
+   gives the most general solutions, possibly several: a hole in a domain
+   can have values that each give a part of [ty] ([h -> h] for
+   [(int -> int) & (bool -> bool)]: [int], and [bool]). MLsem itself may
+   have instantiated the holes several ways and intersected the results, so
+   its solving is not read back: a solution here need not be one of its.
 
    Per solution: each hole as [(range, shown, value, line index)], and each
    line filled with it. *)
 let draft_solutions ctx envs display ty locs =
   let benv, _, _, _, _ = envs in
+  let weak_of t =
+    TVOp.vars t |> MVarSet.proj1 |> TVarSet.elements |> List.filter (TVar.has_kind KInfer)
+  in
+  let rigid_of t =
+    TVOp.vars t |> MVarSet.proj1 |> TVarSet.elements
+    |> List.filter (fun v -> not (TVar.has_kind KInfer v))
+  in
+  (* Each line's rigid variables are its own (['a] in two lines is two
+     variables, as in MLsem), copies with the same names; the holes are
+     shared. *)
   let lines =
     List.filter_map
       (fun r ->
          Option.map
-           (fun t -> (t, Signature.build benv t |> fst |> Signature.to_gty |> GTy.ub))
+           (fun t ->
+              let l = Signature.build benv t |> fst |> Signature.to_gty |> GTy.ub in
+              let own =
+                rigid_of l
+                |> List.map (fun v -> (v, TVar.typ (TVar.mk KNoInfer (Some (TVar.name v)))))
+                |> Subst.of_list1
+              in
+              (t, Subst.apply own l) )
            (sig_type ctx r) )
       locs
   in
-  let weak_of t =
-    TVOp.vars t |> MVarSet.proj1 |> TVarSet.elements |> List.filter (TVar.has_kind KInfer)
-  in
   let d = Ty.conj (List.map snd lines) in
-  let o = TyScheme.get ty |> snd |> GTy.ub in
-  (* The definition's variables are rigid (generalized); a weak one is made
-     rigid too. *)
+  let tvs, o = TyScheme.get ty in
+  let o = GTy.ub o in
+  (* A variable of the definition's type that is not generalized is one
+     type: fixed, like the lines' own. *)
   let o =
-    let w = TVOp.vars o |> MVarSet.proj1 |> TVarSet.filter (TVar.has_kind KInfer) in
+    let w =
+      TVOp.vars o |> MVarSet.proj1
+      |> TVarSet.filter (fun v ->
+        TVar.has_kind KInfer v && not (TVarSet.mem v (MVarSet.proj1 tvs)) )
+    in
     Subst.apply (TVOp.refresh ~kind:KNoInfer (MVarSet.of_set1 w)) o
   in
-  (* The holes: the lines' weak variables, not their rigid ones. *)
+  (* The holes: the lines' weak variables. *)
   let weak = weak_of d in
-  (* The definition's variables are fresh ones made by MLsem: its ['a] is not
-     the lines' ['a]. So the definition's type is fixed, and solved for are
-     the holes and the lines' rigid variables, which a solution maps to the
-     definition's; values are then renamed back to the lines' variables
-     ([back]). *)
-  let mono = MVarSet.diff (TVOp.all_vars KNoInfer) (TVOp.vars d) in
-  TVOp.tally mono [(o, d)]
+  let cs = List.map (fun (_, l) -> (Subst.apply (TVOp.refresh ~kind:KInfer tvs) o, l)) lines in
+  TVOp.tally (TVOp.all_vars KNoInfer) cs
   |> List.filter_map (fun s ->
     (* A solution can leave weak variables, the holes' own among them
              ([_hole := ('a & int) | (_hole \ int)] when the hole is
@@ -413,36 +430,40 @@ let draft_solutions ctx envs display ty locs =
       |> Subst.of_list1
     in
     let resolve t = Subst.apply rest (resolve t) in
-    (* Kept if the definition has the filled lines' type, its variables
-             related to the lines' as the solution does. *)
-    let filled = resolve d in
-    let target = resolve o in
-    (* Each of the lines' rigid variables that the solution maps to a
-             variable of the definition's type: that variable, renamed back. *)
-    let back =
-      TVOp.vars d |> MVarSet.proj1 |> TVarSet.elements
-      |> List.filter (fun r -> not (TVar.has_kind KInfer r))
-      |> List.filter_map (fun r ->
-        let t = Subst.apply s (TVar.typ r) in
-        TVOp.vars o |> MVarSet.proj1 |> TVarSet.elements
-        |> List.find_opt (fun w -> Ty.leq t (TVar.typ w) && Ty.leq (TVar.typ w) t)
-        |> Option.map (fun w -> (w, TVar.typ r)) )
-      |> Subst.of_list1
+    (* Kept if each line, filled, is above its instance: the instances'
+       variables left are any choice, [empty] here. *)
+    let holds (oi, l) =
+      let oi = resolve oi in
+      let left = weak_of oi |> List.map (fun w -> (w, Ty.empty)) |> Subst.of_list1 in
+      Ty.leq (Subst.apply left oi) (resolve l)
     in
-    if not (Ty.leq target filled) then
+    (* Per line: the variables the solution leaves that are not the line's
+       own, named ['a], ['b], ... skipping the line's own names. *)
+    let final l =
+      let own = rigid_of l in
+      let taken = List.map TVar.name own in
+      let others =
+        rigid_of (resolve l) |> List.filter (fun v -> not (List.exists (TVar.equal v) own))
+      in
+      let names =
+        List.init 26 (fun i -> String.make 1 (Char.chr (Char.code 'a' + i)))
+        |> List.filter (fun n -> not (List.mem n taken))
+      in
+      let rename =
+        List.filteri (fun i _ -> i < List.length names) others
+        |> List.mapi (fun i v -> (v, TVar.typ (TVar.mk KNoInfer (Some (List.nth names i)))))
+        |> Subst.of_list1
+      in
+      fun t -> resolve t |> Subst.apply rename
+    in
+    if not (List.for_all holds cs) then
       None
     else
-      (* Variables the solution leaves that are not the lines' own:
-               named ['a], ['b], ... rather than as MLsem made them. *)
-      let names =
-        MVarSet.diff (TVOp.vars (Subst.apply back filled)) (TVOp.vars d)
-        |> TVOp.shorten_names ~kind:KNoInfer
-      in
-      let final t = resolve t |> Subst.apply back |> Subst.apply names in
       let holes =
         List.concat
           (List.mapi
-             (fun i (t, _) ->
+             (fun i (t, l) ->
+                let final = final l in
                 List.filter_map
                   (fun (range, name) ->
                      List.find_opt (fun v -> TVar.name v = name) weak
@@ -455,12 +476,17 @@ let draft_solutions ctx envs display ty locs =
                   (tyexpr_holes t) )
              lines )
       in
-      Some (holes, List.map (fun (_, l) -> final l) lines, filled) )
+      Some
+        (holes, List.map (fun (_, l) -> final l l) lines, List.map (fun (_, l) -> resolve l) lines) )
   (* Only solutions that say something the others do not: one whose filled
      lines the others' together imply is dropped ([empty] in a domain fits
      any function; [~bool -> int] is implied by [int -> int] and
      [~(int | bool) -> 42]). Dropped from the last, so that tally's first
-     ones stay. *)
+     ones stay.
+
+     TODO: a filled line is polymorphic, and implication should allow
+     instantiating the others' variables ([int | 'a -> int | 'a] implies
+     [int -> int]); tallying it hangs on recursive solutions. *)
   |> fun sols ->
   let sols = Array.of_list sols in
   let alive = Array.make (Array.length sols) true in
@@ -468,9 +494,9 @@ let draft_solutions ctx envs display ty locs =
     let _, _, f = sols.(i) in
     let others =
       List.filteri (fun j _ -> j <> i && alive.(j)) (Array.to_list sols)
-      |> List.map (fun (_, _, f) -> f)
+      |> List.concat_map (fun (_, _, f) -> f)
     in
-    if others <> [] && Ty.leq (Ty.conj others) f then alive.(i) <- false
+    if others <> [] && Ty.leq (Ty.conj others) (Ty.conj f) then alive.(i) <- false
   done ;
   Array.to_list sols
   |> List.filteri (fun i _ -> alive.(i))
