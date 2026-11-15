@@ -32,8 +32,7 @@ let parse s =
 (* The simplified forms of the part [p] of the [val] line [line], as written
    in its place, with the steps that give each. *)
 let options envs line (p : Type_refactor.part) =
-  let benv, _, _, _, _ = envs in
-  let build t = Signature.build benv t |> fst |> Signature.to_gty |> GTy.ub in
+  let build t = Typings.build_signature envs t |> fst |> Signature.to_gty |> GTy.ub in
   match p.node with
   | TOption _ -> None
   | _ -> (
