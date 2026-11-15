@@ -204,4 +204,5 @@ val coerce : ?coercion_id:Eid.t -> ?duplicate_arrows:bool -> check -> GTy.t -> t
     pushing coercions inside (for intersections of arrows). *)
 
 val push_coercions : ?duplicate_arrows:bool -> t -> t
-(** Applies {!coerce} to every [TypeCoerce] already present in the term. *)
+(** Applies {!coerce} to every [TypeCoerce] and every annotated [LambdaRec]
+    already present in the term. *)

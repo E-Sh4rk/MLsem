@@ -69,11 +69,9 @@ let infer var env e =
   let msg, visited = Mlsem_system.Analyzer.analyze e annot in
   ty, msg, visited
 
-let cast_kind () =
-  if !Config.allow_implicit_downcast then CheckStatic else Check
 let type_check_with_sigs env (var,e,sigs,aty) =
   let e, id = Transform.expr_to_ast e, Eid.refresh (fst e) in
-  let c = cast_kind () in
+  let c = if !Config.allow_implicit_downcast then CheckStatic else Check in
   let es = sigs |> List.map (fun s ->
     (id, TypeCoerce (e, Signature.to_gty s, c)) |> push_coercions ~duplicate_arrows:true) in
   let tys, msg, visited =
@@ -86,16 +84,8 @@ let type_check_with_sigs env (var,e,sigs,aty) =
   (var,(aty,sigs)),msg
 
 let type_check_recs pos env lst =
-  let c = cast_kind () in
-  let lst = lst |> List.map (fun (v,e,s) ->
-    let e, s = match s with
-    | None -> e, None
-    | Some s ->
-      let id, s = Eid.refresh (fst e), Signature.to_gty' s in
-      (id, PAst.TypeCoerce (e, s, c)), Some s
-    in
-    (v,s,e)
-  ) in
+  let lst = lst |> List.map
+    (fun (v,e,s) -> (v,Option.map Signature.to_gty' s,e)) in
   let e = (Eid.unique_with_pos pos, PAst.LambdaRec lst) |> Transform.expr_to_ast in
   let ty, msg, visited = e |> push_coercions ~duplicate_arrows:true |> infer None env in
   let msg = msg@(Mlsem_system.Analyzer.get_unreachable visited e) in
