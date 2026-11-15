@@ -17,8 +17,11 @@ val decompose : ?recursive:bool -> overload -> t
 val regroup : t -> overload
 val merge : ?recursive:bool -> overload -> overload
 
+(* Ignore draft signatures. *)
 val to_tyscheme : t -> TyScheme.t
+
 val to_gty : overload -> GTy.t
+val to_gty' : t -> GTy.t
 
 (* The (prefixed) names of [overload]'s free type variables, as rendered in its
    text. Per-overload: variables are not shared across overloads. *)

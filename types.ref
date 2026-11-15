@@ -350,3 +350,13 @@ typeof_app': Int -> 0
 [Warning] File "tests/5_misc.ml", line 298, characters 24-34 Unreachable code
 alt_fail: untypeable encoding
 File "tests/5_misc.ml", line 303, characters 23-49
+
+===== Processing tests/6_draft_sigs.ml =====
+foo: int -> int
+bar: int -> int
+foobar: ∀'a. 'a -> 'a
+overload: int | bool -> any
+curry: int -> int -> int
+two: (1 -> 2 -> bool) & (int -> int -> int | true)
+even2: int -> bool
+odd2: int -> bool

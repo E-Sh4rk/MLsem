@@ -9,6 +9,7 @@ let simplify_overload o =
   |> simplify_tyscheme |> TyScheme.get |> snd |> GTy.lb
 
 let to_gty overload = GTy.Builder.build overload
+let to_gty' tys = tys |> List.map to_gty |> GTy.conj
 
 let is_well_formed overload =
   overload |> to_gty |> GTy.fv
@@ -44,7 +45,8 @@ let rec merge ?(recursive=false) ty =
   else ty
 
 let to_tyscheme tys =
-  tys |> List.map to_gty |> GTy.conj |> TyScheme.mk_poly |> simplify_tyscheme
+  tys |> List.filter (fun s -> is_draft s |> not)
+  |> List.map to_gty |> GTy.conj |> TyScheme.mk_poly |> simplify_tyscheme
 
 let extract ty =
   let tvs, ty = TyScheme.get ty in
