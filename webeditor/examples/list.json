@@ -22,5 +22,9 @@
     {
         "name": "Row Polymorphism",
         "path": "records.stml"
+    },
+    {
+        "name": "Draft signatures",
+        "path": "sigs.stml"
     }
 ]
