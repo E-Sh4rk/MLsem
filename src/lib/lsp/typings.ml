@@ -486,11 +486,10 @@ let draft_solutions ctx envs display ty locs =
      - then one whose filled lines the others' together imply
        ([~bool -> int] is implied by [int -> int] and
        [~(int | bool) -> 42]), from the last, so that tally's first ones
-       stay.
-
-     TODO: a filled line is polymorphic, and implication should allow
-     instantiating the others' variables ([int | 'a -> int | 'a] implies
-     [int -> int]); tallying it hangs on recursive solutions. *)
+       stay. A filled line is polymorphic, so the others may be instantiated
+       ([int | 'a -> int | 'a] implies [int -> int]): a tally, after a plain
+       subtyping check. The first pass must come before it: tallying the
+       junk of mixed solutions (recursive types) does not end in time. *)
   |> fun sols ->
   let conj (_, _, f) = Ty.conj f in
   let sols =
@@ -518,7 +517,16 @@ let draft_solutions ctx envs display ty locs =
       List.filteri (fun j _ -> j <> i && alive.(j)) (Array.to_list sols)
       |> List.concat_map (fun (_, _, f) -> f)
     in
-    if others <> [] && Ty.leq (Ty.conj others) (Ty.conj f) then alive.(i) <- false
+    (* Each filled line is polymorphic: the others imply [f] if instances of
+       their lines, each its own, are below it, [f]'s variables fixed. *)
+    let instance l = Subst.apply (TVOp.refresh ~kind:KInfer (TVOp.vars l)) l in
+    if
+      others <> []
+      && ( Ty.leq (Ty.conj others) (Ty.conj f)
+         || TVOp.tally (TVOp.all_vars KNoInfer) [(Ty.conj (List.map instance others), Ty.conj f)]
+            <> [] )
+    then
+      alive.(i) <- false
   done ;
   Array.to_list sols
   |> List.filteri (fun i _ -> alive.(i))
