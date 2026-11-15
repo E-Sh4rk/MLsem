@@ -500,13 +500,21 @@ let draft_solutions ctx envs display ty locs =
        dropped ([empty] in a domain fits any function). Done first: two
        solutions each exact on one line only, and junk on the other, imply
        together the one exact on both, which must stay;
-     - then one whose filled lines the others' together imply
+     - then a set of solutions that together imply each dropped one
        ([~bool -> int] is implied by [int -> int] and
-       [~(int | bool) -> 42]), from the last, so that tally's first ones
-       stay. A filled line is polymorphic, so the others may be instantiated
-       ([int | 'a -> int | 'a] implies [int -> int]): a tally, after a plain
-       subtyping check. The first pass must come before it: tallying the
-       junk of mixed solutions (recursive types) does not end in time. *)
+       [~(int | bool) -> 42]), none implied by the others of the set. It is
+       grown from the solutions with the narrowest domain to those with the
+       widest, a solution added only if the set does not already imply it,
+       so that the precise overloads come first ([int -> int] before
+       [int | 'a -> int | 'a]); then, from the last added, one implied by
+       the rest of the set is dropped. Checking against the set only, not
+       against all the others, keeps each check small: a tally with many
+       arrows does not end in time. A filled line is polymorphic, so the
+       set's lines may be instantiated ([int | 'a -> int | 'a] implies
+       [int -> int]): a tally, after a plain subtyping check. The first pass
+       must come before it: tallying the junk of mixed solutions (recursive
+       types) does not end in time.
+     The kept solutions are in tally's order. *)
   |> fun sols ->
   let conj (_, _, f) = Ty.conj f in
   let sols =
@@ -527,26 +535,50 @@ let draft_solutions ctx envs display ty locs =
       sols
   in
   let sols = Array.of_list sols in
-  let alive = Array.make (Array.length sols) true in
-  for i = Array.length sols - 1 downto 0 do
+  let n = Array.length sols in
+  let filled i =
     let _, _, f = sols.(i) in
-    let others =
-      List.filteri (fun j _ -> j <> i && alive.(j)) (Array.to_list sols)
-      |> List.concat_map (fun (_, _, f) -> f)
-    in
-    (* Each filled line is polymorphic: the others imply [f] if instances of
-       their lines, each its own, are below it, [f]'s variables fixed. *)
+    f
+  in
+  (* Each filled line is polymorphic: the solutions [set] imply solution [i]
+     if instances of their lines, each its own, are below [i]'s, whose
+     variables are fixed. *)
+  let implies set i =
+    let f = Ty.conj (filled i) in
+    let others = List.concat_map filled set in
     let instance l = Subst.apply (TVOp.refresh ~kind:KInfer (TVOp.vars l)) l in
-    if
-      others <> []
-      && ( Ty.leq (Ty.conj others) (Ty.conj f)
-         || TVOp.tally (TVOp.all_vars KNoInfer) [(Ty.conj (List.map instance others), Ty.conj f)]
-            <> [] )
-    then
-      alive.(i) <- false
-  done ;
+    others <> []
+    && ( Ty.leq (Ty.conj others) f
+       || TVOp.tally (TVOp.all_vars KNoInfer) [(Ty.conj (List.map instance others), f)] <> [] )
+  in
+  (* The domain of a solution's filled lines, [any] if they are not a
+     function. *)
+  let dom =
+    Array.init n (fun i ->
+      let t = Ty.conj (filled i) in
+      if Ty.leq t Arrow.any then Arrow.domain t else Ty.any )
+  in
+  (* Narrowest first: by how many domains are strictly below it. *)
+  let narrower i =
+    List.init n Fun.id
+    |> List.filter (fun j -> Ty.leq dom.(j) dom.(i) && not (Ty.leq dom.(i) dom.(j)))
+    |> List.length
+  in
+  let order =
+    List.init n (fun i -> (narrower i, i))
+    |> List.stable_sort (fun (a, _) (b, _) -> compare a b)
+    |> List.map snd
+  in
+  let grown = List.fold_left (fun set i -> if implies set i then set else set @ [i]) [] order in
+  let kept =
+    List.fold_right
+      (fun i set ->
+         let rest = List.filter (( <> ) i) set in
+         if implies rest i then rest else set )
+      grown grown
+  in
   Array.to_list sols
-  |> List.filteri (fun i _ -> alive.(i))
+  |> List.filteri (fun i _ -> List.mem i kept)
   |> List.map (fun (holes, lines, _) -> (holes, lines))
 
 (* The hovers of a draft's holes, from its [solutions]: a hole has a value if
