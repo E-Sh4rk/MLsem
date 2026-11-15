@@ -225,13 +225,13 @@ mutate_ref: ∀'a. 42 | 'a -> 42 | 'a
 inference_let: ∀'a,'b. () -> (ref('a & C('b)), 'b, 'b, 'b)
 is_ref: (ref -> true) & (~ref -> false)
 is_not_ref: (~ref -> true) & (ref -> false)
-test_dict: ∀'a,'b. false | "key" | 'a -> (dict(false | "key" | 'a, 0 | 42 | 'b), 0 | 42 | 'b)
+test_dict: ∀'a,'b. false | "key" | 'b -> (dict(false | "key" | 'b, 0 | 42 | 'a), 0 | 42 | 'a)
 filter_arr: ∀'a,'b,'c. ('b -> ~true) & ('a -> any) -> array('b | 'a) -> array('a \ 'b | 'c)
 test_arr: ∀'a,'b. bool | 'a -> array('a & int | 'b)
 test_double_array: 42
 arr_dict_assign: ∀'a,'b. dict((0..1) | 'b, 'a) | array('a) -> ()
 nested: ∀'a. any -> 'a -> 'a
-swap: ∀'a,'b. ('a & int -> 'a & int -> dict('a, 'b) | array('b) -> ()) & ('a -> 'a -> dict('a, 'b) -> ())
+swap: ∀'a,'b. ('b -> 'b -> dict('b, 'a) -> ()) & (int -> int -> array('a) -> ())
 mx: 42
 mut_invalid: untypeable coercion
 File "tests/4_imperative.ml", line 98, characters 8-12
@@ -245,7 +245,7 @@ mut_narrowing: Nil | int
 mut_seq1: 42
 mut_seq2: Nil
 mut_and_return: any -> int | false
-neg_and_pos: ∀'a. ('a & Nil -> 'a & Nil) & (int -> (int, int))
+neg_and_pos: ∀'a. ('a & Nil -> 'a & Nil) & ('a & int -> (int, int))
 neg_and_pos_ann: Nil | int -> Nil | (int, int)
 order: Nil | (Nil | int, Nil | int) -> Nil | int | (int, int)
 loop_tricky_narrowing: int -> (any, int)
@@ -318,13 +318,13 @@ filter: ∀'a,'b. ('b -> ~true) & ('a -> any) -> [ ('b | 'a)* ] -> [ ('a \ 'b)* 
 filter2: ∀'a,'b. ('b -> ~true) & ('a -> any) -> [ ('b | 'a)* ] -> [ ('a \ 'b)* ]
 filter_noannot: ∀'a. (('a -> any) -> ([ 'a+ ] -> [ 'a* ]) & ([ 'a ] -> [ 'a? ]) & ([  ] -> [  ])) & (('a -> true) -> ([ 'a+ ] -> [ 'a+ ]) & ([  ] -> [  ])) & (('a -> ~true) -> [ 'a* ] -> [  ]) & (any -> [  ] -> [  ])
 filtermap: ∀'a,'b. (('b -> bool | (true, 'a), [ 'b* ]) -> [ ('b | 'a)* ]) & (('b -> false | (true, 'a), [ 'b* ]) -> [ 'a* ])
-member: ∀'a. (('a, [ (~'a)+ ]) | (any, [  ]) -> false) & ((any, [ any+ ]) -> bool)
+member: ∀'a,'b. (('a, [ (~'a)+ ]) | ('b, [ (~'b) ]) | (any, [  ]) -> false) & ((any, [ any+ ]) -> bool)
 call_f: ∀'a. objF('a) -> () | 'a
 deep_flatten: ∀'a. tree('a) -> [ ('a \ [ any* ])* ]
 eval: expr -> int
 obj: obj
 typeof_cf: (() -> "unit") & (~(int | bool | char | string | ()) -> "object") & (string -> "string") & (bool -> "bool") & (int -> "int") & (char -> "char")
-break_return_cf: ∀'a. ('a & (0 | false) -> ()) & (() | 'a \ (0 | false) -> () | 'a \ (0 | false))
+break_return_cf: ∀'a. (() | 'a \ (0 | false) -> () | 'a) & (0 | false -> ())
 weird_return: (true -> 69) & (~true -> (42, 69))
 inference_test1: ∀'a. 'a -> ('a, 'a, 'a)
 inference_test2: ∀'a. C('a) -> ('a, 'a, 'a)
@@ -360,3 +360,4 @@ curry: int -> int -> int
 two: (1 -> 2 -> bool) & (int -> int -> int | true)
 even2: int -> bool
 odd2: int -> bool
+len2: ([ any+ ] -> int) & ([  ] -> 0)

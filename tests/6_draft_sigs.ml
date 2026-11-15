@@ -34,3 +34,8 @@ val even2 : int -> _
 val odd2 : _ -> bool
 let even2 n = if n is 0 then true else odd2 (n-1)
 and odd2 n = if n is 0 then false else even2 (n-1)
+
+
+val len2 : [] -> _
+val len2 : [any+] -> _
+let len2 l = match l with [] -> 0 | _::xs -> 1 + len2 xs end

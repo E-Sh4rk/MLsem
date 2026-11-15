@@ -140,14 +140,28 @@ let substitute_similar_vars2 mono v row =
     )
   in
   Subst.of_list2 nrow
-let minimize_new_tvars mono sol =
-  let minimize_binding1 sol (v,t) =
-    let r = substitute_similar_vars1 mono v t in
-    Subst.compose r sol
+(* When [v] is a variable of the environment, a new variable is not identified
+   with [v] if it also occurs in the binding of another variable of the
+   environment: that would relate two variables of the environment, which loses
+   generality (e.g. [a: b & a ; c: b & c] would become [a: a ; c: a & c], adding
+   the constraint [c <= a] between [a] and [c]). *)
+let minimize_new_tvars ~tvars ~mono sol =
+  let mono = MVarSet.union mono tvars in
+  let sol_env = Subst.restrict tvars sol in
+  let shared_in_env ~mem ~remove v =
+    if mem v tvars
+    then MVarSet.union mono (remove v sol_env |> Subst.intro)
+    else mono
   in
-  let minimize_binding2 sol (v,row) =
+  let minimize_binding1 sol' (v,t) =
+    let mono = shared_in_env ~mem:MVarSet.mem1 ~remove:Subst.remove1 v in
+    let r = substitute_similar_vars1 mono v t in
+    Subst.compose r sol'
+  in
+  let minimize_binding2 sol' (v,row) =
+    let mono = shared_in_env ~mem:MVarSet.mem2 ~remove:Subst.remove2 v in
     let r = substitute_similar_vars2 mono v row in
-    Subst.compose r sol
+    Subst.compose r sol'
   in
   let res = List.fold_left minimize_binding1 sol (Subst.bindings1 sol) in
   List.fold_left minimize_binding2 res (Subst.bindings2 sol)
@@ -170,7 +184,7 @@ let tally_simpl mono tvars res cs =
   (* Format.printf "with env=%a@." Env.pp env ; *)
   tally_const_rows mono cs
   |> !Config.subst_normalization_fun { mono ; tvars ; res }
-  |> List.map (minimize_new_tvars (MVarSet.union mono tvars))
+  |> List.map (minimize_new_tvars ~tvars ~mono)
   |> List.map (fun s -> s, Subst.apply s res)
   (* Simplify result if it does not impact the domains *)
   |> List.map (fun (s,r) ->
