@@ -168,7 +168,9 @@ let domains_of_construct (c:constructor) ty =
   | Tuple n ->
     Tuple.dnf n ty
     |> List.filter (fun b -> Ty.leq (Tuple.mk b) ty)
-  | Join n | Meet n -> [List.init n (fun _ -> ty)]
+  | Join n -> [List.init n (fun _ -> ty)]
+  | Meet n when Ty.is_any ty -> [List.init n (fun _ -> Ty.any)]
+  | Meet _ -> [ ]
   | NoGen -> [ [ty] ]
   | Normalize -> [ [ty] ]
   | Voidify ty' when Ty.leq ty' ty -> [ [Ty.any] ]
