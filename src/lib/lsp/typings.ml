@@ -344,6 +344,13 @@ let rec tyexpr_holes (ty : TyExpr.t) =
 let paren_tuple value =
   if String.contains value ',' && value.[0] <> '(' then "(" ^ value ^ ")" else value
 
+(* The signature of a written type. Building a parametric alias ([t('a)])
+   reads the printing aliases, which [Main] provides per element; outside
+   it they come from [envs]. *)
+let build_signature envs t =
+  let benv, _, _, _, penv = envs in
+  PEnv.sequential_handler penv (Signature.build benv) t |> fst
+
 (* The holes of a draft's [val] lines (at [locs]), solved from the
    definition's type scheme [ty].
 
@@ -361,7 +368,6 @@ let paren_tuple value =
    Per solution: each hole as [(range, shown, value, line index)], and each
    line filled with it. *)
 let draft_solutions ctx envs display ty locs =
-  let benv, _, _, _, _ = envs in
   let weak_of t =
     TVOp.vars t |> MVarSet.proj1 |> TVarSet.elements |> List.filter (TVar.has_kind KInfer)
   in
@@ -377,7 +383,7 @@ let draft_solutions ctx envs display ty locs =
       (fun r ->
          Option.map
            (fun t ->
-              let l = Signature.build benv t |> fst |> Signature.to_gty |> GTy.ub in
+              let l = build_signature envs t |> fst |> Signature.to_gty |> GTy.ub in
               let own =
                 rigid_of l
                 |> List.map (fun v -> (v, TVar.typ (TVar.mk KNoInfer (Some (TVar.name v)))))
