@@ -1,0 +1,61 @@
+val (+) : (int, int) -> int
+val (-) : (int, int) -> int
+val ( * ) : (int, int) -> int
+val (/) : (int, int) -> int
+val (%) : (int, int) -> int
+val compare : 'a -> 'a -> int
+val (<) : ('a, 'a) -> bool
+val (>) : ('a, 'a) -> bool
+val (=) : ('a, 'a) -> bool
+val (<=) : ('a, 'a) -> bool
+val (>=) : ('a, 'a) -> bool
+val failwith : string -> empty
+val invalid_arg : string -> empty
+
+#infer_overload = false
+
+type t('a) =
+  Nil | Node(t('a), Key, 'a, t('a), int)
+
+let height x =
+  match x with
+  | Nil -> 0
+  | Node(_,_,_,_,h) -> h
+  end
+
+let create l x d r =
+  let hl = height l in
+  let hr = height r in
+  Node(l, x, d, r, (if hl >= hr then hl + 1 else hr + 1))
+
+val bal : t('a) -> Key -> 'a -> t('a) -> t('a)
+let bal l x d r =
+  let hl = match l with Nil -> 0 | Node(_,_,_,_,h) -> h end in
+  let hr = match r with Nil -> 0 | Node(_,_,_,_,h) -> h end in
+  if hl > (hr + 2) then
+    match l with
+    | Nil -> invalid_arg "Map.bal"
+    | Node(ll, lv, ld, lr, _) ->
+      if (height ll) >= (height lr) then
+        create ll lv ld (create lr x d r)
+      else
+        match lr with
+        | Nil -> invalid_arg "Map.bal"
+        | Node(lrl, lrv, lrd, lrr, _)->
+          create (create ll lv ld lrl) lrv lrd (create lrr x d r)
+        end
+    end
+  else if hr > (hl + 2) then
+    match r with
+    | Nil -> invalid_arg "Map.bal"
+    | Node(rl, rv, rd, rr, _) ->
+      if (height rr) >= (height rl) then
+        create (create l x d rl) rv rd rr
+      else
+        match rl with
+        | Nil -> invalid_arg "Map.bal"
+        | Node(rll, rlv, rld, rlr, _) ->
+          create (create l x d rll) rlv rld (create rlr rv rd rr)
+        end
+    end
+  else Node(l, x, d, r, (if hl >= hr then hl + 1 else hr + 1))
