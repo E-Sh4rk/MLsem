@@ -478,16 +478,38 @@ let draft_solutions ctx envs display ty locs =
       in
       Some
         (holes, List.map (fun (_, l) -> final l l) lines, List.map (fun (_, l) -> resolve l) lines) )
-  (* Only solutions that say something the others do not: one whose filled
-     lines the others' together imply is dropped ([empty] in a domain fits
-     any function; [~bool -> int] is implied by [int -> int] and
-     [~(int | bool) -> 42]). Dropped from the last, so that tally's first
-     ones stay.
+  (* Only the most precise solutions, in two passes:
+     - one strictly wider than another, or equivalent to an earlier one, is
+       dropped ([empty] in a domain fits any function). Done first: two
+       solutions each exact on one line only, and junk on the other, imply
+       together the one exact on both, which must stay;
+     - then one whose filled lines the others' together imply
+       ([~bool -> int] is implied by [int -> int] and
+       [~(int | bool) -> 42]), from the last, so that tally's first ones
+       stay.
 
      TODO: a filled line is polymorphic, and implication should allow
      instantiating the others' variables ([int | 'a -> int | 'a] implies
      [int -> int]); tallying it hangs on recursive solutions. *)
   |> fun sols ->
+  let conj (_, _, f) = Ty.conj f in
+  let sols =
+    List.filteri
+      (fun i s ->
+         let f = conj s in
+         not
+           ( List.exists
+               (fun s' ->
+                  let f' = conj s' in
+                  Ty.leq f' f && not (Ty.leq f f') )
+               sols
+           || List.exists
+                (fun s' ->
+                   let f' = conj s' in
+                   Ty.leq f' f && Ty.leq f f' )
+                (List.filteri (fun j _ -> j < i) sols) ) )
+      sols
+  in
   let sols = Array.of_list sols in
   let alive = Array.make (Array.length sols) true in
   for i = Array.length sols - 1 downto 0 do
