@@ -152,9 +152,8 @@
             defined together using the <kbd>and</kbd> keyword.
         </p>
         <p>
-            A type signature may also be a <i>draft</i>: a signature with holes, written <tt><kbd>_</kbd></tt>
-            (each occurrence is a fresh hole) or <tt><kbd>'_a</kbd></tt> (all occurrences of the same name denote
-            the same hole). Draft signatures let you fix only part of a type and let the type-checker infer the rest
+            A type signature may also be a <i>draft</i>: a signature with holes, written <tt><kbd>_</kbd></tt>.
+            Draft signatures let you fix only part of a type and let the type-checker infer the rest
             from the definition: the definition is checked against the signature, and the holes are filled in
             with the inferred types. For instance:
         </p>
@@ -167,9 +166,9 @@
     </code>
         <p>
             As with regular signatures, several draft signatures can be given for the same identifier
-            (each one is checked separately, and the results are intersected). However, since its type is only known
-            once its definition has been typed, an identifier with a draft signature cannot be used before its
-            definition (except inside mutually recursive definitions introduced with <kbd>and</kbd>).
+            (the results are intersected). However, since its type is only known once its definition
+            has been typed, an identifier with a draft signature cannot be used before its definition
+            (except inside mutually recursive definitions introduced with <kbd>and</kbd>).
             Mutable variables cannot have draft signatures.
         </p>
 
