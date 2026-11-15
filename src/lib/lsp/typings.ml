@@ -344,139 +344,166 @@ let rec tyexpr_holes (ty : TyExpr.t) =
 let paren_tuple value =
   if String.contains value ',' && value.[0] <> '(' then "(" ^ value ^ ")" else value
 
-(* What each hole of the [val] line at [r] is for the line to be [overload]:
-   tallying the line's type, holes included, against it, in both directions.
-   [None] when nothing fits. *)
-let hole_values ctx envs display overload r =
-  match Option.map tyexpr_holes (sig_type ctx r) with
-  | None
-  | Some [] ->
-      None
-  | Some holes -> (
-      let benv, _, _, _, _ = envs in
-      let draft, _ = Signature.build benv (Option.get (sig_type ctx r)) in
-      let d = Signature.to_gty draft |> GTy.ub in
-      let o = Signature.to_gty overload |> GTy.ub in
-      (* The resolved type's variables are rigid (generalized, then renamed
-         rigid by [Signature.of_tyscheme]); a weak one would be made rigid
-         too. *)
-      let o =
-        let w = TVOp.vars o |> MVarSet.proj1 |> TVarSet.filter (TVar.has_kind KInfer) in
-        Subst.apply (TVOp.refresh ~kind:KNoInfer (MVarSet.of_set1 w)) o
-      in
-      (* The holes: the draft's weak variables, not its rigid ones. *)
-      let weak =
-        TVOp.vars d |> MVarSet.proj1 |> TVarSet.elements |> List.filter (TVar.has_kind KInfer)
-      in
-      (* The resolved type's variables are fresh ones made by MLsem: its ['a]
-         is not the draft's ['a]. So the resolved type is fixed, and solved
-         for are the holes and the draft's rigid variables, which the
-         solution maps to the resolved type's; the values are then renamed
-         back to the draft's variables ([back]). *)
-      let mono = MVarSet.diff (TVOp.all_vars KNoInfer) (TVOp.vars d) in
-      match TVOp.tally mono [(d, o); (o, d)] with
-      | [] -> None
-      | s :: _ ->
-          (* The most general solution can leave weak variables, the holes'
-             own among them ([_hole := ('a & int) | (_hole \ int)] when the
-             hole is intersected with [int]). Any choice for them is a
-             solution, but one choice for the whole line, so that the holes
-             agree:
-             - those in the line are chosen by their polarity in it, as when
-               simplifying a signature ([empty] where only positive, [any]
-               where only negative); one there both ways is a variable of the
-               signature, made a rigid one;
-             - those not in the line do not change it: [empty]. *)
-          let mono = TVOp.all_vars KNoInfer in
-          let weak_of t =
-            TVOp.vars t |> MVarSet.proj1 |> TVarSet.elements |> List.filter (TVar.has_kind KInfer)
-          in
-          let clean =
-            TVOp.clean_subst' ~pos1:Ty.empty ~neg1:Ty.any ~pos2:Row.empty ~neg2:Row.any mono
-              [Subst.apply s d]
-          in
-          let line = Subst.apply clean (Subst.apply s d) in
-          let rigid =
-            TVOp.refresh ~kind:KNoInfer (MVarSet.of_set1 (TVarSet.of_list (weak_of line)))
-          in
-          let resolve t = Subst.apply rigid (Subst.apply clean (Subst.apply s t)) in
-          let rest =
-            List.concat_map (fun v -> weak_of (resolve (TVar.typ v))) weak
-            |> List.sort_uniq TVar.compare
-            |> List.map (fun w -> (w, Ty.empty))
-            |> Subst.of_list1
-          in
-          let resolve t = Subst.apply rest (resolve t) in
-          (* Only shown if filling the holes gives back the resolved type, its
-             variables related to the draft's as the solution does. *)
-          let filled = resolve d in
-          let target = resolve o in
-          (* Each of the draft's rigid variables that the solution maps to a
-             variable of the resolved type: that variable, renamed back. *)
-          let back =
-            TVOp.vars d |> MVarSet.proj1 |> TVarSet.elements
-            |> List.filter (fun r -> not (TVar.has_kind KInfer r))
-            |> List.filter_map (fun r ->
-              let t = Subst.apply s (TVar.typ r) in
-              TVOp.vars o |> MVarSet.proj1 |> TVarSet.elements
-              |> List.find_opt (fun w -> Ty.leq t (TVar.typ w) && Ty.leq (TVar.typ w) t)
-              |> Option.map (fun w -> (w, TVar.typ r)) )
-            |> Subst.of_list1
-          in
-          if not (Ty.leq filled target && Ty.leq target filled) then
-            None
-          else
-            Some
-              (List.filter_map
-                 (fun (range, name) ->
-                    List.find_opt (fun v -> TVar.name v = name) weak
-                    |> Option.map (fun v ->
-                      let shown =
-                        if String.starts_with ~prefix:"_hole" name then "_" else "'" ^ name
-                      in
-                      let value =
-                        resolve (TVar.typ v) |> Subst.apply back |> GTy.mk |> display |> paren_tuple
-                      in
-                      (range, shown, value) ) )
-                 holes ) )
+(* The holes of a draft's [val] lines (at [locs]), solved from the
+   definition's type [ty].
 
-(* What each hole of the [val] line at [r] became, as hovers. [overloads] is
-   the type the line's own check gave: several when the body is overloaded,
-   and then a hole has one value only if every overload gives it the same;
-   otherwise its hover lists the value for each overload, and it cannot be
+   The lines share their holes, and the definition has every line's type
+   with the holes filled: [ty ≤ L₁ & … & Lₙ] is tallied, solving for the
+   holes. Tally gives the most general solutions, possibly several: a hole in
+   a domain can have values that each give a part of [ty] ([h -> h] for
+   [(int -> int) & (bool -> bool)]: [int], and [bool]). MLsem itself may have
+   instantiated the holes several ways and intersected the results, so its
+   solving is not read back: a solution here need not be one of its.
+
+   Per solution: each hole as [(range, shown, value, line index)], and each
+   line filled with it. *)
+let draft_solutions ctx envs display ty locs =
+  let benv, _, _, _, _ = envs in
+  let lines =
+    List.filter_map
+      (fun r ->
+         Option.map
+           (fun t -> (t, Signature.build benv t |> fst |> Signature.to_gty |> GTy.ub))
+           (sig_type ctx r) )
+      locs
+  in
+  let weak_of t =
+    TVOp.vars t |> MVarSet.proj1 |> TVarSet.elements |> List.filter (TVar.has_kind KInfer)
+  in
+  let d = Ty.conj (List.map snd lines) in
+  let o = TyScheme.get ty |> snd |> GTy.ub in
+  (* The definition's variables are rigid (generalized); a weak one is made
+     rigid too. *)
+  let o =
+    let w = TVOp.vars o |> MVarSet.proj1 |> TVarSet.filter (TVar.has_kind KInfer) in
+    Subst.apply (TVOp.refresh ~kind:KNoInfer (MVarSet.of_set1 w)) o
+  in
+  (* The holes: the lines' weak variables, not their rigid ones. *)
+  let weak = weak_of d in
+  (* The definition's variables are fresh ones made by MLsem: its ['a] is not
+     the lines' ['a]. So the definition's type is fixed, and solved for are
+     the holes and the lines' rigid variables, which a solution maps to the
+     definition's; values are then renamed back to the lines' variables
+     ([back]). *)
+  let mono = MVarSet.diff (TVOp.all_vars KNoInfer) (TVOp.vars d) in
+  TVOp.tally mono [(o, d)]
+  |> List.filter_map (fun s ->
+    (* A solution can leave weak variables, the holes' own among them
+             ([_hole := ('a & int) | (_hole \ int)] when the hole is
+             intersected with [int]). Any choice for them is a solution, but
+             one choice for all the lines, so that the holes agree:
+             - those in the lines are chosen by their polarity in them, as
+               when simplifying a signature ([empty] where only positive, so
+               a result is the tightest; [any] where only negative, so a
+               domain is the widest); one there both ways is a variable of the
+               signature, made a rigid one;
+             - those not in the lines do not change them: [empty]. *)
+    let mono = TVOp.all_vars KNoInfer in
+    let clean =
+      TVOp.clean_subst' ~pos1:Ty.empty ~neg1:Ty.any ~pos2:Row.empty ~neg2:Row.any mono
+        [Subst.apply s d]
+    in
+    let line = Subst.apply clean (Subst.apply s d) in
+    let rigid = TVOp.refresh ~kind:KNoInfer (MVarSet.of_set1 (TVarSet.of_list (weak_of line))) in
+    let resolve t = Subst.apply rigid (Subst.apply clean (Subst.apply s t)) in
+    let rest =
+      List.concat_map (fun v -> weak_of (resolve (TVar.typ v))) weak
+      |> List.sort_uniq TVar.compare
+      |> List.map (fun w -> (w, Ty.empty))
+      |> Subst.of_list1
+    in
+    let resolve t = Subst.apply rest (resolve t) in
+    (* Kept if the definition has the filled lines' type, its variables
+             related to the lines' as the solution does. *)
+    let filled = resolve d in
+    let target = resolve o in
+    (* Each of the lines' rigid variables that the solution maps to a
+             variable of the definition's type: that variable, renamed back. *)
+    let back =
+      TVOp.vars d |> MVarSet.proj1 |> TVarSet.elements
+      |> List.filter (fun r -> not (TVar.has_kind KInfer r))
+      |> List.filter_map (fun r ->
+        let t = Subst.apply s (TVar.typ r) in
+        TVOp.vars o |> MVarSet.proj1 |> TVarSet.elements
+        |> List.find_opt (fun w -> Ty.leq t (TVar.typ w) && Ty.leq (TVar.typ w) t)
+        |> Option.map (fun w -> (w, TVar.typ r)) )
+      |> Subst.of_list1
+    in
+    if not (Ty.leq target filled) then
+      None
+    else
+      (* Variables the solution leaves that are not the lines' own:
+               named ['a], ['b], ... rather than as MLsem made them. *)
+      let names =
+        MVarSet.diff (TVOp.vars (Subst.apply back filled)) (TVOp.vars d)
+        |> TVOp.shorten_names ~kind:KNoInfer
+      in
+      let final t = resolve t |> Subst.apply back |> Subst.apply names in
+      let holes =
+        List.concat
+          (List.mapi
+             (fun i (t, _) ->
+                List.filter_map
+                  (fun (range, name) ->
+                     List.find_opt (fun v -> TVar.name v = name) weak
+                     |> Option.map (fun v ->
+                       let shown =
+                         if String.starts_with ~prefix:"_hole" name then "_" else "'" ^ name
+                       in
+                       let value = final (TVar.typ v) |> GTy.mk |> display |> paren_tuple in
+                       (range, shown, value, i) ) )
+                  (tyexpr_holes t) )
+             lines )
+      in
+      Some (holes, List.map (fun (_, l) -> final l) lines, filled) )
+  (* Only solutions that say something the others do not: one whose filled
+     lines the others' together imply is dropped ([empty] in a domain fits
+     any function; [~bool -> int] is implied by [int -> int] and
+     [~(int | bool) -> 42]). Dropped from the last, so that tally's first
+     ones stay. *)
+  |> fun sols ->
+  let sols = Array.of_list sols in
+  let alive = Array.make (Array.length sols) true in
+  for i = Array.length sols - 1 downto 0 do
+    let _, _, f = sols.(i) in
+    let others =
+      List.filteri (fun j _ -> j <> i && alive.(j)) (Array.to_list sols)
+      |> List.map (fun (_, _, f) -> f)
+    in
+    if others <> [] && Ty.leq (Ty.conj others) f then alive.(i) <- false
+  done ;
+  Array.to_list sols
+  |> List.filteri (fun i _ -> alive.(i))
+  |> List.map (fun (holes, lines, _) -> (holes, lines))
+
+(* The hovers of a draft's holes, from its [solutions]: a hole has a value if
+   every solution gives it the same; otherwise its hover lists the value per
+   solution, next to its line filled by that solution, and it cannot be
    filled. *)
-let hole_hovers ctx envs display overloads r =
-  let per = List.map (fun o -> (o, hole_values ctx envs display o r)) overloads in
-  match per with
-  | [(_, None)]
-  | [] ->
-      []
-  | [(_, Some values)] ->
-      List.map
-        (fun ((h_start, h_end), hole, value) -> {h_start; h_end; body = Hole {hole; value}})
-        values
-  | _ -> (
-      (* The holes, from whichever overload gave values. *)
-      match List.find_map snd per with
-      | None -> []
-      | Some holes ->
-          List.mapi
-            (fun i ((h_start, h_end), hole, _) ->
-               let value_in = Option.map (fun vs -> (fun (_, _, v) -> v) (List.nth vs i)) in
-               let values = List.map (fun (_, vs) -> value_in vs) per in
-               let body =
-                 match List.sort_uniq compare values with
-                 | [Some value] -> Hole {hole; value}
-                 | _ ->
-                     Hole_per_overload
-                       {
-                         hole;
-                         rows =
-                           List.map2 (fun (o, _) v -> (display (Signature.to_gty o), v)) per values;
-                       }
-               in
-               {h_start; h_end; body} )
-            holes )
+let draft_hole_hovers display solutions =
+  match solutions with
+  | [] -> []
+  | (holes, _) :: _ ->
+      List.mapi
+        (fun k ((h_start, h_end), hole, _, i) ->
+           let values =
+             List.map (fun (hs, _) -> (fun (_, _, v, _) -> v) (List.nth hs k)) solutions
+           in
+           let body =
+             match List.sort_uniq compare values with
+             | [value] -> Hole {hole; value}
+             | _ ->
+                 Hole_per_overload
+                   {
+                     hole;
+                     rows =
+                       List.map2
+                         (fun (_, lines) v -> (display (GTy.mk (List.nth lines i)), Some v))
+                         solutions values;
+                   }
+           in
+           {h_start; h_end; body} )
+        holes
 
 (* The instance of [overload] a call with these argument and result types
    uses: a value for each of the overload's variables such that the
@@ -529,7 +556,7 @@ let is_tvar ty =
 
 (* Occurrences of the overload's type variables in its [val] line. *)
 let val_tvar_occs ctx overload r =
-  let vars = Signature.to_gty overload |> GTy.fv |> MVarSet.proj1 |> TVarSet.elements in
+  let vars = GTy.fv overload |> MVarSet.proj1 |> TVarSet.elements in
   match sig_type ctx r with
   | None -> []
   | Some ty ->
@@ -595,10 +622,15 @@ let lens_names (b : Main.inferred) =
       end ) ;
     !names
 
+(* Whether [b] has [val] lines. [Main] checks a draft with the definitions
+   without signature, and marks it as not declared. *)
+let declared (b : Main.inferred) = b.declared || Variable.get_sig_locations b.var <> []
+
 let add ctx envs (b : Main.inferred) =
   ctx.sigs <- (b.var, b.sigs) :: ctx.sigs ;
+  let declared = declared b in
   let display =
-    if b.declared then
+    if declared then
       Main.display_gty envs
     else
       let names = lens_names b in
@@ -607,7 +639,7 @@ let add ctx envs (b : Main.inferred) =
   let sig_texts = Main.signature envs b.sigs in
   (* The [val] lines, in the order of [b.sigs]. *)
   let sig_locs =
-    if b.declared then
+    if declared then
       Variable.get_sig_locations b.var |> List.rev |> List.filter_map range
     else
       []
@@ -624,7 +656,7 @@ let add ctx envs (b : Main.inferred) =
     | None -> None
   in
   let label = function
-    | Some i when b.declared -> List.nth_opt sig_texts i
+    | Some i when declared -> List.nth_opt sig_texts i
     | _ -> None
   in
   (* Hover types: per position, per derivation, the union of the types seen
@@ -766,9 +798,8 @@ let add ctx envs (b : Main.inferred) =
     | _ -> hovers
   in
   (* The overloads of the [i]th [val] line. A complete signature's overloads
-     are its lines. A draft's are what each line's check gave, which can be
-     several for one line (an overloaded body), so they are taken from that
-     line's derivation, not by position. *)
+     are its lines. A draft's are its lines filled by each solution of its
+     holes. *)
   let draft =
     List.exists
       (fun loc ->
@@ -777,21 +808,14 @@ let add ctx envs (b : Main.inferred) =
          | None -> false )
       sig_locs
   in
+  let solutions = if draft then draft_solutions ctx envs display b.ty sig_locs else [] in
   let line_overloads i =
     if draft then
-      match
-        List.find_opt (fun (d : Main.derivation) -> d.sig_index = Some i) b.derivations
-      with
-      | Some d -> d.resolved
-      | None -> []
+      List.filter_map (fun (_, lines) -> Option.map GTy.mk (List.nth_opt lines i)) solutions
     else
-      Option.to_list (List.nth_opt b.sigs i)
+      Option.to_list (Option.map Signature.to_gty (List.nth_opt b.sigs i))
   in
-  let hovers =
-    List.concat
-      (List.mapi (fun i loc -> hole_hovers ctx envs display (line_overloads i) loc) sig_locs)
-    @ hovers
-  in
+  let hovers = draft_hole_hovers display solutions @ hovers in
   let tvar_occs =
     List.concat
       (List.mapi
