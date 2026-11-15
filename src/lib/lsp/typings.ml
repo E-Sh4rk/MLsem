@@ -409,6 +409,17 @@ let draft_solutions ctx envs display ty locs =
   (* The holes: the lines' weak variables. *)
   let weak = weak_of d in
   let cs = List.map (fun (_, l) -> (Subst.apply (TVOp.refresh ~kind:KInfer tvs) o, l)) lines in
+  (* The variables a solution leaves in the lines are made rigid ones taken
+     from one pool: the i-th of any solution is the pool's i-th, so that two
+     solutions that differ only by these variables give equal lines. *)
+  let pool = Hashtbl.create 8 in
+  let pooled i =
+    match Hashtbl.find_opt pool i with
+    | Some v -> v
+    | None ->
+        let v = TVar.mk KNoInfer None in
+        Hashtbl.add pool i v ; v
+  in
   TVOp.tally (TVOp.all_vars KNoInfer) cs
   |> List.filter_map (fun s ->
     (* A solution can leave weak variables, the holes' own among them
@@ -419,7 +430,7 @@ let draft_solutions ctx envs display ty locs =
                when simplifying a signature ([empty] where only positive, so
                a result is the tightest; [any] where only negative, so a
                domain is the widest); one there both ways is a variable of the
-               signature, made a rigid one;
+               signature, made a rigid one of the pool;
              - those not in the lines do not change them: [empty]. *)
     let mono = TVOp.all_vars KNoInfer in
     let clean =
@@ -427,7 +438,7 @@ let draft_solutions ctx envs display ty locs =
         [Subst.apply s d]
     in
     let line = Subst.apply clean (Subst.apply s d) in
-    let rigid = TVOp.refresh ~kind:KNoInfer (MVarSet.of_set1 (TVarSet.of_list (weak_of line))) in
+    let rigid = weak_of line |> List.mapi (fun i v -> (v, TVar.typ (pooled i))) |> Subst.of_list1 in
     let resolve t = Subst.apply rigid (Subst.apply clean (Subst.apply s t)) in
     let rest =
       List.concat_map (fun v -> weak_of (resolve (TVar.typ v))) weak
