@@ -69,6 +69,11 @@ module Builder = struct
         keys tenv.aliases @ keys tenv.enums @ keys tenv.tags @ keys tenv.abs
         |> List.sort_uniq String.compare
 
+    (* The number of parameters of the type alias [name] ([None] if [name] is
+       not an alias): 2 for [type t('a, 'b) = ...], 0 for [type t = ...]. *)
+    let alias_arity { tenv ; _ } name =
+        StrMap.find_opt name tenv.aliases |> Option.map (fun (_, ps) -> List.length ps)
+
     let reg_to_sstt f r =
         let open TyExpr in
         let open Sstt.Extensions in
