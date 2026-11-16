@@ -38,6 +38,10 @@ val build_type : envs -> string -> Ty.t
    suggestions in the type toolkit. *)
 val user_type_names : envs -> string list
 
+(* The number of parameters of a user-defined type alias, [None] if the name
+   is not an alias. *)
+val user_alias_arity : envs -> string -> int option
+
 type parsing_result =
 | PSuccess of PAst.program
 | PFailure of Position.t * string

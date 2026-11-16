@@ -63,6 +63,10 @@ module Builder : sig
        abstract types), sorted and de-duplicated. *)
     val type_names : benv -> string list
 
+    (* The number of parameters of a type alias, [None] if the name is not
+       an alias. *)
+    val alias_arity : benv -> string -> int option
+
     val type_base_to_typ : TyExpr.base -> Ty.t
 
     val type_expr_to_typ : ?allow_gradual:bool -> benv -> TyExpr.t -> Ty.t * benv
