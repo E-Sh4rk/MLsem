@@ -264,10 +264,6 @@ let is_operation_generalizable o =
   | RecUpd _ | RecDel _ | Ignore _ -> true
   | OCustom c -> c.ogen
 
-let fv_of_rec_defs lst =
-  lst |> List.map (fun (_,_,t) -> fv t)
-  |> List.fold_left VarSet.union VarSet.empty
-
 let coerce ?coercion_id ?(duplicate_arrows=false) c ty t =
   let mono = TVOp.all_vars KNoInfer in
   let to_single_arrow ty =
@@ -335,17 +331,12 @@ let coerce ?coercion_id ?(duplicate_arrows=false) c ty t =
         let n = List.length lst in
         let tys = List.mapi (fun i _ -> GTy.map (Tuple.proj n i) ty) lst in
         if GTy.leq (GTy.mapl Tuple.mk tys) ty |> not then raise Exit ;
-        let fv = fv_of_rec_defs lst in
         LambdaRec (List.combine lst tys |> List.map (fun ((tya,v,e), ty) ->
             match tya with
             | Some tya ->
               let s = unify ty tya in
               Some (GTy.substitute s ty), v, aux (GTy.substitute s ty) (apply_subst s e)
-            | None ->
-              (* Optimisation: we only annotate if recursivity is used,
-              in order to avoid a useless binding of a type variable in the environment *)
-              let aty = if VarSet.mem v fv then Some ty else None in
-              aty, v, aux ty e
+            | None -> Some ty, v, aux ty e
           ))
       | _ -> raise Exit
       with Exit -> t
@@ -360,14 +351,9 @@ let push_coercions ?(duplicate_arrows=false) t =
     match t with
     | id, TypeCoerce (t, ty, c) -> coerce ~coercion_id:id ~duplicate_arrows c ty t
     | id, LambdaRec lst ->
-      let fv = fv_of_rec_defs lst in
       let lst = lst |> List.map (function
         | (None, v, t) -> None, v, t
-        | (Some ty, v, t) ->
-          (* Optimisation: we only annotate if recursivity is used,
-          in order to avoid a useless binding of a type variable in the environment *)
-          let aty = if VarSet.mem v fv then Some ty else None in
-          aty, v, coerce ~duplicate_arrows CheckStatic ty t
+        | (Some ty, v, t) -> Some ty, v, coerce ~duplicate_arrows CheckStatic ty t
         ) in
       id, LambdaRec lst
     | t -> t

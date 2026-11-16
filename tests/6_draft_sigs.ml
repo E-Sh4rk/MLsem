@@ -39,3 +39,6 @@ and odd2 n = if n is 0 then false else even2 (n-1)
 val len2 : [] -> _
 val len2 : [any+] -> _
 let len2 l = match l with [] -> 0 | _::xs -> 1 + len2 xs end
+
+val neg_true : _ -> _
+let neg_true x = if x is true then false else x

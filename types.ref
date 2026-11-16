@@ -361,3 +361,4 @@ two: (1 -> 2 -> bool) & (int -> int -> int | true)
 even2: int -> bool
 odd2: int -> bool
 len2: ([ any+ ] -> int) & ([  ] -> 0)
+neg_true: ∀'a. ('a \ true -> 'a \ true) & (true -> false)
