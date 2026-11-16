@@ -929,3 +929,25 @@ let inline t =
       else
         checked_print (if kept = [] then body else TWhere (body, kept))
   | _ -> None
+
+(* [t] without the definitions of its [where] that its body does not use,
+   directly or through the definitions it uses (one using only itself is
+   unused); [None] when every definition is used. *)
+let drop_unused t =
+  match strip t with
+  | TWhere (body, defs) ->
+      let rec reach seen = function
+        | [] -> seen
+        | n :: rest when List.mem n seen -> reach seen rest
+        | n :: rest -> (
+            match List.find_opt (fun (m, _, _) -> m = n) defs with
+            | Some (_, _, d) -> reach (n :: seen) (names d @ rest)
+            | None -> reach seen rest )
+      in
+      let used = reach [] (names body) in
+      let kept = List.filter (fun (n, _, _) -> List.mem n used) defs in
+      if List.length kept = List.length defs then
+        None
+      else
+        Some (if kept = [] then body else TWhere (body, kept))
+  | _ -> None

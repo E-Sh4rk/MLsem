@@ -15,7 +15,10 @@
      output positions of the whole line becomes [empty], and one only in
      input positions [any] ([TyScheme.bot_instance], as when MLsem
      simplifies a signature). The positions are the line's, not the part's;
-   - all: the last three, in the order MLsem applies them, then printed.
+   - all: the last three, in the order MLsem applies them, then printed;
+   - unused definitions dropped: a [where] without the definitions its body
+     does not use, the rest as written;
+   - declared type: a declared type equal to the part, by name.
 
    Results that are the same are offered once, with their labels together;
    a result that is the part as written is not offered. *)
@@ -107,8 +110,23 @@ let options envs line (p : Type_refactor.part) =
                     | exception _ -> acc )
                  results
           in
+          (* The part without the [where] definitions nothing uses, as
+             written otherwise. *)
+          let results =
+            match Type_refactor.drop_unused p.node with
+            | None -> results
+            | Some e ->
+                let l = "unused definitions dropped" in
+                if List.exists (fun (e', _) -> same e e') results then
+                  List.map (fun (e', ls) -> if same e e' then (e', ls @ [l]) else (e', ls)) results
+                else
+                  results @ [(e, [l])]
+          in
           let label ls =
-            if List.length ls = List.length steps then "any step" else String.concat " · " ls
+            if steps <> [] && List.for_all (fun (l, _) -> List.mem l ls) steps then
+              "any step"
+            else
+              String.concat " · " ls
           in
           Some (List.map (fun (e, ls) -> (Type_parts.written p e, Some (label ls))) results) )
 
