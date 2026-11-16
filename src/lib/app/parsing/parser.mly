@@ -331,7 +331,6 @@ atomic_term:
 }
 | c=CID { annot $startpos $endpos (Enum c) }
 | t=PCID a=term RPAREN { annot $startpos $endpos (Tag (t,a)) }
-| t=PCID RPAREN { annot $startpos $endpos (Tag (t,annot $startpos $endpos (Const Unit))) }
 | l=literal { annot $startpos $endpos (Const l) }
 | LPAREN RPAREN { annot $startpos $endpos (Const Unit) }
 | LPAREN t=term RPAREN { t }
@@ -481,7 +480,7 @@ atomic_typ:
   { Ty (TApp (s, ts |> List.map (as_typ $loc))) }
 | s=CID { Ty (TEnum s) }
 | s=PCID t=typ RPAREN { Ty (TTag (s, t)) }
-| s=PCID RPAREN { Ty (TTag (s, TBase TUnit)) }
+| s=PCID RPAREN { Ty (TTag (s, TBase TAny)) }
 | s=TVAR { Ty (TVar (KNoInfer, s)) }
 | s=TVAR_WEAK { Ty (TVar (KInfer, s)) }
 | PLACEHOLDER_VAR { Ty (fresh_hole ()) }
@@ -550,7 +549,7 @@ atomic_pattern:
 | c=literal { PatLit c }
 | e=CID { PatType (TEnum e) }
 | t=PCID p=pattern RPAREN { PatTag (t,p) }
-| t=PCID RPAREN { PatType (TTag (t,TBase TUnit)) }
+| t=PCID RPAREN { PatType (TTag (t,TBase TAny)) }
 | LBRACE fs=separated_list(SEMICOLON, pat_field) o=optional_open RBRACE { PatRecord (fs, o) }
 | LPAREN RPAREN { PatType (TBase TUnit) }
 | LPAREN p=pattern RPAREN { p }
