@@ -67,6 +67,11 @@ module Builder : sig
        an alias. *)
     val alias_arity : benv -> string -> int option
 
+    (* The number of arguments a user-defined type is written with: an
+       alias's or an abstract type's parameters, 1 for a tag, 0 for an enum;
+       [None] if the name is not a user-defined type. *)
+    val type_arity : benv -> string -> int option
+
     val type_base_to_typ : TyExpr.base -> Ty.t
 
     val type_expr_to_typ : ?allow_gradual:bool -> benv -> TyExpr.t -> Ty.t * benv
