@@ -211,13 +211,14 @@ let overloads params : Yojson.Safe.t =
         let texts = Main.signature envs b.sigs in
         let strs ss = `List (List.map (fun s -> `String s) ss) in
         let overload_vars = b.sigs |> List.map (fun o -> strs (Signature.overload_vars o)) in
-        (* A declared type with parameters as a template, its arguments
-           holes ([tree(_)]), for the panel to have them typed. *)
+        (* A declared type written with arguments (a type with parameters, a
+           tag) as a template, its arguments holes ([tree(_)], [Node(_)]),
+           for the panel to have them typed. *)
         let concrete_types =
           builtin_type_names
           @ List.map
               (fun n ->
-                 match Main.user_alias_arity envs n with
+                 match Main.user_type_arity envs n with
                  | Some k when k > 0 ->
                      n ^ "(" ^ String.concat ", " (List.init k (fun _ -> "_")) ^ ")"
                  | _ -> n )
