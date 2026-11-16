@@ -5,9 +5,77 @@
    printer puts it in them there. *)
 
 open Mlsem_app
+open Mlsem_types
 open Yojson.Safe.Util
 
 let error msg = `Assoc [("ok", `Bool false); ("error", `String msg)]
+
+(* Build a type expression of the [val] type [line]: under the line's
+   [where] definitions, so that a part may use their names ([Node(x1)] in
+   [... where x1 = ...]). *)
+let build envs line =
+  let defs =
+    match Type_refactor.strip line with
+    | TyExpr.TWhere (_, defs) -> defs
+    | _ -> []
+  in
+  fun t ->
+    let t = if defs = [] then t else TyExpr.TWhere (t, defs) in
+    Typings.build_signature envs t |> fst |> Signature.to_gty |> GTy.ub
+
+(* The declared type [name] with [k] parameters, applied to the tightest
+   arguments that make it contain [part_ty]: [part_ty ≤ name('_1, …, '_k)]
+   tallied, the part's own variables fixed, and each argument its lower
+   bound (the variables tally leaves in it [empty]). The arguments are
+   printed and parsed back, to be written. [None] when no arguments fit. *)
+let applied envs build part_ty name k =
+  let open TyExpr in
+  let names = List.init k (fun i -> "_arg" ^ string_of_int i) in
+  match build (TApp (name, List.map (fun n -> TVar (KInfer, n)) names)) with
+  | exception _ -> None
+  | c_ty -> (
+      let args =
+        TVOp.vars c_ty |> MVarSet.proj1 |> TVarSet.elements |> List.filter (TVar.has_kind KInfer)
+      in
+      let arg n = List.find_opt (fun v -> TVar.name v = n) args in
+      let mono = MVarSet.union (TVOp.all_vars KNoInfer) (TVOp.vars part_ty) in
+      match TVOp.tally mono [(part_ty, c_ty)] with
+      | [] -> None
+      | s :: _ -> (
+          let lower t =
+            let t = Subst.apply s t in
+            let left =
+              TVOp.vars t |> MVarSet.proj1 |> TVarSet.elements
+              |> List.filter (fun v -> TVar.has_kind KInfer v && not (MVarSet.mem1 v mono))
+            in
+            Subst.apply (Subst.of_list1 (List.map (fun v -> (v, Ty.empty)) left)) t
+          in
+          let print t = Main.display_gty envs (GTy.mk t) in
+          match
+            List.map
+              (fun n ->
+                 match arg n with
+                 | Some v -> IO.parse_type_string (print (lower (TVar.typ v)))
+                 | None -> TBase TAny )
+              names
+          with
+          (* An [empty] argument: the part has none of that parameter's
+             values ([tree(empty)] for [Leaf]), not worth the name. *)
+          | exprs ->
+              let exprs = List.map Type_refactor.strip exprs in
+              if List.mem (TBase TEmpty) exprs then None else Some (TApp (name, exprs))
+          | exception _ -> None ) )
+
+(* The declared types that may contain a part of type [part_ty]: those
+   without parameters by name, those with parameters applied to the
+   tightest arguments that fit ([applied]). [build] builds an expression
+   where the part is. *)
+let declared envs build part_ty =
+  Main.user_type_names envs
+  |> List.concat_map (fun n ->
+    match Main.user_alias_arity envs n with
+    | Some k when k > 0 -> Option.to_list (applied envs build part_ty n k)
+    | _ -> [TyExpr.TCustom n] )
 
 (* [c] as written in place of the part [p]. *)
 let written (p : Type_refactor.part) c =

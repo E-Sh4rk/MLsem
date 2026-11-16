@@ -32,7 +32,7 @@ let parse s =
 (* The simplified forms of the part [p] of the [val] line [line], as written
    in its place, with the steps that give each. *)
 let options envs line (p : Type_refactor.part) =
-  let build t = Typings.build_signature envs t |> fst |> Signature.to_gty |> GTy.ub in
+  let build = Type_parts.build envs line in
   match p.node with
   | TOption _ -> None
   | _ -> (
@@ -42,7 +42,7 @@ let options envs line (p : Type_refactor.part) =
           (* The values of the line's variables that occur one way only, by
              name: the part's variables are built apart from the line's. *)
           let unused =
-            match build line with
+            match Typings.build_signature envs line |> fst |> Signature.to_gty |> GTy.ub with
             | exception _ -> []
             | line_ty ->
                 TVOp.vars_with_polarity1 line_ty
@@ -66,6 +66,14 @@ let options envs line (p : Type_refactor.part) =
               ("all", ty |> drop |> Ty.simplify |> Ty.factorize);
             ]
           in
+          (* A part using the line's [where] names is printed with their
+             definitions again, which says nothing new: only its declared
+             types are offered. *)
+          let steps =
+            match Typings.build_signature envs p.node with
+            | _ -> steps
+            | exception _ -> []
+          in
           (* Compared up to the order of unions and intersections, which the
              printer may change without simplifying anything; a duplicate
              member it drops is a simplification. *)
@@ -83,6 +91,21 @@ let options envs line (p : Type_refactor.part) =
                        acc
                  | Some e -> acc @ [(e, [label])] )
               [] steps
+          in
+          (* A declared type that is the part: its name. *)
+          let results =
+            Type_parts.declared envs build ty
+            |> List.fold_left
+                 (fun acc c ->
+                    match build c with
+                    | c_ty
+                      when Ty.leq c_ty ty && Ty.leq ty c_ty
+                           && (not (same c original))
+                           && not (List.exists (fun (e, _) -> same c e) acc) ->
+                        acc @ [(c, ["declared type"])]
+                    | _ -> acc
+                    | exception _ -> acc )
+                 results
           in
           let label ls =
             if List.length ls = List.length steps then "any step" else String.concat " · " ls
