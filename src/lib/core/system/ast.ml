@@ -282,15 +282,20 @@ let coerce ?coercion_id ?(duplicate_arrows=false) c ty t =
     | _ -> raise Exit
   in
   let decompose_gradual _ = (* not implemented *) raise Exit in
+  let domains_of_construct cons ty =
+    match domains_of_construct cons ty with
+    | [doms] -> doms
+    | _ -> raise Exit
+  in
+  let unify ty1 ty2 =
+    match TVOp.tally mono
+      [ (GTy.lb ty1, GTy.lb ty2) ; (GTy.lb ty2, GTy.lb ty1) ;
+        (GTy.ub ty1, GTy.ub ty2) ; (GTy.ub ty2, GTy.ub ty1) ]
+    with
+    | [s'] -> s'
+    | _ -> raise Exit
+  in
   let rec aux ?coercion_id ty (id,t) =
-    let unify ty1 ty2 =
-      match TVOp.tally mono
-        [(GTy.lb ty1, GTy.lb ty2) ; (GTy.lb ty2, GTy.lb ty1) ;
-         (GTy.ub ty1, GTy.ub ty2) ; (GTy.ub ty2, GTy.ub ty1)]
-      with
-      | [s'] -> s'
-      | _ -> raise Exit
-    in
     let t =
       try match t with
       | Let (tys, v, e1, e2) -> Let (tys, v, e1, aux ty e2)
@@ -298,13 +303,8 @@ let coerce ?coercion_id ?(duplicate_arrows=false) c ty t =
       | Projection (p, e) ->
         Projection (p, aux (GTy.map (domain_of_proj p) ty) e)
       | Constructor (cons, es) ->
-        let domains_of_construct ty =
-          match domains_of_construct cons ty with
-          | [doms] -> doms
-          | _ -> raise Exit
-        in
-        let tys_lb = domains_of_construct (GTy.lb ty) in
-        let tys_ub = domains_of_construct (GTy.ub ty) in
+        let tys_lb = domains_of_construct cons (GTy.lb ty) in
+        let tys_ub = domains_of_construct cons (GTy.ub ty) in
         let tys = List.map2 GTy.mk_gradual tys_lb tys_ub in
         Constructor (cons, List.map2 aux tys es)
       | Lambda (da,v,e) as expr ->
@@ -327,17 +327,6 @@ let coerce ?coercion_id ?(duplicate_arrows=false) c ty t =
           | None -> Lambda (Some d, v, aux cd e)
           end
         end
-      | LambdaRec lst ->
-        let n = List.length lst in
-        let tys = List.mapi (fun i _ -> GTy.map (Tuple.proj n i) ty) lst in
-        if GTy.leq (GTy.mapl Tuple.mk tys) ty |> not then raise Exit ;
-        LambdaRec (List.combine lst tys |> List.map (fun ((tya,v,e), ty) ->
-            match tya with
-            | Some tya ->
-              let s = unify ty tya in
-              Some (GTy.substitute s ty), v, aux (GTy.substitute s ty) (apply_subst s e)
-            | None -> Some ty, v, aux ty e
-          ))
       | _ -> raise Exit
       with Exit -> t
     in
