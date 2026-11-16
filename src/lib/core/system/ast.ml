@@ -134,6 +134,15 @@ let refresh t = map (fun (eid,t) -> (Eid.refresh eid, t)) t
 
 (* Projections and constructors *)
 
+let proj p ty =
+  match p with
+  | PiField label | PiFieldOpt label -> Record.proj ty label
+  | Pi (n,i) -> Tuple.proj n i ty
+  | Hd -> Lst.proj ty |> fst
+  | Tl -> Lst.proj ty |> snd
+  | PiTag tag -> Tag.proj tag ty
+  | PCustom r -> r.proj ty
+
 let domain_of_proj p ty =
   match p with
   | PiField label -> Record.mk_open [label, (ty, false)]
@@ -149,19 +158,32 @@ let domain_of_proj p ty =
     Tag.mk tag ty
   | PCustom r -> r.pdom ty
 
-let proj p ty =
-  match p with
-  | PiField label | PiFieldOpt label -> Record.proj ty label
-  | Pi (n,i) -> Tuple.proj n i ty
-  | Hd -> Lst.proj ty |> fst
-  | Tl -> Lst.proj ty |> snd
-  | PiTag tag -> Tag.proj tag ty
-  | PCustom r -> r.proj ty
-
 let is_proj_generalizable p =
   match p with
   | Pi _ | PiField _ | PiFieldOpt _ | Hd | Tl | PiTag _ -> true
   | PCustom c -> c.pgen
+
+let construct (c:constructor) tys =
+  match c, tys with
+  | Tuple n, tys when List.length tys = n -> Tuple.mk tys
+  | Join n, tys when List.length tys = n -> Ty.disj tys
+  | Meet n, tys when List.length tys = n -> Ty.conj tys
+  | NoGen, [ty] -> ty
+  | Normalize, [ty] -> !Config.normalization_fun ty
+  | Voidify ty, [_] -> ty
+  | Ternary tau, [t;t1;t2] ->
+    if Ty.leq t tau then t1
+    else if Ty.leq t (Ty.neg tau) then t2
+    else Ty.cup t1 t2
+  | Cons, [t1 ; t2] -> Lst.cons t1 t2
+  | Rec (labels, opened), tys when List.length labels = List.length tys ->
+    let mk = if opened then Record.mk_open else Record.mk_closed in
+    let bindings = List.map2 (fun lbl ty -> (lbl, (ty,false))) labels tys in
+    mk bindings
+  | Tag tag, [t] -> Tag.mk tag t
+  | Enum enum, [] -> Enum.typ enum
+  | CCustom r, tys -> r.cons tys
+  | _ -> raise (Invalid_argument "Invalid arity for constructor.")
 
 let domains_of_construct (c:constructor) ty =
   match c with
@@ -194,28 +216,9 @@ let domains_of_construct (c:constructor) ty =
   | Enum e when Ty.leq (Enum.typ e) ty -> [ [] ]
   | Enum _ -> [ ]
   | CCustom r -> r.cdom ty
-
-let construct (c:constructor) tys =
-  match c, tys with
-  | Tuple n, tys when List.length tys = n -> Tuple.mk tys
-  | Join n, tys when List.length tys = n -> Ty.disj tys
-  | Meet n, tys when List.length tys = n -> Ty.conj tys
-  | NoGen, [ty] -> ty
-  | Normalize, [ty] -> !Config.normalization_fun ty
-  | Voidify ty, [_] -> ty
-  | Ternary tau, [t;t1;t2] ->
-    if Ty.leq t tau then t1
-    else if Ty.leq t (Ty.neg tau) then t2
-    else Ty.cup t1 t2
-  | Cons, [t1 ; t2] -> Lst.cons t1 t2
-  | Rec (labels, opened), tys when List.length labels = List.length tys ->
-    let mk = if opened then Record.mk_open else Record.mk_closed in
-    let bindings = List.map2 (fun lbl ty -> (lbl, (ty,false))) labels tys in
-    mk bindings
-  | Tag tag, [t] -> Tag.mk tag t
-  | Enum enum, [] -> Enum.typ enum
-  | CCustom r, tys -> r.cons tys
-  | _ -> raise (Invalid_argument "Invalid arity for constructor.")
+let domains_of_construct c ty =
+  domains_of_construct c ty |> List.filter
+    (fun args -> Ty.leq (construct c args) ty)
 
 let is_construct_generalizable c =
   match c with
@@ -260,6 +263,10 @@ let is_operation_generalizable o =
   match o with
   | RecUpd _ | RecDel _ | Ignore _ -> true
   | OCustom c -> c.ogen
+
+let fv_of_rec_defs lst =
+  lst |> List.map (fun (_,_,t) -> fv t)
+  |> List.fold_left VarSet.union VarSet.empty
 
 let coerce ?coercion_id ?(duplicate_arrows=false) c ty t =
   let mono = TVOp.all_vars KNoInfer in
@@ -328,12 +335,17 @@ let coerce ?coercion_id ?(duplicate_arrows=false) c ty t =
         let n = List.length lst in
         let tys = List.mapi (fun i _ -> GTy.map (Tuple.proj n i) ty) lst in
         if GTy.leq (GTy.mapl Tuple.mk tys) ty |> not then raise Exit ;
+        let fv = fv_of_rec_defs lst in
         LambdaRec (List.combine lst tys |> List.map (fun ((tya,v,e), ty) ->
             match tya with
             | Some tya ->
               let s = unify ty tya in
               Some (GTy.substitute s ty), v, aux (GTy.substitute s ty) (apply_subst s e)
-            | None -> Some ty, v, aux ty e
+            | None ->
+              (* Optimisation: we only annotate if recursivity is used,
+              in order to avoid a useless binding of a type variable in the environment *)
+              let aty = if VarSet.mem v fv then Some ty else None in
+              aty, v, aux ty e
           ))
       | _ -> raise Exit
       with Exit -> t
@@ -348,9 +360,14 @@ let push_coercions ?(duplicate_arrows=false) t =
     match t with
     | id, TypeCoerce (t, ty, c) -> coerce ~coercion_id:id ~duplicate_arrows c ty t
     | id, LambdaRec lst ->
+      let fv = fv_of_rec_defs lst in
       let lst = lst |> List.map (function
         | (None, v, t) -> None, v, t
-        | (Some ty, v, t) -> Some ty, v, coerce ~duplicate_arrows CheckStatic ty t
+        | (Some ty, v, t) ->
+          (* Optimisation: we only annotate if recursivity is used,
+          in order to avoid a useless binding of a type variable in the environment *)
+          let aty = if VarSet.mem v fv then Some ty else None in
+          aty, v, coerce ~duplicate_arrows CheckStatic ty t
         ) in
       id, LambdaRec lst
     | t -> t
