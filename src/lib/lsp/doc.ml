@@ -332,7 +332,7 @@ let lenses_in_range uri (req_range : Lsp.Types.Range.t) :
       List.filter_map
         (fun (l : Typecheck.lens) ->
            (* A binder starts at its name: its line before the name ([let],
-              [let rec], [and]) counts too. *)
+              or [and] in [let ... and ...]) counts too. *)
            let line_start =
              e.line_offsets.((position_of_offset e.line_offsets l.start_offset).line)
            in
