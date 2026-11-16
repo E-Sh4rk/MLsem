@@ -24,7 +24,6 @@
    ([Type_refactor] prints it anew), so that a replacement is not text put
    in place of a span. *)
 
-open Mlsem_app
 open Mlsem_types
 open TyExpr
 
@@ -52,59 +51,11 @@ let widen_literals t =
   in
   go t
 
-(* The declared type [name] with [k] parameters, applied to the tightest
-   arguments that make it contain [part_ty]: [part_ty ≤ name('_1, …, '_k)]
-   tallied, the part's own variables fixed, and each argument its lower
-   bound (the variables tally leaves in it [empty]). The arguments are
-   printed and parsed back, to be written. [None] when no arguments fit. *)
-let applied envs build part_ty name k =
-  let names = List.init k (fun i -> "_arg" ^ string_of_int i) in
-  match build (TApp (name, List.map (fun n -> TVar (KInfer, n)) names)) with
-  | exception _ -> None
-  | c_ty -> (
-      let args =
-        TVOp.vars c_ty |> MVarSet.proj1 |> TVarSet.elements |> List.filter (TVar.has_kind KInfer)
-      in
-      let arg n = List.find_opt (fun v -> TVar.name v = n) args in
-      let mono = MVarSet.union (TVOp.all_vars KNoInfer) (TVOp.vars part_ty) in
-      match TVOp.tally mono [(part_ty, c_ty)] with
-      | [] -> None
-      | s :: _ -> (
-          let lower t =
-            let t = Subst.apply s t in
-            let left =
-              TVOp.vars t |> MVarSet.proj1 |> TVarSet.elements
-              |> List.filter (fun v -> TVar.has_kind KInfer v && not (MVarSet.mem1 v mono))
-            in
-            Subst.apply (Subst.of_list1 (List.map (fun v -> (v, Ty.empty)) left)) t
-          in
-          let print t = Main.display_gty envs (GTy.mk t) in
-          match
-            List.map
-              (fun n ->
-                 match arg n with
-                 | Some v -> IO.parse_type_string (print (lower (TVar.typ v)))
-                 | None -> TBase TAny )
-              names
-          with
-          | exprs -> Some (TApp (name, exprs))
-          | exception _ -> None ) )
-
 (* The wider types of the located part [p] of the [val] type [line], as
    written in its place, and the hole; [None] when it cannot be built (an
-   optional field [t?]) or is a hole itself. Types are built under the
-   line's [where] definitions, so that a part may use their names
-   ([Node(x1)] in [... where x1 = ...]). *)
+   optional field [t?]) or is a hole itself. *)
 let wider envs line (p : Type_refactor.part) =
-  let defs =
-    match Type_refactor.strip line with
-    | TWhere (_, defs) -> defs
-    | _ -> []
-  in
-  let build t =
-    let t = if defs = [] then t else TWhere (t, defs) in
-    Typings.build_signature envs t |> fst |> Signature.to_gty |> GTy.ub
-  in
+  let build = Type_parts.build envs line in
   match p.node with
   | TOption _ -> None
   | _ -> (
@@ -116,22 +67,17 @@ let wider envs line (p : Type_refactor.part) =
              that fit the part, and with those arguments' literals widened
              ([box(bool)] for [Box(true)], where [box(true)] is the part
              itself). *)
-          let declared n =
-            match Main.user_alias_arity envs n with
-            | Some k when k > 0 -> (
-                match applied envs build part_ty n k with
-                | None -> []
-                | Some c ->
-                    let c = Type_refactor.strip c in
-                    let w = widen_literals c in
-                    if w <> c then [c; w] else [c] )
-            | _ -> [TCustom n]
+          let declared =
+            Type_parts.declared envs build part_ty
+            |> List.concat_map (fun c ->
+              let w = widen_literals c in
+              if w <> c then [c; w] else [c] )
           in
           let literal = widen_literals node in
           (* Declared types first: of two equivalent candidates the first is
              kept, and a declared name reads better than its structure. *)
           let exprs =
-            List.concat_map declared (Main.user_type_names envs)
+            declared
             @ (if literal <> node then [literal] else [])
             @ List.map (fun b -> TBase b) builtin
           in
