@@ -331,12 +331,24 @@ let lenses_in_range uri (req_range : Lsp.Types.Range.t) :
       let lo, hi = (min req_s req_e, max req_s req_e) in
       List.filter_map
         (fun (l : Typecheck.lens) ->
-           (* A binder starts at its name: its line before the name ([let],
-              or [and] in [let ... and ...]) counts too. *)
-           let line_start =
-             e.line_offsets.((position_of_offset e.line_offsets l.start_offset).line)
+           (* A binder starts at its name: the [let] just before the name
+              counts too, not an [and] (in [let f = ... and g = ...], [let]
+              is [f]'s only, on one line or not). *)
+           let start =
+             let blank c = String.contains " \t\r\n" c in
+             let rec back i = if i > 0 && blank e.text.[i - 1] then back (i - 1) else i in
+             (* [k]: the end of the word before the name. *)
+             let k = back l.start_offset in
+             if
+               k < l.start_offset && k >= 3
+               && String.sub e.text (k - 3) 3 = "let"
+               && (k = 3 || blank e.text.[k - 4])
+             then
+               k - 3
+             else
+               l.start_offset
            in
-           if l.end_offset < lo || line_start > hi then
+           if l.end_offset < lo || start > hi then
              None
            else
              let range =
