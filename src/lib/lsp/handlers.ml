@@ -122,6 +122,34 @@ let merge_texts envs (sigs : Signature.t) (wanted : string list) =
    [only], when present, keeps just the overloads whose *original* rendered text
    is in it (the per-overload Insert action writes a single one).
    May raise on a malformed concrete type (caught by the handler). *)
+(* An overload's text with the holes an instantiation put in it ([_] in the
+   type given, printed ['_holeN]) written as holes again: [_] where it occurs
+   once; where it occurs more than once (the variable did), a named hole
+   (['_a]), so that its copies stay one type. *)
+let written_holes text =
+  let hole = Str.regexp "'_hole[0-9]+" in
+  let rec occurrences i acc =
+    match Str.search_forward hole text i with
+    | j -> occurrences (j + 1) (Str.matched_string text :: acc)
+    | exception Not_found -> List.rev acc
+  in
+  let all = occurrences 0 [] in
+  let shared =
+    List.sort_uniq compare (List.filter (fun h -> List.length (List.filter (( = ) h) all) > 1) all)
+  in
+  (* Names for the shared ones, not used by the line. *)
+  let names =
+    List.init 26 (fun i -> "'_" ^ String.make 1 (Char.chr (Char.code 'a' + i)))
+    |> List.filter (fun n ->
+      not (Str.string_match (Str.regexp (".*" ^ Str.quote n ^ "\\b")) text 0) )
+  in
+  let named = List.mapi (fun i h -> (h, List.nth names i)) shared in
+  Str.global_substitute hole
+    (fun s ->
+       let h = Str.matched_string s in
+       Option.value ~default:"_" (List.assoc_opt h named) )
+    text
+
 let instantiate_texts ?only envs (sigs : Signature.t) insts =
   Config.restore_all () ;
   let rendered = Main.signature envs sigs in
@@ -140,7 +168,7 @@ let instantiate_texts ?only envs (sigs : Signature.t) insts =
                  List.fold_left
                    (fun s (var, tystr) ->
                       let ty =
-                        try Main.build_type envs tystr with
+                        try Typings.build_type envs tystr with
                         | _ -> raise (Bad_type tystr)
                       in
                       Signature.instantiate s var ty )
@@ -154,7 +182,7 @@ let instantiate_texts ?only envs (sigs : Signature.t) insts =
       | None -> pairs
       | Some texts -> List.filter (fun (r, _) -> List.mem r texts) pairs
     in
-    `Ok (Main.signature envs (List.map snd kept))
+    `Ok (List.map written_holes (Main.signature envs (List.map snd kept)))
 
 (* The instances of the [k]th overload of [b] that its calls in the document
    fit, each with the calls (range and text), in order of first call. A call

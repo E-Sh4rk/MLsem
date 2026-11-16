@@ -351,6 +351,11 @@ let build_signature envs t =
   let benv, _, _, _, penv = envs in
   PEnv.sequential_handler penv (Signature.build benv) t |> fst
 
+(* The type of a type's text ([Main.build_type]), under the same handler. *)
+let build_type envs s =
+  let _, _, _, _, penv = envs in
+  PEnv.sequential_handler penv (Main.build_type envs) s |> fst
+
 (* The holes of a draft's [val] lines (at [locs]), solved from the
    definition's type scheme [ty].
 
