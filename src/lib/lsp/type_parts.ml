@@ -83,6 +83,24 @@ let written (p : Type_refactor.part) c =
   | Some (parent, i) -> Type_refactor.print_as_child parent i c
   | None -> Type_refactor.print c
 
+(* The type written [text], [where] definitions included, and its parts as
+   the parser locates them ([Type_refactor.located_parts]), the type itself
+   first; a part's span is in [text]. Raises when [text] is not a type. *)
+let locate text =
+  let ty = IO.parse_type_string text in
+  (ty, Type_refactor.located_parts ty)
+
+(* The part [p] of [text], for the client: its [start, end), [shift]ed, its
+   text, and [fields]. *)
+let part_json text ?(shift = 0) (p : Type_refactor.part) fields : Yojson.Safe.t =
+  let s, e = p.span in
+  `Assoc
+    ( [
+        ("start", `Int (s + shift)); ("end", `Int (e + shift));
+        ("text", `String (String.sub text s (e - s)));
+      ]
+    @ fields )
+
 (* The [val] lines of the definition at [position]: per line, its number and
    text, and per part (on that line) its columns, its text and its options,
    each as written and with a label if any. [options envs line part] gives
@@ -104,9 +122,10 @@ let lines params options : Yojson.Safe.t =
           List.filter_map
             (fun (_, elem) ->
                match elem with
-               | PAst.SigDef (_, _, (Mlsem_types.TyExpr.TLoc ((s, _), _) as ty))
+               | PAst.SigDef (_, _, Mlsem_types.TyExpr.TLoc ((s, e), _))
                  when in_vals s.Lexing.pos_cnum ->
-                   let line = (Doc.position_of_offset offsets s.pos_cnum).line in
+                   let s = s.pos_cnum and e = e.Lexing.pos_cnum in
+                   let line = (Doc.position_of_offset offsets s).line in
                    let line_start = offsets.(line) in
                    let line_end =
                      match String.index_from_opt text line_start '\n' with
@@ -118,12 +137,13 @@ let lines params options : Yojson.Safe.t =
                        ( ("text", `String text)
                        :: Option.fold ~none:[] ~some:(fun l -> [("label", `String l)]) label )
                    in
+                   let ty_text = String.sub text s (e - s) in
+                   let ty, located = locate ty_text in
                    let parts =
-                     Type_refactor.located_parts ty
+                     located
                      |> List.filter_map (fun (p : Type_refactor.part) ->
-                       let s, e = p.span in
                        (* A part on this line only. *)
-                       if e > line_end then
+                       if s + snd p.span > line_end then
                          None
                        else
                          match
@@ -134,13 +154,8 @@ let lines params options : Yojson.Safe.t =
                              None
                          | Some os ->
                              Some
-                               (`Assoc
-                                   [
-                                     ("start", `Int (s - line_start));
-                                     ("end", `Int (e - line_start));
-                                     ("text", `String (String.sub text s (e - s)));
-                                     ("options", `List (List.map option os));
-                                   ] ) )
+                               (part_json ty_text ~shift:(s - line_start) p
+                                  [("options", `List (List.map option os))] ) )
                    in
                    Some
                      (`Assoc
