@@ -87,8 +87,6 @@ type e =
 (** The type list is a suggested decomposition of the bound variable: the body
     is typed once per cell and the results are joined, which is what lets a
     single definition be used at several types in a same scope.
-    The decomposition may contain weak type variables (KInfer),
-    but only if they are already bound to the type environment.
     An empty list disables partitioning; note that only a partitioned [Let]
     propagates the divergence of its definition (an empty definition type
     makes every cell vanish). *)
