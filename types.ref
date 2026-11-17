@@ -202,7 +202,7 @@ test_rec_proj: a_or_b
 test_mix: { l1 : 42? ; l2 : 33 | true ; l4 : false? }
 test_merge: { l1 : 42 ; l2 : 33 | true ; l4 : false }
 test_merge2: ∀'a,'b,'c. { x : 'a ; y : (42 | 'b)? ; z : (73 | 'c)? ..} -> ('a, 42 | 'b, 73 | 'c)
-test_foo: { l1 : 42 ; l2 : 42 ; l3 : 42 } | { l1 : 73 ; l2 : 73 ; l3 : 73 } -> { l1 : int ; l2 : 42 | 73 ; l3 : 42 | 73 }
+test_foo: { l1 : 73 ; l2 : 73 ; l3 : 73 } | { l1 : 42 ; l2 : 42 ; l3 : 42 } -> { l1 : int ; l2 : 42 | 73 ; l3 : 42 | 73 }
 test_lapply: [ [ int* ]* ]
 test_r_lists: { a : (1..3) ; c : (1..3) ; b : (1..3) ;; (1..3)? }
 test_classes: { data_frame : true ;; false }

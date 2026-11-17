@@ -70,22 +70,28 @@ type param_annot = GTy.t option
 
 type e =
 | Value of GTy.t
+(** The value type may contain weak type variables (KInfer),
+    but only if they are already bound to the type environment. *)
 | Var of Variable.t
 | Constructor of constructor * t list
 | GConstructor of gconstructor * t list
 | Lambda of param_annot * Variable.t * t
 | LambdaRec of (param_annot * Variable.t * t) list
 | Ite of t * Ty.t * t * t
+(** The test type may contain weak type variables (KInfer),
+    but only if they are already bound to the type environment. *)
 | App of t * t
 | Operation of operation * t
 | Projection of projection * t
 | Let of (Ty.t list) (* empty list = no partitioning *) * Variable.t * t * t
 (** The type list is a suggested decomposition of the bound variable: the body
     is typed once per cell and the results are joined, which is what lets a
-    single definition be used at several types in a same scope. An empty list
-    disables partitioning; note that only a partitioned [Let] propagates the
-    divergence of its definition (an empty definition type makes every cell
-    vanish). *)
+    single definition be used at several types in a same scope.
+    The decomposition may contain weak type variables (KInfer),
+    but only if they are already bound to the type environment.
+    An empty list disables partitioning; note that only a partitioned [Let]
+    propagates the divergence of its definition (an empty definition type
+    makes every cell vanish). *)
 | TypeCast of t * GTy.t * check
 (** The cast type may contain weak type variables (KInfer),
     but only if they are already bound to the type environment. *)

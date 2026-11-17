@@ -87,10 +87,10 @@ let to_expr benv env e =
         benv := benv' ; tys
     in
     let aux_a tyo = Option.map aux_gty tyo in
-    let aux_cond t =
-        let t = aux_ty t in
+    let aux_cond t = aux_ty t
+        (* let t = aux_ty t in
         if B.is_test_type t then t
-        else raise (SymbolError ("typecases should use test types"))
+        else raise (SymbolError ("typecases should use test types")) *)
     in
     let aux_var env str =
         if NameMap.mem str env
@@ -197,11 +197,11 @@ let to_expr benv env e =
                     Variable.attach_location var pos ; kind, var, str
             in
             match pat with
-            | PatType t ->
-                let t = aux_ty t in
+            | PatType t -> (PatType (aux_ty t), NameMap.empty)
+                (* let t = aux_ty t in
                 if B.is_test_type t
                 then (PatType t, NameMap.empty)
-                else raise (SymbolError ("typecases should use test types"))
+                else raise (SymbolError ("typecases should use test types")) *)
             | PatVar vdef ->
                 let mut, var, str = find_or_def_var vdef in
                 (PatVar (mut, var), NameMap.singleton str var)
