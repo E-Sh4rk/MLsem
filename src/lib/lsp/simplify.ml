@@ -18,7 +18,9 @@
    - all: the last three, in the order MLsem applies them, then printed;
    - unused definitions dropped: a [where] without the definitions its body
      does not use, the rest as written;
-   - declared type: a declared type equal to the part, by name.
+   - declared type: a declared type equal to the part, by name;
+   - variables merged: for the whole line only, two of its variables made
+     one when that means the same ([merged_variables]).
 
    Results that are the same are offered once, with their labels together;
    a result that is the part as written is not offered. *)
@@ -31,6 +33,73 @@ let parse s =
   match Type_refactor.strip (IO.parse_type_string s) with
   | t -> Some t
   | exception _ -> None
+
+(* Whether [t1] is a subtype of an instance of [t2], [t2]'s weak variables
+   instantiable and every other variable fixed: what [## t1 <= t2] checks
+   ([Main.poly_leq], which [Main] does not export). *)
+let poly_leq t1 t2 =
+  let mono = TVOp.all_vars KNoInfer in
+  if MVarSet.subset (TVOp.vars t1) mono && MVarSet.subset (TVOp.vars t2) mono then
+    Ty.leq t1 t2
+  else
+    TVOp.tally mono [(t1, t2)] <> []
+
+(* The line [line_ty] with two of its variables made one, when that means
+   the same: the merged type is an instance of the line (one variable put
+   for the other), and the line must be an instance of it too, that is an
+   instance of the merged type, its variables instantiable, below the line
+   ([tree('a) -> int -> 'a -> tree('a)] for [tree('b) -> int -> 'a ->
+   tree('b | 'a)], with ['a := 'b | 'a], as [tree] is covariant). One
+   option per pair of variables that merge, the first by name kept; not on
+   a line with holes or weak variables. Each with its label. *)
+let merged_variables envs line line_ty =
+  (* Built as [Typings.build_signature] does, and with [envs] whose printer
+     knows the instances of declared types met building it: [tree('a)] is
+     printed by name only if it was built somewhere. *)
+  let build t =
+    let benv, varm, senv, env, penv = envs in
+    let (s, _), penv = PEnv.sequential_handler penv (Signature.build benv) t in
+    (Signature.to_gty s |> GTy.ub, (benv, varm, senv, env, penv))
+  in
+  let line = Type_refactor.strip line in
+  let vars =
+    Type_refactor.subterms line
+    |> List.filter_map (function
+      | TVar (KNoInfer, n) -> Some n
+      | _ -> None )
+    |> List.sort_uniq compare
+  in
+  let weak =
+    List.exists
+      (function
+        | TVar (KInfer, _) -> true
+        | _ -> false )
+      (Type_refactor.subterms line)
+  in
+  let rec pairs = function
+    | [] -> []
+    | a :: rest -> List.map (fun b -> (a, b)) rest @ pairs rest
+  in
+  let rec rename b a t =
+    match t with
+    | TVar (KNoInfer, n) when n = b -> TVar (KNoInfer, a)
+    | t -> Type_refactor.map_children (rename b a) t
+  in
+  if weak then
+    []
+  else
+    pairs vars
+    |> List.filter_map (fun (a, b) ->
+      match build (rename b a line) with
+      | exception _ -> None
+      | merged, envs ->
+          let instance = Subst.apply (TVOp.refresh ~kind:KInfer (TVOp.vars merged)) merged in
+          if poly_leq instance line_ty then
+            Some
+              ( Printf.sprintf "variables '%s and '%s merged" a b,
+                Main.display_gty envs (GTy.mk (merged |> Ty.simplify |> Ty.factorize)) )
+          else
+            None )
 
 (* The simplified forms of the part [p] of the [val] line [line], as written
    in its place, with the steps that give each. *)
@@ -121,6 +190,24 @@ let options envs line (p : Type_refactor.part) =
                   List.map (fun (e', ls) -> if same e e' then (e', ls @ [l]) else (e', ls)) results
                 else
                   results @ [(e, [l])]
+          in
+          (* The whole line with two variables merged, printed as the steps
+             are. *)
+          let results =
+            if p.parent <> None || steps = [] then
+              results
+            else
+              List.fold_left
+                (fun acc (label, printed) ->
+                   match parse printed with
+                   | None -> acc
+                   | Some e when same e original -> acc
+                   | Some e when List.exists (fun (e', _) -> same e e') acc ->
+                       List.map
+                         (fun (e', ls) -> if same e e' then (e', ls @ [label]) else (e', ls))
+                         acc
+                   | Some e -> acc @ [(e, [label])] )
+                results (merged_variables envs p.node ty)
           in
           let label ls =
             if steps <> [] && List.for_all (fun (l, _) -> List.mem l ls) steps then
