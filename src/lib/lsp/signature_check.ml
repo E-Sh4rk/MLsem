@@ -302,6 +302,43 @@ let definition_status params : Yojson.Safe.t =
               | [] -> status [("status", `String "unknown")]
               | errors -> status [("status", `String "errors"); ("errors", `List errors)] ) ) )
 
+(* The first line an edit of the [val] lines of [t] touches: the first [val]
+   line, or the definition. *)
+let first_val t =
+  match t.vals with
+  | (s, _) :: _ -> s
+  | [] -> t.line_start
+
+(* The [val] lines [decls] (as text) written above the definition of [t] in
+   [text], in place of its [val] lines, and the source typechecked up to the
+   definition followed by the later declarations: the errors in the [val]
+   lines and the definition, empty when it checks. Also the text kept
+   between the first [val] line and the definition. *)
+let check_decls text t decls =
+  let from = first_val t in
+  let kept = without_spans text t.vals ~from ~until:t.line_start in
+  let prefix = String.sub text 0 from ^ kept in
+  let lines s = List.length (String.split_on_char '\n' s) - 1 in
+  let checked = prefix ^ decls ^ String.sub text t.line_start (t.stop - t.line_start) ^ "\n" in
+  let candidate = checked ^ t.later_decls in
+  (* Errors from the [val] lines to the end of the definition. *)
+  let first_line = lines prefix and last_line = lines checked in
+  let result = Typecheck.run candidate in
+  let errors = errors_in candidate result.diagnostics ~first_line ~last_line in
+  let declared =
+    List.exists
+      (fun (b : Typecheck.binding) ->
+         b.name = t.name && b.declared && b.def_start >= String.length prefix )
+      result.bindings
+  in
+  let errors =
+    if errors = [] && not declared then
+      [`String "The definition does not check against these types."]
+    else
+      errors
+  in
+  (kept, errors)
+
 (* mlsem/checkSignature *)
 let check_signature params : Yojson.Safe.t =
   with_target params (fun text offsets t ->
@@ -314,28 +351,8 @@ let check_signature params : Yojson.Safe.t =
         |> List.map (fun ty -> indent ^ "val " ^ t.name ^ " : " ^ String.trim ty ^ "\n")
         |> String.concat ""
       in
-      (* The first line the edit touches: the first [val] line, or the
-       definition. *)
-      let from =
-        match t.vals with
-        | (s, _) :: _ -> s
-        | [] -> t.line_start
-      in
-      let kept = without_spans text t.vals ~from ~until:t.line_start in
-      let prefix = String.sub text 0 from ^ kept in
-      let lines s = List.length (String.split_on_char '\n' s) - 1 in
-      let checked = prefix ^ decls ^ String.sub text t.line_start (t.stop - t.line_start) ^ "\n" in
-      let candidate = checked ^ t.later_decls in
-      (* Errors from the [val] lines to the end of the definition. *)
-      let first_line = lines prefix and last_line = lines checked in
-      let result = Typecheck.run candidate in
-      let errors = errors_in candidate result.diagnostics ~first_line ~last_line in
-      let declared =
-        List.exists
-          (fun (b : Typecheck.binding) ->
-             b.name = t.name && b.declared && b.def_start >= String.length prefix )
-          result.bindings
-      in
+      let from = first_val t in
+      let kept, errors = check_decls text t decls in
       let range =
         Lsp.Types.Range.create
           ~start:(Doc.position_of_offset offsets from)
@@ -346,14 +363,9 @@ let check_signature params : Yojson.Safe.t =
           `Assoc [("range", Lsp.Types.Range.yojson_of_t range); ("newText", `String (kept ^ decls))]
         )
       in
-      if errors = [] && declared then
+      (* With errors, the edit too, for a client that writes the types
+         anyway. *)
+      if errors = [] then
         `Assoc [("ok", `Bool true); edit]
       else
-        let errors =
-          if errors = [] then
-            [`String "The definition does not check against these types."]
-          else
-            errors
-        in
-        (* The edit too, for a client that writes the types anyway. *)
         `Assoc [("ok", `Bool false); ("errors", `List errors); edit] )
