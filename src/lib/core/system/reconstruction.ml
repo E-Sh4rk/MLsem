@@ -48,12 +48,12 @@ let initial ?(direct_narrowing=true) ?(partition_narrowing=true) refinements e =
     | Alt (_,es) -> AAlt (false, List.map (fun e -> Some (initial r e)) es) |> right
     | Let (suggs, v, e1, e2) ->
       let a1 = initial r e1 in
-      let tys = Refinement.Partitioner.decomposition_for r v suggs in
-      if List.is_empty tys
+      if List.is_empty suggs
       then
         let a2 = initial r e2 in
         ALet' (a1, MVarSet.empty, a2) |> right
       else
+        let tys = Refinement.Partitioner.decomposition_for r v suggs in
         (* Format.printf "Part for %a: %a@." Variable.pp v (Utils.pp_list Ty.pp) tys ; *)
         let parts = tys |> List.map (fun ty -> ty, Some ((fun () ->
             let r = Refinement.Partitioner.filter_compatible r v ty in
