@@ -261,11 +261,8 @@ rec_and_imp: ∀'a,'b. dict(int | 'a, int | 'b) | array(int | 'b) -> int -> int 
 interval: ∀'a. int -> int -> array(int | 'a)
 test_ann_mut1: 42, 73
 test_ann_mut2: 42, 73
-test_ann_mut3: untypeable application
-File "tests/4_imperative.ml", line 242, characters 18-22
-function: 'a -> 'a
-argument: ()
-test_ann_mut4: 42, 73
+test_ann_mut3: 42 | 73 | (), 42 | 73 | ()
+test_ann_mut4: 42 | 73, 42 | 73
 test_ann_mut5: tuple2
 
 ===== Processing tests/5_misc.ml =====

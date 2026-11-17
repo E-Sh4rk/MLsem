@@ -238,12 +238,12 @@ let test_ann_mut2 =
    so f stays monomorphic: thus it must be annotated with all the needed instances.  *)
 
 let test_ann_mut3 =
-  let mut f : 'a -> 'a in
+  let mut f : '_a -> '_a in
   f := (fun x ->  f () ; x) ;
   f 42, f 73
 
 let test_ann_mut4 =
-  let mut f : ('a -> 'a) & (() -> ()) in
+  let mut f : ('_a -> '_a) & (() -> ()) in
   f := (fun x ->  f () ; x) ;
   f 42, f 73
 

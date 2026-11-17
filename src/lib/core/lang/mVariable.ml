@@ -59,52 +59,47 @@ let replace_in_env v ty env =
   add_to_env v ty (Env.rm v env)
 
 let a = TVar.mk KInfer None
-let alb v =
+let aty v =
   match Hashtbl.find_opt all v with
   | None -> invalid_arg "Variable must be mutable."
-  | Some None -> TVar.typ a
-  | Some (Some gty) -> GTy.lb gty
-let aub v =
+  | Some None -> TVar.typ a |> GTy.mk
+  | Some (Some gty) -> gty
+let aref_codom v =
   match Hashtbl.find_opt all v with
   | None -> invalid_arg "Variable must be mutable."
-  | Some None -> TVar.typ a
-  | Some (Some gty) -> GTy.ub gty
-let aref v =
+  | Some None -> TVar.typ a |> mk_ref |> GTy.mk
+  | Some (Some gty) -> gty
+  (* The type of an AnnotMut variable must be kept in the environment
+     so that its type variables stay bound to it (and thus cannot be generalized). *)
+let aref_dom v =
   match Hashtbl.find_opt all v with
   | None -> invalid_arg "Variable must be mutable."
   | Some None -> TVar.typ a |> mk_ref
   | Some (Some _) -> Ty.any
-(* The type variables that an [AnnotMut] annotation may contain are bound by the
-   enclosing scope and must remain monomorphic. *)
-let quantified = MVarSet.of_list [a] []
-let mk_gradual lb ub = GTy.mk_gradual lb ub |> TyScheme.mk quantified
-let mk ty = GTy.mk ty |> TyScheme.mk quantified
 
-let ref_uninit v =
-  Arrow.mk Ty.unit (aref v) |> mk
+let quantified = MVarSet.of_list [a] []
+let mk dom codom = GTy.map (Arrow.mk dom) codom |> TyScheme.mk quantified
+
+let ref_uninit v = mk Ty.unit (aref_codom v)
 let ref_uninit v =
   let arg = Eid.unique (), SA.Value (GTy.mk Ty.unit) in
   let op = { SA.oname="ref_uninit" ; ofun=Fun.const (ref_uninit v) ; ogen=false } in
   SA.Operation (OCustom op, arg)
 
-let ref_cons v =
-  Arrow.mk (aub v) (aref v) |> mk
+let ref_cons v = mk (aty v |> GTy.ub) (aref_codom v)
 let ref_cons v arg =
   let arg = Eid.unique (), SA.GConstructor (SA.UpperBound, [arg]) in
   let op = { SA.oname="ref" ; ofun=Fun.const (ref_cons v) ; ogen=false } in
   SA.Operation (OCustom op, arg)
 
-let ref_get v =
-  let lb = Arrow.mk (aref v) (alb v) in
-  let ub = Arrow.mk (aref v) (aub v) in
-  mk_gradual lb ub
+let ref_get v = mk (aref_dom v) (aty v)
 let ref_get v =
   let arg = Eid.unique (), SA.Var v in
   let op = { SA.oname="get" ; ofun=Fun.const (ref_get v) ; ogen=false } in
   SA.Operation (OCustom op, arg)
 
 let ref_assign v =
-  Arrow.mk (Tuple.mk [aref v ; aub v]) (!Config.void_ty) |> mk
+  mk (Tuple.mk [aref_dom v ; aty v |> GTy.ub]) (!Config.void_ty |> GTy.mk)
 let ref_assign v arg =
   let arg = Eid.unique (), SA.GConstructor (SA.UpperBound, [arg]) in
   let arg = Eid.unique (), SA.Constructor (SA.Tuple 2,[
