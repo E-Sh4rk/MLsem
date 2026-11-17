@@ -53,6 +53,7 @@ let tool_handlers =
     ("mlsem/checkSignature", Signature_check.check_signature);
     ("mlsem/extractGroups", Extract_tool.groups); ("mlsem/extractApply", Extract_tool.apply);
     ("mlsem/widen", Widen.parts); ("mlsem/simplify", Simplify.parts);
+    ("mlsem/narrow", Narrow.parts); ("mlsem/narrowCheck", Narrow.check_one);
     ("mlsem/subtractDomains", Domain_subtraction.subtract);
   ]
 
