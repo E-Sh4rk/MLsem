@@ -87,7 +87,11 @@ type e =
     divergence of its definition (an empty definition type makes every cell
     vanish). *)
 | TypeCast of t * GTy.t * check
+(** The cast type may contain weak type variables (KInfer),
+    but only if they are already bound to the type environment. *)
 | TypeCoerce of t * GTy.t * check
+(** The coerce type may contain weak type variables (KInfer),
+    but only if they are already bound to the type environment. *)
 | Alt of alt_settings * t list
 and t = Eid.t * e
 
