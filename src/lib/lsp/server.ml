@@ -531,9 +531,22 @@ let hole_actions uri (req_range : Lsp.Types.Range.t) =
       ~start:(Position.create ~line:req_range.start.line ~character:0)
       ~end_:(Position.create ~line:(req_range.end_.line + 1) ~character:0)
   in
-  let holes = Doc.holes uri lines in
+  (* Each value as written in place of its hole: in parentheses only where
+     the hole needs them ([Draft_holes.writer]). *)
+  let written =
+    match Doc.text uri with
+    | None -> Fun.id
+    | Some text ->
+        let write = Draft_holes.writer text in
+        let offsets = Doc.compute_line_offsets text in
+        let off = Doc.offset_of_position offsets (String.length text) in
+        fun ((r : Range.t), hole, value) -> (r, hole, write (off r.start, off r.end_) value)
+  in
+  let holes = Doc.holes uri lines |> List.map written in
   let at_cursor =
-    match Doc.holes uri (Range.create ~start:req_range.start ~end_:req_range.start) with
+    match
+      Doc.holes uri (Range.create ~start:req_range.start ~end_:req_range.start) |> List.map written
+    with
     | [] -> []
     | (range, hole, _) :: _ when hole <> "_" ->
         List.filter (fun ((r : Range.t), h, _) -> h = hole && r.start.line = range.start.line) holes

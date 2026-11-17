@@ -47,7 +47,28 @@ let as_written ty_text (hs, he) value =
   | Some t when parse (put bare) = Some t -> bare
   | _ -> wrapped
 
-(* mlsem/holes: the resolved holes of the [val] lines of the definition at
+(* For the document [text]: [value] as written in place of the hole at
+   [start, end) (offsets in [text]), by [as_written] in the [val] type
+   around it; as it is when no [val] type is around it. *)
+let writer text =
+  let val_types =
+    match Mlsem_app.Main.parse (`String text) with
+    | PSuccess program ->
+        List.filter_map
+          (fun (_, elem) ->
+             match elem with
+             | Mlsem_app.PAst.SigDef (_, _, Mlsem_types.TyExpr.TLoc ((s, e), _)) ->
+                 Some (s.Lexing.pos_cnum, e.Lexing.pos_cnum)
+             | _ -> None )
+          program
+    | PFailure _ -> []
+  in
+  fun (hs, he) value ->
+    match List.find_opt (fun (s, e) -> s <= hs && he <= e) val_types with
+    | Some (s, e) -> as_written (String.sub text s (e - s)) (hs - s, he - s) value
+    | None -> value
+
+(* mlsem/holes:the resolved holes of the [val] lines of the definition at
    [position], from the document's typecheck, in order, with the line of
    each. A value is as written in place of its hole ([as_written]), and
    comes with its [parts] ([kept_parts]), as [start, end) in it and their
@@ -59,25 +80,9 @@ let holes params : Yojson.Safe.t =
     in
     Store.sync_text uri text ;
     let _, _, (typings : Typings.t) = Store.results uri in
-    (* The types of the [val] lines, as their [start, end). *)
-    let val_types =
-      match Mlsem_app.Main.parse (`String text) with
-      | PSuccess program ->
-          List.filter_map
-            (fun (_, elem) ->
-               match elem with
-               | Mlsem_app.PAst.SigDef (_, _, Mlsem_types.TyExpr.TLoc ((s, e), _)) ->
-                   Some (s.Lexing.pos_cnum, e.Lexing.pos_cnum)
-               | _ -> None )
-            program
-      | PFailure _ -> []
-    in
+    let write = writer text in
     (* [value] as written in place of the hole [h]. *)
-    let written (h : Typings.hover) value =
-      match List.find_opt (fun (s, e) -> s <= h.h_start && h.h_end <= e) val_types with
-      | Some (s, e) -> as_written (String.sub text s (e - s)) (h.h_start - s, h.h_end - s) value
-      | None -> value
-    in
+    let written (h : Typings.hover) value = write (h.h_start, h.h_end) value in
     let in_vals (s, e) = List.exists (fun (vs, ve) -> vs <= s && e <= ve) t.vals in
     let range (s, e) =
       Lsp.Types.Range.create
