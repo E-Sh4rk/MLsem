@@ -3,9 +3,28 @@
 
 open Yojson.Safe.Util
 
+(* The parts of a hole's [value] that may be kept as holes, located as the
+   parts of a [val] line are ([Type_parts.locate]): not the whole value
+   (keeping it is not filling the hole), an optional field's [t?] (a hole
+   cannot be optional), nor a hole. Keeping any of them is safe: the whole
+   value is one solution of the holes left. *)
+let kept_parts value =
+  match Type_parts.locate value with
+  | exception _ -> []
+  | _, parts ->
+      List.tl parts
+      |> List.filter (fun (p : Type_refactor.part) ->
+        match p.node with
+        | Mlsem_types.TyExpr.TOption _ -> false
+        | t -> not (Type_refactor.is_hole (Type_refactor.strip t)) )
+      |> List.sort_uniq (fun (p : Type_refactor.part) (q : Type_refactor.part) ->
+        compare p.span q.span )
+      |> List.map (fun p -> Type_parts.part_json value p [])
+
 (* mlsem/holes: the resolved holes of the [val] lines of the definition at
    [position], from the document's typecheck, in order, with the line of
-   each. *)
+   each. A value comes with its [parts] ([kept_parts]), as [start, end) in
+   it and their text. *)
 let holes params : Yojson.Safe.t =
   Signature_check.with_target params (fun text offsets t ->
     let uri =
@@ -21,20 +40,19 @@ let holes params : Yojson.Safe.t =
     in
     (* A hole's values: one, or one per overload of its line's result when
        they differ ([value] null where the line cannot be that overload). *)
+    let row overload value =
+      `Assoc
+        [
+          ("overload", overload);
+          ("value", Option.fold ~none:`Null ~some:(fun v -> `String v) value);
+          ("parts", `List (Option.fold ~none:[] ~some:kept_parts value));
+        ]
+    in
     let rows (body : Typings.hover_body) =
       match body with
-      | Hole {hole; value} -> Some (hole, [`Assoc [("overload", `Null); ("value", `String value)]])
+      | Hole {hole; value} -> Some (hole, [row `Null (Some value)])
       | Hole_per_overload {hole; rows} ->
-          Some
-            ( hole,
-              List.map
-                (fun (o, v) ->
-                   `Assoc
-                     [
-                       ("overload", `String o);
-                       ("value", Option.fold ~none:`Null ~some:(fun v -> `String v) v);
-                     ] )
-                rows )
+          Some (hole, List.map (fun (o, v) -> row (`String o) v) rows)
       | _ -> None
     in
     let holes =
