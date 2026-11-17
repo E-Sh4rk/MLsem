@@ -48,7 +48,7 @@ let tool_handlers =
     ("mlsem/generalizePreview", Handlers.generalize_preview);
     ("mlsem/instantiatePreview", Handlers.instantiate_preview);
     ("mlsem/applyInstantiate", Handlers.apply_instantiate);
-    ("mlsem/definitionAt", Signature_check.definition_at); ("mlsem/holes", Signature_check.holes);
+    ("mlsem/definitionAt", Signature_check.definition_at); ("mlsem/holes", Draft_holes.holes);
     ("mlsem/definitionStatus", Signature_check.definition_status);
     ("mlsem/checkSignature", Signature_check.check_signature);
     ("mlsem/extractGroups", Extract_tool.groups); ("mlsem/extractApply", Extract_tool.apply);
