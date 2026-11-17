@@ -1,4 +1,4 @@
-(* What the toolkit's part tools (Widen, Simplify) share: the [val] lines of
+(* What the toolkit's part tools (Widen, Narrow, Simplify) share: the [val] lines of
    the definition at a position, and per line the parts of its type that a
    tool has options for. A part is located by the parser; an option is
    written in its place, parentheses included, in parentheses when the
@@ -26,9 +26,12 @@ let build envs line =
 (* The declared type [name] with [k] parameters, applied to the tightest
    arguments that make it contain [part_ty]: [part_ty ≤ name('_1, …, '_k)]
    tallied, the part's own variables fixed, and each argument its lower
-   bound (the variables tally leaves in it [empty]). The arguments are
-   printed and parsed back, to be written. [None] when no arguments fit. *)
-let applied envs build part_ty name k =
+   bound (the variables tally leaves in it [empty]). With [~narrower], the
+   widest arguments that make it contained in [part_ty] instead:
+   [name('_1, …, '_k) ≤ part_ty], each argument its upper bound (the
+   variables left [any]). The arguments are printed and parsed back, to be
+   written. [None] when no arguments fit. *)
+let applied ?(narrower = false) envs build part_ty name k =
   let open TyExpr in
   let names = List.init k (fun i -> "_arg" ^ string_of_int i) in
   match build (TApp (name, List.map (fun n -> TVar (KInfer, n)) names)) with
@@ -39,23 +42,25 @@ let applied envs build part_ty name k =
       in
       let arg n = List.find_opt (fun v -> TVar.name v = n) args in
       let mono = MVarSet.union (TVOp.all_vars KNoInfer) (TVOp.vars part_ty) in
-      match TVOp.tally mono [(part_ty, c_ty)] with
+      let constr = if narrower then (c_ty, part_ty) else (part_ty, c_ty) in
+      match TVOp.tally mono [constr] with
       | [] -> None
       | s :: _ -> (
-          let lower t =
+          let bound t =
             let t = Subst.apply s t in
             let left =
               TVOp.vars t |> MVarSet.proj1 |> TVarSet.elements
               |> List.filter (fun v -> TVar.has_kind KInfer v && not (MVarSet.mem1 v mono))
             in
-            Subst.apply (Subst.of_list1 (List.map (fun v -> (v, Ty.empty)) left)) t
+            let fill = if narrower then Ty.any else Ty.empty in
+            Subst.apply (Subst.of_list1 (List.map (fun v -> (v, fill)) left)) t
           in
           let print t = Main.display_gty envs (GTy.mk t) in
           match
             List.map
               (fun n ->
                  match arg n with
-                 | Some v -> IO.parse_type_string (print (lower (TVar.typ v)))
+                 | Some v -> IO.parse_type_string (print (bound (TVar.typ v)))
                  | None -> TBase TAny )
               names
           with
@@ -68,13 +73,14 @@ let applied envs build part_ty name k =
 
 (* The declared types that may contain a part of type [part_ty]: those
    without parameters by name, those with parameters applied to the
-   tightest arguments that fit ([applied]). [build] builds an expression
+   tightest arguments that fit ([applied]). With [~narrower], that may be
+   contained in it, with the widest arguments. [build] builds an expression
    where the part is. *)
-let declared envs build part_ty =
+let declared ?narrower envs build part_ty =
   Main.user_type_names envs
   |> List.concat_map (fun n ->
     match Main.user_alias_arity envs n with
-    | Some k when k > 0 -> Option.to_list (applied envs build part_ty n k)
+    | Some k when k > 0 -> Option.to_list (applied ?narrower envs build part_ty n k)
     | _ -> [TyExpr.TCustom n] )
 
 (* [c] as written in place of the part [p]. *)
