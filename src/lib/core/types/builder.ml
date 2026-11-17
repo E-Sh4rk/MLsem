@@ -74,6 +74,21 @@ module Builder = struct
     let alias_arity { tenv ; _ } name =
         StrMap.find_opt name tenv.aliases |> Option.map (fun (_, ps) -> List.length ps)
 
+    (* The number of arguments the user-defined type [name] is written with
+       ([None] if [name] is not one): an alias's or an abstract type's
+       parameters, 1 for a tag ([T(t)]), 0 for an enum. A name of several
+       kinds is taken in that order. *)
+    let type_arity ({ tenv ; _ } as benv) name =
+        match alias_arity benv name with
+        | Some n -> Some n
+        | None ->
+            match StrMap.find_opt name tenv.abs with
+            | Some abs -> Some (Abstract.arity abs)
+            | None ->
+                if StrMap.mem name tenv.tags then Some 1
+                else if StrMap.mem name tenv.enums then Some 0
+                else None
+
     let reg_to_sstt f r =
         let open TyExpr in
         let open Sstt.Extensions in

@@ -341,6 +341,9 @@ let user_type_names ((benv, _, _, _, _) : envs) = Builder.type_names benv
 (* The number of parameters of the user-defined type alias [name]. *)
 let user_alias_arity ((benv, _, _, _, _) : envs) name = Builder.alias_arity benv name
 
+(* The number of arguments the user-defined type [name] is written with. *)
+let user_type_arity ((benv, _, _, _, _) : envs) name = Builder.type_arity benv name
+
 type parsing_result =
 | PSuccess of PAst.program
 | PFailure of Position.t * string

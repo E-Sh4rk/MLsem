@@ -42,6 +42,11 @@ val user_type_names : envs -> string list
    is not an alias. *)
 val user_alias_arity : envs -> string -> int option
 
+(* The number of arguments a user-defined type is written with: an alias's
+   or an abstract type's parameters, 1 for a tag, 0 for an enum; [None] if the
+   name is not a user-defined type. *)
+val user_type_arity : envs -> string -> int option
+
 type parsing_result =
 | PSuccess of PAst.program
 | PFailure of Position.t * string
