@@ -295,17 +295,24 @@ let coerce ?coercion_id ?(duplicate_arrows=false) c ty t =
     | [s'] -> s'
     | _ -> raise Exit
   in
-  let rec aux ?coercion_id ty (id,t) =
+  (* [vis] is the id of the nearest enclosing expression whose notices are shown:
+     a coercion that stops on generated code (e.g. the [Ite] chain of a pattern
+     matching) takes its id from there, so that its notices are not hidden. *)
+  let rec aux ?coercion_id ~vis ty (id,t) =
+    let vis = if Eid.show_notices id then id else vis in
+    let aux' ty e = aux ~vis ty e in
     let t =
       try match t with
-      | Let (tys, v, e1, e2) -> Let (tys, v, e1, aux ty e2)
+      | Let (tys, v, e1, e2) -> Let (tys, v, e1, aux' ty e2)
+      | Ite (e, tau, e1, e2) -> (* Allows entering inside pattern matchings *)
+        Ite (e, tau, aux' ty e1, aux' ty e2)
       | Projection (p, e) ->
-        Projection (p, aux (GTy.map (domain_of_proj p) ty) e)
+        Projection (p, aux' (GTy.map (domain_of_proj p) ty) e)
       | Constructor (cons, es) ->
         let tys_lb = domains_of_construct cons (GTy.lb ty) in
         let tys_ub = domains_of_construct cons (GTy.ub ty) in
         let tys = List.map2 GTy.mk_gradual tys_lb tys_ub in
-        Constructor (cons, List.map2 aux tys es)
+        Constructor (cons, List.map2 aux' tys es)
       | Lambda (da,v,e) as expr ->
         begin match to_single_arrow ty with
         | None ->
@@ -315,24 +322,25 @@ let coerce ?coercion_id ?(duplicate_arrows=false) c ty t =
               then GTy.lb ty |> decompose |> List.map GTy.mk
               else decompose_gradual ty
             in
-            let ts = tys |> List.map (fun ty -> aux ty (refresh (id, expr))) in
+            let ts = tys |> List.map (fun ty -> aux' ty (refresh (id, expr))) in
             Constructor (Meet (List.length ts), ts)
           else raise Exit
         | Some (d,cd) ->
           begin match da with
           | Some da ->
             let s = unify d da in
-            Lambda (Some (GTy.substitute s d), v, aux (GTy.substitute s cd) (apply_subst s e))
-          | None -> Lambda (Some d, v, aux cd e)
+            Lambda (Some (GTy.substitute s d), v, aux' (GTy.substitute s cd) (apply_subst s e))
+          | None -> Lambda (Some d, v, aux' cd e)
           end
         end
       | _ -> raise Exit
       with Exit -> t
     in
-    let coercion_id = match coercion_id with None -> Eid.refresh id | Some id -> id in
+    let coercion_id = match coercion_id with None -> Eid.refresh vis | Some id -> id in
     coercion_id, TypeCoerce ((id,t), ty, c)
   in
-  aux ?coercion_id ty t
+  let vis = match coercion_id with Some id -> id | None -> fst t in
+  aux ?coercion_id ~vis ty t
 
 let push_coercions ?(duplicate_arrows=false) t =
   let f t =
