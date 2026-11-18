@@ -10,7 +10,8 @@
    - when the part is a union, written or once its declared type or [where]
      name is unfolded ([tree(string)] is [Leaf | Node(tree(string), int,
      string, tree(string))]), each member alone and, with more than two
-     members, each union of all members but one.
+     members, each union of all members but one. A sequence type counts as
+     the union of its cases ([[ t* ]] is [[ t+ ] | []], see [members]).
    No narrower types are offered for literals, type variables, [empty],
    [any] (too many to choose from) or on a line with wildcards.
 
@@ -68,8 +69,15 @@ let rec unfold wheres decls fuel t =
   | Some t' when fuel > 0 -> unfold wheres decls (fuel - 1) (Type_refactor.strip t')
   | _ -> t
 
+(* The members of a union, a sequence type counting as the union of its
+   cases: [[ t* ]] is [[ t+ ] | []], [[ t? ]] is [[ t ] | []], and a sequence
+   of alternatives is the union of a sequence of each. The non-empty case
+   comes first, as it is the one that more often checks. *)
 let rec members = function
   | TCup (a, b) -> members a @ members b
+  | TSList (Star r) -> [TSList (Plus r); TSList Epsilon]
+  | TSList (Option r) -> [TSList r; TSList Epsilon]
+  | TSList (Union rs) -> List.map (fun r -> TSList r) rs
   | t -> [t]
 
 let union = function
