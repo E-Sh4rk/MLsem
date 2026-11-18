@@ -9,7 +9,8 @@ the holes resolve to?
   its commented-out signatures.
 - `run.py`: replaces the `val bal` line by each variant below, runs
   `native.exe` on it with a 60 s limit, and with `--lsp` asks the language
-  server for the Draft holes (`mlsem/holes`) of the variants that finish.
+  server for the Partial signatures (`mlsem/wildcards`; `mlsem/holes` when
+  the results below were measured) of the variants that finish.
 
 ```
 python src/lib/lsp/experiments/bal_holes/run.py --lsp
