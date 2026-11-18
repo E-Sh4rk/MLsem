@@ -2,9 +2,9 @@
    types.
 
    For each [val] line of the definition at a position, every part of its
-   type (as the parser located it), with its wider types and a hole. A wider type is written in place of the part,
-   parentheses included, in parentheses when the printer puts it in them
-   there.
+   type (as the parser located it), with its wider types and a wildcard. A
+   wider type is written in place of the part, parentheses included, in
+   parentheses when the printer puts it in them there.
 
    The wider types (the part is a subtype of each, and none is a subtype of
    it), tightest first:
@@ -15,8 +15,8 @@
      applied to the tightest arguments that make it contain the part
      ([tree(int)] for a tree of [int]s), found by tallying;
    - [any];
-   then the hole [_], which Draft holes fills from the definition's body
-   (not wider: it can end up narrower than the part).
+   then the wildcard [_], which Partial signatures fills from the
+   definition's body (not wider: it can end up narrower than the part).
    Types are built in the environment of the document's typecheck, which
    has its declared types.
 
@@ -52,8 +52,8 @@ let widen_literals t =
   go t
 
 (* The wider types of the located part [p] of the [val] type [line], as
-   written in its place, and the hole; [None] when it cannot be built (an
-   optional field [t?]) or is a hole itself. *)
+   written in its place, and the wildcard; [None] when it cannot be built (an
+   optional field [t?]) or is a wildcard itself. *)
 let wider envs line (p : Type_refactor.part) =
   let build = Type_parts.build envs line in
   match p.node with
@@ -100,12 +100,12 @@ let wider envs line (p : Type_refactor.part) =
           let sorted = List.stable_sort (fun a b -> compare (wider_than b) (wider_than a)) wider in
           let written = Type_parts.written p in
           let any = if Ty.leq Ty.any part_ty then [] else [(written (TBase TAny), None)] in
-          let hole =
+          let wildcard =
             match node with
             | TVar (KInfer, _) -> []
-            | _ -> [("_", Some "hole")]
+            | _ -> [("_", Some "wildcard")]
           in
-          match List.map (fun (c, _) -> (written c, None)) sorted @ any @ hole with
+          match List.map (fun (c, _) -> (written c, None)) sorted @ any @ wildcard with
           | [] -> None
           | os -> Some os ) )
 

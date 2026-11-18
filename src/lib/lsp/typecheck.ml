@@ -166,7 +166,8 @@ let line_start source off =
 
 (* For a call [f a] that fails, where [f] is a definition typed earlier
    ([bindings]), changes of [f]'s [val] lines that may make the call
-   typecheck, written as drafts so the definition's check gives the result:
+   typecheck, written as partial signatures so the definition's check gives
+   the result:
    - add the overload [<type of a> -> _];
    - widen the domain of an overload with [a]'s type: [<domain> | <type of a> -> _].
    Nothing more is checked: whether the definition still typechecks against
@@ -207,17 +208,17 @@ let app_fixes envs source val_types bindings (err : Mlsem_lang.Error.t) : Typing
               List.map parse rendered
           in
           let arg_expr = parse (Main.display_gty envs (GTy.mk arg)) in
-          let hole = TVar (KInfer, "_hole") in
-          (* [t] with its domain widened with [a] and its result a hole. *)
+          let wildcard = TVar (KInfer, "_hole") in
+          (* [t] with its domain widened with [a] and its result a wildcard. *)
           let rec widen_domain a = function
             | TLoc (_, t) -> widen_domain a t
             | TWhere (t, defs) -> Option.map (fun t -> TWhere (t, defs)) (widen_domain a t)
-            | TArrow (d, _) -> Some (TArrow (TCup (d, a), hole))
+            | TArrow (d, _) -> Some (TArrow (TCup (d, a), wildcard))
             | _ -> None
           in
           let print t = Type_refactor.checked_print (Type_refactor.strip t) in
-          (* The draft [dom -> _]. *)
-          let draft dom = print (TArrow (dom, hole)) in
+          (* The partial signature [dom -> _]. *)
+          let partial dom = print (TArrow (dom, wildcard)) in
           let val_line ty = "val " ^ b.name ^ " : " ^ ty in
           let at_binder = line_start source b.def_start in
           (* Add [decl] as a [val] line; a definition without [val] lines also
@@ -228,7 +229,7 @@ let app_fixes envs source val_types bindings (err : Mlsem_lang.Error.t) : Typing
             [(at_binder, at_binder, lines ((if b.declared then [] else rendered) @ [decl]))]
           in
           (* Replace the [k]th overload by [decl]: its [val] line when each
-             overload is one line; else (a draft line can give several) all
+             overload is one line; else (a partial line can give several) all
              the lines are rewritten, the first replaced and the others
              deleted. *)
           let replace k decl =
@@ -255,7 +256,7 @@ let app_fixes envs source val_types bindings (err : Mlsem_lang.Error.t) : Typing
           | None -> []
           | Some a ->
               let added =
-                match draft a with
+                match partial a with
                 | Some d -> [fix ("Add overload: " ^ val_line d) (add d)]
                 | None -> []
               in

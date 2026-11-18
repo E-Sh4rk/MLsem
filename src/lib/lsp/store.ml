@@ -134,7 +134,7 @@ let declarations uri text =
    render it in. A declared one with complete [val] lines comes from the
    declarations, without typechecking [text]: the tools that only rewrite
    types then work whatever the definitions do, and whether there is one;
-   its [checked] is [None]. Any other (inferred, or with a draft [val] line,
+   its [checked] is [None]. Any other (inferred, or with a partial [val] line,
    whose overloads its definition gives) comes from the typecheck. *)
 let lookup uri text select =
   let declared =
