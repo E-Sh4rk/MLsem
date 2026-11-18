@@ -511,58 +511,66 @@ let inline_type_action uri (range : Lsp.Types.Range.t) ~indent ~name ~tys : Lsp.
     ~title:("Inline inferred type: " ^ String.concat " ; " tys)
     ~kind:Lsp.Types.CodeActionKind.RefactorInline ~edit:workspace_edit ()
 
-(* Replace holes of draft [val] lines with the types they were resolved to. *)
-let fill_holes_action uri ~title holes : Lsp.Types.CodeAction.t =
+(* Replace wildcards of partial [val] lines with the types they were resolved
+   to. *)
+let fill_wildcards_action uri ~title wildcards : Lsp.Types.CodeAction.t =
   let edits =
-    List.map (fun (range, _, value) -> Lsp.Types.TextEdit.create ~newText:value ~range) holes
+    List.map (fun (range, _, value) -> Lsp.Types.TextEdit.create ~newText:value ~range) wildcards
   in
   let workspace_edit = Lsp.Types.WorkspaceEdit.create ~changes:[(uri, edits)] () in
   Lsp.Types.CodeAction.create ~title ~kind:Lsp.Types.CodeActionKind.RefactorRewrite
     ~edit:workspace_edit ()
 
-(* For the hole at the cursor, an action replacing it; for the holes on the
-   lines of [req_range], one replacing all of them, unless it would be the
-   same edit. A named hole (['_a]) is one variable: its occurrences on the
-   line are replaced together. *)
-let hole_actions uri (req_range : Lsp.Types.Range.t) =
+(* For the wildcard at the cursor, an action replacing it; for the wildcards
+   on the lines of [req_range], one replacing all of them, unless it would be
+   the same edit. A named wildcard (['_a]) is one variable: its occurrences
+   on the line are replaced together. *)
+let wildcard_actions uri (req_range : Lsp.Types.Range.t) =
   let open Lsp.Types in
   let lines =
     Range.create
       ~start:(Position.create ~line:req_range.start.line ~character:0)
       ~end_:(Position.create ~line:(req_range.end_.line + 1) ~character:0)
   in
-  (* Each value as written in place of its hole: in parentheses only where
-     the hole needs them ([Draft_holes.writer]). *)
+  (* Each value as written in place of its wildcard: in parentheses only where
+     the wildcard needs them ([Partial_signatures.writer]). *)
   let written =
     match Doc.text uri with
     | None -> Fun.id
     | Some text ->
-        let write = Draft_holes.writer text in
+        let write = Partial_signatures.writer text in
         let offsets = Doc.compute_line_offsets text in
         let off = Doc.offset_of_position offsets (String.length text) in
-        fun ((r : Range.t), hole, value) -> (r, hole, write (off r.start, off r.end_) value)
+        fun ((r : Range.t), wildcard, value) -> (r, wildcard, write (off r.start, off r.end_) value)
   in
-  let holes = Doc.holes uri lines |> List.map written in
+  let wildcards = Doc.wildcards uri lines |> List.map written in
   let at_cursor =
     match
-      Doc.holes uri (Range.create ~start:req_range.start ~end_:req_range.start) |> List.map written
+      Doc.wildcards uri (Range.create ~start:req_range.start ~end_:req_range.start)
+      |> List.map written
     with
     | [] -> []
-    | (range, hole, _) :: _ when hole <> "_" ->
-        List.filter (fun ((r : Range.t), h, _) -> h = hole && r.start.line = range.start.line) holes
-    | h :: _ -> [h]
+    | (range, wildcard, _) :: _ when wildcard <> "_" ->
+        List.filter
+          (fun ((r : Range.t), w, _) -> w = wildcard && r.start.line = range.start.line)
+          wildcards
+    | w :: _ -> [w]
   in
   let one =
     match at_cursor with
     | [] -> []
-    | (_, hole, value) :: _ ->
-        [fill_holes_action uri ~title:(Printf.sprintf "Replace %s with %s" hole value) at_cursor]
+    | (_, wildcard, value) :: _ ->
+        [
+          fill_wildcards_action uri
+            ~title:(Printf.sprintf "Replace %s with %s" wildcard value)
+            at_cursor;
+        ]
   in
   let all =
-    if holes = [] || List.length holes = List.length at_cursor then
+    if wildcards = [] || List.length wildcards = List.length at_cursor then
       []
     else
-      [fill_holes_action uri ~title:"Replace all holes with their types" holes]
+      [fill_wildcards_action uri ~title:"Replace all wildcards with their types" wildcards]
   in
   one @ all
 
@@ -601,10 +609,10 @@ let where_actions uri (req_range : Lsp.Types.Range.t) =
                          ]
                    in
                    action Lsp.Types.CodeActionKind.RefactorExtract "Extract repeated parts"
-                     (Type_refactor.extract ~holes:false ty)
+                     (Type_refactor.extract ~wildcards:false ty)
                    @ action Lsp.Types.CodeActionKind.RefactorExtract
-                       "Extract repeated parts as holes"
-                       (Type_refactor.extract ~holes:true ty)
+                       "Extract repeated parts as wildcards"
+                       (Type_refactor.extract ~wildcards:true ty)
                    @ action Lsp.Types.CodeActionKind.RefactorInline "Inline where definitions"
                        (Type_refactor.inline ty)
                | _ -> [] )
@@ -628,7 +636,7 @@ let code_actions_for uri (req_range : Lsp.Types.Range.t) =
     match signature with
     | None -> None
     | Some (name, tys) -> Some (inline_type_action uri range ~indent ~name ~tys) ) )
-  @ call_fix_actions uri req_range @ hole_actions uri req_range @ where_actions uri req_range
+  @ call_fix_actions uri req_range @ wildcard_actions uri req_range @ where_actions uri req_range
   |> List.map (fun a -> `CodeAction a)
 
 (* A toolkit request becomes an engine job. Its [text] is filled in from our
@@ -685,14 +693,14 @@ let overload_color i = overload_colors.(i mod Array.length overload_colors)
    allow HTML in hovers. *)
 let hover_markdown : Typings.hover_body -> string = function
   | Type t -> code_block t
-  | Hole {hole; value} -> code_block (hole ^ " = " ^ value)
-  | Hole_per_overload {hole; rows} ->
+  | Wildcard {wildcard; value} -> code_block (wildcard ^ " = " ^ value)
+  | Wildcard_per_overload {wildcard; rows} ->
       (* One row per overload, the overload as a comment, aligned. *)
       let lefts =
         List.map
           (function
-            | _, Some v -> hole ^ " = " ^ v
-            | _, None -> hole ^ " : no value" )
+            | _, Some v -> wildcard ^ " = " ^ v
+            | _, None -> wildcard ^ " : no value" )
           rows
       in
       let width = List.fold_left (fun w s -> max w (String.length s)) 0 lefts in

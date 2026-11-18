@@ -150,7 +150,7 @@ let shift_typings (t : Typings.t) shift =
           (fun (h : Typings.hover) ->
              let body : Typings.hover_body =
                match h.body with
-               | (Type _ | Hole _ | Hole_per_overload _) as b -> b
+               | (Type _ | Wildcard _ | Wildcard_per_overload _) as b -> b
                | Overloads o ->
                    (* A [val] line the edit touched loses its colour. *)
                    let row (r : Typings.overload_row) =
@@ -398,9 +398,9 @@ let hover uri (pos : Lsp.Types.Position.t) : (Lsp.Types.Range.t * Typings.hover_
       | h :: _ -> Some (lsp_range e (h.h_start, h.h_end), h.body)
       | [] -> None )
 
-(* The resolved holes of draft [val] lines overlapping [range], in document
-   order, as (range, hole as written, type). *)
-let holes uri (range : Lsp.Types.Range.t) : (Lsp.Types.Range.t * string * string) list =
+(* The resolved wildcards of partial [val] lines overlapping [range], in
+   document order, as (range, wildcard as written, type). *)
+let wildcards uri (range : Lsp.Types.Range.t) : (Lsp.Types.Range.t * string * string) list =
   match find uri with
   | None -> []
   | Some e ->
@@ -411,8 +411,8 @@ let holes uri (range : Lsp.Types.Range.t) : (Lsp.Types.Range.t * string * string
       e.typings.hovers
       |> List.filter_map (fun (h : Typings.hover) ->
         match h.body with
-        | Hole {hole; value} when overlaps (h.h_start, h.h_end) ->
-            Some (h.h_start, (lsp_range e (h.h_start, h.h_end), hole, value))
+        | Wildcard {wildcard; value} when overlaps (h.h_start, h.h_end) ->
+            Some (h.h_start, (lsp_range e (h.h_start, h.h_end), wildcard, value))
         | _ -> None )
       |> List.sort_uniq (fun (a, _) (b, _) -> compare a b)
       |> List.map snd

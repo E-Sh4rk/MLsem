@@ -12,7 +12,7 @@
      string, tree(string))]), each member alone and, with more than two
      members, each union of all members but one.
    No narrower types are offered for literals, type variables, [empty],
-   [any] (too many to choose from) or on a line with holes.
+   [any] (too many to choose from) or on a line with wildcards.
 
    A narrower type is a guess: in a result it promises more, in an argument
    it accepts fewer inputs, which a recursive call may still need. So each
@@ -93,7 +93,7 @@ let skipped = function
       true
   | _ -> false
 
-let has_holes line =
+let has_wildcards line =
   List.exists
     (function
       | TVar (KInfer, _) -> true
@@ -116,7 +116,7 @@ let in_definition line (p : Type_refactor.part) =
    written in its place; [decls] are the file's type definitions. *)
 let narrower decls envs line (p : Type_refactor.part) =
   let node = Type_refactor.strip p.node in
-  if skipped node || has_holes line || in_definition line p then
+  if skipped node || has_wildcards line || in_definition line p then
     None
   else
     let build = Type_parts.build envs line in

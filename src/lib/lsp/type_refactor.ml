@@ -10,8 +10,8 @@ open TyExpr
 
 (* ===== Structure ===== *)
 
-(* Holes are fresh variables named [_holeN] by the parser: all are the same
-   here, so that a type and its reparse compare equal. *)
+(* Wildcards are fresh variables named [_holeN] by the parser: all are the
+   same here, so that a type and its reparse compare equal. *)
 let rec strip (t : t) : t =
   match t with
   | TLoc (_, t) -> strip t
@@ -311,7 +311,7 @@ let checked_print t =
 
 let rec subterms t = t :: List.concat_map subterms (children t)
 
-let is_hole = function
+let is_wildcard = function
   | TVar (KInfer, "_hole") -> true
   | _ -> false
 
@@ -319,7 +319,7 @@ let is_hole = function
    something as a record field (an optional one; a closed record's tail is
    [empty?]), a row variable only in a record's tail, [dyn] is rejected in
    a [where] definition, and naming a part with a [_] would make its copies
-   one hole instead of several. *)
+   one wildcard instead of several. *)
 let unnamable t =
   match t with
   | TDyn
@@ -347,7 +347,7 @@ let unnamable t =
             | TOption f -> bad f
             | TRowVar _ -> false
             | t -> bad t )
-        | t -> is_hole t || List.exists bad (children t)
+        | t -> is_wildcard t || List.exists bad (children t)
       and unoption = function
         | TOption f -> f
         | f -> f
@@ -470,9 +470,9 @@ let rec replace ~what ~by t =
 (* Name the repeated parts of [t], largest first, until none is left: each
    becomes a [where] definition. Repeats are counted in the type and in the
    definitions made so far, so a part shared by two definitions gets a name
-   too. With [holes], the definitions are holes instead, and only those
-   still used are kept. *)
-let extract ~holes t =
+   too. With [wildcards], the definitions are wildcards instead, and only
+   those still used are kept. *)
+let extract ~wildcards t =
   let t = strip t in
   let body, old_defs =
     match t with
@@ -523,7 +523,7 @@ let extract ~holes t =
   in
   let body, defs = loop body [] in
   let defs =
-    if not holes then
+    if not wildcards then
       defs
     else
       (* Only the definitions the type itself uses: those used only inside
@@ -611,11 +611,12 @@ let shared_records t =
 
 (* ===== Extracting chosen parts, for the toolkit ===== *)
 
-let holes_in t = List.length (List.filter is_hole (subterms t))
+let wildcards_in t = List.length (List.filter is_wildcard (subterms t))
 
 (* The parts of [t] that repeat, largest first. Unlike [extract], parts with
-   holes are included: all [_] compare equal, so these group by shape, and
-   the toolkit extracts them linking the holes or keeping them apart. *)
+   wildcards are included: all [_] compare equal, so these group by shape,
+   and the toolkit extracts them linking the wildcards or keeping them
+   apart. *)
 let groups t =
   let t = strip t in
   let ps = parts t in
@@ -655,10 +656,11 @@ let groups t =
     List.length
       (List.filter (fun p -> same p g || sub_members g p <> None || record_rest g p <> None) ps)
   in
-  (* [unnamable] without its rule on holes: a hole inside is fine here. *)
+  (* [unnamable] without its rule on wildcards: a wildcard inside is fine
+     here. *)
   let extractable s =
-    let rec no_holes s = if is_hole s then TBase TAny else map_children no_holes s in
-    not (unnamable (no_holes s))
+    let rec no_wildcards s = if is_wildcard s then TBase TAny else map_children no_wildcards s in
+    not (unnamable (no_wildcards s))
   in
   List.fold_left
     (fun acc g ->
@@ -739,11 +741,11 @@ let valid_name n =
 
 (* Extract the chosen parts of [t], each [(part, name)] with [part] one of
    [groups t]. Smaller parts first, so that a larger part is matched with
-   its smaller chosen parts already named. A part with holes becomes, with
-   [plumbing], a definition with one parameter per hole, used with a fresh
-   hole for each ([fn(_, _) where fn('a, 'b) = 'a -> 'b]): the type keeps
-   its meaning. Without, it is used as a plain name ([fn where
-   fn = _ -> _]): all its copies share the same holes. *)
+   its smaller chosen parts already named. A part with wildcards becomes,
+   with [plumbing], a definition with one parameter per wildcard, used with
+   a fresh wildcard for each ([fn(_, _) where fn('a, 'b) = 'a -> 'b]): the
+   type keeps its meaning. Without, it is used as a plain name ([fn where
+   fn = _ -> _]): all its copies share the same wildcards. *)
 (* Records only part of some record ([global]) become top-level types, first:
    the result is the new type and their declarations. [types]: the names of
    the file's types, which a top-level type cannot reuse. *)
@@ -824,13 +826,13 @@ let extract_chosen ~plumbing ~types t chosen =
           List.fold_left
             (fun (applied, body, old_defs, new_defs) (g, name) ->
                let g = applied g in
-               let k = holes_in g in
+               let k = wildcards_in g in
                let params, def, by =
                  if plumbing && k > 0 then
                    let params = List.init k (fun _ -> fresh_tvar ()) in
                    let rest = ref params in
                    let rec number t =
-                     if is_hole t then
+                     if is_wildcard t then
                        match
                          !rest
                        with
@@ -880,8 +882,8 @@ let rec count_name n t =
 let inline t =
   match strip t with
   | TWhere (body, defs) as t ->
-      (* A [_] in a definition used more than once is one hole: inlined, it
-         becomes a named one (['_a]) so that its copies stay one. *)
+      (* A [_] in a definition used more than once is one wildcard: inlined,
+         it becomes a named one (['_a]) so that its copies stay one. *)
       let used =
         ref
           (List.filter_map
@@ -903,8 +905,8 @@ let inline t =
         used := n :: !used ;
         n
       in
-      let rec name_holes t =
-        if is_hole t then TVar (KInfer, fresh ()) else map_children name_holes t
+      let rec name_wildcards t =
+        if is_wildcard t then TVar (KInfer, fresh ()) else map_children name_wildcards t
       in
       (* An inlined definition is replaced in the type and in every other
          definition, before and after it. *)
@@ -918,7 +920,7 @@ let inline t =
                 (fun k (_, _, t) -> k + count_name n t)
                 (count_name n body) (kept @ rest)
             in
-            let d = if uses > 1 then name_holes d else d in
+            let d = if uses > 1 then name_wildcards d else d in
             let sub = subst n d in
             let sub_def (m, ps, t) = (m, ps, sub t) in
             go (sub body) (List.map sub_def kept) (List.map sub_def rest)

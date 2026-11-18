@@ -122,14 +122,15 @@ let merge_texts envs (sigs : Signature.t) (wanted : string list) =
    [only], when present, keeps just the overloads whose *original* rendered text
    is in it (the per-overload Insert action writes a single one).
    May raise on a malformed concrete type (caught by the handler). *)
-(* An overload's text with the holes an instantiation put in it ([_] in the
-   type given, printed ['_holeN]) written as holes again: [_] where it occurs
-   once; where it occurs more than once (the variable did), a named hole
-   (['_a]), so that its copies stay one type. *)
-let written_holes text =
-  let hole = Str.regexp "'_hole[0-9]+" in
+(* An overload's text with the wildcards an instantiation put in it ([_] in
+   the type given, printed ['_holeN] as the parser names it) written as
+   wildcards again: [_] where it occurs once; where it occurs more than once
+   (the variable did), a named wildcard (['_a]), so that its copies stay one
+   type. *)
+let written_wildcards text =
+  let wildcard = Str.regexp "'_hole[0-9]+" in
   let rec occurrences i acc =
-    match Str.search_forward hole text i with
+    match Str.search_forward wildcard text i with
     | j -> occurrences (j + 1) (Str.matched_string text :: acc)
     | exception Not_found -> List.rev acc
   in
@@ -144,7 +145,7 @@ let written_holes text =
       not (Str.string_match (Str.regexp (".*" ^ Str.quote n ^ "\\b")) text 0) )
   in
   let named = List.mapi (fun i h -> (h, List.nth names i)) shared in
-  Str.global_substitute hole
+  Str.global_substitute wildcard
     (fun s ->
        let h = Str.matched_string s in
        Option.value ~default:"_" (List.assoc_opt h named) )
@@ -182,7 +183,7 @@ let instantiate_texts ?only envs (sigs : Signature.t) insts =
       | None -> pairs
       | Some texts -> List.filter (fun (r, _) -> List.mem r texts) pairs
     in
-    `Ok (List.map written_holes (Main.signature envs (List.map snd kept)))
+    `Ok (List.map written_wildcards (Main.signature envs (List.map snd kept)))
 
 (* The instances of the [k]th overload of [b] that its calls in the document
    fit, each with the calls (range and text), in order of first call. A call
@@ -240,7 +241,7 @@ let overloads params : Yojson.Safe.t =
         let strs ss = `List (List.map (fun s -> `String s) ss) in
         let overload_vars = b.sigs |> List.map (fun o -> strs (Signature.overload_vars o)) in
         (* A declared type written with arguments (a type with parameters, a
-           tag) as a template, its arguments holes ([tree(_)], [Node(_)]),
+           tag) as a template, its arguments wildcards ([tree(_)], [Node(_)]),
            for the panel to have them typed. *)
         let concrete_types =
           builtin_type_names

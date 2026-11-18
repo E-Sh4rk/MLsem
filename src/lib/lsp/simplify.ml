@@ -51,7 +51,7 @@ let poly_leq t1 t2 =
    ([tree('a) -> int -> 'a -> tree('a)] for [tree('b) -> int -> 'a ->
    tree('b | 'a)], with ['a := 'b | 'a], as [tree] is covariant). One
    option per pair of variables that merge, the first by name kept; not on
-   a line with holes or weak variables. Each with its label. *)
+   a line with wildcards or weak variables. Each with its label. *)
 let merged_variables envs line line_ty =
   (* Built as [Typings.build_signature] does, and with [envs] whose printer
      knows the instances of declared types met building it: [tree('a)] is

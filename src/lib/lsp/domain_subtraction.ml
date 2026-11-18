@@ -170,7 +170,7 @@ let subtract params : Yojson.Safe.t =
         if not (List.for_all (fun w -> List.mem w rendered) wanted) then
           `Assoc [("ok", `Bool false); ("stale", `Bool true)]
         else if (not b.declared) || List.length locs <> List.length rendered then
-          error "Domain subtraction rewrites val lines: write them first, without holes."
+          error "Domain subtraction rewrites val lines: write them first, without wildcards."
         else
           let trees = (Typings.source program).sigs in
           let selected =
