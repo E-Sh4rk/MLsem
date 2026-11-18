@@ -72,7 +72,7 @@ let groups params : Yojson.Safe.t =
              `Assoc
                [
                  ("key", `String (key g)); ("name", `String name);
-                 ("holes", `Int (Type_refactor.holes_in g));
+                 ("wildcards", `Int (Type_refactor.wildcards_in g));
                  ("global", `Bool (Type_refactor.global g ty)); ("occurrences", `List occurrences);
                ]
            in
@@ -110,7 +110,8 @@ let apply params : Yojson.Safe.t =
           | Error msg -> Signature_check.error msg
           | Ok (s, decls) ->
               let links =
-                (not plumbing) && List.exists (fun (g, _) -> Type_refactor.holes_in g > 0) chosen
+                (not plumbing)
+                && List.exists (fun (g, _) -> Type_refactor.wildcards_in g > 0) chosen
               in
               let edit range text =
                 `Assoc [("range", Lsp.Types.Range.yojson_of_t range); ("newText", `String text)]
@@ -134,5 +135,5 @@ let apply params : Yojson.Safe.t =
                 [
                   ("ok", `Bool true); ("text", `String s);
                   ("decls", `List (List.map (fun d -> `String d) decls));
-                  ("linksHoles", `Bool links); ("edits", `List (decl_edits @ [edit range s]));
+                  ("linksWildcards", `Bool links); ("edits", `List (decl_edits @ [edit range s]));
                 ] ) )

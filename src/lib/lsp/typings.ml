@@ -27,16 +27,17 @@ type overload_row = {
 
 type hover_body =
   | Type of string
-  (* A hole of a draft [val] line, as written ([_] or ['_a]), and the type it
-     was resolved to. *)
-  | Hole of {
-      hole: string;
+  (* A wildcard of a partial [val] line, as written ([_] or ['_a]), and the
+     type it was resolved to. *)
+  | Wildcard of {
+      wildcard: string;
       value: string;
     }
-  (* A hole of a line whose check gave several overloads, which disagree on
-     it: per overload, its value ([None]: the line cannot be that overload). *)
-  | Hole_per_overload of {
-      hole: string;
+  (* A wildcard of a line whose check gave several overloads, which disagree
+     on it: per overload, its value ([None]: the line cannot be that
+     overload). *)
+  | Wildcard_per_overload of {
+      wildcard: string;
       rows: (string * string option) list;
     }
   | Overloads of {
@@ -332,12 +333,12 @@ let rec tyexpr_tvars (ty : TyExpr.t) =
 (* The type written in the [val] line at [r]. *)
 let sig_type ctx r = List.assoc_opt r ctx.src.sigs
 
-(* Located holes of a draft [val] line: its weak type variables, written [_]
-   (named [_holeN] by the parser) or ['_a]. *)
-let rec tyexpr_holes (ty : TyExpr.t) =
+(* Located wildcards of a partial [val] line: its weak type variables,
+   written [_] (named [_holeN] by the parser) or ['_a]. *)
+let rec tyexpr_wildcards (ty : TyExpr.t) =
   match ty with
   | TLoc (loc, TVar (KInfer, name)) -> [(lex_range loc, name)]
-  | _ -> List.concat_map tyexpr_holes (tyexpr_children ty)
+  | _ -> List.concat_map tyexpr_wildcards (tyexpr_children ty)
 
 (* A tuple is printed without parentheses; written in place of a variable, it
    needs them. *)
@@ -356,23 +357,23 @@ let build_type envs s =
   let _, _, _, _, penv = envs in
   PEnv.sequential_handler penv (Main.build_type envs) s |> fst
 
-(* The holes of a draft's [val] lines (at [locs]), solved from the
-   definition's type scheme [ty].
+(* The wildcards of a partial signature's [val] lines (at [locs]), solved
+   from the definition's type scheme [ty].
 
-   The definition has every line's type with the holes filled, so each line
-   [Lᵢ] is above an instance of [ty]: [ty₁ ≤ L₁, …, tyₙ ≤ Lₙ] is tallied,
-   each [tyᵢ] a copy of [ty] whose variables are solved for, the holes
+   The definition has every line's type with the wildcards filled, so each
+   line [Lᵢ] is above an instance of [ty]: [ty₁ ≤ L₁, …, tyₙ ≤ Lₙ] is tallied,
+   each [tyᵢ] a copy of [ty] whose variables are solved for, the wildcards
    shared by the lines, and the lines' type variables fixed (a line's ['a]
    is any type; ['a] in two lines is two variables, as in MLsem). Tally
-   gives the most general solutions, possibly several: a hole in a domain
-   can have values that each give a part of [ty] ([h -> h] for
+   gives the most general solutions, possibly several: a wildcard in a
+   domain can have values that each give a part of [ty] ([h -> h] for
    [(int -> int) & (bool -> bool)]: [int], and [bool]). MLsem itself may
-   have instantiated the holes several ways and intersected the results, so
-   its solving is not read back: a solution here need not be one of its.
+   have instantiated the wildcards several ways and intersected the results,
+   so its solving is not read back: a solution here need not be one of its.
 
-   Per solution: each hole as [(range, shown, value, line index)], and each
-   line filled with it. *)
-let draft_solutions ctx envs display ty locs =
+   Per solution: each wildcard as [(range, shown, value, line index)], and
+   each line filled with it. *)
+let wildcard_solutions ctx envs display ty locs =
   let weak_of t =
     TVOp.vars t |> MVarSet.proj1 |> TVarSet.elements |> List.filter (TVar.has_kind KInfer)
   in
@@ -381,7 +382,7 @@ let draft_solutions ctx envs display ty locs =
     |> List.filter (fun v -> not (TVar.has_kind KInfer v))
   in
   (* Each line's rigid variables are its own (['a] in two lines is two
-     variables, as in MLsem), copies with the same names; the holes are
+     variables, as in MLsem), copies with the same names; the wildcards are
      shared. *)
   let lines =
     List.filter_map
@@ -411,7 +412,7 @@ let draft_solutions ctx envs display ty locs =
     in
     Subst.apply (TVOp.refresh ~kind:KNoInfer (MVarSet.of_set1 w)) o
   in
-  (* The holes: the lines' weak variables. *)
+  (* The wildcards: the lines' weak variables. *)
   let weak = weak_of d in
   let cs = List.map (fun (_, l) -> (Subst.apply (TVOp.refresh ~kind:KInfer tvs) o, l)) lines in
   (* The variables a solution leaves in the lines are made rigid ones taken
@@ -427,10 +428,10 @@ let draft_solutions ctx envs display ty locs =
   in
   TVOp.tally (TVOp.all_vars KNoInfer) cs
   |> List.filter_map (fun s ->
-    (* A solution can leave weak variables, the holes' own among them
-             ([_hole := ('a & int) | (_hole \ int)] when the hole is
+    (* A solution can leave weak variables, the wildcards' own among them
+             ([_hole := ('a & int) | (_hole \ int)] when the wildcard is
              intersected with [int]). Any choice for them is a solution, but
-             one choice for all the lines, so that the holes agree:
+             one choice for all the lines, so that the wildcards agree:
              - those in the lines are chosen by their polarity in them, as
                when simplifying a signature ([empty] where only positive, so
                a result is the tightest; [any] where only negative, so a
@@ -481,7 +482,7 @@ let draft_solutions ctx envs display ty locs =
     if not (List.for_all holds cs) then
       None
     else
-      let holes =
+      let wildcards =
         List.concat
           (List.mapi
              (fun i (t, l) ->
@@ -495,11 +496,13 @@ let draft_solutions ctx envs display ty locs =
                        in
                        let value = final (TVar.typ v) |> GTy.mk |> display |> paren_tuple in
                        (range, shown, value, i) ) )
-                  (tyexpr_holes t) )
+                  (tyexpr_wildcards t) )
              lines )
       in
       Some
-        (holes, List.map (fun (_, l) -> final l l) lines, List.map (fun (_, l) -> resolve l) lines) )
+        ( wildcards,
+          List.map (fun (_, l) -> final l l) lines,
+          List.map (fun (_, l) -> resolve l) lines ) )
   (* Only the most precise solutions, in two passes:
      - one strictly wider than another, or equivalent to an earlier one, is
        dropped ([empty] in a domain fits any function). Done first: two
@@ -512,7 +515,7 @@ let draft_solutions ctx envs display ty locs =
        many solutions each alone strictly implies), a solution added only if
        the set does not already imply it, so that the precise overloads come
        first ([int -> int] before [int | 'a -> int | 'a], which implies it),
-       wherever the holes sit in the lines; then, from the last added, one
+       wherever the wildcards sit in the lines; then, from the last added, one
        implied by the rest of the set is dropped. Checking against one
        solution, or the set only, not against all the others, keeps each
        check small: a tally with many arrows does not end in time. A filled
@@ -578,28 +581,28 @@ let draft_solutions ctx envs display ty locs =
   in
   Array.to_list sols
   |> List.filteri (fun i _ -> List.mem i kept)
-  |> List.map (fun (holes, lines, _) -> (holes, lines))
+  |> List.map (fun (wildcards, lines, _) -> (wildcards, lines))
 
-(* The hovers of a draft's holes, from its [solutions]: a hole has a value if
-   every solution gives it the same; otherwise its hover lists the value per
-   solution, next to its line filled by that solution, and it cannot be
-   filled. *)
-let draft_hole_hovers display solutions =
+(* The hovers of a partial signature's wildcards, from its [solutions]: a
+   wildcard has a value if every solution gives it the same; otherwise its
+   hover lists the value per solution, next to its line filled by that
+   solution, and it cannot be filled. *)
+let wildcard_hovers display solutions =
   match solutions with
   | [] -> []
-  | (holes, _) :: _ ->
+  | (wildcards, _) :: _ ->
       List.mapi
-        (fun k ((h_start, h_end), hole, _, i) ->
+        (fun k ((h_start, h_end), wildcard, _, i) ->
            let values =
              List.map (fun (hs, _) -> (fun (_, _, v, _) -> v) (List.nth hs k)) solutions
            in
            let body =
              match List.sort_uniq compare values with
-             | [value] -> Hole {hole; value}
+             | [value] -> Wildcard {wildcard; value}
              | _ ->
-                 Hole_per_overload
+                 Wildcard_per_overload
                    {
-                     hole;
+                     wildcard;
                      rows =
                        List.map2
                          (fun (_, lines) v -> (display (GTy.mk (List.nth lines i)), Some v))
@@ -607,7 +610,7 @@ let draft_hole_hovers display solutions =
                    }
            in
            {h_start; h_end; body} )
-        holes
+        wildcards
 
 (* The instance of [overload] a call with these argument and result types
    uses: a value for each of the overload's variables such that the
@@ -726,8 +729,8 @@ let lens_names (b : Main.inferred) =
       end ) ;
     !names
 
-(* Whether [b] has [val] lines. [Main] checks a draft with the definitions
-   without signature, and marks it as not declared. *)
+(* Whether [b] has [val] lines. [Main] checks a partial signature with the
+   definitions without signature, and marks it as not declared. *)
 let declared (b : Main.inferred) = b.declared || Variable.get_sig_locations b.var <> []
 
 let add ctx envs (b : Main.inferred) =
@@ -902,24 +905,24 @@ let add ctx envs (b : Main.inferred) =
     | _ -> hovers
   in
   (* The overloads of the [i]th [val] line. A complete signature's overloads
-     are its lines. A draft's are its lines filled by each solution of its
-     holes. *)
-  let draft =
+     are its lines. A partial signature's are its lines filled by each
+     solution of its wildcards. *)
+  let partial =
     List.exists
       (fun loc ->
          match sig_type ctx loc with
-         | Some ty -> tyexpr_holes ty <> []
+         | Some ty -> tyexpr_wildcards ty <> []
          | None -> false )
       sig_locs
   in
-  let solutions = if draft then draft_solutions ctx envs display b.ty sig_locs else [] in
+  let solutions = if partial then wildcard_solutions ctx envs display b.ty sig_locs else [] in
   let line_overloads i =
-    if draft then
+    if partial then
       List.filter_map (fun (_, lines) -> Option.map GTy.mk (List.nth_opt lines i)) solutions
     else
       Option.to_list (Option.map Signature.to_gty (List.nth_opt b.sigs i))
   in
-  let hovers = draft_hole_hovers display solutions @ hovers in
+  let hovers = wildcard_hovers display solutions @ hovers in
   let tvar_occs =
     List.concat
       (List.mapi
