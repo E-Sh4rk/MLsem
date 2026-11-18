@@ -299,7 +299,6 @@ let coerce ?coercion_id ?(duplicate_arrows=false) c ty t =
     let t =
       try match t with
       | Let (tys, v, e1, e2) -> Let (tys, v, e1, aux ty e2)
-      | Ite (e, tau, e1, e2) -> Ite (e, tau, aux ty e1, aux ty e2)
       | Projection (p, e) ->
         Projection (p, aux (GTy.map (domain_of_proj p) ty) e)
       | Constructor (cons, es) ->
