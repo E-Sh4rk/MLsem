@@ -1,6 +1,6 @@
-"""bal.mlsem with its val line replaced by variants with holes: the native
-typecheck's time and result for each, then, with --lsp, the language
-server's Draft holes for those the native check finishes.
+"""bal.mlsem with its val line replaced by variants with wildcards: the
+native typecheck's time and result for each, then, with --lsp, the language
+server's Partial signatures for those the native check finishes.
 
 Run from the repository root after `dune build`:
     python src/lib/lsp/experiments/bal_holes/run.py [--lsp] [--skip-timeouts]
@@ -82,13 +82,13 @@ try:
             print(f"{name:12} LSP errors: {errs}")
         i = text.split("\n").index(line.rstrip("\n"))
         t = time.time()
-        r = c.response(c.request("mlsem/holes", {
+        r = c.response(c.request("mlsem/wildcards", {
             "textDocument": {"uri": uri}, "position": {"line": i, "character": 4}}), 120)
         th = time.time() - t
         if "result" not in r:
             print(f"{name:12} LSP typecheck {tdiag:5.2f}s  ERROR {r['error']['message']}")
         else:
-            vals = [" / ".join(x["value"] for x in h["rows"]) for h in r["result"]["holes"]]
-            print(f"{name:12} LSP typecheck {tdiag:5.2f}s holes {th:.2f}s  {vals}")
+            vals = [" / ".join(x["value"] for x in w["rows"]) for w in r["result"]["wildcards"]]
+            print(f"{name:12} LSP typecheck {tdiag:5.2f}s wildcards {th:.2f}s  {vals}")
 finally:
     c.cleanup()
