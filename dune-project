@@ -70,5 +70,11 @@
 (package
  (name mlsem-lsp)
  (synopsis "LSP binary for mlsem")
- (depends mlsem-app fmt lsp jsonrpc yojson logs)
+ (depends
+  mlsem-app
+  fmt
+  (lsp (and (>= 1.23) (< 1.24)))
+  (jsonrpc (and (>= 1.23) (< 1.24)))
+  yojson
+  logs)
 )
