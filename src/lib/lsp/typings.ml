@@ -372,7 +372,8 @@ let build_type envs s =
    so its solving is not read back: a solution here need not be one of its.
 
    Per solution: each wildcard as [(range, shown, value, line index)], and
-   each line filled with it. *)
+   each line filled with it, with the line's own variables (the ones its
+   definition was checked with). *)
 let wildcard_solutions ctx envs display ty locs =
   let weak_of t =
     TVOp.vars t |> MVarSet.proj1 |> TVarSet.elements |> List.filter (TVar.has_kind KInfer)
@@ -383,21 +384,22 @@ let wildcard_solutions ctx envs display ty locs =
   in
   (* Each line's rigid variables are its own (['a] in two lines is two
      variables, as in MLsem), copies with the same names; the wildcards are
-     shared. *)
-  let lines =
+     shared. With each line, the renaming of its copies back to the
+     variables the definition was checked with, which its body's types
+     mention. *)
+  let lines, backs =
     List.filter_map
       (fun r ->
          Option.map
            (fun t ->
               let l = build_signature envs t |> fst |> Signature.to_gty |> GTy.ub in
-              let own =
-                rigid_of l
-                |> List.map (fun v -> (v, TVar.typ (TVar.mk KNoInfer (Some (TVar.name v)))))
-                |> Subst.of_list1
-              in
-              (t, Subst.apply own l) )
+              let copies = rigid_of l |> List.map (fun v -> (v, TVar.mk KNoInfer (Some (TVar.name v)))) in
+              let own = copies |> List.map (fun (v, c) -> (v, TVar.typ c)) |> Subst.of_list1 in
+              let back = copies |> List.map (fun (v, c) -> (c, TVar.typ v)) |> Subst.of_list1 in
+              ((t, Subst.apply own l), back) )
            (sig_type ctx r) )
       locs
+    |> List.split
   in
   let d = Ty.conj (List.map snd lines) in
   let tvs, o = TyScheme.get ty in
@@ -581,7 +583,7 @@ let wildcard_solutions ctx envs display ty locs =
   in
   Array.to_list sols
   |> List.filteri (fun i _ -> List.mem i kept)
-  |> List.map (fun (wildcards, lines, _) -> (wildcards, lines))
+  |> List.map (fun (wildcards, lines, _) -> (wildcards, List.map2 Subst.apply backs lines))
 
 (* The hovers of a partial signature's wildcards, from its [solutions]: a
    wildcard has a value if every solution gives it the same; otherwise its
@@ -802,7 +804,15 @@ let add ctx envs (b : Main.inferred) =
             (use_range ctx pos)
       | Binder (v, ty) when not (Variable.equal v b.var) ->
           Option.iter
-            (fun r -> note v r d.sig_index ty ; mark r ty ; occ ctx ~binder:true v r)
+            (fun r ->
+               (* The binder of a recursive group's component for [b] is a
+                  copy of [b.var]: its type there is the group's
+                  monomorphic one, not [b]'s. *)
+               if Some r <> binder_range b.var then begin
+                 note v r d.sig_index ty ;
+                 mark r ty
+               end ;
+               occ ctx ~binder:true v r )
             (binder_range v)
       | Binder _ -> ()
       | Call {pos; callee; args; result} -> (
