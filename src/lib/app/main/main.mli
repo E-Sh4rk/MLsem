@@ -8,14 +8,18 @@ type message = Mlsem_system.Analyzer.severity * Position.t * string * string opt
 (** Severity, location, title, description, and the analyzer's diagnostic it
     comes from, if any. *)
 
-type derivation = { sig_index: int option ; env: Env.t ;
+type derivation = { sig_index: int option ; part: int option ; env: Env.t ;
                     expr: Mlsem_system.Ast.t ; annot: Mlsem_system.Annot.Annot.t ;
                     resolved: Signature.t }
 (** One checking pass of a definition: [sig_index] is the index of the [val]
     declaration it was checked against, if any. [expr] is the expression
     checked in the environment [env], and [annot] its derivation, with every
     typed node's type cached in it. [resolved] is the type this pass gave, as
-    overloads: several when the body is overloaded. *)
+    overloads: several when the body is overloaded.
+
+    The definitions of a recursive group are checked together: each one has
+    the derivation of the whole group (the same [expr] and [annot]), and
+    [part] is the index of the definition in the group. *)
 
 type inferred = {
   var: Variable.t;

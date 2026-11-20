@@ -67,8 +67,13 @@ let children ((id, e) : Mlsem_system.Ast.t) (a : Annot.t) =
 (* The typings of [expr], whose derivation is [annot], in the order the
    checker types the nodes: a node after its children. A node typed under
    several derivations of an intersection is listed once per derivation.
-   [annot] must have been typed again from cleared caches, see [typings]. *)
-let read expr annot =
+   [annot] must have been typed again from cleared caches, see [typings].
+
+   With [part], [expr] is a recursive group (possibly under wrappers) and
+   only its [part]th component is read: the definitions
+   of a group share the derivation of the whole group, and each one shows
+   its own. *)
+let read ?part expr annot =
   let acc = ref [] and inner = ref Eid.Set.empty in
   (* The callee and arguments of a call, following the function part of
      curried applications. *)
@@ -87,12 +92,22 @@ let read expr annot =
     | _, AInter (a :: _) -> spine (id, e) a args
     | _ -> (None, args)
   in
-  let rec walk ((id, e) as ex : Mlsem_system.Ast.t) (a : Annot.t) =
+  (* [part]: the component to read of the group below, see above. *)
+  let rec walk ?part ((id, e) as ex : Mlsem_system.Ast.t) (a : Annot.t) =
     match a.cache with
     | None -> ()
     | Some ty -> (
-        List.iter (fun (e, a) -> walk e a) (children ex a) ;
         let add t = acc := (id, t) :: !acc in
+        match (part, e, a.ann) with
+        | Some i, LambdaRec lst, ALambdaRec anns when List.length lst = List.length anns ->
+            Option.iter
+              (fun ((_, v, e), (s, a)) ->
+                 walk e a ;
+                 add (Binder (v, s)) )
+              (List.nth_opt (List.combine lst anns) i)
+        | Some _, _, _ -> List.iter (fun (e, a) -> walk ?part e a) (children ex a)
+        | None, _, _ -> (
+        List.iter (fun (e, a) -> walk e a) (children ex a) ;
         match (e, a.ann) with
         | Var v, AVar _ -> add (Use (Eid.loc id, v, ty))
         | Lambda (_, v, _), ALambda (s, _) -> add (Binder (v, s))
@@ -104,9 +119,9 @@ let read expr annot =
             let callee, args = spine ex a [] in
             inner := Eid.Set.remove id !inner ;
             add (Call {pos = Eid.loc id; callee; args; result = ty})
-        | _ -> () )
+        | _ -> () ) )
   in
-  walk expr annot ;
+  walk ?part expr annot ;
   (* Applications that are the function part of a larger call are covered by
      that call. *)
   !acc |> List.rev
@@ -115,12 +130,27 @@ let read expr annot =
     | Call _ when Eid.Set.mem id !inner -> None
     | t -> Some t )
 
+(* The derivation last typed again, and whether that succeeded: the
+   definitions of a recursive group share one derivation, read once per
+   definition, one after the other. *)
+let last_typed = ref None
+
 (* The typings of a checked definition. Its caches are cleared and the
    derivation typed again in its environment, so that every cached type is
    the one the checker computes for the final derivation. If typing again
    fails, which the checker already did once, nothing is shown. *)
 let typings (d : Mlsem_app.Main.derivation) =
-  Annot.clear_caches d.annot ;
-  match Mlsem_system.Checker.typeof_def d.env d.annot d.expr with
-  | _ -> read d.expr d.annot
-  | exception Mlsem_system.Error.Untypeable _ -> []
+  let ok =
+    match !last_typed with
+    | Some (annot, ok) when annot == d.annot -> ok
+    | _ ->
+        Annot.clear_caches d.annot ;
+        let ok =
+          match Mlsem_system.Checker.typeof_def d.env d.annot d.expr with
+          | _ -> true
+          | exception Mlsem_system.Error.Untypeable _ -> false
+        in
+        last_typed := Some (d.annot, ok) ;
+        ok
+  in
+  if ok then read ?part:d.part d.expr d.annot else []
