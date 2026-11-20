@@ -123,6 +123,9 @@ type running = {
   job: job;
   started: float;
   progress: Lsp.Types.ProgressToken.t option;
+  mutable typechecking: bool;
+    (** A toolkit job is typechecking its document ([Engine.Typechecking]):
+          its timeout or crash is the document's. *)
 }
 
 type engine = {
@@ -145,6 +148,10 @@ let failed : (Uri.t, Digest.t * string) Hashtbl.t = Hashtbl.create 4
 (* Settings from initialize. *)
 let timeout = ref 10.0
 let editor_pid : int option ref = ref None
+
+(* Colour swatches in overload hovers, matching the extension's colouring of
+   [val] lines. Set by the [hoverOverloadColors] initialization option. *)
+let hover_colors = ref false
 let work_done_progress = ref false
 
 let crash_times : float list ref = ref []
@@ -255,7 +262,14 @@ let error_at_start message =
     ~severity:Lsp.Types.DiagnosticSeverity.Error ~source:"mlsem" ()
 
 (* Remember that [text] of [uri] cannot be typechecked, and tell the client.
-   Earlier lenses and diagnostics describe another text: drop them. *)
+   Earlier lenses and diagnostics describe another text: drop them.
+
+   TODO: say which definition the typecheck was in when it timed out or
+   crashed. The engine could report each top-level definition as it starts
+   it, like [Engine.Typechecking]; the error would then sit on that
+   definition instead of the file's start, and the LLM inference could say
+   whether its target or an earlier definition is the one that times out
+   (an earlier one makes every check of the target time out too). *)
 let mark_failed uri text message =
   Hashtbl.replace failed uri (Digest.string text, message) ;
   Doc.clear_results uri ;
@@ -283,9 +297,16 @@ let spawn_engine () =
   engine := Some e ;
   e
 
+(* Built when the job starts, so a failure found while it waited counts. *)
 let call_of = function
   | Check {uri; text} -> Engine.Check {uri; text}
-  | Tool {method_; params; _} -> Engine.Tool {method_; params = J.to_string params}
+  | Tool {method_; params; uri; text; _} ->
+      let known_failure =
+        match (uri, text) with
+        | Some uri, Some text -> known_failure uri text
+        | _ -> None
+      in
+      Engine.Tool {method_; params = J.to_string params; known_failure}
 
 (* A pop-up in the editor, prefixed with the file name when there is one. *)
 let show_message ~type_ ?uri message =
@@ -298,20 +319,25 @@ let show_message ~type_ ?uri message =
     (Lsp.Server_notification.ShowMessage
        (Lsp.Types.ShowMessageParams.create ~message:("MLsem: " ^ message) ~type_) )
 
-(* The running job will not finish: answer or report it with [message], both
-   in the response or diagnostics and as a pop-up. *)
+(* The running job will not finish: answer or report it with [message]. A
+   failure while typechecking the document is the document's: it is
+   remembered, published and shown as a pop-up. Any other failure of a
+   toolkit job is the job's own, and only answers its request: the client
+   shows it where the request came from. *)
 let fail_running ~type_ message =
   Option.iter
     (fun r ->
        running := None ;
        end_progress r.progress ;
+       let document_failed uri text =
+         show_message ~type_ ~uri message ; mark_failed uri text message
+       in
        match r.job with
-       | Check {uri; text} -> show_message ~type_ ~uri message ; mark_failed uri text message
+       | Check {uri; text} -> document_failed uri text
        | Tool {id; uri; text; _} -> (
-           show_message ~type_ ?uri message ;
            respond_error id Response.Error.Code.RequestFailed message ;
-           match (uri, text) with
-           | Some uri, Some text -> mark_failed uri text message
+           match (r.typechecking, uri, text) with
+           | true, Some uri, Some text -> document_failed uri text
            | _ -> () ) )
     !running
 
@@ -320,7 +346,10 @@ let engine_died () =
   kill_engine () ;
   let now = Unix.gettimeofday () in
   crash_times := now :: List.filter (fun t -> now -. t < crash_window) !crash_times ;
-  fail_running ~type_:Lsp.Types.MessageType.Error "Typechecking crashed the MLsem server" ;
+  fail_running ~type_:Lsp.Types.MessageType.Error
+    ( match !running with
+    | Some {job = Tool _; typechecking = false; _} -> "Toolkit request crashed the MLsem server"
+    | _ -> "Typechecking crashed the MLsem server" ) ;
   if List.length !crash_times >= max_crashes then
     wind_down (Printf.sprintf "engine crashed %d times in %.0f s" max_crashes crash_window)
 
@@ -348,21 +377,25 @@ let rec dispatch () =
                 begin_progress ("Typechecking " ^ Filename.basename (Uri.to_path uri))
             | Tool _ -> None
           in
-          running := Some {job; started = Unix.gettimeofday (); progress} )
+          running := Some {job; started = Unix.gettimeofday (); progress; typechecking = false} )
   | _ -> ()
 
 let on_reply (reply : Engine.reply) =
   match (!running, reply) with
-  | Some {job = Check {uri; text}; progress; _}, Checked {lenses; diagnostics} ->
+  | Some {job = Check {uri; text}; progress; _}, Checked {lenses; diagnostics; typings} ->
       running := None ;
       end_progress progress ;
       if Doc.find uri <> None then begin
-        Doc.set_result uri ~text ~lenses ~diagnostics ;
+        Doc.set_result uri ~text ~lenses ~diagnostics ~typings ;
         publish uri (Doc.diagnostics uri)
       end
+  | Some ({job = Tool _; _} as r), Typechecking -> r.typechecking <- true
   | Some {job = Tool {id; _}; _}, Tool_result json ->
       running := None ;
       respond id (J.from_string json)
+  | Some {job = Tool {id; _}; _}, Tool_refused message ->
+      running := None ;
+      respond_error id Response.Error.Code.RequestFailed message
   | _ -> Log.Server.warn (fun m -> m "engine reply does not match the running job")
 
 let enqueue job = queue := !queue @ [job]
@@ -382,10 +415,10 @@ let cancel id =
   | Some {job = Tool t; _} when t.id = id ->
       kill_engine () ;
       running := None ;
-      respond_error id Response.Error.Code.RequestCancelled "Request cancelled"
+      respond_error id Response.Error.Code.RequestCancelled "Toolkit request cancelled"
   | _ ->
       if drop_queued id then
-        respond_error id Response.Error.Code.RequestCancelled "Request cancelled"
+        respond_error id Response.Error.Code.RequestCancelled "Toolkit request cancelled"
 
 (* Typecheck [text] of [uri]. Older typechecks of [uri] are pointless now:
    queued ones are dropped, and a running one of another text is killed. *)
@@ -430,11 +463,18 @@ let initialize_result_json () =
       ()
   in
   let code_action_opts =
-    CodeActionOptions.create ~codeActionKinds:[CodeActionKind.RefactorInline] ()
+    CodeActionOptions.create
+      ~codeActionKinds:
+        [
+          CodeActionKind.RefactorInline; CodeActionKind.RefactorRewrite;
+          CodeActionKind.RefactorExtract; CodeActionKind.QuickFix;
+        ]
+      ()
   in
   let capabilities =
     ServerCapabilities.create ~codeActionProvider:(`CodeActionOptions code_action_opts)
       ~codeLensProvider:(CodeLensOptions.create ~resolveProvider:false ())
+      ~hoverProvider:(`Bool true) ~documentHighlightProvider:(`Bool true)
       ~textDocumentSync:(`TextDocumentSyncOptions sync) ()
   in
   InitializeResult.yojson_of_t (InitializeResult.create ~capabilities ())
@@ -446,9 +486,12 @@ let read_initialize_params (params : Lsp.Types.InitializeParams.t) =
     |> Option.value ~default:false ;
   ( match params.initializationOptions with
   | Some (`Assoc opts) -> (
-      match List.assoc_opt "typecheckTimeout" opts with
+      ( match List.assoc_opt "typecheckTimeout" opts with
       | Some (`Int n) -> timeout := float_of_int n
       | Some (`Float f) -> timeout := f
+      | _ -> () ) ;
+      match List.assoc_opt "hoverOverloadColors" opts with
+      | Some (`Bool b) -> hover_colors := b
       | _ -> () )
   | _ -> () ) ;
   editor_pid := params.processId
@@ -468,16 +511,138 @@ let inline_type_action uri (range : Lsp.Types.Range.t) ~indent ~name ~tys : Lsp.
     ~title:("Inline inferred type: " ^ String.concat " ; " tys)
     ~kind:Lsp.Types.CodeActionKind.RefactorInline ~edit:workspace_edit ()
 
+(* Replace wildcards of partial [val] lines with the types they were resolved
+   to. *)
+let fill_wildcards_action uri ~title wildcards : Lsp.Types.CodeAction.t =
+  let edits =
+    List.map (fun (range, _, value) -> Lsp.Types.TextEdit.create ~newText:value ~range) wildcards
+  in
+  let workspace_edit = Lsp.Types.WorkspaceEdit.create ~changes:[(uri, edits)] () in
+  Lsp.Types.CodeAction.create ~title ~kind:Lsp.Types.CodeActionKind.RefactorRewrite
+    ~edit:workspace_edit ()
+
+(* For the wildcard at the cursor, an action replacing it; for the wildcards
+   on the lines of [req_range], one replacing all of them, unless it would be
+   the same edit. A named wildcard (['_a]) is one variable: its occurrences
+   on the line are replaced together. *)
+let wildcard_actions uri (req_range : Lsp.Types.Range.t) =
+  let open Lsp.Types in
+  let lines =
+    Range.create
+      ~start:(Position.create ~line:req_range.start.line ~character:0)
+      ~end_:(Position.create ~line:(req_range.end_.line + 1) ~character:0)
+  in
+  (* Each value as written in place of its wildcard: in parentheses only where
+     the wildcard needs them ([Partial_signatures.writer]). *)
+  let written =
+    match Doc.text uri with
+    | None -> Fun.id
+    | Some text ->
+        let write = Partial_signatures.writer text in
+        let offsets = Doc.compute_line_offsets text in
+        let off = Doc.offset_of_position offsets (String.length text) in
+        fun ((r : Range.t), wildcard, value) -> (r, wildcard, write (off r.start, off r.end_) value)
+  in
+  let wildcards = Doc.wildcards uri lines |> List.map written in
+  let at_cursor =
+    match
+      Doc.wildcards uri (Range.create ~start:req_range.start ~end_:req_range.start)
+      |> List.map written
+    with
+    | [] -> []
+    | (range, wildcard, _) :: _ when wildcard <> "_" ->
+        List.filter
+          (fun ((r : Range.t), w, _) -> w = wildcard && r.start.line = range.start.line)
+          wildcards
+    | w :: _ -> [w]
+  in
+  let one =
+    match at_cursor with
+    | [] -> []
+    | (_, wildcard, value) :: _ ->
+        [
+          fill_wildcards_action uri
+            ~title:(Printf.sprintf "Replace %s with %s" wildcard value)
+            at_cursor;
+        ]
+  in
+  let all =
+    if wildcards = [] || List.length wildcards = List.length at_cursor then
+      []
+    else
+      [fill_wildcards_action uri ~title:"Replace all wildcards with their types" wildcards]
+  in
+  one @ all
+
+(* Naming the repeated parts of the type of a [val] line on the lines of
+   [req_range] with [where], or inlining its [where] definitions. Answered
+   from a parse of our copy of the document. *)
+let where_actions uri (req_range : Lsp.Types.Range.t) =
+  match Doc.text uri with
+  | None -> []
+  | Some text -> (
+      match Mlsem_app.Main.parse (`String text) with
+      | PFailure _ -> []
+      | PSuccess program ->
+          let offsets = Doc.compute_line_offsets text in
+          let line_off l = if l < Array.length offsets then offsets.(l) else String.length text in
+          let lo = line_off req_range.start.line in
+          let hi = line_off (req_range.end_.line + 1) in
+          List.concat_map
+            (fun (_, elem) ->
+               match elem with
+               | Mlsem_app.PAst.SigDef (_, _, TLoc ((s, e), ty))
+                 when s.Lexing.pos_cnum < hi && lo <= e.Lexing.pos_cnum ->
+                   let range =
+                     Lsp.Types.Range.create
+                       ~start:(Doc.position_of_offset offsets s.pos_cnum)
+                       ~end_:(Doc.position_of_offset offsets e.pos_cnum)
+                   in
+                   let action kind title = function
+                     | None -> []
+                     | Some newText ->
+                         let edit = Lsp.Types.TextEdit.create ~newText ~range in
+                         [
+                           Lsp.Types.CodeAction.create ~title ~kind
+                             ~edit:(Lsp.Types.WorkspaceEdit.create ~changes:[(uri, [edit])] ())
+                             ();
+                         ]
+                   in
+                   action Lsp.Types.CodeActionKind.RefactorExtract "Extract repeated parts"
+                     (Type_refactor.extract ~wildcards:false ty)
+                   @ action Lsp.Types.CodeActionKind.RefactorExtract
+                       "Extract repeated parts as wildcards"
+                       (Type_refactor.extract ~wildcards:true ty)
+                   @ action Lsp.Types.CodeActionKind.RefactorInline "Inline where definitions"
+                       (Type_refactor.inline ty)
+               | _ -> [] )
+            program )
+
+(* For a failing call in [req_range], the changes of the callee's [val]
+   lines the typecheck proposed ([Typecheck.app_fixes]). *)
+let call_fix_actions uri (req_range : Lsp.Types.Range.t) =
+  Doc.fixes uri req_range
+  |> List.map (fun (title, edits) ->
+    let edits =
+      List.map (fun (range, newText) -> Lsp.Types.TextEdit.create ~newText ~range) edits
+    in
+    Lsp.Types.CodeAction.create ~title ~kind:Lsp.Types.CodeActionKind.QuickFix
+      ~edit:(Lsp.Types.WorkspaceEdit.create ~changes:[(uri, edits)] ())
+      () )
+
 let code_actions_for uri (req_range : Lsp.Types.Range.t) =
-  Doc.lenses_in_range uri req_range
+  ( Doc.lenses_in_range uri req_range
   |> List.filter_map (fun (range, signature, indent) ->
     match signature with
     | None -> None
-    | Some (name, tys) -> Some (`CodeAction (inline_type_action uri range ~indent ~name ~tys)) )
+    | Some (name, tys) -> Some (inline_type_action uri range ~indent ~name ~tys) ) )
+  @ call_fix_actions uri req_range @ wildcard_actions uri req_range @ where_actions uri req_range
+  |> List.map (fun a -> `CodeAction a)
 
 (* A toolkit request becomes an engine job. Its [text] is filled in from our
    copy of the document when the client did not send it, so the engine always
-   works on an explicit text. *)
+   works on an explicit text. A known failure of that text does not stop it
+   here: only the engine knows whether the request needs the typecheck. *)
 let handle_tool (req : Request.t) =
   let params = params_json req in
   let uri =
@@ -497,9 +662,7 @@ let handle_tool (req : Request.t) =
     | `Assoc fields, `Null, Some t -> `Assoc (("text", `String t) :: fields)
     | _ -> params
   in
-  match Option.bind uri (fun uri -> Option.bind text (known_failure uri)) with
-  | Some message -> respond_error req.id Response.Error.Code.RequestFailed message
-  | None -> enqueue (Tool {id = req.id; method_ = req.method_; uri; text; params})
+  enqueue (Tool {id = req.id; method_ = req.method_; uri; text; params})
 
 let shutdown () =
   (* Answered here so it works even when the engine hangs. Pending work is
@@ -515,11 +678,110 @@ let shutdown () =
   queue := [] ;
   kill_engine ()
 
+let code_block t = "```mlsem\n" ^ t ^ "\n```"
+
+(* Colours of overload rows, readable on dark and light themes. The extension
+   tints the editor with them at low opacity. *)
+let overload_colors = [| "#e5534b"; "#539bf5"; "#c69026"; "#57ab5a"; "#986ee2"; "#cc6b2c" |]
+let overload_color i = overload_colors.(i mod Array.length overload_colors)
+
+(* A single type as a code block; overloads as a table of type and [val]
+   signature per row, with the union as the last row. Markdown table cells
+   can't hold code blocks, which are the only highlighted code, so the table
+   is HTML with a code block in each cell: the blank lines around a block
+   switch the renderer back to markdown inside the HTML. Needs the client to
+   allow HTML in hovers. *)
+let hover_markdown : Typings.hover_body -> string = function
+  | Type t -> code_block t
+  | Wildcard {wildcard; value} -> code_block (wildcard ^ " = " ^ value)
+  | Wildcard_per_overload {wildcard; rows} ->
+      (* One row per overload, the overload as a comment, aligned. *)
+      let lefts =
+        List.map
+          (function
+            | _, Some v -> wildcard ^ " = " ^ v
+            | _, None -> wildcard ^ " : no value" )
+          rows
+      in
+      let width = List.fold_left (fun w s -> max w (String.length s)) 0 lefts in
+      List.map2
+        (fun l (o, _) -> l ^ String.make (width - String.length l + 2) ' ' ^ "(* " ^ o ^ " *)")
+        lefts rows
+      |> String.concat "\n" |> code_block
+  | Overloads {rows; union} ->
+      let cell = function
+        | `Code s -> "<td>\n\n" ^ code_block s ^ "\n\n</td>"
+        | `Text s -> "<td>" ^ s ^ "</td>"
+      in
+      (* VS Code strips [nowrap]; non-breaking spaces keep the cells from
+         wrapping, and a long table scrolls instead. *)
+      let nowrap s = String.concat "\xC2\xA0" (String.split_on_char ' ' s) in
+      (* A swatch in the colour the extension gives the row's part of its
+         [val] line. VS Code keeps [style] only on spans, and only colours. *)
+      let swatch i =
+        Printf.sprintf "<span style=\"background-color:%s;\">&nbsp;&nbsp;&nbsp;</span>"
+          (overload_color i)
+      in
+      (* VS Code's hover styles draw no table borders and the sanitizer
+         keeps no border styles, so the columns are separated by a bar in a
+         code block of its own: it gets the padding of the neighbouring code
+         blocks, so the bars of consecutive one-line rows join up. *)
+      let bar = cell (`Code "│") in
+      let row ?mark a b =
+        let first = if !hover_colors then [cell (`Text (Option.value mark ~default:""))] else [] in
+        "<tr>" ^ String.concat "" (first @ [cell a; bar; cell b]) ^ "</tr>"
+      in
+      let rows =
+        List.mapi
+          (fun i (r : Typings.overload_row) ->
+             let mark = Option.map (fun _ -> swatch i) r.sig_range in
+             row ?mark
+               ( match r.row_type with
+               | Some t -> `Code (nowrap t)
+               | None -> `Text "<em>unreachable</em>" )
+               ( match r.sig_text with
+               | Some s -> `Code (nowrap s)
+               | None -> `Text "" ) )
+          rows
+      in
+      let header =
+        (if !hover_colors then "<th></th>" else "") ^ "<th>type</th><th></th><th>overload</th>"
+      in
+      String.concat "\n"
+        ( ["<table>"; "<tr>" ^ header ^ "</tr>"]
+        @ rows
+        @ [row (`Code (nowrap union)) (`Text "<em>union</em>"); "</table>"] )
+
+(* [mlsem/hoverOverloads]: for the hover at a position, the parts of [val]
+   lines its overload rows stand for, each with its row's colour, for the
+   extension to colour in the editor. *)
+let hover_overloads (params : Yojson.Safe.t) =
+  let open Yojson.Safe.Util in
+  let uri = params |> member "textDocument" |> member "uri" |> Lsp.Types.DocumentUri.t_of_yojson in
+  let pos = params |> member "position" |> Lsp.Types.Position.t_of_yojson in
+  if !hover_colors then
+    `List
+      ( Doc.hover_overload_ranges uri pos
+      |> List.map (fun (i, range) ->
+        `Assoc [("range", Lsp.Types.Range.yojson_of_t range); ("color", `String (overload_color i))] )
+      )
+  else
+    `List []
+
 let handle_request (req : Request.t) =
   if !shutdown_received then
     respond_error req.id Response.Error.Code.InvalidRequest "Server is shutting down"
   else if Engine.is_tool req.method_ then
     handle_tool req
+  else if req.method_ = "mlsem/hoverOverloads" then
+    match
+      req.params
+    with
+    | Some p -> (
+        try respond req.id (hover_overloads (Jsonrpc.Structured.yojson_of_t p)) with
+        | Yojson.Safe.Util.Type_error (msg, _) ->
+            respond_error req.id Response.Error.Code.InvalidParams msg )
+    | None -> respond_error req.id Response.Error.Code.InvalidParams "missing params"
   else
     match
       Lsp.Client_request.of_jsonrpc req
@@ -543,6 +805,34 @@ let handle_request (req : Request.t) =
                follows the new result. *)
             let lenses = Doc.code_lenses params.textDocument.uri in
             respond req.id (Lsp.Client_request.yojson_of_result typed_req lenses)
+        | Lsp.Client_request.TextDocumentHover params ->
+            (* Like codeLens, answered from the copy. *)
+            let hover =
+              Doc.hover params.textDocument.uri params.position
+              |> Option.map (fun (range, body) ->
+                let value = hover_markdown body in
+                let contents =
+                  `MarkupContent (Lsp.Types.MarkupContent.create ~kind:Markdown ~value)
+                in
+                Lsp.Types.Hover.create ~contents ~range () )
+            in
+            respond req.id (Lsp.Client_request.yojson_of_result typed_req hover)
+        | Lsp.Client_request.TextDocumentHighlight params ->
+            (* Never [None]: VS Code would then highlight every occurrence of
+               the word under the cursor, comments and shadowed names included. *)
+            let highlights =
+              Doc.highlights params.textDocument.uri params.position
+              |> List.map (fun (range, kind) ->
+                let kind : Lsp.Types.DocumentHighlightKind.t =
+                  match kind with
+                  | `Read -> Read
+                  | `Write -> Write
+                  | `Text -> Text
+                in
+                Lsp.Types.DocumentHighlight.create ~kind ~range () )
+              |> Option.some
+            in
+            respond req.id (Lsp.Client_request.yojson_of_result typed_req highlights)
         | _ -> respond_error req.id Response.Error.Code.MethodNotFound "Method not found" )
 
 (* --- Notifications ------------------------------------------------------- *)
@@ -653,7 +943,8 @@ let check_timeout () =
       fail_running ~type_:Lsp.Types.MessageType.Warning
         ( match r.job with
         | Check _ -> "Typechecking timed out after " ^ limit
-        | Tool _ -> "Request timed out after " ^ limit )
+        | Tool _ when r.typechecking -> "Typechecking timed out after " ^ limit
+        | Tool _ -> "Toolkit request timed out after " ^ limit )
   | _ -> ()
 
 let last_editor_check = ref 0.0

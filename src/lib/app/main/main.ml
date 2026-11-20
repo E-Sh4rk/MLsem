@@ -43,6 +43,14 @@ let sigs_of_def varm senv env (kind,str) =
       v, Some (sigs, Env.find_opt v env)
     end
 
+type derivation = { sig_index: int option ; part: int option ; env: Env.t ;
+                    expr: Mlsem_system.Ast.t ; annot: Mlsem_system.Annot.Annot.t ;
+                    resolved: Signature.t }
+(** One checking pass of a definition: [sig_index] is the index of the [val]
+    declaration it was checked against, if any, and [resolved] the type this
+    pass gave, as overloads: several when the body is overloaded. [part]: see
+    the interface. *)
+
 (* Type checking and inference *)
 
 let infer var env e =
@@ -67,34 +75,43 @@ let infer var env e =
   let (tvs, ty) = TyScheme.get ty in
   let ty = TyScheme.mk tvs (GTy.ub ty |> GTy.mk) |> Signature.simplify_tyscheme in
   let msg, visited = Mlsem_system.Analyzer.analyze e annot in
-  ty, msg, visited
+  ty, msg, visited, annot
 
 let type_check_with_sigs env (var,e,sigs,aty) =
   let e, id = Transform.expr_to_ast e, Eid.refresh (fst e) in
   let c = if !Config.allow_implicit_downcast then CheckStatic else Check in
   let es = sigs |> List.map (fun s ->
     (id, TypeCoerce (e, Signature.to_gty s, c)) |> push_coercions ~duplicate_arrows:true) in
-  let tys, msg, visited =
-    List.map (infer (Some var) env) es |> Mlsem_utils.Utils.split3 in
+  let results = List.map (infer (Some var) env) es in
+  let tys = List.map (fun (ty,_,_,_) -> ty) results in
+  let msg = List.map (fun (_,msg,_,_) -> msg) results in
+  let visited = List.map (fun (_,_,visited,_) -> visited) results in
   List.iter (check_resolved ~allow_mono:false var env) tys ;
+  let derivations = List.combine es results |> List.mapi
+    (fun i (expr,(ty,_,_,annot)) ->
+      { sig_index=Some i ; part=None ; env ; expr ; annot ; resolved=Signature.of_tyscheme ty }) in
   (* Each signature is inferred separately, but they all annotate the same [e]:
      a sub-expression is unreachable only if no signature reached it. *)
   let visited = Mlsem_system.Analyzer.Visited.union_many visited in
   let msg = (List.concat msg)@(Mlsem_system.Analyzer.get_unreachable visited e) in
-  (var,(aty,sigs)),msg
+  (var,(aty,sigs,derivations)),msg
 
 let type_check_recs pos env lst =
   let lst = lst |> List.map
     (fun (v,e,s) -> (v,Option.map Signature.to_gty' s,e)) in
   let e = (Eid.unique_with_pos pos, PAst.LambdaRec lst) |> Transform.expr_to_ast in
-  let ty, msg, visited = e |> push_coercions ~duplicate_arrows:true |> infer None env in
+  let expr = push_coercions ~duplicate_arrows:true e in
+  let ty, msg, visited, annot = infer None env expr in
   let msg = msg@(Mlsem_system.Analyzer.get_unreachable visited e) in
   let tvs, ty = ty |> TyScheme.get in
   let n = List.length lst in
   List.mapi (fun i (var,_,_) ->
     let ty = GTy.map (Tuple.proj n i) ty |> TyScheme.mk tvs |> Signature.simplify_tyscheme in
     check_resolved ~allow_mono:true var env ty ;
-    (var, (ty, Signature.of_tyscheme ty))
+    let resolved = Signature.of_tyscheme ty in
+    (* The definitions are checked together: each one carries the derivation
+       of the whole group, of which it is the [i]th component. *)
+    (var, (ty, resolved, [{ sig_index=None ; part=Some i ; env ; expr ; annot ; resolved }]))
   ) lst, msg
 
 let poly_leq t1 t2 =
@@ -138,16 +155,19 @@ let debug benv d =
     msg, benv
 
 type message = Mlsem_system.Analyzer.severity * Position.t * string * string option
+               * Mlsem_system.Analyzer.Diagnostic.kind option
 type inferred = {
   var: Variable.t;
   ty: TyScheme.t;
   sigs: Signature.t;
   declared: bool;
+  derivations: derivation list;
 }
 type result =
 | TSuccess of inferred list * float
 | TDone
 | TFailure of Variable.t option * Position.t * string * string option * float
+              * Mlsem_lang.Error.t option
 type output = { res:result ; msg:message list }
 
 let dummy = Variable.create (Some "_")
@@ -159,11 +179,13 @@ let treat (benv,varm,senv,env) (annot, elem) =
     match elem with
     | PAst.Definitions lst ->
       let varm, benv = ref varm, ref benv in
-      let lst = lst |> List.map (fun (bpos, (kind, name), e) ->
+      let lst = lst |> List.map (fun (bpos, (kind, lname), e) ->
+        let name = Position.value lname in
         let kind, benv' = resolve_kind !benv kind in
         let var, sigs = sigs_of_def !varm senv env (kind, name) in
         let bpos = if bpos = Position.dummy then pos else bpos in
         benv := benv' ; Variable.attach_location var bpos ;
+        Variable.attach_name_location var (Position.position lname) ;
         varm := NameMap.add name var !varm ;
         (var, e, sigs)
       )
@@ -179,22 +201,22 @@ let treat (benv,varm,senv,env) (annot, elem) =
         | Some (sigs,Some aty) -> Either.Left (var, e, sigs, aty)
         ) lst in
       let tys1, msg1 = type_check_recs pos env recs in
-      let env = List.fold_left (fun env (v,(ty,_)) ->
+      let env = List.fold_left (fun env (v,(ty,_,_)) ->
         try MVariable.add_to_env v ty env
         with Invalid_argument _ -> raise (IncompatibleType (v,ty))
       ) env tys1 in
       let tys2, msg2 = List.map (type_check_with_sigs env) sigs |> List.split in
       let msg = msg1@(List.concat msg2) |> List.map (fun d ->
         let open Mlsem_system.Analyzer.Diagnostic in
-        (severity d, Eid.loc d.eid, title d, descr d)
+        (severity d, Eid.loc d.eid, title d, descr d, Some d.kind)
       ) in
       let senv = List.fold_left (fun senv (v,_) -> VarMap.remove v senv) senv tys2 in
-      let render ~declared (v, (ty,sigs)) = { var = v; ty; sigs; declared } in
+      let render ~declared (v, (ty,sigs,derivations)) = { var = v; ty; sigs; declared; derivations } in
       let tys = List.map (render ~declared:false) tys1 @ List.map (render ~declared:true) tys2 in
       (!benv,varm,senv,env), { res=TSuccess (tys,retrieve_time time) ; msg }
     | PAst.Debug dbg ->
       let msg, benv = debug benv dbg in
-      let msg = [Mlsem_system.Analyzer.Message, pos, "Computation result", Some msg] in
+      let msg = [Mlsem_system.Analyzer.Message, pos, "Computation result", Some msg, None] in
       (benv,varm,senv,env), { res=TDone ; msg }
     | PAst.SigDef (name, mut, ty) ->
       begin try
@@ -220,7 +242,7 @@ let treat (benv,varm,senv,env) (annot, elem) =
         let senv = VarMap.add var sigs senv in
         (benv,varm,senv,env), { res=TDone ; msg=[] }
       with Invalid_argument str -> (benv,varm,senv,env),
-        { res=TFailure (None, pos, str, None, 0.0) ; msg=[] }
+        { res=TFailure (None, pos, str, None, 0.0, None) ; msg=[] }
       end
     | PAst.Command (str, c) ->
       begin match str, c with
@@ -254,11 +276,11 @@ let treat (benv,varm,senv,env) (annot, elem) =
       (benv,varm,senv,env), { res=TDone ; msg=[] }
   with
   | PAst.SymbolError msg ->
-    (benv,varm,senv,env), { res=TFailure (Some !v, pos, msg, None, 0.0) ; msg=[] }
+    (benv,varm,senv,env), { res=TFailure (Some !v, pos, msg, None, 0.0, None) ; msg=[] }
   | TypeDefinitionError msg ->
-    (benv,varm,senv,env), { res=TFailure (None, pos, msg, None, 0.0) ; msg=[] }
+    (benv,varm,senv,env), { res=TFailure (None, pos, msg, None, 0.0, None) ; msg=[] }
   | AlreadyDefined v ->
-    (benv,varm,senv,env), { res=TFailure (Some v, pos, "Symbol already defined.", None, 0.0) ; msg=[] }
+    (benv,varm,senv,env), { res=TFailure (Some v, pos, "Symbol already defined.", None, 0.0, None) ; msg=[] }
   | Untypeable (v', err) ->
     let v = match v' with None -> !v | Some v -> v in
     let pos =
@@ -266,16 +288,16 @@ let treat (benv,varm,senv,env) (annot, elem) =
       then Variable.get_location v
       else Eid.loc err.eid
     in
-    (benv,varm,senv,env), { res=TFailure (Some v, pos, Mlsem_lang.Error.title err, Mlsem_lang.Error.descr ~style:!Config.errors_style err, retrieve_time time) ; msg=[] }
+    (benv,varm,senv,env), { res=TFailure (Some v, pos, Mlsem_lang.Error.title err, Mlsem_lang.Error.descr ~style:!Config.errors_style err, retrieve_time time, Some err) ; msg=[] }
   | IncompatibleType (var,_) ->
     (benv,varm,senv,env), { res=TFailure (Some var, Variable.get_location var,
       "the type inferred is not a subtype of the type specified", None,
-      retrieve_time time); msg=[] }
+      retrieve_time time, None); msg=[] }
   | UnresolvedType (var,ty) ->
     (benv,varm,senv,env), { res=TFailure (Some var, Variable.get_location var,
       "the type inferred is not fully resolved",
       Some (Format.asprintf "type inferred: @[<h>%a@]" TyScheme.pp_short ty),
-      retrieve_time time); msg=[] }
+      retrieve_time time, None); msg=[] }
 
 let treat (benv,varm,senv,env,penv) e =
   let ((benv,varm,senv,env),r), penv = PEnv.sequential_handler penv (treat (benv,varm,senv,env)) e in
@@ -329,6 +351,7 @@ let print_ty pp (_,_,_,_,penv) ty =
     (fun () -> Format.asprintf "@[<h>%a@]" pp ty) ()
   |> fst
 let display envs ty = print_ty TyScheme.pp_short envs ty
+let display_gty ?(names=Subst.identity) envs ty = print_ty (GTy.pp' names) envs ty
 let signature envs sigs = sigs |> List.map (print_ty Signature.pp_overload envs)
 
 let build_type ((benv, _, _, _, _) : envs) (s : string) : Ty.t =

@@ -40,6 +40,9 @@ module TyExpr : sig
         | TRecUpd of t * (string * t) list
         | TRecProj of t * string
         | TTagProj of t * string
+        (* Where a type is written in the source, for editor tooling; the
+           builder ignores it. *)
+        | TLoc of (Lexing.position * Lexing.position) * t
 end
 
 (** @canonical Mlsem_types.Builder *)
