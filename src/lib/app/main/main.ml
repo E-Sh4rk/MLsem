@@ -43,12 +43,13 @@ let sigs_of_def varm senv env (kind,str) =
       v, Some (sigs, Env.find_opt v env)
     end
 
-type derivation = { sig_index: int option ; env: Env.t ;
+type derivation = { sig_index: int option ; part: int option ; env: Env.t ;
                     expr: Mlsem_system.Ast.t ; annot: Mlsem_system.Annot.Annot.t ;
                     resolved: Signature.t }
 (** One checking pass of a definition: [sig_index] is the index of the [val]
     declaration it was checked against, if any, and [resolved] the type this
-    pass gave, as overloads: several when the body is overloaded. *)
+    pass gave, as overloads: several when the body is overloaded. [part]: see
+    the interface. *)
 
 (* Type checking and inference *)
 
@@ -88,7 +89,7 @@ let type_check_with_sigs env (var,e,sigs,aty) =
   List.iter (check_resolved ~allow_mono:false var env) tys ;
   let derivations = List.combine es results |> List.mapi
     (fun i (expr,(ty,_,_,annot)) ->
-      { sig_index=Some i ; env ; expr ; annot ; resolved=Signature.of_tyscheme ty }) in
+      { sig_index=Some i ; part=None ; env ; expr ; annot ; resolved=Signature.of_tyscheme ty }) in
   (* Each signature is inferred separately, but they all annotate the same [e]:
      a sub-expression is unreachable only if no signature reached it. *)
   let visited = Mlsem_system.Analyzer.Visited.union_many visited in
@@ -108,9 +109,9 @@ let type_check_recs pos env lst =
     let ty = GTy.map (Tuple.proj n i) ty |> TyScheme.mk tvs |> Signature.simplify_tyscheme in
     check_resolved ~allow_mono:true var env ty ;
     let resolved = Signature.of_tyscheme ty in
-    (* The definitions are checked together: the first one carries the derivation of the whole group. *)
-    let derivations = if i = 0 then [{ sig_index=None ; env ; expr ; annot ; resolved }] else [] in
-    (var, (ty, resolved, derivations))
+    (* The definitions are checked together: each one carries the derivation
+       of the whole group, of which it is the [i]th component. *)
+    (var, (ty, resolved, [{ sig_index=None ; part=Some i ; env ; expr ; annot ; resolved }]))
   ) lst, msg
 
 let poly_leq t1 t2 =
