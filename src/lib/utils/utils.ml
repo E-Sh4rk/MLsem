@@ -102,17 +102,6 @@ let merge_when_possible merge_opt lst =
     in
     aux lst
 
-let rec insert x lst =
-  match lst with
-  | [] -> [[x]]
-  | h::t ->
-    (x::lst) :: (List.map (fun el -> h::el) (insert x t))
-
-let rec perm lst =
-  match lst with
-  | [] -> [[]]
-  | h::t -> List.concat_map (insert h) (perm t)
-
 let cartesian_prod l1 l2 =
   l1 |> List.concat_map (fun e1 ->
     l2 |> List.map (fun e2 ->
