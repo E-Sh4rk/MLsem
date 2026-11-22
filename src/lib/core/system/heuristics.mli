@@ -34,7 +34,8 @@ val assimilate_vars : MVarSet.t -> GTy.t -> Subst.t
     that occurs in [ty] at exactly the same positions and with the same variance,
     if any. A position is a path in the sense of [Sstt.Dependencies.Position]: for
     instance, occurrences in [C('a) & C('b)] or [('a, any) & ('b, any)] are at the
-    same position.
+    same position. Occurrences reached through a recursive type are recorded too
+    (as a back edge to the repeated node).
     Variables occurring at the top level of a node (or of a record field) together
     with another variable of the same sort, as in ['a & int | 'b & bool], are
     combined by connectives rather than being at the same place: they are never

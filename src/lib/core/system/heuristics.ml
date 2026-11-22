@@ -50,15 +50,28 @@ let factorize_abstracts vs ty =
   ) Subst.identity
 
 module Position = Sstt.Dependencies.Position
+
+(* A step of a path: a position, or [Loop] for a back edge to a node already on the path. *)
+type step = Pos of Position.t | Loop
+let compare_step s1 s2 =
+  match s1, s2 with
+  | Pos p1, Pos p2 -> Position.compare p1 p2
+  | Pos _, Loop -> -1
+  | Loop, Pos _ -> 1
+  | Loop, Loop -> 0
+
 module PathSet = Set.Make(struct
-  type t = Position.t list
-  let compare = List.compare Position.compare
+  type t = step list
+  let compare = List.compare compare_step
 end)
 
 (* For each variable of [ty], the paths (sequences of positions, in the sense of
    [Sstt.Dependencies]) leading from the root of [ty] to its occurrences. The path of
    a row variable ends with the field it occurs in. A recursive type is explored until
-   a node repeats on the current path.
+   a node repeats on the current path: the variables of this node then get the path
+   leading to it, ended by [Loop], as they also occur below it through the cycle.
+   For instance, in [lst('a, [any*]) & [any* 'b]], ['a] and ['b] both occur at the head
+   of the list, but only ['b] also occurs below the tail, which [Loop] records.
    Also returns the variables that occur at the top level of a node (or of a field)
    together with another variable of the same sort. *)
 let positions ty =
@@ -67,7 +80,13 @@ let positions ty =
   let shared = ref MVarSet.empty in
   let add p = function None -> Some (PathSet.singleton p) | Some ps -> Some (PathSet.add p ps) in
   let rec aux visited path n =
-    if not (MVarSet.is_empty (Ty.all_vars n) || Dependencies.NodeSet.mem n visited) then begin
+    let avs = Ty.all_vars n in
+    if MVarSet.is_empty avs then ()
+    else if Dependencies.NodeSet.mem n visited then begin
+      let p = List.rev (Loop::path) in
+      MVarSet.elements1 avs |> List.iter (fun v -> tvs := VarMap.update v (add p) !tvs) ;
+      MVarSet.elements2 avs |> List.iter (fun v -> rvs := RowVarMap.update v (add p) !rvs)
+    end else begin
       let visited = Dependencies.NodeSet.add n visited in
       let p = List.rev path in
       let vs = Ty.vars_toplevel n in
@@ -76,7 +95,7 @@ let positions ty =
       let add_row_vars pos f =
         let vs = Row.all_fields f |> Row.row_vars_toplevel in
         if RowVarSet.cardinal vs > 1 then shared := MVarSet.union !shared (MVarSet.of_set2 vs) ;
-        vs |> RowVarSet.iter (fun v -> rvs := RowVarMap.update v (add (p@[pos])) !rvs) in
+        vs |> RowVarSet.iter (fun v -> rvs := RowVarMap.update v (add (p@[Pos pos])) !rvs) in
       let _ = Ty.def n |> VDescr.map (fun d ->
         let _ = Descr.get_records d |> Records.map (fun a ->
           Records.Atom.dom a |> LabelSet.elements |> List.iter (fun lbl ->
@@ -84,7 +103,7 @@ let positions ty =
           add_row_vars Position.Tail a.Records.Atom.tail ; a) in
         d) in
       Dependencies.of_ty n |> Dependencies.PosMap.iter (fun pos ns ->
-        Dependencies.NodeSet.iter (aux visited (pos::path)) ns)
+        Dependencies.NodeSet.iter (aux visited (Pos pos::path)) ns)
     end
   in
   aux Dependencies.NodeSet.empty [] ty ;

@@ -89,6 +89,23 @@ let test_cast1_ok x =
 let test_cast2_fail (x:any) =
   (match x with :int -> 42 | x -> true end :> int)
 
+(* List examples *)
+
+val last : [ any* 'a ] -> 'a
+let test_first_last t = (hd t, last t)
+let test_last_first t = (last t, hd t)
+let test_first_second t = (hd t, hd (tl t))
+let test_last t = last t
+
+val test_first_last_ann : [ 'a any* ] & [ any* 'b ] -> ('a, 'b)
+let test_first_last_ann t = (hd t, last t)
+
+val test_first_last_ann2 : [ 'a | 'a any* 'b ] -> ('a, 'a | 'b)
+let test_first_last_ann2 t = (hd t, last t)
+
+let test_instance = test_first_last ("a" :: 1 :: [])
+let test_instance_ann = test_first_last_ann ("a" :: 1 :: [])
+
 (* Type narrowing *)
 
 # type_narrowing = "partition"
