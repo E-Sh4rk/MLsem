@@ -393,7 +393,9 @@ let wildcard_solutions ctx envs display ty locs =
          Option.map
            (fun t ->
               let l = build_signature envs t |> fst |> Signature.to_gty |> GTy.ub in
-              let copies = rigid_of l |> List.map (fun v -> (v, TVar.mk KNoInfer (Some (TVar.name v)))) in
+              let copies =
+                rigid_of l |> List.map (fun v -> (v, TVar.mk KNoInfer (Some (TVar.name v))))
+              in
               let own = copies |> List.map (fun (v, c) -> (v, TVar.typ c)) |> Subst.of_list1 in
               let back = copies |> List.map (fun (v, c) -> (c, TVar.typ v)) |> Subst.of_list1 in
               ((t, Subst.apply own l), back) )
@@ -441,10 +443,7 @@ let wildcard_solutions ctx envs display ty locs =
                signature, made a rigid one of the pool;
              - those not in the lines do not change them: [empty]. *)
     let mono = TVOp.all_vars KNoInfer in
-    let clean =
-      TVOp.clean_subst' ~pos1:Ty.empty ~neg1:Ty.any ~pos2:Row.empty ~neg2:Row.any mono
-        [Subst.apply s d]
-    in
+    let clean = TVOp.clean_subst' ~dir:`Bot mono [Subst.apply s d] in
     let line = Subst.apply clean (Subst.apply s d) in
     let rigid = weak_of line |> List.mapi (fun i v -> (v, TVar.typ (pooled i))) |> Subst.of_list1 in
     let resolve t = Subst.apply rigid (Subst.apply clean (Subst.apply s t)) in
@@ -638,9 +637,7 @@ let call_instance overload args result =
     | [] -> None
     | s :: _ ->
         let inst = Subst.apply s o in
-        let clean =
-          TVOp.clean_subst' ~pos1:Ty.any ~neg1:Ty.empty ~pos2:Row.any ~neg2:Row.empty mono [inst]
-        in
+        let clean = TVOp.clean_subst' ~dir:`Top mono [inst] in
         let open_vars t =
           MVarSet.diff (TVOp.vars t) mono
           |> MVarSet.proj1 |> TVarSet.elements
@@ -809,8 +806,7 @@ let add ctx envs (b : Main.inferred) =
                   copy of [b.var]: its type there is the group's
                   monomorphic one, not [b]'s. *)
                if Some r <> binder_range b.var then begin
-                 note v r d.sig_index ty ;
-                 mark r ty
+                 note v r d.sig_index ty ; mark r ty
                end ;
                occ ctx ~binder:true v r )
             (binder_range v)
