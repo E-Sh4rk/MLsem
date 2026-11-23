@@ -56,6 +56,7 @@ let record_ab ({ a ; b }) = { a ; b }
 ## 42 <= int
 ## [ int* bool int* ] & [ bool* int* bool* ]
 ## { { a: T('_a) ;; `_c } = { a: T(bool) | T('b) ; b: int ;; `d } }
+## Ok() = Ok(any)
 
 (* ========= POLYMORPHISM ======== *)
 

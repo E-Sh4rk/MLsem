@@ -303,6 +303,8 @@ true
   '_a: bool | 'b ;
   `_c: { a : `_c ; b : int ;; `d }
 ]
+[Message] File "tests/5_misc.ml", line 59, characters 0-17 Computation result
+true
 test: ∀'a. ('a, any) -> ('a, 'a)
 and_js: ∀'a,'b. ('a & truthy -> 'b -> 'b) & ('a & falsy -> any -> 'a & falsy)
 not_js: (falsy -> 1) & (truthy -> 0)
@@ -340,21 +342,21 @@ test_alt: (Nil -> Nil) & (() -> ()) & (char -> char) & (string -> string) & (boo
 fall: (Nil -> Nil) & (() -> ()) & (char -> char) & (string -> string) & (bool -> bool) & (int -> int)
 test_noalt: (char -> char) & (bool -> bool) & (string -> string) & (Nil -> Nil) & (() -> ()) & (int -> int)
 typeof_app: Int -> 0
-[Warning] File "tests/5_misc.ml", line 281, characters 9-29 Unreachable code
+[Warning] File "tests/5_misc.ml", line 282, characters 9-29 Unreachable code
 typeof_app': Int -> 0
-[Warning] File "tests/5_misc.ml", line 301, characters 7-27 Unreachable code
-[Warning] File "tests/5_misc.ml", line 299, characters 43-48 Unreachable code
-[Warning] File "tests/5_misc.ml", line 296, characters 12-21 Unreachable code
-[Warning] File "tests/5_misc.ml", line 296, characters 24-33 Unreachable code
-[Warning] File "tests/5_misc.ml", line 296, characters 36-45 Unreachable code
-[Warning] File "tests/5_misc.ml", line 296, characters 48-57 Unreachable code
+[Warning] File "tests/5_misc.ml", line 302, characters 7-27 Unreachable code
+[Warning] File "tests/5_misc.ml", line 300, characters 43-48 Unreachable code
 [Warning] File "tests/5_misc.ml", line 297, characters 12-21 Unreachable code
 [Warning] File "tests/5_misc.ml", line 297, characters 24-33 Unreachable code
 [Warning] File "tests/5_misc.ml", line 297, characters 36-45 Unreachable code
+[Warning] File "tests/5_misc.ml", line 297, characters 48-57 Unreachable code
 [Warning] File "tests/5_misc.ml", line 298, characters 12-21 Unreachable code
-[Warning] File "tests/5_misc.ml", line 298, characters 24-34 Unreachable code
+[Warning] File "tests/5_misc.ml", line 298, characters 24-33 Unreachable code
+[Warning] File "tests/5_misc.ml", line 298, characters 36-45 Unreachable code
+[Warning] File "tests/5_misc.ml", line 299, characters 12-21 Unreachable code
+[Warning] File "tests/5_misc.ml", line 299, characters 24-34 Unreachable code
 alt_fail: untypeable encoding
-File "tests/5_misc.ml", line 303, characters 23-49
+File "tests/5_misc.ml", line 304, characters 23-49
 
 ===== Processing tests/6_draft_sigs.ml =====
 foo: int -> int
