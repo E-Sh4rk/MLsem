@@ -11,10 +11,11 @@ let initial ?(direct_narrowing=true) ?(partition_narrowing=true) refinements e =
   let new_renaming () =
     let s = ref Subst.identity in
     fun dom ->
-      let dom' = Subst.domain !s in
-      let dom = MVarSet.diff dom dom' in
-      let s' = TVOp.refresh ~kind:KInfer dom in
-      s := Subst.combine !s s' ; !s
+      let new_vars = MVarSet.diff dom (Subst.domain !s) in
+      s := Subst.combine !s (TVOp.refresh ~kind:KInfer new_vars) ;
+      (* [s] is shared by all the branches of the derivation, in which the
+         variables to rename may differ: only those of [dom] must be renamed *)
+      Subst.restrict dom !s
   in
   let new_result () = TVar.mk KInfer None |> TVar.typ in
   let new_param v oty =
