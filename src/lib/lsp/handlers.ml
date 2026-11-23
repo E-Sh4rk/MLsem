@@ -15,6 +15,12 @@
    Ambient global config may have been mutated by an intervening typecheck, so
    we [Config.restore_all ()] before rendering/merging. *)
 
+(* TODO: more operations for the toolkit.
+   - Merge arrows: [int → int ∧ dbl → dbl] becomes [num → num] (loses
+     precision) or [α ≤ num. α → α] (keeps it).
+   - Split an arrow whose result union hides a dependency on the input.
+   - Widen an arrow to cover inputs the traces never exercised. *)
+
 open Mlsem_app
 open Yojson.Safe.Util
 
@@ -64,13 +70,11 @@ let decode_instantiations params =
    webview also lets the user type any other type expression. *)
 let builtin_type_names = ["int"; "bool"; "string"; "float"; "char"; "list"; "any"; "empty"]
 
-(* Typecheck and cache the buffer so binding resolution below runs against
-   exactly the text the request's position/name refer to. The supervisor
-   fills in [text] from its copy of the document when the client omits it. *)
-let sync params uri =
-  match member "text" params with
-  | `String text -> Store.sync_text uri text
-  | _ -> ()
+(* The text the request's position or name refer to: bindings are resolved
+   against exactly it ([Store.binding_at], [Store.binding_by_name]). The
+   supervisor fills it in from its copy of the document when the client
+   omits it. *)
+let text_of params = params |> member "text" |> to_string
 
 let not_found =
   `Assoc
@@ -118,6 +122,35 @@ let merge_texts envs (sigs : Signature.t) (wanted : string list) =
    [only], when present, keeps just the overloads whose *original* rendered text
    is in it (the per-overload Insert action writes a single one).
    May raise on a malformed concrete type (caught by the handler). *)
+(* An overload's text with the wildcards an instantiation put in it ([_] in
+   the type given, printed ['_holeN] as the parser names it) written as
+   wildcards again: [_] where it occurs once; where it occurs more than once
+   (the variable did), a named wildcard (['_a]), so that its copies stay one
+   type. *)
+let written_wildcards text =
+  let wildcard = Str.regexp "'_hole[0-9]+" in
+  let rec occurrences i acc =
+    match Str.search_forward wildcard text i with
+    | j -> occurrences (j + 1) (Str.matched_string text :: acc)
+    | exception Not_found -> List.rev acc
+  in
+  let all = occurrences 0 [] in
+  let shared =
+    List.sort_uniq compare (List.filter (fun h -> List.length (List.filter (( = ) h) all) > 1) all)
+  in
+  (* Names for the shared ones, not used by the line. *)
+  let names =
+    List.init 26 (fun i -> "'_" ^ String.make 1 (Char.chr (Char.code 'a' + i)))
+    |> List.filter (fun n ->
+      not (Str.string_match (Str.regexp (".*" ^ Str.quote n ^ "\\b")) text 0) )
+  in
+  let named = List.mapi (fun i h -> (h, List.nth names i)) shared in
+  Str.global_substitute wildcard
+    (fun s ->
+       let h = Str.matched_string s in
+       Option.value ~default:"_" (List.assoc_opt h named) )
+    text
+
 let instantiate_texts ?only envs (sigs : Signature.t) insts =
   Config.restore_all () ;
   let rendered = Main.signature envs sigs in
@@ -136,7 +169,7 @@ let instantiate_texts ?only envs (sigs : Signature.t) insts =
                  List.fold_left
                    (fun s (var, tystr) ->
                       let ty =
-                        try Main.build_type envs tystr with
+                        try Typings.build_type envs tystr with
                         | _ -> raise (Bad_type tystr)
                       in
                       Signature.instantiate s var ty )
@@ -150,7 +183,48 @@ let instantiate_texts ?only envs (sigs : Signature.t) insts =
       | None -> pairs
       | Some texts -> List.filter (fun (r, _) -> List.mem r texts) pairs
     in
-    `Ok (Main.signature envs (List.map snd kept))
+    `Ok (List.map written_wildcards (Main.signature envs (List.map snd kept)))
+
+(* The instances of the [k]th overload of [b] that its calls in the document
+   fit, each with the calls (range and text), in order of first call. A call
+   to [b] is one whose callee is named like [b] and bound inside its
+   definition. From the typecheck, which must have been synced. *)
+let call_instances uri (b : Typecheck.binding) k =
+  let _, _, typings = Store.results uri in
+  let calls =
+    typings.calls
+    |> List.filter (fun (c : Typings.call) ->
+      match c.callee with
+      | Some (name, off) -> name = b.name && b.def_start <= off && off <= b.def_end
+      | None -> false )
+    |> List.sort (fun (c : Typings.call) c' -> compare c.c_start c'.c_start)
+  in
+  let groups =
+    List.fold_left
+      (fun groups (c : Typings.call) ->
+         match List.assoc_opt k c.instances with
+         | None -> groups
+         | Some inst when List.mem_assoc inst groups ->
+             List.map (fun (i, cs) -> if i = inst then (i, c :: cs) else (i, cs)) groups
+         | Some inst -> groups @ [(inst, [c])] )
+      [] calls
+  in
+  groups
+  |> List.map (fun (inst, cs) ->
+    `Assoc
+      [
+        ( "assignments",
+          `List (List.map (fun (v, ty) -> `Assoc [("var", `String v); ("type", `String ty)]) inst)
+        );
+        ( "calls",
+          `List
+            ( List.rev cs
+            |> List.filter_map (fun (c : Typings.call) ->
+              Store.span uri (c.c_start, c.c_end)
+              |> Option.map (fun (range, text) ->
+                `Assoc [("range", Lsp.Types.Range.yojson_of_t range); ("text", `String text)] ) ) )
+        );
+      ] )
 
 (* mlsem/overloads: the binding under the cursor and its overloads, each
    rendered to [val]-compatible surface syntax (text is the overload's
@@ -159,23 +233,70 @@ let overloads params : Yojson.Safe.t =
   try
     let uri = decode_uri params in
     let pos = decode_position params in
-    sync params uri ;
-    match (Store.find_binding_at uri pos, Store.envs_of uri) with
-    | Some b, Some envs ->
+    let text = text_of params in
+    match Store.binding_at uri text pos with
+    | Some (b, envs) ->
         Config.restore_all () ;
         let texts = Main.signature envs b.sigs in
         let strs ss = `List (List.map (fun s -> `String s) ss) in
         let overload_vars = b.sigs |> List.map (fun o -> strs (Signature.overload_vars o)) in
-        let concrete_types = builtin_type_names @ Main.user_type_names envs in
+        (* A declared type written with arguments (a type with parameters, a
+           tag) as a template, its arguments wildcards ([tree(_)], [Node(_)]),
+           for the panel to have them typed. *)
+        let concrete_types =
+          builtin_type_names
+          @ List.map
+              (fun n ->
+                 match Main.user_type_arity envs n with
+                 | Some k when k > 0 ->
+                     n ^ "(" ^ String.concat ", " (List.init k (fun _ -> "_")) ^ ")"
+                 | _ -> n )
+              (Main.user_type_names envs)
+        in
+        (* From the typecheck: with its extras. From the declarations: they
+           come with [mlsem/overloadExtras]. *)
+        let extras =
+          match b.checked with
+          | None -> []
+          | Some checked ->
+              [
+                ("checked", `Bool checked);
+                ( "callInstances",
+                  `List (List.mapi (fun k _ -> `List (call_instances uri b k)) b.sigs) );
+              ]
+        in
         `Assoc
-          [
-            ("found", `Bool true); ("name", `String b.name); ("declared", `Bool b.declared);
-            ("overloads", strs texts); ("overloadVars", `List overload_vars);
-            ("concreteTypes", strs concrete_types);
-          ]
+          ( [
+              ("found", `Bool true); ("name", `String b.name); ("declared", `Bool b.declared);
+              ("body", `Bool b.body); ("overloads", strs texts);
+              ("overloadVars", `List overload_vars); ("concreteTypes", strs concrete_types);
+            ]
+          @ extras )
     | _ -> not_found
   with
   | _ -> not_found
+
+(* mlsem/overloadExtras: what the overloads of the declared binding [name]
+   come with that needs the typecheck, typechecking [text] if it is not
+   cached: whether its definition typechecks ([null] without one), and per
+   overload the instances its calls use. Asked for after [mlsem/overloads],
+   so that the overloads do not wait for it. *)
+let overload_extras params : Yojson.Safe.t =
+  try
+    let uri = decode_uri params in
+    let name = decode_name params in
+    Store.sync_text uri (text_of params) ;
+    match Store.find_binding_by_name uri name with
+    | Some b ->
+        `Assoc
+          [
+            ("ok", `Bool true);
+            ("checked", Option.fold ~none:`Null ~some:(fun c -> `Bool c) b.checked);
+            ("callInstances", `List (List.mapi (fun k _ -> `List (call_instances uri b k)) b.sigs));
+          ]
+    | None -> `Assoc [("ok", `Bool true); ("checked", `Null); ("callInstances", `List [])]
+  with
+  | e -> error (Printexc.to_string e)
 
 (* mlsem/mergePreview: the merged type of the selected overloads as the
    one-line [val name : ...] the apply would write. *)
@@ -184,14 +305,59 @@ let merge_preview params : Yojson.Safe.t =
     let uri = decode_uri params in
     let name = decode_name params in
     let wanted = decode_overload_texts params in
-    sync params uri ;
-    match (Store.find_binding_by_name uri name, Store.envs_of uri) with
-    | Some b, Some envs -> (
+    match Store.binding_by_name uri (text_of params) name with
+    | Some (b, envs) -> (
         match merge_texts envs b.sigs wanted with
         | `Empty -> error "Select at least one overload."
         | `Stale -> stale
         | `Ok (merged, _) ->
             `Assoc [("ok", `Bool true); ("text", `String ("val " ^ name ^ " : " ^ merged))] )
+    | _ -> error "No binding found."
+  with
+  | e -> error (Printexc.to_string e)
+
+(* mlsem/generalizePreview: the selected overloads generalized into one
+   polymorphic type ([Generalize]), as the [val name : ...] line and as the
+   type alone, for [mlsem/checkSignature] to check: the result claims more
+   than the overloads, so it may not hold. [precision] compares it with the
+   overloads ([Generalize.compare_with_overloads]): "equivalent", "stronger"
+   or "weaker". *)
+let generalize_preview params : Yojson.Safe.t =
+  try
+    let uri = decode_uri params in
+    let name = decode_name params in
+    let wanted = decode_overload_texts params in
+    match Store.binding_by_name uri (text_of params) name with
+    | Some (b, envs) -> (
+        Config.restore_all () ;
+        let rendered = Main.signature envs b.sigs in
+        if not (List.for_all (fun w -> List.mem w rendered) wanted) then
+          stale
+        else
+          let pairs =
+            List.combine b.sigs rendered |> List.filter (fun (_, r) -> List.mem r wanted)
+          in
+          match pairs with
+          | [] -> error "Select at least one overload."
+          | _ -> (
+              let selected = List.map snd pairs in
+              let g = Generalize.generalize (List.map IO.parse_type_string selected) in
+              let overload, _ = Typings.build_signature envs g.ty in
+              let ty_of o = Signature.to_gty o |> Mlsem_types.GTy.ub in
+              let precision =
+                Generalize.compare_with_overloads ~copies:(List.length pairs)
+                  ~generalized:(ty_of overload)
+                  ~overloads:(ty_of (Signature.regroup (List.map fst pairs)))
+              in
+              match Main.signature envs [overload] with
+              | [ty] ->
+                  `Assoc
+                    [
+                      ("ok", `Bool true); ("text", `String ("val " ^ name ^ " : " ^ ty));
+                      ("type", `String ty);
+                      ("precision", `String (Generalize.precision_name precision));
+                    ]
+              | _ -> error "The generalized type did not print as one overload." ) )
     | _ -> error "No binding found."
   with
   | e -> error (Printexc.to_string e)
@@ -204,9 +370,9 @@ let apply_merge params : Yojson.Safe.t =
     let uri = decode_uri params in
     let name = decode_name params in
     let wanted = decode_overload_texts params in
-    sync params uri ;
-    match (Store.find_binding_by_name uri name, Store.envs_of uri) with
-    | Some b, Some envs -> (
+    let text = text_of params in
+    match Store.binding_by_name uri text name with
+    | Some (b, envs) -> (
         match merge_texts envs b.sigs wanted with
         | `Empty -> error "Select at least one overload."
         | `Stale -> stale
@@ -224,7 +390,7 @@ let apply_merge params : Yojson.Safe.t =
                   else
                     [merged]
             in
-            let edits = Store.signature_edit uri b ~name ~decls ~mode in
+            let edits = Store.signature_edit text b ~name ~decls ~mode in
             `Assoc
               [
                 ("ok", `Bool true); ("uri", Lsp.Types.DocumentUri.yojson_of_t uri);
@@ -251,9 +417,8 @@ let instantiate_preview params : Yojson.Safe.t =
     let uri = decode_uri params in
     let name = decode_name params in
     let insts = decode_instantiations params in
-    sync params uri ;
-    match (Store.find_binding_by_name uri name, Store.envs_of uri) with
-    | Some b, Some envs -> (
+    match Store.binding_by_name uri (text_of params) name with
+    | Some (b, envs) -> (
         match instantiate_texts envs b.sigs insts with
         | `Stale -> stale
         | `Ok overloads ->
@@ -276,13 +441,13 @@ let apply_instantiate params : Yojson.Safe.t =
     let name = decode_name params in
     let insts = decode_instantiations params in
     let only = decode_only params in
-    sync params uri ;
-    match (Store.find_binding_by_name uri name, Store.envs_of uri) with
-    | Some b, Some envs -> (
+    let text = text_of params in
+    match Store.binding_by_name uri text name with
+    | Some (b, envs) -> (
         match instantiate_texts ?only envs b.sigs insts with
         | `Stale -> stale
         | `Ok overloads ->
-            let edits = Store.signature_edit uri b ~name ~decls:overloads ~mode:(mode_of params) in
+            let edits = Store.signature_edit text b ~name ~decls:overloads ~mode:(mode_of params) in
             `Assoc
               [
                 ("ok", `Bool true); ("uri", Lsp.Types.DocumentUri.yojson_of_t uri);

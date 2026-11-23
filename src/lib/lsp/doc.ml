@@ -88,6 +88,8 @@ type entry = {
   mutable checked_digest: Digest.t;
   mutable lenses: Typecheck.lens list;
   mutable diagnostics: Lsp.Types.Diagnostic.t list;
+  (* Types of variables and calls, shifted through edits like lenses. *)
+  mutable typings: Typings.t;
   (* Edits since a typecheck was queued, newest first; [None] when no
      typecheck is pending. *)
   mutable pending: shift list option;
@@ -105,6 +107,7 @@ let open_ uri text =
       checked_digest = no_digest;
       lenses = [];
       diagnostics = [];
+      typings = Typings.empty;
       pending = None;
     }
 
@@ -128,6 +131,103 @@ let shift_lenses lenses shift =
           lenses
       in
       (lenses, !dropped)
+
+(* Shift typings through one edit; [true] if any range was dropped. *)
+let shift_typings (t : Typings.t) shift =
+  match shift with
+  | Replace_all -> (Typings.empty, t <> Typings.empty)
+  | Shift {s_off; e_off; delta} ->
+      let dropped = ref false in
+      let move (s, e) =
+        match shift_offsets ~s_off ~e_off ~delta (s, e) with
+        | Some r -> Some r
+        | None ->
+            dropped := true ;
+            None
+      in
+      let hovers =
+        List.filter_map
+          (fun (h : Typings.hover) ->
+             let body : Typings.hover_body =
+               match h.body with
+               | (Type _ | Wildcard _ | Wildcard_per_overload _) as b -> b
+               | Overloads o ->
+                   (* A [val] line the edit touched loses its colour. *)
+                   let row (r : Typings.overload_row) =
+                     {
+                       r with
+                       sig_range = Option.bind r.sig_range (shift_offsets ~s_off ~e_off ~delta);
+                     }
+                   in
+                   Overloads {o with rows = List.map row o.rows}
+             in
+             Option.map
+               (fun (h_start, h_end) -> {Typings.h_start; h_end; body})
+               (move (h.h_start, h.h_end)) )
+          t.hovers
+      in
+      let defns =
+        List.map
+          (fun (d : Typings.defn) ->
+             {
+               Typings.tvar_occs =
+                 List.filter_map
+                   (fun (o : Typings.tvar_occ) ->
+                      Option.map
+                        (fun (o_start, o_end) -> {o with o_start; o_end})
+                        (move (o.o_start, o.o_end)) )
+                   d.tvar_occs;
+               marks =
+                 List.filter_map
+                   (fun (m : Typings.mark) ->
+                      Option.map
+                        (fun (m_start, m_end) -> {m with m_start; m_end})
+                        (move (m.m_start, m.m_end)) )
+                   d.marks;
+             } )
+          t.defns
+      in
+      let calls =
+        List.filter_map
+          (fun (c : Typings.call) ->
+             match move (c.c_start, c.c_end) with
+             | None -> None
+             | Some (c_start, c_end) ->
+                 let args =
+                   List.filter_map
+                     (fun (s, e, ty) -> Option.map (fun (s, e) -> (s, e, ty)) (move (s, e)))
+                     c.args
+                 in
+                 Some {c with c_start; c_end; args} )
+          t.calls
+      in
+      let occs =
+        List.filter_map
+          (fun (o : Typings.occ) ->
+             Option.map
+               (fun (v_start, v_end) -> {o with v_start; v_end})
+               (move (o.v_start, o.v_end)) )
+          t.occs
+      in
+      (* A fix whose call or any of whose edits the edit touched is gone. *)
+      let fixes =
+        List.filter_map
+          (fun (f : Typings.fix) ->
+             match move (f.x_start, f.x_end) with
+             | None -> None
+             | Some (x_start, x_end) ->
+                 let edits =
+                   List.map
+                     (fun (s, e, text) -> Option.map (fun (s, e) -> (s, e, text)) (move (s, e)))
+                     f.edits
+                 in
+                 if List.mem None edits then
+                   None
+                 else
+                   Some {f with x_start; x_end; edits = List.filter_map Fun.id edits} )
+          t.fixes
+      in
+      ({hovers; defns; calls; occs; fixes}, !dropped)
 
 (* Apply one [TextDocumentContentChangeEvent]: update the buffer, shift the
    cached lenses through the edit, and log the edit for a pending typecheck.
@@ -157,8 +257,10 @@ let apply_change uri (event : Lsp.Types.TextDocumentContentChangeEvent.t) =
       in
       e.line_offsets <- compute_line_offsets e.text ;
       let lenses, dropped = shift_lenses e.lenses shift in
+      let typings, dropped' = shift_typings e.typings shift in
       e.lenses <- lenses ;
-      if dropped || shift = Replace_all then e.checked_digest <- no_digest ;
+      e.typings <- typings ;
+      if dropped || dropped' || shift = Replace_all then e.checked_digest <- no_digest ;
       e.pending <- Option.map (fun l -> shift :: l) e.pending
 
 (* A typecheck of the current text was queued: start logging edits. *)
@@ -169,20 +271,22 @@ let cancel_check uri = Option.iter (fun e -> e.pending <- None) (find uri)
 
 (* Store a typecheck result computed from [text], shifted through the edits
    made since it was queued. *)
-let set_result uri ~text ~(lenses : Typecheck.lens list) ~diagnostics =
+let set_result uri ~text ~(lenses : Typecheck.lens list) ~diagnostics ~typings =
   match find uri with
   | None -> ()
   | Some e ->
       let shifts = List.rev (Option.value e.pending ~default:[]) in
-      let lenses, dropped =
+      let lenses, typings, dropped =
         List.fold_left
-          (fun (lenses, dropped) s ->
+          (fun (lenses, typings, dropped) s ->
              let lenses, d = shift_lenses lenses s in
-             (lenses, dropped || d) )
-          (lenses, false) shifts
+             let typings, d' = shift_typings typings s in
+             (lenses, typings, dropped || d || d') )
+          (lenses, typings, false) shifts
       in
       let replaced = List.mem Replace_all shifts in
       e.lenses <- lenses ;
+      e.typings <- typings ;
       e.diagnostics <- diagnostics ;
       e.checked_digest <- (if dropped || replaced then no_digest else Digest.string text) ;
       e.pending <- None
@@ -193,6 +297,7 @@ let clear_results uri =
     (fun e ->
        e.lenses <- [] ;
        e.diagnostics <- [] ;
+       e.typings <- Typings.empty ;
        e.checked_digest <- no_digest ;
        e.pending <- None )
     (find uri)
@@ -226,7 +331,24 @@ let lenses_in_range uri (req_range : Lsp.Types.Range.t) :
       let lo, hi = (min req_s req_e, max req_s req_e) in
       List.filter_map
         (fun (l : Typecheck.lens) ->
-           if l.end_offset < lo || l.start_offset > hi then
+           (* A binder starts at its name: the [let] just before the name
+              counts too, not an [and] (in [let f = ... and g = ...], [let]
+              is [f]'s only, on one line or not). *)
+           let start =
+             let blank c = String.contains " \t\r\n" c in
+             let rec back i = if i > 0 && blank e.text.[i - 1] then back (i - 1) else i in
+             (* [k]: the end of the word before the name. *)
+             let k = back l.start_offset in
+             if
+               k < l.start_offset && k >= 3
+               && String.sub e.text (k - 3) 3 = "let"
+               && (k = 3 || blank e.text.[k - 4])
+             then
+               k - 3
+             else
+               l.start_offset
+           in
+           if l.end_offset < lo || start > hi then
              None
            else
              let range =
@@ -252,3 +374,105 @@ let code_lenses uri : Lsp.Types.CodeLens.t list =
            let command = Lsp.Types.Command.create ~command:"" ~title:l.title () in
            Lsp.Types.CodeLens.create ~range ~command () )
         e.lenses
+
+let lsp_range e (s, e_off) =
+  Lsp.Types.Range.create
+    ~start:(position_of_offset e.line_offsets s)
+    ~end_:(position_of_offset e.line_offsets e_off)
+
+(* [off] lies in [[s, e]]: the end is included so that a cursor right after
+   an identifier still finds it. *)
+let covers off (s, e) = s <= off && off <= e
+
+(* The hover of the tightest variable occurrence or binder at [pos]. *)
+let hover uri (pos : Lsp.Types.Position.t) : (Lsp.Types.Range.t * Typings.hover_body) option =
+  match find uri with
+  | None -> None
+  | Some e -> (
+      let off = offset_of_position e.line_offsets (String.length e.text) pos in
+      e.typings.hovers
+      |> List.filter (fun (h : Typings.hover) -> covers off (h.h_start, h.h_end))
+      |> List.sort (fun (a : Typings.hover) (b : Typings.hover) ->
+        compare (a.h_end - a.h_start) (b.h_end - b.h_start) )
+      |> function
+      | h :: _ -> Some (lsp_range e (h.h_start, h.h_end), h.body)
+      | [] -> None )
+
+(* The resolved wildcards of partial [val] lines overlapping [range], in
+   document order, as (range, wildcard as written, type). *)
+let wildcards uri (range : Lsp.Types.Range.t) : (Lsp.Types.Range.t * string * string) list =
+  match find uri with
+  | None -> []
+  | Some e ->
+      let text_len = String.length e.text in
+      let lo = offset_of_position e.line_offsets text_len range.start in
+      let hi = offset_of_position e.line_offsets text_len range.end_ in
+      let overlaps (s, e_off) = s <= hi && lo <= e_off in
+      e.typings.hovers
+      |> List.filter_map (fun (h : Typings.hover) ->
+        match h.body with
+        | Wildcard {wildcard; value} when overlaps (h.h_start, h.h_end) ->
+            Some (h.h_start, (lsp_range e (h.h_start, h.h_end), wildcard, value))
+        | _ -> None )
+      |> List.sort_uniq (fun (a, _) (b, _) -> compare a b)
+      |> List.map snd
+
+(* The fixes of the failing calls overlapping [range]: title and edits. *)
+let fixes uri (range : Lsp.Types.Range.t) : (string * (Lsp.Types.Range.t * string) list) list =
+  match find uri with
+  | None -> []
+  | Some e ->
+      let text_len = String.length e.text in
+      let lo = offset_of_position e.line_offsets text_len range.start in
+      let hi = offset_of_position e.line_offsets text_len range.end_ in
+      e.typings.fixes
+      |> List.filter (fun (f : Typings.fix) -> f.x_start <= hi && lo <= f.x_end)
+      |> List.map (fun (f : Typings.fix) ->
+        (f.title, List.map (fun (s, e', text) -> (lsp_range e (s, e'), text)) f.edits) )
+
+(* For the hover at [pos]: the parts of [val] lines its overload rows stand
+   for, with the row's index. *)
+let hover_overload_ranges uri pos : (int * Lsp.Types.Range.t) list =
+  match (find uri, hover uri pos) with
+  | Some e, Some (_, Overloads {rows; _}) ->
+      List.mapi (fun i (r : Typings.overload_row) -> (i, r.sig_range)) rows
+      |> List.filter_map (fun (i, r) -> Option.map (fun r -> (i, lsp_range e r)) r)
+  | _ -> []
+
+(* With the cursor on a type variable of a [val] line: that variable's
+   occurrences in the definition's [val] lines, and everything in its body
+   whose type mentions it. *)
+let highlights uri (pos : Lsp.Types.Position.t) :
+  (Lsp.Types.Range.t * [`Read | `Write | `Text]) list
+  =
+  match find uri with
+  | None -> []
+  | Some e -> (
+      let off = offset_of_position e.line_offsets (String.length e.text) pos in
+      let at_cursor (d : Typings.defn) =
+        List.find_opt (fun (o : Typings.tvar_occ) -> covers off (o.o_start, o.o_end)) d.tvar_occs
+        |> Option.map (fun (o : Typings.tvar_occ) -> (d, o.tvar))
+      in
+      let var_at_cursor =
+        List.find_opt (fun (o : Typings.occ) -> covers off (o.v_start, o.v_end)) e.typings.occs
+      in
+      match (List.find_map at_cursor e.typings.defns, var_at_cursor) with
+      | None, None -> []
+      | None, Some o ->
+          (* With the cursor on a variable: where it is bound and used. *)
+          e.typings.occs
+          |> List.filter (fun (o' : Typings.occ) -> o'.var = o.var)
+          |> List.map (fun (o : Typings.occ) ->
+            (lsp_range e (o.v_start, o.v_end), if o.binder then `Write else `Read) )
+      | Some (d, tvar), _ ->
+          let occs =
+            d.tvar_occs
+            |> List.filter (fun (o : Typings.tvar_occ) -> o.tvar = tvar)
+            |> List.map (fun (o : Typings.tvar_occ) -> (o.o_start, o.o_end))
+          in
+          let marks =
+            d.marks
+            |> List.filter (fun (m : Typings.mark) -> List.mem tvar m.tvars)
+            |> List.map (fun (m : Typings.mark) -> (m.m_start, m.m_end))
+          in
+          List.sort_uniq compare (occs @ marks) |> List.map (fun r -> (lsp_range e r, `Text)) )

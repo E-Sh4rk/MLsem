@@ -1,7 +1,8 @@
 (* The engine: a child process ([lsp.exe --engine]) that runs all mlsem work.
 
    The supervisor ([Server]) sends one [call] at a time over the engine's
-   stdin and reads one [reply] from its stdout, both with [Marshal]. Only plain
+   stdin and reads its [reply] from its stdout, both with [Marshal]; a toolkit
+   call may first send [Typechecking]. Only plain
    data crosses: texts, offsets, strings, LSP diagnostics, JSON as text. mlsem
    types stay here, because they carry ids from process-global counters that
    mean nothing in another process.
@@ -18,40 +19,69 @@ type call =
   | Tool of {
       method_: string;
       params: string;
+      known_failure: string option;
     }
   (** an [mlsem/*] toolkit request; [params] is JSON text including the
-          document [text]; answered with [Tool_result] *)
+          document [text], and [known_failure] the message of the document's
+          failed typecheck if the supervisor knows of one; answered with
+          [Tool_result] or [Tool_refused] *)
 
 type reply =
   | Checked of {
       lenses: Typecheck.lens list;
       diagnostics: Lsp.Types.Diagnostic.t list;
+      typings: Typings.t;
     }
+  | Typechecking
+  (** Not an answer: the toolkit call starts typechecking its document, so
+          a timeout or crash from now on is the document's. *)
   | Tool_result of string  (** JSON text *)
+  | Tool_refused of string
+  (** The call needed the typecheck of a document whose typecheck is
+          known to fail, with that failure's message. *)
 
 (* The toolkit requests the engine serves. *)
 let tool_handlers =
   [
-    ("mlsem/overloads", Handlers.overloads); ("mlsem/mergePreview", Handlers.merge_preview);
-    ("mlsem/applyMerge", Handlers.apply_merge);
+    ("mlsem/overloads", Handlers.overloads); ("mlsem/overloadExtras", Handlers.overload_extras);
+    ("mlsem/mergePreview", Handlers.merge_preview); ("mlsem/applyMerge", Handlers.apply_merge);
+    ("mlsem/generalizePreview", Handlers.generalize_preview);
     ("mlsem/instantiatePreview", Handlers.instantiate_preview);
     ("mlsem/applyInstantiate", Handlers.apply_instantiate);
+    ("mlsem/definitionAt", Signature_check.definition_at);
+    ("mlsem/wildcards", Partial_signatures.wildcards);
+    ("mlsem/definitionStatus", Signature_check.definition_status);
+    ("mlsem/checkSignature", Signature_check.check_signature);
+    ("mlsem/extractGroups", Extract_tool.groups); ("mlsem/extractApply", Extract_tool.apply);
+    ("mlsem/widen", Widen.parts); ("mlsem/simplify", Simplify.parts);
+    ("mlsem/narrow", Narrow.parts); ("mlsem/narrowCheck", Narrow.check_one);
+    ("mlsem/subtractDomains", Domain_subtraction.subtract);
   ]
 
 let is_tool method_ = List.mem_assoc method_ tool_handlers
 
-let handle = function
+(* Whether a tool needs the document's typecheck shows in what it does: it
+   goes through [Store.sync_text] or not. So the handlers run unchanged, and
+   [Store] refuses or reports the typecheck. *)
+let handle ~typechecking = function
   | Check {uri; text} ->
+      Store.known_failure := None ;
+      Store.on_typecheck := ignore ;
       Store.sync_text uri text ;
-      let lenses, diagnostics = Store.results uri in
-      Checked {lenses; diagnostics}
-  | Tool {method_; params} ->
+      let lenses, diagnostics, typings = Store.results uri in
+      Checked {lenses; diagnostics; typings}
+  | Tool {method_; params; known_failure} -> (
+      Store.known_failure := known_failure ;
+      Store.refused := None ;
+      Store.on_typecheck := typechecking ;
       let result =
         match List.assoc_opt method_ tool_handlers with
         | Some handler -> handler (Yojson.Safe.from_string params)
         | None -> `Null
       in
-      Tool_result (Yojson.Safe.to_string result)
+      match !Store.refused with
+      | Some message -> Tool_refused message
+      | None -> Tool_result (Yojson.Safe.to_string result) )
 
 (* Exit as soon as the supervisor that started us is gone, even mid-typecheck.
 
@@ -105,7 +135,9 @@ let run () =
     | exception End_of_file -> exit 0
     | call ->
         arm () ;
-        let reply = Fun.protect ~finally:disarm (fun () -> handle call) in
-        output_value out reply ; flush out ; loop ()
+        let send (reply : reply) = output_value out reply ; flush out in
+        let typechecking () = send Typechecking in
+        let reply = Fun.protect ~finally:disarm (fun () -> handle ~typechecking call) in
+        send reply ; loop ()
   in
   loop ()
