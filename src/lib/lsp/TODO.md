@@ -20,3 +20,14 @@
   (`` `TextDocumentContentChangePartial `` with a range,
   `` `TextDocumentContentChangeWholeDocument ``), which `Doc.apply_change`
   does not handle yet. Port and lift the cap.
+- Hovers of a recursive function inside its own body show the open type the
+  recursion was checked with, besides the overloads: in
+  `paper/running/1_top_down_find.mlsem` (MLsem-dummy-project), `find` in
+  `find l k` is `(Node(x1, int, 'a, x1) -> int -> Nil | 'a) & (Leaf -> any
+  -> Nil) | 'b & (x1 -> int -> Nil | 'a) where ...`. Hide the `'b & (...)`
+  part, or explain it in the hover.
+- Print declared types by name: the same hover writes the tree as
+  `x1 where x1 = Leaf | Node(x1, int, 'a, x1)` though the file declares
+  `type tree('a) = Leaf | Node(tree('a), int, 'a, tree('a))`. Hovers and
+  code lenses should fold it to `tree('a)` automatically, as the toolkit's
+  Simplify offers it ("declared type").
