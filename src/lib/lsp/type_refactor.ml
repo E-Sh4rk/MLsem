@@ -203,7 +203,7 @@ and pr_node (t : t) =
   | TEnum s ->
       lit s
   | TApp (s, ts) -> cat [lit (s ^ "("); join ", " (List.map (pr 2) ts); lit ")"]
-  | TTag (s, TBase TUnit) -> lit (s ^ "()")
+  | TTag (s, TBase TAny) -> lit (s ^ "()")
   | TTag (s, t) -> cat [lit (s ^ "("); pr 0 t; lit ")"]
   | TTuple ts -> join ", " (List.map (pr 2) ts)
   | TRecord (fs, tail) ->
@@ -328,7 +328,7 @@ let unnamable t =
   | TBase _
   | TCustom _
   | TEnum _
-  | TTag (_, TBase TUnit) ->
+  | TTag (_, TBase TAny) ->
       true
   | TApp (_, []) -> true
   | _ ->
