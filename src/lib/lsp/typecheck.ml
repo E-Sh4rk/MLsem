@@ -207,7 +207,7 @@ let app_fixes envs source val_types bindings (err : Mlsem_lang.Error.t) : Typing
             else
               List.map parse rendered
           in
-          let arg_expr = parse (Main.display_gty envs (GTy.mk arg)) in
+          let arg_expr = parse (Main.display_gty envs (GTy.simplify (GTy.mk arg))) in
           let wildcard = TVar (KInfer, "_hole") in
           (* [t] with its domain widened with [a] and its result a wildcard. *)
           let rec widen_domain a = function

@@ -55,7 +55,7 @@ let applied ?(narrower = false) envs build part_ty name k =
             let fill = if narrower then Ty.any else Ty.empty in
             Subst.apply (Subst.of_list1 (List.map (fun v -> (v, fill)) left)) t
           in
-          let print t = Main.display_gty envs (GTy.mk t) in
+          let print t = Main.display_gty envs (GTy.simplify (GTy.mk t)) in
           match
             List.map
               (fun n ->

@@ -737,10 +737,10 @@ let add ctx envs (b : Main.inferred) =
   let declared = declared b in
   let display =
     if declared then
-      Main.display_gty envs
+      fun ty -> Main.display_gty envs (GTy.simplify ty)
     else
       let names = lens_names b in
-      fun ty -> Main.display_gty ~names:(names ty) envs ty
+      fun ty -> Main.display_gty ~names:(names ty) envs (GTy.simplify ty)
   in
   let sig_texts = Main.signature envs b.sigs in
   (* The [val] lines, in the order of [b.sigs]. *)

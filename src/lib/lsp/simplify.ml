@@ -97,7 +97,8 @@ let merged_variables envs line line_ty =
           if poly_leq instance line_ty then
             Some
               ( Printf.sprintf "variables '%s and '%s merged" a b,
-                Main.display_gty envs (GTy.mk (merged |> Ty.simplify |> Ty.factorize)) )
+                Main.display_gty envs
+                  (GTy.simplify (GTy.mk (merged |> Ty.simplify |> Ty.factorize))) )
           else
             None )
 
@@ -154,7 +155,7 @@ let options envs line (p : Type_refactor.part) =
           let results =
             List.fold_left
               (fun acc (label, t) ->
-                 match parse (Main.display_gty envs (GTy.mk t)) with
+                 match parse (Main.display_gty envs (GTy.simplify (GTy.mk t))) with
                  | None -> acc
                  | Some e when same e original -> acc
                  | Some e when List.exists (fun (e', _) -> same e e') acc ->
