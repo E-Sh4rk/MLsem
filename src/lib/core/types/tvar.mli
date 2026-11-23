@@ -203,17 +203,22 @@ module TVOp : sig
     val pp_typ_subst : Subst.t -> Format.formatter -> Ty.t -> unit
     (** Prints the type after applying the given substitution. *)
 
-    (** [clean p n mono t] substitutes in [t]
-        all variables not in [mono] and only occurring positively by [p], and
-        all variables not in [mono] and only occurring negatively by [n] *)
-    val clean : pos1:Ty.t -> neg1:Ty.t -> pos2:Row.t -> neg2:Row.t -> MVarSet.t -> Ty.t -> Ty.t
-    val clean_subst : pos1:Ty.t -> neg1:Ty.t -> pos2:Row.t -> neg2:Row.t -> MVarSet.t -> Ty.t -> Subst.t
-    val clean' : pos1:Ty.t -> neg1:Ty.t -> pos2:Row.t -> neg2:Row.t -> MVarSet.t -> Ty.t list -> Ty.t list
-    val clean_subst' : pos1:Ty.t -> neg1:Ty.t -> pos2:Row.t -> neg2:Row.t -> MVarSet.t -> Ty.t list -> Subst.t
+    (** [clean ~dir mono t] substitutes in [t] each variable not in [mono] by
+        an extremum, when this yields a smaller ([dir = `Bot]) or larger
+        ([dir = `Top]) instance of [t]: [empty] is tried first and then [any]
+        for [`Bot], and the converse for [`Top]. This only requires the variable
+        to be monotone w.r.t. that extremum: e.g. ['a] is invariant in
+        [(ref('a), 'a)], yet replacing it by [empty] yields a smaller instance.
+        The primed variants use the same substitution for all the types, which
+        must yield a smaller (resp. larger) instance of each of them. *)
+    val clean : dir:[`Bot | `Top] -> MVarSet.t -> Ty.t -> Ty.t
+    val clean_subst : dir:[`Bot | `Top] -> MVarSet.t -> Ty.t -> Subst.t
+    val clean' : dir:[`Bot | `Top] -> MVarSet.t -> Ty.t list -> Ty.t list
+    val clean_subst' : dir:[`Bot | `Top] -> MVarSet.t -> Ty.t list -> Subst.t
 
     val bot_instance : MVarSet.t -> Ty.t -> Ty.t
-    (** The smallest instance of the type, obtained by {!clean}ing the variables
-        outside [mono] with [empty] positively and [any] negatively. *)
+    (** A smallest instance of the type, obtained by {!clean}ing the variables
+        outside [mono] with [~dir:`Bot]. *)
 
     val top_instance : MVarSet.t -> Ty.t -> Ty.t
     (** Dual of {!bot_instance}: the largest instance. *)

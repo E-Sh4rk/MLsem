@@ -230,7 +230,7 @@ ref_42_unresolved: the type inferred is not fully resolved
 File "tests/4_imperative.ml", line 24, characters 4-30
 type inferred: ref(42 | 'I2581)
 mutate_ref: ∀'a. 42 | 'a -> 42 | 'a
-inference_let: ∀'a,'b. () -> (ref('a & C('b)), 'b, 'b, 'b)
+inference_let: () -> empty
 is_ref: (ref -> true) & (~ref -> false)
 is_not_ref: (~ref -> true) & (ref -> false)
 test_dict: ∀'a,'b. false | "key" | 'b -> (dict(false | "key" | 'b, 0 | 42 | 'a), 0 | 42 | 'a)

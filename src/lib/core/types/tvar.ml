@@ -266,44 +266,46 @@ module TVOp = struct
   let pp_typ_subst s fmt t =
     Ty.pp' s fmt t
 
-  let clean_subst' ~pos1 ~neg1 ~pos2 ~neg2 mono ts =
-    let b1 = vars_with_polarity1' ts |>
-    List.filter_map (fun (v,p) ->
-        if MVarSet.mem1 v mono then None
-        else match p with
-        | `Pos -> Some (v, pos1)
-        | `Neg -> Some (v, neg1)
-        | `Both -> None
-    ) in
-    let b2 = vars_with_polarity2' ts |>
-    List.filter_map (fun (v,p) ->
-        if MVarSet.mem2 v mono then None
-        else match p with
-        | `Pos -> Some (v, pos2)
-        | `Neg -> Some (v, neg2)
-        | `Both -> None
-    ) in
-  Subst.of_list b1 b2
-  let clean_subst ~pos1 ~neg1 ~pos2 ~neg2 mono t =
-    clean_subst' ~pos1 ~neg1 ~pos2 ~neg2 mono [t]
+  (* Each variable not in [mono] is replaced by the first candidate that yields
+     a smaller (resp. larger) instance of every type of [ts]. *)
+  let clean_subst' ~dir mono ts =
+    let better t t' = match dir with
+      | `Bot -> Ty.leq t' t
+      | `Top -> Ty.leq t t'
+    in
+    let ok s = List.for_all (fun t -> better t (Subst.apply s t)) ts in
+    let c1, c2 = match dir with
+      | `Bot -> [Ty.empty ; Ty.any], [Row.empty ; Row.any]
+      | `Top -> [Ty.any ; Ty.empty], [Row.any ; Row.empty]
+    in
+    let pick singleton cands v =
+      List.find_opt (fun c -> ok (singleton v c)) cands
+      |> Option.map (fun c -> (v, c))
+    in
+    let vs = vars' ts in
+    let b1 = vs |> Sstt.MixVarSet.elements1 |> List.filter_map (fun v ->
+      if MVarSet.mem1 v mono then None else pick Subst.singleton1 c1 v) in
+    let b2 = vs |> Sstt.MixVarSet.elements2 |> List.filter_map (fun v ->
+      if MVarSet.mem2 v mono then None else pick Subst.singleton2 c2 v) in
+    Subst.of_list b1 b2
+  let clean_subst ~dir mono t = clean_subst' ~dir mono [t]
 
-  let clean' ~pos1 ~neg1 ~pos2 ~neg2 mono ts =
-    let s = clean_subst' ~pos1 ~neg1 ~pos2 ~neg2 mono ts in
+  let clean' ~dir mono ts =
+    let s = clean_subst' ~dir mono ts in
     List.map (Subst.apply s) ts
-  let clean ~pos1 ~neg1 ~pos2 ~neg2 mono t =
-    clean' ~pos1 ~neg1 ~pos2 ~neg2 mono [t] |> List.hd
+  let clean ~dir mono t = clean' ~dir mono [t] |> List.hd
 
   let bot_instance' mono tys =
     let fc = FieldCtx.of_tys_approx (MVarSet.proj2 mono) tys in
     List.map (FieldCtx.decorrelate fc) tys
-    |> clean' ~pos1:Ty.empty ~neg1:Ty.any ~pos2:Row.empty ~neg2:Row.any mono
+    |> clean' ~dir:`Bot mono
     |> List.map (FieldCtx.recombine fc)
   let bot_instance mono ty = bot_instance' mono [ty] |> List.hd
 
   let top_instance' mono tys =
     let fc = FieldCtx.of_tys_approx (MVarSet.proj2 mono) tys in
     List.map (FieldCtx.decorrelate fc) tys
-    |> clean' ~pos1:Ty.any ~neg1:Ty.empty ~pos2:Row.any ~neg2:Row.empty mono
+    |> clean' ~dir:`Top mono
     |> List.map (FieldCtx.recombine fc)
   let top_instance mono ty = top_instance' mono [ty] |> List.hd
 

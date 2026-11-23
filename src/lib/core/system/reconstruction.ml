@@ -189,8 +189,7 @@ let tally_simpl mono tvars res cs =
   (* Simplify result if it does not impact the domains *)
   |> List.map (fun (s,r) ->
     let mono = MVarSet.union mono (ntvars s) in
-    let clean = clean_subst
-      ~pos1:Ty.empty ~neg1:Ty.any ~pos2:Row.empty ~neg2:Row.any mono r in
+    let clean = clean_subst ~dir:`Bot mono r in
     (Subst.compose clean s, Subst.apply clean r)
   )
   |> Utils.filter_among_others not_redundant
