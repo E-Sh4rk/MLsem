@@ -199,7 +199,10 @@ val is_operation_generalizable : operation -> bool
 
 (** {2 Coercions} *)
 
-val coerce : ?coercion_id:Eid.t -> ?duplicate_arrows:bool -> check -> GTy.t -> t -> t
+exception CoercionFailure
+
+val coerce : ?coercion_id:Eid.t -> ?duplicate_arrows:bool  -> ?raise_on_failure:bool
+             -> check -> GTy.t -> t -> t
 (** [coerce c ty e] wraps [e] in a [TypeCoerce] to [ty], {e pushing} the coercion
     inwards as far as the shape of [e] allows: coercing a lambda to an arrow
     type coerces its body and annotates its parameter, coercing a constructor
@@ -209,8 +212,12 @@ val coerce : ?coercion_id:Eid.t -> ?duplicate_arrows:bool -> check -> GTy.t -> t
     given and under a refreshed id otherwise; sub-terms whose shape does not
     match the target type are simply left alone. If [duplicate_arrows] is set
     to true, [Lambda] expressions may be duplicated when necessary to allow
-    pushing coercions inside (for intersections of arrows). *)
+    pushing coercions inside (for intersections of arrows).
+    If [raise_on_failure] is set to [true], this function raises [CoercionFailure]
+    when a coercion cannot be pushed. *)
 
-val push_coercions : ?duplicate_arrows:bool -> t -> t
+val push_coercions : ?duplicate_arrows:bool -> ?raise_on_failure:bool -> t -> t
 (** Applies {!coerce} to every [TypeCoerce] and every annotated [LambdaRec]
-    already present in the term. *)
+    already present in the term.
+    If [raise_on_failure] is set to [true], this function raises [CoercionFailure]
+    when a coercion cannot be pushed. *)

@@ -264,7 +264,9 @@ let is_operation_generalizable o =
   | RecUpd _ | RecDel _ | Ignore _ -> true
   | OCustom c -> c.ogen
 
-let coerce ?coercion_id ?(duplicate_arrows=false) c ty t =
+exception CoercionFailure
+
+let coerce ?coercion_id ?(duplicate_arrows=false) ?(raise_on_failure=false) c ty t =
   let mono = TVOp.all_vars KNoInfer in
   let to_single_arrow ty =
     let codom t s = if Ty.is_empty s then Ty.any else Arrow.apply t s in
@@ -333,7 +335,7 @@ let coerce ?coercion_id ?(duplicate_arrows=false) c ty t =
           | None -> Lambda (Some d, v, aux' cd e)
           end
         end
-      | _ -> raise Exit
+      | _ -> if raise_on_failure then raise CoercionFailure else t
       with Exit -> t
     in
     let coercion_id = match coercion_id with None -> Eid.refresh vis | Some id -> id in
@@ -342,14 +344,16 @@ let coerce ?coercion_id ?(duplicate_arrows=false) c ty t =
   let vis = match coercion_id with Some id -> id | None -> fst t in
   aux ?coercion_id ~vis ty t
 
-let push_coercions ?(duplicate_arrows=false) t =
+let push_coercions ?(duplicate_arrows=false) ?(raise_on_failure=false) t =
   let f t =
     match t with
-    | id, TypeCoerce (t, ty, c) -> coerce ~coercion_id:id ~duplicate_arrows c ty t
+    | id, TypeCoerce (t, ty, c) ->
+      coerce ~coercion_id:id ~duplicate_arrows ~raise_on_failure c ty t
     | id, LambdaRec lst ->
       let lst = lst |> List.map (function
         | (None, v, t) -> None, v, t
-        | (Some ty, v, t) -> Some ty, v, coerce ~duplicate_arrows CheckStatic ty t
+        | (Some ty, v, t) ->
+          Some ty, v, coerce ~duplicate_arrows ~raise_on_failure CheckStatic ty t
         ) in
       id, LambdaRec lst
     | t -> t
