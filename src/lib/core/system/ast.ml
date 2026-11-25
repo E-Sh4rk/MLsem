@@ -335,8 +335,8 @@ let coerce ?coercion_id ?(duplicate_arrows=false) ?(raise_on_failure=false) c ty
           | None -> Lambda (Some d, v, aux' cd e)
           end
         end
-      | _ -> if raise_on_failure then raise CoercionFailure else t
-      with Exit -> t
+      | _ -> t
+      with Exit -> if raise_on_failure then raise CoercionFailure else t
     in
     let coercion_id = match coercion_id with None -> Eid.refresh vis | Some id -> id in
     coercion_id, TypeCoerce ((id,t), ty, c)
