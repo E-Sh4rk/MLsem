@@ -488,15 +488,19 @@ let wildcard_solutions ctx envs display ty locs =
           (List.mapi
              (fun i (t, l) ->
                 let final = final l in
-                List.filter_map
+                List.map
                   (fun (range, name) ->
-                     List.find_opt (fun v -> TVar.name v = name) weak
-                     |> Option.map (fun v ->
-                       let shown =
-                         if String.starts_with ~prefix:"_hole" name then "_" else "'" ^ name
-                       in
-                       let value = final (TVar.typ v) |> GTy.mk |> display |> paren_tuple in
-                       (range, shown, value, i) ) )
+                     let shown =
+                       if String.starts_with ~prefix:"_hole" name then "_" else "'" ^ name
+                     in
+                     (* A wildcard gone from the line's type (an argument of a
+                        type that does not use it) fits any type. *)
+                     let value =
+                       match List.find_opt (fun v -> TVar.name v = name) weak with
+                       | Some v -> final (TVar.typ v) |> GTy.mk |> display |> paren_tuple
+                       | None -> "any"
+                     in
+                     (range, shown, value, i) )
                   (tyexpr_wildcards t) )
              lines )
       in

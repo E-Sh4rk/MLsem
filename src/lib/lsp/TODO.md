@@ -4,8 +4,6 @@
   so a `_` is a single `TLoc (loc, TVar (KInfer, "_holeN"))`.
   `tyexpr_wildcards` and `tyexpr_tvars` in `typings.ml` should match that
   shape only, not also reach it through a second `TLoc` around it.
-- Wildcards in type arguments: `mlsem/wildcards` finds none in
-  `val f : int -> t(_)`.
 - The toolkit's printer (`type_refactor.ml`) is trusted only through a
   runtime check: a rewrite is offered when its printed text parses back to
   the same type, and silently dropped otherwise. Nothing shows the printer
