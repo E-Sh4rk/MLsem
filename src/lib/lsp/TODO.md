@@ -1,9 +1,5 @@
 # To do
 
-- Wildcard locations: the parser locates every part of a type (`as_typ`),
-  so a `_` is a single `TLoc (loc, TVar (KInfer, "_holeN"))`.
-  `tyexpr_wildcards` and `tyexpr_tvars` in `typings.ml` should match that
-  shape only, not also reach it through a second `TLoc` around it.
 - The toolkit's printer (`type_refactor.ml`) is trusted only through a
   runtime check: a rewrite is offered when its printed text parses back to
   the same type, and silently dropped otherwise. Nothing shows the printer
