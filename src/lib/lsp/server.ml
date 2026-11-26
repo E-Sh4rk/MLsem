@@ -804,7 +804,7 @@ let handle_request (req : Request.t) =
                are the previous ones shifted through edits, and a refresh
                follows the new result. *)
             let lenses = Doc.code_lenses params.textDocument.uri in
-            respond req.id (Lsp.Client_request.yojson_of_result typed_req lenses)
+            respond req.id (Lsp.Client_request.yojson_of_result typed_req (Some lenses))
         | Lsp.Client_request.TextDocumentHover params ->
             (* Like codeLens, answered from the copy. *)
             let hover =

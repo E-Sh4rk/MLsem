@@ -73,8 +73,8 @@
  (depends
   mlsem-app
   fmt
-  (lsp (and (>= 1.23) (< 1.24)))
-  (jsonrpc (and (>= 1.23) (< 1.24)))
+  (lsp (>= 1.28))
+  (jsonrpc (>= 1.28))
   yojson
   logs)
 )

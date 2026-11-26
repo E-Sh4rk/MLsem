@@ -241,18 +241,17 @@ let apply_change uri (event : Lsp.Types.TextDocumentContentChangeEvent.t) =
   | None -> ()
   | Some e ->
       let shift =
-        match event.range with
-        | None ->
-            e.text <- event.text ;
+        match event with
+        | `TextDocumentContentChangeWholeDocument {text} ->
+            e.text <- text ;
             Replace_all
-        | Some range ->
+        | `TextDocumentContentChangePartial {range; text; _} ->
             let text_len = String.length e.text in
             let s_off = offset_of_position e.line_offsets text_len range.start in
             let e_off = offset_of_position e.line_offsets text_len range.end_ in
             let s_off, e_off = (min s_off e_off, max s_off e_off) in
-            let delta = String.length event.text - (e_off - s_off) in
-            e.text <-
-              String.sub e.text 0 s_off ^ event.text ^ String.sub e.text e_off (text_len - e_off) ;
+            let delta = String.length text - (e_off - s_off) in
+            e.text <- String.sub e.text 0 s_off ^ text ^ String.sub e.text e_off (text_len - e_off) ;
             Shift {s_off; e_off; delta}
       in
       e.line_offsets <- compute_line_offsets e.text ;

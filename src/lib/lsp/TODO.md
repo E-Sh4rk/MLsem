@@ -15,11 +15,6 @@
   it (log it, tell the user the rewrite failed) instead of dropping the
   rewrite without a word. Also decide whether the rewrites should work on
   the syntax tree directly, with one printer at the end.
-- `lsp` and `jsonrpc` are capped below 1.24 (`dune-project`): later versions
-  make `TextDocumentContentChangeEvent` a variant
-  (`` `TextDocumentContentChangePartial `` with a range,
-  `` `TextDocumentContentChangeWholeDocument ``), which `Doc.apply_change`
-  does not handle yet. Port and lift the cap.
 - Hovers of a recursive function inside its own body show the open type the
   recursion was checked with, besides the overloads: in
   `paper/running/1_top_down_find.mlsem` (MLsem-dummy-project), `find` in
