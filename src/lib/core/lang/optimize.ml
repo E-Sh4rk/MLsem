@@ -420,13 +420,15 @@ let rec can_fail (_,e) =
    its body regardless of the type of its definition, so only the body matters:
    an empty definition only propagates through the reads of the variable, which
    are covered by the above. A [Seq] is a partitioned [Let] for the type system.
+   A [Loop] is typed as a [Voidify] (see [MAst.to_system_ast]): it is never
+   empty, even if its body is.
    [Value] is deemed non-empty by convention: a caller that wants to express
    divergence uses [Exc] rather than a value of type [empty]. *)
 let rec can_empty evs (_,e) =
   match e with
-  | Void | Voidify _ | Value _ -> false
+  | Void | Voidify _ | Loop _ | Value _ -> false
   | Var v -> MVariable.is_mutable v || VarSet.mem v evs
-  | Loop e | Declare (_, _, e) | Ignore e -> can_empty evs e
+  | Declare (_, _, e) | Ignore e -> can_empty evs e
   | Let (tys, v, _, e2) when List.is_empty tys || MVariable.is_mutable v ->
     can_empty evs e2
   | Let (_, _, e1, e2) | Seq (e1, e2) -> can_empty evs e1 || can_empty evs e2
