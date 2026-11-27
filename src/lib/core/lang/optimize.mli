@@ -13,20 +13,13 @@
     resolved — across a closure, a loop, or an unknown evaluation order — and
     are dropped altogether when nothing reads them.
 
-    {b Side condition.} The same AST drives the typing rules, so a rewriting
-    that is sound for evaluation is not automatically sound here: deleting a
-    node also deletes whatever the type system was checking at that node. This
-    is why [materialize_annot_obligations] runs first, and any new rewriting
-    must be checked against the same criterion.
-
     The optimization relies on the evaluation orders declared in {!Config}; a
     declared order that the source language does not actually have makes it
     unsound. *)
 
 val optimize_dataflow : MAst.t -> MAst.t
-(** The full pipeline: materialize the typing obligations carried by mutable
-    declarations, perform the SSA-like conversion, drop the assignments that are
-    never read, then {!clean}.
+(** The full pipeline: perform the SSA-like conversion,
+    drop the assignments that are never read, then {!clean}.
     @raise Failure if the term contains a hole. *)
 
 val clean : ?removable:Mlsem_common.VarSet.t -> MAst.t -> MAst.t
@@ -36,6 +29,4 @@ val clean : ?removable:Mlsem_common.VarSet.t -> MAst.t -> MAst.t
     to allow the user to insert probes or introduce type variables
     through let-bindings, except for those binding a
     variable of [removable] (default: empty), which is meant for
-    definitions introduced by a transformation rather than by the user.
-    Assumes the typing obligations of annotated mutable variables have
-    been materialized, as done by {!optimize_dataflow}. *)
+    definitions introduced by a transformation rather than by the user. *)
