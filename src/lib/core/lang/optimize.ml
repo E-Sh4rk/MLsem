@@ -58,6 +58,7 @@ let read_vars e =
 type env = { captured:VarSet.t ; immut:Variable.t VarMap.t ; mut:Variable.t list VarMap.t ; partitions:Ty.t list VarMap.t }
 
 let optimize_dataflow e =
+  let snapshots = ref VarSet.empty in
   let hole = Eid.dummy, Hole 0 in
   let fill e elt = fill_hole 0 elt e in
   let norm env =
@@ -105,6 +106,7 @@ let optimize_dataflow e =
   let get_preferred_mut env v = match get_muts env v with hd::_ -> hd | [] -> v in
   let add_immut_def (env, ctx) v e =
     let vimmut = MVariable.refresh MVariable.Immut v in
+    snapshots := VarSet.add vimmut !snapshots ;
     let env = add_immut env v vimmut in
     let tys = VarMap.find_opt v env.partitions |> Option.value ~default:[] in
     let ctx = fill ctx (Eid.unique (), Let (tys, vimmut, e, hole)) in
@@ -263,7 +265,8 @@ let optimize_dataflow e =
     merge_envs env env', fill ctx e
   in
   (* We consider the free variables captured because they may be mutated by external functions *)
-  aux' { captured=fv e ; immut=VarMap.empty ; mut=VarMap.empty ; partitions=VarMap.empty } e |> snd
+  let e = aux' { captured=fv e ; immut=VarMap.empty ; mut=VarMap.empty ; partitions=VarMap.empty } e |> snd in
+  e, !snapshots
 
 (* === Cleaning === *)
 
@@ -418,7 +421,7 @@ let rec can_empty evs (_,e) =
   | Let (_, _, e1, e2) | Seq (e1, e2) -> can_empty evs e1 || can_empty evs e2
   | Try es | Alt (_, es) -> List.exists (can_empty evs) es
   | _ -> true
-let clean e =
+let clean ?(removable=VarSet.empty) e =
   let evs = ref VarSet.empty in
   e |> iter (function
     | (_, Let ([], v, _, _)) -> evs := VarSet.add v !evs
@@ -431,9 +434,10 @@ let clean e =
     | Seq ((_, Ignore e1), e2) -> id, Seq (e1, e2)
     | Seq (e1, e2) when (can_fail e1 |> not) && (can_empty evs e1 |> not) -> e2
     | Declare (v, e) when VarSet.mem v (fv e) |> not -> e
-    (* Immutable definitions are kept: they may serve as probes or introduce
-       type variables. *)
-    | Let (_, v, e1, e2) when MVariable.is_mutable v
+    (* Immutable definitions are kept, unless [removable]: they may serve as
+       probes or introduce type variables. *)
+    | Let (_, v, e1, e2)
+      when (MVariable.is_mutable v || VarSet.mem v removable)
       && (VarSet.mem v (fv e2) |> not)
       && (can_fail e1 |> not) && (can_empty evs e1 |> not) -> e2
     | e -> id, e
@@ -469,5 +473,7 @@ let materialize_annot_obligations e =
 (* === Main === *)
 
 let optimize_dataflow e =
-  e |> materialize_annot_obligations
-    |> optimize_dataflow |> clean_unused_assigns |> clean
+  let e, snapshots = e |> materialize_annot_obligations |> optimize_dataflow in
+  (* Snapshots are not user definitions: those whose assignment turned out
+     to be dead may be removed. *)
+  e |> clean_unused_assigns |> clean ~removable:snapshots
