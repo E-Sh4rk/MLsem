@@ -83,7 +83,7 @@ let optimize_dataflow e =
     ) benv.immut nenv.immut in
     let mut = benv.mut in
     let captured = VarSet.union benv.captured nenv.captured in
-    (* A variable is bound by a single [Let], so the two maps cannot associate
+    (* A variable is bound by a single [Declare], so the two maps cannot associate
        different decompositions to a same variable: keeping either is correct. *)
     let partitions = VarMap.union (fun _ tys _ -> Some tys)
       benv.partitions nenv.partitions in
@@ -121,8 +121,8 @@ let optimize_dataflow e =
     else
       add_immut_def (env, ctx) v (Eid.unique (), Var (get_preferred_mut env v))
   in
-  (* The initialization is encoded as a [Declare] followed by a [VarAssign] rather than
-     a mutable [Let], so that [clean_unused_assigns] can remove it when dead. *)
+  (* As [MAst] has no mutable [Let], the initialization is a [VarAssign]: this
+     way, [clean_unused_assigns] can remove it when dead. *)
   let mut_declare eid tys v def =
     let assign = Eid.refresh eid, VarAssign (v, def) in
     let body = Eid.unique (), Seq (assign, hole) in
@@ -197,13 +197,6 @@ let optimize_dataflow e =
       let env = { env with partitions=VarMap.add v tys env.partitions } in
       let env, ctx, e = aux env e in
       env, (id, Declare (tys, v, ctx)), e
-    | Let (tys, v, e1, e2) when MVariable.is_mutable v ->
-      let env, ctx1, e1 = aux env e1 in
-      let env = { env with partitions=VarMap.add v tys env.partitions } in
-      let env,ctx1,v' = add_immut_def (env,ctx1) v e1 in
-      let ctx1 = fill ctx1 (mut_declare id tys v (Eid.unique (), Var v')) in
-      let env, ctx2, e2 = aux env e2 in
-      env, fill ctx1 ctx2, e2
     | Let (tys, v, e1, e2) ->
       let env, ctx1, e1 = aux env e1 in
       let env, ctx2, e2 = aux env e2 in
@@ -417,9 +410,9 @@ let rec can_fail (_,e) =
    its cells — and hence the whole expression — vanish when its definition is
    empty. A read of a mutable variable may always be empty: its content type is
    inferred from all the writes (or fixed by an annotation), regardless of the
-   partition of its [Let], which is dropped by [MAst.to_system_ast].
-   Conversely, a non-partitioned [Let] (which includes any mutable one) types
-   its body regardless of the type of its definition, so only the body matters:
+   partition of its [Declare], which is dropped by [MAst.to_system_ast].
+   Conversely, a non-partitioned [Let] types its body regardless of the type
+   of its definition, so only the body matters:
    an empty definition only propagates through the reads of the variable, which
    are covered by the above. A [Seq] is a partitioned [Let] for the type system.
    A [Loop] is typed as a [Voidify] (see [MAst.to_system_ast]): it is never
@@ -431,8 +424,7 @@ let rec can_empty evs (_,e) =
   | Void | Voidify _ | Loop _ | Value _ -> false
   | Var v -> MVariable.is_mutable v || VarSet.mem v evs
   | Declare (_, _, e) | Ignore e -> can_empty evs e
-  | Let (tys, v, _, e2) when List.is_empty tys || MVariable.is_mutable v ->
-    can_empty evs e2
+  | Let ([], _, _, e2) -> can_empty evs e2
   | Let (_, _, e1, e2) | Seq (e1, e2) -> can_empty evs e1 || can_empty evs e2
   | Try es | Alt (_, es) -> List.exists (can_empty evs) es
   | _ -> true
@@ -449,12 +441,11 @@ let clean ?(removable=VarSet.empty) e =
     | Seq ((_, Ignore e1), e2) -> id, Seq (e1, e2)
     | Seq (e1, e2) when (can_fail e1 |> not) && (can_empty evs e1 |> not) -> e2
     | Declare (_, v, e) when VarSet.mem v (fv e) |> not -> e
-    (* Immutable definitions are kept, unless [removable]: they may serve as
-       probes or introduce type variables. *)
-    | Let (tys, v, e1, e2)
-      when (MVariable.is_mutable v || VarSet.mem v removable)
+    (* Definitions are kept, unless [removable]: they may serve as probes or
+       introduce type variables. *)
+    | Let (tys, v, e1, e2) when VarSet.mem v removable
       && (VarSet.mem v (fv e2) |> not) && (can_fail e1 |> not)
-      && (List.is_empty tys || MVariable.is_mutable v || (can_empty evs e1 |> not))
+      && (List.is_empty tys || (can_empty evs e1 |> not))
       -> e2
     | e -> id, e
   in
@@ -480,7 +471,6 @@ let materialize_annot_obligations e =
   in
   let f (id,e) =
     match e with
-    | Let (tys, v, e1, e2) -> id, Let (tys, v, obligation v e1, e2)
     | VarAssign (v, e) -> id, VarAssign (v, obligation v e)
     | e -> id, e
   in

@@ -54,7 +54,10 @@ type e =
     The first parameter is a suggested type decomposition, similarly to
     let-bindings: it applies to the values later assigned to the variable. *)
 | Let of Ty.t list * Variable.t * t * t
-(** The first parameter is a suggested type decomposition *)
+(** The first parameter is a suggested type decomposition.
+    If the variable is mutable, it is equivalent to a [Declare] followed by
+    an assignment: in particular, the whole expression diverges if the
+    definition diverges, regardless of the decomposition. *)
 | TypeCast of t * GTy.t * SA.check
 | TypeCoerce of t * GTy.t * SA.check
 | VarAssign of Variable.t * t

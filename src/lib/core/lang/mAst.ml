@@ -147,13 +147,9 @@ let to_system_ast t =
       let def = Eid.unique (), MVariable.ref_uninit x in
       SA.Let ([], x, def, aux e)
     | Declare _ -> invalid_arg "Cannot declare an immutable variable."
-    | Let (tys, x, e1, e2) ->
-      let tys, def =
-        if MVariable.is_mutable x
-        then [], (Eid.refresh (fst e1), MVariable.ref_cons x (aux e1))
-        else tys, aux e1
-      in
-      SA.Let (tys, x, def, aux e2)
+    | Let (_, x, _, _) when MVariable.is_mutable x ->
+      invalid_arg "Let cannot bind a mutable variable."
+    | Let (tys, x, e1, e2) -> SA.Let (tys, x, aux e1, aux e2)
     | TypeCast (e, ty, c) -> SA.TypeCast (aux e, ty, c)
     | TypeCoerce (e, ty, c) -> SA.TypeCoerce (aux e, ty, c)
     | VarAssign (v, e) when MVariable.is_mutable v -> MVariable.ref_assign v (aux e)

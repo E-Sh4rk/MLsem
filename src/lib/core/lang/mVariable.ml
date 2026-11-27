@@ -86,12 +86,6 @@ let ref_uninit v =
   let op = { SA.oname="ref_uninit" ; ofun=Fun.const (ref_uninit v) ; ogen=false } in
   SA.Operation (OCustom op, arg)
 
-let ref_cons v = mk (aty v |> GTy.ub) (aref_codom v)
-let ref_cons v arg =
-  let arg = Eid.unique (), SA.GConstructor (SA.UpperBound, [arg]) in
-  let op = { SA.oname="ref" ; ofun=Fun.const (ref_cons v) ; ogen=false } in
-  SA.Operation (OCustom op, arg)
-
 let ref_get v = mk (aref_dom v) (aty v)
 let ref_get v =
   let arg = Eid.unique (), SA.Var v in

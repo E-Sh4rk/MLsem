@@ -32,9 +32,9 @@ val optimize_dataflow : MAst.t -> MAst.t
 val clean : ?removable:Mlsem_common.VarSet.t -> MAst.t -> MAst.t
 (** Removes effect-free sub-expressions whose result is discarded.
     Conservative: an expression is only dropped if it can neither fail
-    (raise a type error) nor diverge. Non-mutable let-definitions are
-    never dropped to allow the user to insert probes or introduce
-    type variables through let-bindings, except for those binding a
+    (raise a type error) nor diverge. Let-definitions are never dropped
+    to allow the user to insert probes or introduce type variables
+    through let-bindings, except for those binding a
     variable of [removable] (default: empty), which is meant for
     definitions introduced by a transformation rather than by the user.
     Assumes the typing obligations of annotated mutable variables have

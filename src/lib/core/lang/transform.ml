@@ -335,6 +335,11 @@ let eliminate_cf t =
     | Operation (o, e) -> MAst.Operation (o, aux e)
     | Projection (p, e) -> MAst.Projection (p, aux e)
     | Declare (tys, x, e) -> MAst.Declare (tys, x, aux e)
+    | Let (tys, x, e1, e2) when MVariable.is_mutable x ->
+      (* [MAst] has no mutable [Let]: the initialization is an assignment like
+         any other, so that it can be removed when dead (cf. test [mut_dead_init]) *)
+      let assign = Eid.refresh id, MAst.VarAssign (x, aux e1) in
+      MAst.Declare (tys, x, (Eid.unique (), MAst.Seq (assign, aux e2)))
     | Let (tys, x, e1, e2) -> MAst.Let (tys, x, aux e1, aux e2)
     | TypeCast (e, ty, c) -> MAst.TypeCast (aux e, ty, c)
     | TypeCoerce (e, ty, c) -> MAst.TypeCoerce (aux e, ty, c)

@@ -21,16 +21,12 @@ val add_to_env : Variable.t -> TyScheme.t -> Env.t -> Env.t
 val replace_in_env : Variable.t -> TyScheme.t -> Env.t -> Env.t
 (** @raise Invalid_argument as {!add_to_env}. *)
 
-(** The four operations a mutable variable is encoded with, on an abstract
+(** The three operations a mutable variable is encoded with, on an abstract
     reference type. Each raises [Invalid_argument] if the variable is not
     mutable. *)
 
 val ref_uninit : Variable.t -> SA.e
 (** Creation of an uninitialized cell.
-    @raise Invalid_argument if the variable is not mutable. *)
-
-val ref_cons : Variable.t -> SA.t -> SA.e
-(** Creation of a cell holding the given expression.
     @raise Invalid_argument if the variable is not mutable. *)
 
 val ref_get : Variable.t -> SA.e
