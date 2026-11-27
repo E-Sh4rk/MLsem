@@ -402,15 +402,18 @@ let rec can_fail (_,e) =
    Such a sub-expression must not be dropped either, as that would turn a
    diverging program into a returning one.
 
-   [evs] is the set of variables that may have type [empty]: exactly those bound
-   by a *non-partitioned* [Let], since a partitioned one makes all its cells —
-   and hence the whole expression — vanish when its definition is empty.
+   [evs] is the set of immutable variables that may have type [empty]: exactly
+   those bound by a *non-partitioned* [Let], since a partitioned one makes all
+   its cells — and hence the whole expression — vanish when its definition is
+   empty. A read of a mutable variable may always be empty: its content type is
+   inferred from all the writes (or fixed by an annotation), regardless of the
+   partition of its [Let], which is dropped by [MAst.to_system_ast].
    [Value] is deemed non-empty by convention: a caller that wants to express
    divergence uses [Exc] rather than a value of type [empty]. *)
 let rec can_empty evs (_,e) =
   match e with
   | Void | Voidify _ | Value _ -> false
-  | Var v -> VarSet.mem v evs
+  | Var v -> MVariable.is_mutable v || VarSet.mem v evs
   | Loop e | Declare (_, e) | Ignore e -> can_empty evs e
   | Let (_, _, e1, e2) | Seq (e1, e2) -> can_empty evs e1 || can_empty evs e2
   | Try es | Alt (_, es) -> List.exists (can_empty evs) es
@@ -428,6 +431,11 @@ let clean e =
     | Seq ((_, Ignore e1), e2) -> id, Seq (e1, e2)
     | Seq (e1, e2) when (can_fail e1 |> not) && (can_empty evs e1 |> not) -> e2
     | Declare (v, e) when VarSet.mem v (fv e) |> not -> e
+    (* Immutable definitions are kept: they may serve as probes or introduce
+       type variables. *)
+    | Let (_, v, e1, e2) when MVariable.is_mutable v
+      && (VarSet.mem v (fv e2) |> not)
+      && (can_fail e1 |> not) && (can_empty evs e1 |> not) -> e2
     | e -> id, e
   in
   map f e

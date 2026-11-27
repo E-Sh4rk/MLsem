@@ -30,6 +30,10 @@ val optimize_dataflow : MAst.t -> MAst.t
     @raise Failure if the term contains a hole. *)
 
 val clean : MAst.t -> MAst.t
-(** Removes definitions and effect-free sub-expressions whose result is
-    discarded. Conservative: an expression is only dropped if it can neither
-    fail (raise a type error) nor diverge. *)
+(** Removes effect-free sub-expressions whose result is discarded.
+    Conservative: an expression is only dropped if it can neither fail
+    (raise a type error) nor diverge. Non-mutable let-definitions are
+    never dropped to allow the user to insert probes or introduce
+    type variables through let-bindings.
+    Assumes the typing obligations of annotated mutable variables have
+    been materialized, as done by {!optimize_dataflow}. *)
