@@ -411,6 +411,10 @@ let rec can_fail (_,e) =
    empty. A read of a mutable variable may always be empty: its content type is
    inferred from all the writes (or fixed by an annotation), regardless of the
    partition of its [Let], which is dropped by [MAst.to_system_ast].
+   Conversely, a non-partitioned [Let] (which includes any mutable one) types
+   its body regardless of the type of its definition, so only the body matters:
+   an empty definition only propagates through the reads of the variable, which
+   are covered by the above. A [Seq] is a partitioned [Let] for the type system.
    [Value] is deemed non-empty by convention: a caller that wants to express
    divergence uses [Exc] rather than a value of type [empty]. *)
 let rec can_empty evs (_,e) =
@@ -418,6 +422,8 @@ let rec can_empty evs (_,e) =
   | Void | Voidify _ | Value _ -> false
   | Var v -> MVariable.is_mutable v || VarSet.mem v evs
   | Loop e | Declare (_, e) | Ignore e -> can_empty evs e
+  | Let (tys, v, _, e2) when List.is_empty tys || MVariable.is_mutable v ->
+    can_empty evs e2
   | Let (_, _, e1, e2) | Seq (e1, e2) -> can_empty evs e1 || can_empty evs e2
   | Try es | Alt (_, es) -> List.exists (can_empty evs) es
   | _ -> true
@@ -436,10 +442,11 @@ let clean ?(removable=VarSet.empty) e =
     | Declare (v, e) when VarSet.mem v (fv e) |> not -> e
     (* Immutable definitions are kept, unless [removable]: they may serve as
        probes or introduce type variables. *)
-    | Let (_, v, e1, e2)
+    | Let (tys, v, e1, e2)
       when (MVariable.is_mutable v || VarSet.mem v removable)
-      && (VarSet.mem v (fv e2) |> not)
-      && (can_fail e1 |> not) && (can_empty evs e1 |> not) -> e2
+      && (VarSet.mem v (fv e2) |> not) && (can_fail e1 |> not)
+      && (List.is_empty tys || MVariable.is_mutable v || (can_empty evs e1 |> not))
+      -> e2
     | e -> id, e
   in
   map f e
