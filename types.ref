@@ -249,7 +249,8 @@ mut_valid: int
 counter: 0
 incr: () -> ()
 test_global: any -> int
-mut_narrowing: Nil | int
+mut_narrowing1: Nil | int
+mut_narrowing2: ()
 mut_seq1: 42
 mut_seq2: Nil
 mut_and_return: any -> int | false
@@ -258,7 +259,7 @@ neg_and_pos_ann: Nil | int -> Nil | (int, int)
 order: Nil | (Nil | int, Nil | int) -> Nil | int | (int, int)
 loop_tricky_narrowing: int -> (any, int)
 loop_invalid: untypeable assignment
-File "tests/4_imperative.ml", line 180, characters 4-14
+File "tests/4_imperative.ml", line 191, characters 4-14
 variable: x
 expected: int
 given: false

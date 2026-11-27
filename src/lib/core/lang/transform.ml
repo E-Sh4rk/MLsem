@@ -226,7 +226,7 @@ let rec try_elim_ret ~keep_ret bid e =
          is always called at least once for non-ret expr *)
       (id, Voidify hole) |> cont' |> aux e
     | Ignore e -> (id, Ignore hole) |> cont' |> aux e
-    | Declare (v, e) -> (id, Declare (v, aux e cont))
+    | Declare (tys, v, e) -> (id, Declare (tys, v, aux e cont))
     | Let (tys, v, e1, e2) ->
       (id, Let (tys, v, hole, aux e2 cont)) |> aux e1
     | TypeCast (e, tau, c) ->
@@ -285,7 +285,7 @@ let elim_ret_args bid (id,e) =
     let v = Lazy.force v in
     let body = Eid.refresh id, VarAssign (v, e) in
     let body = Eid.refresh id, Seq ((Eid.unique (), Voidify body), (Eid.unique (), Var v)) in
-    Eid.refresh id, Declare (v, body)
+    Eid.refresh id, Declare ([], v, body)
   else e
 
 let clean_unreachable e =
@@ -334,7 +334,7 @@ let eliminate_cf t =
     | App (e1,e2) -> MAst.App (aux e1, aux e2)
     | Operation (o, e) -> MAst.Operation (o, aux e)
     | Projection (p, e) -> MAst.Projection (p, aux e)
-    | Declare (x, e) -> MAst.Declare (x, aux e)
+    | Declare (tys, x, e) -> MAst.Declare (tys, x, aux e)
     | Let (tys, x, e1, e2) -> MAst.Let (tys, x, aux e1, aux e2)
     | TypeCast (e, ty, c) -> MAst.TypeCast (aux e, ty, c)
     | TypeCoerce (e, ty, c) -> MAst.TypeCoerce (aux e, ty, c)

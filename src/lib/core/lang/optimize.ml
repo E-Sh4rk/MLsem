@@ -104,11 +104,14 @@ let optimize_dataflow e =
     { env with mut = VarMap.add v (v'::(get_muts env v)) env.mut }|> norm
   in
   let get_preferred_mut env v = match get_muts env v with hd::_ -> hd | [] -> v in
+  let get_partition env v =
+    VarMap.find_opt v env.partitions |> Option.value ~default:[]
+  in
   let add_immut_def (env, ctx) v e =
     let vimmut = MVariable.refresh MVariable.Immut v in
     snapshots := VarSet.add vimmut !snapshots ;
     let env = add_immut env v vimmut in
-    let tys = VarMap.find_opt v env.partitions |> Option.value ~default:[] in
+    let tys = get_partition env v in
     let ctx = fill ctx (Eid.unique (), Let (tys, vimmut, e, hole)) in
     (env,ctx,vimmut)
   in
@@ -118,17 +121,18 @@ let optimize_dataflow e =
     else
       add_immut_def (env, ctx) v (Eid.unique (), Var (get_preferred_mut env v))
   in
-  let mut_declare eid v def =
+  let mut_declare eid tys v def =
     let assign = Eid.refresh eid, VarAssign (v, def) in
     let body = Eid.unique (), Seq (assign, hole) in
-    Eid.unique (), Declare (v, body)
+    Eid.unique (), Declare (tys, v, body)
   in
   let add_mut_alias eid (env,ctx) v =
     if has_immut env v then
       let vdef = get_immut env v in
       let vmut = MVariable.refresh (MVariable.kind v) v in
       let env = add_mut env v vmut in
-      let ctx = fill ctx (mut_declare eid vmut (Eid.unique (), Var vdef)) in
+      let ctx = fill ctx
+        (mut_declare eid (get_partition env v) vmut (Eid.unique (), Var vdef)) in
       (env,ctx)
     else
       (env,ctx)
@@ -187,14 +191,15 @@ let optimize_dataflow e =
     | Projection (p, e) ->
       let env, ctx, e = aux env e in
       env, ctx, (id, Projection (p, e))
-    | Declare (v, e) ->
+    | Declare (tys, v, e) ->
+      let env = { env with partitions=VarMap.add v tys env.partitions } in
       let env, ctx, e = aux env e in
-      env, (id, Declare (v, ctx)), e
+      env, (id, Declare (tys, v, ctx)), e
     | Let (tys, v, e1, e2) when MVariable.is_mutable v ->
       let env, ctx1, e1 = aux env e1 in
       let env = { env with partitions=VarMap.add v tys env.partitions } in
       let env,ctx1,v' = add_immut_def (env,ctx1) v e1 in
-      let ctx1 = fill ctx1 (mut_declare id v (Eid.unique (), Var v')) in
+      let ctx1 = fill ctx1 (mut_declare id tys v (Eid.unique (), Var v')) in
       let env, ctx2, e2 = aux env e2 in
       env, fill ctx1 ctx2, e2
     | Let (tys, v, e1, e2) ->
@@ -315,7 +320,7 @@ let rec clean_unused_assigns e =
       (id, App (List.nth es 0, List.nth es 1)), rv
     | Operation (o, e) -> let e, rv = aux cv rv e in (id, Operation (o, e)), rv
     | Projection (p, e) -> let e, rv = aux cv rv e in (id, Projection (p, e)), rv
-    | Declare (v, e) -> let e, rv = aux cv rv e in (id, Declare (v, e)), rv
+    | Declare (tys, v, e) -> let e, rv = aux cv rv e in (id, Declare (tys, v, e)), rv
     | Let (tys, v, e1, e2) ->
       let e2, rv = aux cv rv e2 in
       let e1, rv = aux cv rv e1 in
@@ -395,7 +400,7 @@ let rec can_fail (_,e) =
   match e with
   | Exc | Void | Value _ | Var _ -> false
   | Voidify e | Ignore e | TypeCast (e, _, NoCheck) | TypeCoerce (e, _, NoCheck)
-  | Loop e | Declare (_, e)  -> can_fail e
+  | Loop e | Declare (_, _, e)  -> can_fail e
   | Let (_, _, e1, e2) | Seq (e1, e2) -> can_fail e1 || can_fail e2
   | Try es | Alt (_, es) -> List.exists can_fail es
   | Ite (e,_,e1,e2) -> can_fail e || can_fail e1 || can_fail e2
@@ -421,7 +426,7 @@ let rec can_empty evs (_,e) =
   match e with
   | Void | Voidify _ | Value _ -> false
   | Var v -> MVariable.is_mutable v || VarSet.mem v evs
-  | Loop e | Declare (_, e) | Ignore e -> can_empty evs e
+  | Loop e | Declare (_, _, e) | Ignore e -> can_empty evs e
   | Let (tys, v, _, e2) when List.is_empty tys || MVariable.is_mutable v ->
     can_empty evs e2
   | Let (_, _, e1, e2) | Seq (e1, e2) -> can_empty evs e1 || can_empty evs e2
@@ -439,7 +444,7 @@ let clean ?(removable=VarSet.empty) e =
     | Ignore e when (can_fail e |> not) && (can_empty evs e |> not) -> id, Void
     | Seq ((_, Ignore e1), e2) -> id, Seq (e1, e2)
     | Seq (e1, e2) when (can_fail e1 |> not) && (can_empty evs e1 |> not) -> e2
-    | Declare (v, e) when VarSet.mem v (fv e) |> not -> e
+    | Declare (_, v, e) when VarSet.mem v (fv e) |> not -> e
     (* Immutable definitions are kept, unless [removable]: they may serve as
        probes or introduce type variables. *)
     | Let (tys, v, e1, e2)

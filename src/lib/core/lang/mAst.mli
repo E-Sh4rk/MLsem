@@ -20,10 +20,12 @@ type e =
 | App of t * t
 | Operation of SA.operation * t
 | Projection of SA.projection * t
-| Declare of Variable.t * t
+| Declare of Ty.t list * Variable.t * t
 (** Declaration of an uninitialized mutable variable.
     The variable provided must be mutable (cf. {!MVariable.create}).
-    The type system will not check that the variable is assigned before use. *)
+    The type system will not check that the variable is assigned before use.
+    The first parameter is a suggested type decomposition, similarly to
+    let-bindings: it applies to the values later assigned to the variable. *)
 | Let of Ty.t list * Variable.t * t * t
 (** The first parameter is a suggested type decomposition *)
 | TypeCast of t * GTy.t * SA.check

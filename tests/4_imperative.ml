@@ -108,7 +108,7 @@ let test_global _ =
     incr () ;
     counter
 
-let mut_narrowing =
+let mut_narrowing1 =
   let mut y = 42 in
   while y is ~Nil do
     y := succ y ;
@@ -116,6 +116,17 @@ let mut_narrowing =
     if y > 100 do y := Nil end
   end ;
   y
+
+# type_narrowing = "partition"
+
+let mut_narrowing2 =
+  let mut x in
+  while <bool> do
+    x := <any> ;
+    if x is int do x := x+1 end
+  end
+
+# type_narrowing = true
 
 let mut_seq1 =
   let mut y = false in

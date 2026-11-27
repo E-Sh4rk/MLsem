@@ -35,7 +35,7 @@ type e =
 | App of t * t
 | Operation of SA.operation * t
 | Projection of SA.projection * t
-| Declare of Variable.t * t
+| Declare of Ty.t list * Variable.t * t
 | Let of Ty.t list * Variable.t * t * t
 | TypeCast of t * GTy.t * SA.check
 | TypeCoerce of t * GTy.t * SA.check
@@ -115,7 +115,7 @@ let map_tl f (id,e) =
     | App (e1, e2) -> App (f e1, f e2)
     | Operation (o, e) -> Operation (o, f e)
     | Projection (p, e) -> Projection (p, f e)
-    | Declare (v, e) -> Declare (v, f e)
+    | Declare (tys, v, e) -> Declare (tys, v, f e)
     | Let (tys, v, e1, e2) -> Let (tys, v, f e1, f e2)
     | TypeCast (e, ty, c) -> TypeCast (f e, ty, c)
     | TypeCoerce (e, ty, c) -> TypeCoerce (f e, ty, c)
@@ -161,7 +161,7 @@ let fill_hole n elt e =
 let bv e =
   let bv = ref VarSet.empty in
   let aux (_,e) = match e with
-  | Lambda (_, _, v, _) | Let (_, v, _, _) | Declare (v, _) -> bv := VarSet.add v !bv
+  | Lambda (_, _, v, _) | Let (_, v, _, _) | Declare (_, v, _) -> bv := VarSet.add v !bv
   | LambdaRec lst -> lst |> List.iter (fun (_, v, _) -> bv := VarSet.add v !bv)
   | PatMatch (_,pats) ->
     bv := List.fold_left (fun acc (pat,_) -> VarSet.union acc (bv_pat pat)) !bv pats
