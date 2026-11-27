@@ -144,6 +144,12 @@ let mut_seq2 =
   while <bool> do y := Nil end ;
   y
 
+let mut_dead_init =
+  let mut y = false in
+  if <bool> do y := 1 else y := 2 end ;
+  while <bool> do y := succ y end ;
+  y
+
 let mut_and_return (_) =
     if mx is 0 do
         mx := 69

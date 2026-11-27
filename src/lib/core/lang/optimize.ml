@@ -121,6 +121,8 @@ let optimize_dataflow e =
     else
       add_immut_def (env, ctx) v (Eid.unique (), Var (get_preferred_mut env v))
   in
+  (* The initialization is encoded as a [Declare] followed by a [VarAssign] rather than
+     a mutable [Let], so that [clean_unused_assigns] can remove it when dead. *)
   let mut_declare eid tys v def =
     let assign = Eid.refresh eid, VarAssign (v, def) in
     let body = Eid.unique (), Seq (assign, hole) in
