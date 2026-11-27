@@ -129,8 +129,9 @@ let to_system_ast t =
     | Var v -> if MVariable.is_mutable v then MVariable.ref_get v else SA.Var v
     | Constructor (c, es) -> SA.Constructor (c, List.map aux es)
     | GConstructor (c, es) -> SA.GConstructor (c, List.map aux es)
+    | Lambda (_, _, x, _) when MVariable.is_mutable x ->
+      invalid_arg "Variable of Lambda cannot be mutable."
     | Lambda (tys, ty, x, e) ->
-      if MVariable.is_mutable x then invalid_arg "Variable of Lambda cannot be mutable." ;
       let x' = MVariable.refresh Immut x in
       let body = Eid.refresh (fst e), Let (tys, x, (Eid.unique (), Var x'), e) in
       SA.Lambda (ty, x', aux body)

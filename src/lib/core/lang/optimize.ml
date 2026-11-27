@@ -139,9 +139,6 @@ let optimize_dataflow e =
     else
       (env,ctx)
   in
-  let reset_env env =
-    { captured=env.captured ; mut=VarMap.empty ; immut=VarMap.empty ; partitions=env.partitions }
-  in
   let rec aux env (id, e) =
     let env, ctx, e = match e with
     | Hole _ -> failwith "Unsupported hole."
@@ -162,7 +159,9 @@ let optimize_dataflow e =
       let env, ctx, es = aux_order (eval_order_of_gconstructor c) env es in
       env, ctx, (id, GConstructor (c, es))
     | Lambda (tys, ty, v, e) ->
-      let e = aux' (reset_env env) e |> snd in
+      let env' = { captured=env.captured ; partitions=env.partitions ;
+                   mut=VarMap.empty ; immut=VarMap.empty } in
+      let e = aux' env' e |> snd in
       let env = add_captured env (written_vars e) in
       env, hole, (id, Lambda (tys, ty, v, e))
     | LambdaRec lst ->
@@ -265,7 +264,9 @@ let optimize_dataflow e =
     merge_envs env env', fill ctx e
   in
   (* We consider the free variables captured because they may be mutated by external functions *)
-  let e = aux' { captured=fv e ; immut=VarMap.empty ; mut=VarMap.empty ; partitions=VarMap.empty } e |> snd in
+  let env = { captured=fv e ; partitions=VarMap.empty ;
+              immut=VarMap.empty ; mut=VarMap.empty } in
+  let e = aux' env e |> snd in
   e, !snapshots
 
 (* === Cleaning === *)
